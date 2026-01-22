@@ -3,14 +3,13 @@
 import os
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, UploadFile, Security, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, Security, status, Query
 from sqlalchemy.orm import Session
 
 import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.dependencies as users_dependencies
 import users.users.utils as users_utils
-import users.users.models as users_models
 
 import users.users_identity_providers.crud as user_idp_crud
 
@@ -46,6 +45,26 @@ async def read_users_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    show_inactive: Annotated[
+        bool | None,
+        Query(description="Filter by inactive status"),
+    ] = None,
+    show_email_unverified: Annotated[
+        bool | None,
+        Query(description="Filter by email verification status"),
+    ] = None,
+    show_pending_approval: Annotated[
+        bool | None,
+        Query(description="Filter by pending approval status"),
+    ] = None,
+    show_external_auth: Annotated[
+        bool | None,
+        Query(description="Filter by external authentication status"),
+    ] = None,
+    show_local_auth: Annotated[
+        bool | None,
+        Query(description="Filter by local authentication status"),
+    ] = None,
 ) -> users_schema.UsersListResponse:
     """
     Retrieve paginated list of all users.
@@ -56,12 +75,24 @@ async def read_users_all_pagination(
         _validate_pagination_values: Pagination validation.
         _check_scopes: Authorization check.
         db: Database session dependency.
+        show_inactive: Optional filter by inactive status.
+        show_email_unverified: Optional filter by email verification status.
+        show_pending_approval: Optional filter by pending approval status.
+        show_external_auth: Optional filter by external authentication status.
+        show_local_auth: Optional filter by local authentication status.
 
     Returns:
         Paginated list of users with total count.
     """
     total = users_crud.get_users_number(db)
-    users = users_crud.get_users_with_pagination(db, page_number, num_records)
+    users = users_crud.get_users_with_pagination(
+        db,
+        page_number,
+        num_records,
+        show_inactive,
+        show_email_unverified,
+        show_pending_approval,
+    )
 
     # Enrich with IDP count before serializing
     enriched_users = []
@@ -71,6 +102,13 @@ async def read_users_all_pagination(
         )
         user_read = users_schema.UsersRead.model_validate(user)
         user_read.external_auth_count = idp_count
+
+        # Apply external/local auth filters
+        if idp_count > 0 and show_external_auth is False:
+            continue
+        if idp_count == 0 and show_local_auth is False:
+            continue
+
         enriched_users.append(user_read)
 
     return users_schema.UsersListResponse(
