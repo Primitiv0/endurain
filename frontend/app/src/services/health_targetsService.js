@@ -7,9 +7,9 @@ import {
 
 export const health_targets = {
   getUserHealthTargets() {
-    return fetchGetRequest(`health_targets/`)
+    return fetchGetRequest(`health/targets/`)
   },
   setUserHealthTargets(data) {
-    return fetchPutRequest(`health_targets/`, data)
+    return fetchPutRequest(`health/targets/`, data)
   }
 }

@@ -43,6 +43,10 @@ class HealthTargets(Base):
         nullable=True,
         comment="Number of hours slept in seconds",
     )
+    fasting: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Target fasting duration in seconds",
+    )
 
     # Define a relationship to the Users model
     # TODO: Change to Mapped["User"] when all modules use mapped
