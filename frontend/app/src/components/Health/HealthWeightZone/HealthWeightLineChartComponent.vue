@@ -173,10 +173,6 @@ watch(
   { deep: true }
 )
 
-/**
- * Creates or recreates the chart instance.
- * Should be called when the canvas becomes available.
- */
 function createChart() {
   if (!chartCanvas.value) return
 

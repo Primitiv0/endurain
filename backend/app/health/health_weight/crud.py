@@ -40,13 +40,17 @@ def get_all_health_weight(
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_number(user_id: int, db: Session) -> int:
+def get_health_weight_number(
+    user_id: int, db: Session, interval: health_constants.Interval | None = None
+) -> int:
     """
-    Retrieve total count of health weight records for a user.
+    Retrieve total count of health weight records for a user. If interval is
+    provided, count only records starting from the calculated start date.
 
     Args:
         user_id: User ID to count records for.
         db: Database session.
+        interval: Optional filter by goal interval.
 
     Returns:
         Total number of health weight records.
@@ -60,6 +64,13 @@ def get_health_weight_number(user_id: int, db: Session) -> int:
         .select_from(health_weight_models.HealthWeight)
         .where(health_weight_models.HealthWeight.user_id == user_id)
     )
+
+    if interval is not None:
+        stmt = stmt.where(
+            health_weight_models.HealthWeight.date
+            >= health_utils.get_start_date_for_interval(interval.value)
+        )
+
     return db.execute(stmt).scalar_one()
 
 

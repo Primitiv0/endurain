@@ -1,7 +1,9 @@
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, Security, HTTPException, status
+from fastapi import APIRouter, Depends, Security, HTTPException, status, Query
 from sqlalchemy.orm import Session
+
+import health.constants as health_constants
 
 import health.health_steps.schema as health_steps_schema
 import health.health_steps.crud as health_steps_crud
@@ -13,54 +15,6 @@ import core.dependencies as core_dependencies
 
 # Define the API router
 router = APIRouter()
-
-
-@router.get(
-    "",
-    response_model=health_steps_schema.HealthStepsListResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def read_health_steps_all(
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:read"])
-    ],
-    token_user_id: Annotated[
-        int,
-        Depends(auth_security.get_sub_from_access_token),
-    ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
-) -> health_steps_schema.HealthStepsListResponse:
-    """
-    Retrieve all health steps records for the authenticated user.
-
-    This endpoint fetches all health steps entries associated with the authenticated user's ID.
-    It requires the 'health:read' scope for authorization.
-
-    Args:
-        _check_scopes (Callable): Security dependency that validates the required scopes.
-        token_user_id (int): The user ID extracted from the access token.
-        db (Session): Database session dependency for querying the database.
-
-    Returns:
-        HealthStepsListResponse: A response object containing:
-            - total (int): The total number of health steps records for the user.
-            - records (List): A list of all health steps records for the user.
-
-    Raises:
-        HTTPException: May raise authentication or authorization related exceptions
-            if the token is invalid or the user lacks required permissions.
-    """
-    # Get the total count and records from the database
-    total = health_steps_crud.get_health_steps_number(token_user_id, db)
-    records = health_steps_crud.get_all_health_steps_by_user_id(token_user_id, db)
-
-    # Pydantic will convert ORM models to HealthStepsRead via from_attributes=True
-    return health_steps_schema.HealthStepsListResponse(
-        total=total, records=records  # type: ignore[arg-type]
-    )
 
 
 @router.get(
@@ -85,37 +39,46 @@ async def read_health_steps_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    interval: Annotated[
+        health_constants.Interval | None,
+        Query(description="Filter by goal interval"),
+    ] = None,
 ) -> health_steps_schema.HealthStepsListResponse:
     """
     Retrieve paginated health steps records for the authenticated user.
 
-    This endpoint returns a paginated list of health steps data for the user identified
-    by the access token. It enforces proper authentication, authorization (health:read scope),
-    and pagination parameter validation.
+    This endpoint returns a paginated list of health steps data for the user
+    identified by the access token. It enforces proper authentication,
+    authorization (health:read scope), and pagination parameter validation.
 
     Args:
         page_number (int): The page number to retrieve (1-indexed).
         num_records (int): The number of records per page.
-        _check_scopes (Callable): Dependency that validates the user has 'health:read' scope.
-        _validate_pagination_values (Callable): Dependency that validates pagination parameters.
+        _check_scopes (Callable): Dependency that validates the user has
+            'health:read' scope.
+        _validate_pagination_values (Callable): Dependency that validates
+            pagination parameters.
         token_user_id (int): The user ID extracted from the access token.
         db (Session): Database session dependency.
+        interval (health_constants.Interval | None): Optional filter by goal
+            interval.
 
     Returns:
         HealthStepsListResponse: A response object containing:
-            - total (int): The total number of health steps records for the user.
+            - total (int): The total number of health steps records for the
+                user.
             - num_records (int): Number of records returned in this response.
             - page_number (int): Page number of the current response.
             - records (list): A list of paginated health steps records.
 
     Raises:
-        HTTPException: If authentication fails, authorization is denied, or pagination
-                       parameters are invalid.
+        HTTPException: If authentication fails, authorization is denied, or
+            pagination parameters are invalid.
     """
     # Get the total count and paginated records from the database
-    total = health_steps_crud.get_health_steps_number(token_user_id, db)
+    total = health_steps_crud.get_health_steps_number(token_user_id, db, interval)
     records = health_steps_crud.get_health_steps_with_pagination(
-        token_user_id, db, page_number, num_records
+        token_user_id, db, page_number, num_records, interval
     )
 
     # Pydantic will convert ORM models to HealthStepsRead via from_attributes=True

@@ -47,16 +47,8 @@
 
     <!-- Include the HealthStepsZone -->
     <HealthStepsZone
-      :userHealthSteps="userHealthSteps"
-      :userHealthStepsPagination="userHealthStepsPagination"
       :userHealthTargets="userHealthTargets"
-      :isLoading="isLoading"
-      :totalPages="totalPagesSteps"
-      :pageNumber="pageNumberSteps"
-      @createdSteps="updateStepsListAdded"
-      @deletedSteps="updateStepsListDeleted"
-      @editedSteps="updateStepsListEdited"
-      @pageNumberChanged="setPageNumberSteps"
+      :isLoadingParent="isLoading"
       @setStepsTarget="setStepsTarget"
       v-if="activeSection === 'steps' && !isLoading"
     />
@@ -87,7 +79,6 @@ import HealthWeightZone from '../components/Health/HealthWeightZone.vue'
 import BackButtonComponent from '@/components/GeneralComponents/BackButtonComponent.vue'
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 import { health_sleep } from '@/services/health_sleepService'
-import { health_steps } from '@/services/health_stepsService'
 import { health_targets } from '@/services/health_targetsService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 
@@ -108,23 +99,12 @@ const totalPagesSleep = ref(1)
 // RHR variables
 const pageNumberRHR = ref(1)
 const totalPagesRHR = ref(1)
-// Steps variables
-const isHealthStepsUpdatingLoading = ref(true)
-const userHealthStepsNumber = ref(0)
-const userHealthSteps = ref([])
-const userHealthStepsPagination = ref([])
-const pageNumberSteps = ref(1)
-const totalPagesSteps = ref(1)
 // Targets variables
 const userHealthTargets = ref(null)
 
 function updateActiveSection(section) {
   activeSection.value = section
   router.push({ query: { tab: section } })
-  if (pageNumberSteps.value !== 1) {
-    pageNumberSteps.value = 1
-    updateHealthStepsPagination()
-  }
 }
 
 // Sleep functions
@@ -202,76 +182,6 @@ function setPageNumberRHR(page) {
   pageNumberRHR.value = page
 }
 
-// Steps functions
-async function updateHealthStepsPagination() {
-  try {
-    isHealthStepsUpdatingLoading.value = true
-    const stepsDataPagination = await health_steps.getUserHealthStepsWithPagination(
-      pageNumberSteps.value,
-      numRecords
-    )
-    userHealthStepsPagination.value = stepsDataPagination.records
-    isHealthStepsUpdatingLoading.value = false
-  } catch (error) {
-    push.error(`${t('healthView.errorFetchingHealthSteps')} - ${error}`)
-  }
-}
-
-async function fetchHealthSteps() {
-  try {
-    const stepsData = await health_steps.getUserHealthSteps()
-    userHealthStepsNumber.value = stepsData.total
-    userHealthSteps.value = stepsData.records
-    await updateHealthStepsPagination()
-    totalPagesSteps.value = Math.ceil(userHealthStepsNumber.value / numRecords)
-  } catch (error) {
-    push.error(`${t('healthView.errorFetchingHealthSteps')} - ${error}`)
-  }
-}
-
-function updateStepsListAdded(createdStep) {
-  const updateOrAdd = (array, newEntry) => {
-    const index = array.findIndex((item) => item.id === newEntry.id)
-    if (index !== -1) {
-      array[index] = newEntry
-    } else {
-      array.unshift(newEntry)
-    }
-  }
-  if (userHealthStepsPagination.value) {
-    updateOrAdd(userHealthStepsPagination.value, createdStep)
-  } else {
-    userHealthStepsPagination.value = [createdStep]
-  }
-  if (userHealthSteps.value) {
-    updateOrAdd(userHealthSteps.value, createdStep)
-  } else {
-    userHealthSteps.value = [createdStep]
-  }
-  userHealthStepsNumber.value = userHealthSteps.value.length
-}
-
-function updateStepsListEdited(editedStep) {
-  const indexPagination = userHealthStepsPagination.value.findIndex(
-    (step) => step.id === editedStep.id
-  )
-  const index = userHealthSteps.value.findIndex((step) => step.id === editedStep.id)
-  userHealthStepsPagination.value[indexPagination] = editedStep
-  userHealthSteps.value[index] = editedStep
-}
-
-function updateStepsListDeleted(deletedStep) {
-  userHealthStepsPagination.value = userHealthStepsPagination.value.filter(
-    (step) => step.id !== deletedStep
-  )
-  userHealthSteps.value = userHealthSteps.value.filter((step) => step.id !== deletedStep)
-  userHealthStepsNumber.value--
-}
-
-function setPageNumberSteps(page) {
-  pageNumberSteps.value = page
-}
-
 // Health Targets functions
 async function fetchHealthTargets() {
   try {
@@ -328,17 +238,14 @@ function setSleepTarget(sleepTarget) {
 
 // Watch functions
 watch(pageNumberSleep, updateHealthSleepPagination, { immediate: false })
-watch(pageNumberSteps, updateHealthStepsPagination, { immediate: false })
 
 onMounted(async () => {
   if (route.query.tab && typeof route.query.tab === 'string') {
     activeSection.value = route.query.tab
   }
   await fetchHealthSleep()
-  await fetchHealthSteps()
   await fetchHealthTargets()
   isHealthSleepUpdatingLoading.value = false
-  isHealthStepsUpdatingLoading.value = false
   isLoading.value = false
 })
 </script>

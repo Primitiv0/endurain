@@ -73,7 +73,7 @@ async def read_health_weight_all_pagination(
         HTTPException: If pagination parameters are invalid.
     """
     # Get the total count and paginated records from the database
-    total = health_weight_crud.get_health_weight_number(token_user_id, db)
+    total = health_weight_crud.get_health_weight_number(token_user_id, db, interval)
     records = health_weight_crud.get_health_weight_with_pagination(
         token_user_id, db, page_number, num_records, interval
     )
