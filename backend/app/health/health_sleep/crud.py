@@ -3,6 +3,9 @@ from sqlalchemy import func, desc, select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+import health.constants as health_constants
+import health.utils as health_utils
+
 import health.health_sleep.schema as health_sleep_schema
 import health.health_sleep.models as health_sleep_models
 
@@ -10,13 +13,17 @@ import core.decorators as core_decorators
 
 
 @core_decorators.handle_db_errors
-def get_health_sleep_number(user_id: int, db: Session) -> int:
+def get_health_sleep_number(
+    user_id: int, db: Session, interval: health_constants.Interval | None = None
+) -> int:
     """
-    Retrieve total count of health sleep records for a user.
+    Retrieve total count of health sleep records for a user. If interval is
+    provided, count only records starting from the calculated start date.
 
     Args:
         user_id: User ID to count records for.
         db: Database session.
+        interval: Optional filter by goal interval.
 
     Returns:
         Total number of health sleep records.
@@ -30,33 +37,14 @@ def get_health_sleep_number(user_id: int, db: Session) -> int:
         .select_from(health_sleep_models.HealthSleep)
         .where(health_sleep_models.HealthSleep.user_id == user_id)
     )
+
+    if interval is not None:
+        stmt = stmt.where(
+            health_sleep_models.HealthSleep.date
+            >= health_utils.get_start_date_for_interval(interval.value)
+        )
+
     return db.execute(stmt).scalar_one()
-
-
-@core_decorators.handle_db_errors
-def get_all_health_sleep_by_user_id(
-    user_id: int, db: Session
-) -> list[health_sleep_models.HealthSleep]:
-    """
-    Retrieve all sleep health records for a user.
-
-    Args:
-        user_id: User ID to fetch records for.
-        db: Database session.
-
-    Returns:
-        List of HealthSleep models ordered by date descending.
-
-    Raises:
-        HTTPException: If database error occurs.
-    """
-    # Get the health_sleep from the database
-    stmt = (
-        select(health_sleep_models.HealthSleep)
-        .where(health_sleep_models.HealthSleep.user_id == user_id)
-        .order_by(desc(health_sleep_models.HealthSleep.date))
-    )
-    return db.execute(stmt).scalars().all()
 
 
 @core_decorators.handle_db_errors
@@ -91,15 +79,20 @@ def get_health_sleep_with_pagination(
     db: Session,
     page_number: int = 1,
     num_records: int = 5,
+    interval: health_constants.Interval | None = None,
 ) -> list[health_sleep_models.HealthSleep]:
     """
-    Retrieve paginated health sleep records for a user.
+    Retrieve paginated health sleep records for a user. If interval is
+    provided, filter records starting from the calculated start date. If no
+    interval is provided, default to the last 7 days.
 
     Args:
         user_id: User ID to fetch records for.
         db: Database session.
         page_number: Page number to retrieve (1-indexed).
         num_records: Number of records per page.
+        interval: Optional filter by goal interval. If not provided, defaults
+            to "last_7_days".
 
     Returns:
         List of HealthSleep models for the requested page.
@@ -115,6 +108,18 @@ def get_health_sleep_with_pagination(
         .offset((page_number - 1) * num_records)
         .limit(num_records)
     )
+
+    if interval is not None:
+        stmt = stmt.where(
+            health_sleep_models.HealthSleep.date
+            >= health_utils.get_start_date_for_interval(interval.value)
+        )
+    else:
+        stmt = stmt.where(
+            health_sleep_models.HealthSleep.date
+            >= health_utils.get_start_date_for_interval("last_7_days")
+        )
+
     return db.execute(stmt).scalars().all()
 
 

@@ -14,9 +14,6 @@ class TestReadHealthSleepAll:
     """
 
     @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_number")
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_all_health_sleep_by_user_id"
-    )
     def test_read_health_sleep_all_success(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -83,9 +80,6 @@ class TestReadHealthSleepAll:
         assert len(data["records"]) == 1
 
     @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_number")
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_all_health_sleep_by_user_id"
-    )
     def test_read_health_sleep_all_empty(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
     ):

@@ -1,7 +1,9 @@
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, Security, status
+from fastapi import APIRouter, Depends, Security, status, Query
 from sqlalchemy.orm import Session
+
+import health.constants as health_constants
 
 import health.health_sleep.schema as health_sleep_schema
 import health.health_sleep.crud as health_sleep_crud
@@ -14,53 +16,6 @@ import core.dependencies as core_dependencies
 
 # Define the API router
 router = APIRouter()
-
-
-@router.get(
-    "",
-    response_model=health_sleep_schema.HealthSleepListResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def read_health_sleep_all(
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:read"])
-    ],
-    token_user_id: Annotated[
-        int,
-        Depends(auth_security.get_sub_from_access_token),
-    ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
-) -> health_sleep_schema.HealthSleepListResponse:
-    """
-    Retrieve all health sleep records for the authenticated user.
-
-    This endpoint fetches all sleep tracking records associated with the authenticated
-    user's ID from the database.
-
-    Args:
-        _check_scopes: Security dependency that validates the user has 'health:read' scope.
-        token_user_id: The user ID extracted from the JWT access token.
-        db: Database session dependency for executing queries.
-
-    Returns:
-        HealthSleepListResponse: A response object containing:
-            - total (int): The total count of sleep records for the user.
-            - records (list): A list of all sleep record objects for the user.
-
-    Raises:
-        HTTPException: If authentication fails or user lacks required scopes.
-    """
-    # Get the total count and records from the database
-    total = health_sleep_crud.get_health_sleep_number(token_user_id, db)
-    records = health_sleep_crud.get_all_health_sleep_by_user_id(token_user_id, db)
-
-    # Pydantic will convert ORM models to HealthSleepRead via from_attributes=True
-    return health_sleep_schema.HealthSleepListResponse(
-        total=total, records=records  # type: ignore[arg-type]
-    )
 
 
 @router.get(
@@ -85,6 +40,10 @@ async def read_health_sleep_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    interval: Annotated[
+        health_constants.Interval | None,
+        Query(description="Filter by goal interval"),
+    ] = None,
 ) -> health_sleep_schema.HealthSleepListResponse:
     """
     Retrieve all health sleep records for a user with pagination.
@@ -112,9 +71,9 @@ async def read_health_sleep_all_pagination(
         HTTPException: If pagination values are invalid.
     """
     # Get the total count and records from the database
-    total = health_sleep_crud.get_health_sleep_number(token_user_id, db)
+    total = health_sleep_crud.get_health_sleep_number(token_user_id, db, interval)
     records = health_sleep_crud.get_health_sleep_with_pagination(
-        token_user_id, db, page_number, num_records
+        token_user_id, db, page_number, num_records, interval
     )
 
     # Pydantic will convert ORM models to HealthSleepRead via from_attributes=True

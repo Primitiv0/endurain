@@ -162,20 +162,12 @@ import { formatDuration } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey } from '@/utils/healthUtils'
 
 const props = defineProps({
-  userHealthWeight: {
-    type: [Object, null],
-    required: true
-  },
-  userHealthSteps: {
-    type: [Object, null],
-    required: true
-  },
-  userHealthSleep: {
-    type: [Object, null],
-    required: true
-  },
   userHealthTargets: {
     type: [Object, null],
+    required: true
+  },
+  isLoadingParent: {
+    type: Boolean,
     required: true
   }
 })

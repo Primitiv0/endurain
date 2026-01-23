@@ -5,8 +5,6 @@
   "filter_last_90_days": "Last 90 days",
   "filter_last_year": "Last year",
   "filter_all_time": "All time",
-  "errorFetchingHealthSteps": "Error fetching health steps",
-  "errorFetchingHealthSleep": "Error fetching health sleep",
   "errorFetchingHealthTargets": "Error fetching health targets",
   "successUpdatingWeightTarget": "Successfully updated weight target",
   "errorUpdatingWeightTarget": "Error updating weight target",

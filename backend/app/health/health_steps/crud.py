@@ -48,32 +48,6 @@ def get_health_steps_number(
 
 
 @core_decorators.handle_db_errors
-def get_all_health_steps_by_user_id(
-    user_id: int, db: Session
-) -> list[health_steps_models.HealthSteps]:
-    """
-    Retrieve all health steps records for a user.
-
-    Args:
-        user_id: User ID to fetch records for.
-        db: Database session.
-
-    Returns:
-        List of HealthSteps models ordered by date descending.
-
-    Raises:
-        HTTPException: If database error occurs.
-    """
-    # Get the health_steps from the database
-    stmt = (
-        select(health_steps_models.HealthSteps)
-        .where(health_steps_models.HealthSteps.user_id == user_id)
-        .order_by(desc(health_steps_models.HealthSteps.date))
-    )
-    return db.execute(stmt).scalars().all()
-
-
-@core_decorators.handle_db_errors
 def get_health_steps_by_id_and_user_id(
     health_steps_id: int, user_id: int, db: Session
 ) -> health_steps_models.HealthSteps | None:

@@ -136,7 +136,6 @@ const serverSettingsStore = useServerSettingsStore()
 const isLoadingNewSteps = ref(false)
 const isLoading = ref(false)
 const userHealthStepsNumber = ref(0)
-const userHealthStepsPaginationNumber = ref(0)
 const userHealthStepsPagination = ref([])
 const pageNumber = ref(1)
 const totalPages = ref(1)
@@ -153,7 +152,6 @@ async function updateHealthStepsPagination() {
     )
     userHealthStepsPagination.value = stepsDataPagination.records
     userHealthStepsNumber.value = stepsDataPagination.total
-    userHealthStepsPaginationNumber.value = userHealthStepsPagination.value.length
     totalPages.value = Math.ceil(userHealthStepsNumber.value / numRecords)
   } catch (error) {
     push.error(`${t('healthStepsZoneComponent.errorFetchingHealthSteps')} - ${error}`)
@@ -173,7 +171,6 @@ function updateStepsListAdded(createdStep) {
       array[index] = newEntry
     } else {
       array.unshift(newEntry)
-      userHealthStepsPaginationNumber.value++
       userHealthStepsNumber.value++
     }
   }
@@ -195,7 +192,6 @@ function updateStepsListDeleted(deletedStep) {
   userHealthStepsPagination.value = userHealthStepsPagination.value.filter(
     (step) => step.id !== deletedStep
   )
-  userHealthStepsPaginationNumber.value--
   userHealthStepsNumber.value--
 }
 

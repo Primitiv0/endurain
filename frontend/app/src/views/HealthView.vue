@@ -9,41 +9,20 @@
 
     <LoadingComponent v-if="isLoading" />
 
-    <!-- Include the HealthDashboardZone -->
-    <HealthDashboardZone
-      :userHealthWeight="userHealthWeight"
-      :userHealthSteps="userHealthSteps"
-      :userHealthSleep="userHealthSleep"
-      :userHealthTargets="userHealthTargets"
-      v-if="activeSection === 'dashboard' && !isLoading"
-    />
+    <!-- Include the HealthDashboardZone
+    <HealthDashboardZone :userHealthTargets="userHealthTargets" :isLoadingParent="isLoading"
+      v-if="activeSection === 'dashboard' && !isLoading" /> -->
 
     <!-- Include the HealthSleepZone -->
     <HealthSleepZone
-      :userHealthSleep="userHealthSleep"
-      :userHealthSleepPagination="userHealthSleepPagination"
       :userHealthTargets="userHealthTargets"
-      :isLoading="isLoading"
-      :totalPages="totalPagesSleep"
-      :pageNumber="pageNumberSleep"
-      @createdSleep="updateSleepListAdded"
-      @editedSleep="updateSleepListEdited"
-      @deletedSleep="updateSleepListDeleted"
-      @pageNumberChanged="setPageNumberSleep"
+      :isLoadingParent="isLoading"
       @setSleepTarget="setSleepTarget"
       v-if="activeSection === 'sleep' && !isLoading"
     />
 
     <!-- Include the HealthRHRZone -->
-    <HealthRHRZone
-      :userHealthSleep="userHealthSleep"
-      :userHealthSleepPagination="userHealthSleepPagination"
-      :isLoading="isLoading"
-      :totalPages="totalPagesRHR"
-      :pageNumber="pageNumberRHR"
-      @pageNumberChanged="setPageNumberRHR"
-      v-if="activeSection === 'rhr' && !isLoading"
-    />
+    <HealthRHRZone :isLoadingParent="isLoading" v-if="activeSection === 'rhr' && !isLoading" />
 
     <!-- Include the HealthStepsZone -->
     <HealthStepsZone
@@ -66,7 +45,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
@@ -78,27 +57,13 @@ import HealthStepsZone from '../components/Health/HealthStepsZone.vue'
 import HealthWeightZone from '../components/Health/HealthWeightZone.vue'
 import BackButtonComponent from '@/components/GeneralComponents/BackButtonComponent.vue'
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
-import { health_sleep } from '@/services/health_sleepService'
 import { health_targets } from '@/services/health_targetsService'
-import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
-const serverSettingsStore = useServerSettingsStore()
 const activeSection = ref('dashboard')
-const isLoading = ref(true)
-const numRecords = serverSettingsStore.serverSettings.num_records_per_page || 25
-// Sleep variables
-const isHealthSleepUpdatingLoading = ref(true)
-const userHealthSleepNumber = ref(0)
-const userHealthSleep = ref([])
-const userHealthSleepPagination = ref([])
-const pageNumberSleep = ref(1)
-const totalPagesSleep = ref(1)
-// RHR variables
-const pageNumberRHR = ref(1)
-const totalPagesRHR = ref(1)
+const isLoading = ref(false)
 // Targets variables
 const userHealthTargets = ref(null)
 
@@ -107,87 +72,15 @@ function updateActiveSection(section) {
   router.push({ query: { tab: section } })
 }
 
-// Sleep functions
-async function updateHealthSleepPagination() {
-  try {
-    isHealthSleepUpdatingLoading.value = true
-    const sleepDataPagination = await health_sleep.getUserHealthSleepWithPagination(
-      pageNumberSleep.value,
-      numRecords
-    )
-    userHealthSleepPagination.value = sleepDataPagination.records
-    isHealthSleepUpdatingLoading.value = false
-  } catch (error) {
-    push.error(`${t('healthView.errorFetchingHealthSleep')} - ${error}`)
-  }
-}
-
-async function fetchHealthSleep() {
-  try {
-    const sleepData = await health_sleep.getUserHealthSleep()
-    userHealthSleepNumber.value = sleepData.total
-    userHealthSleep.value = sleepData.records
-    await updateHealthSleepPagination()
-    totalPagesSleep.value = Math.ceil(userHealthSleepNumber.value / numRecords)
-  } catch (error) {
-    push.error(`${t('healthView.errorFetchingHealthSleep')} - ${error}`)
-  }
-}
-
-function updateSleepListAdded(createdSleep) {
-  const updateOrAdd = (array, newEntry) => {
-    const index = array.findIndex((item) => item.id === newEntry.id)
-    if (index !== -1) {
-      array[index] = newEntry
-    } else {
-      array.unshift(newEntry)
-    }
-  }
-  if (userHealthSleepPagination.value) {
-    updateOrAdd(userHealthSleepPagination.value, createdSleep)
-  } else {
-    userHealthSleepPagination.value = [createdSleep]
-  }
-  if (userHealthSleep.value) {
-    updateOrAdd(userHealthSleep.value, createdSleep)
-  } else {
-    userHealthSleep.value = [createdSleep]
-  }
-  userHealthSleepNumber.value = userHealthSleep.value.length
-}
-
-function updateSleepListEdited(editedSleep) {
-  const indexPagination = userHealthSleepPagination.value.findIndex(
-    (sleep) => sleep.id === editedSleep.id
-  )
-  const index = userHealthSleep.value.findIndex((sleep) => sleep.id === editedSleep.id)
-  userHealthSleepPagination.value[indexPagination] = editedSleep
-  userHealthSleep.value[index] = editedSleep
-}
-
-function updateSleepListDeleted(deletedSleep) {
-  userHealthSleepPagination.value = userHealthSleepPagination.value.filter(
-    (sleep) => sleep.id !== deletedSleep
-  )
-  userHealthSleep.value = userHealthSleep.value.filter((sleep) => sleep.id !== deletedSleep)
-  userHealthSleepNumber.value--
-}
-
-function setPageNumberSleep(page) {
-  pageNumberSleep.value = page
-}
-
-// RHR functions
-function setPageNumberRHR(page) {
-  pageNumberRHR.value = page
-}
-
 // Health Targets functions
 async function fetchHealthTargets() {
   try {
+    isLoading.value = true
     userHealthTargets.value = await health_targets.getUserHealthTargets()
   } catch (error) {
     push.error(`${t('healthView.errorFetchingHealthTargets')} - ${error}`)
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -236,16 +129,10 @@ function setSleepTarget(sleepTarget) {
   }
 }
 
-// Watch functions
-watch(pageNumberSleep, updateHealthSleepPagination, { immediate: false })
-
 onMounted(async () => {
   if (route.query.tab && typeof route.query.tab === 'string') {
     activeSection.value = route.query.tab
   }
-  await fetchHealthSleep()
   await fetchHealthTargets()
-  isHealthSleepUpdatingLoading.value = false
-  isLoading.value = false
 })
 </script>

@@ -4,7 +4,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, watchEffect } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 // Import the components
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
@@ -124,7 +124,14 @@ watch(
   { deep: true }
 )
 
-onMounted(() => {
+function createChart() {
+  if (!chartCanvas.value) return
+
+  if (myChart) {
+    myChart.destroy()
+    myChart = null
+  }
+
   myChart = new Chart(chartCanvas.value.getContext('2d'), {
     type: 'bar',
     data: chartData.value,
@@ -210,6 +217,22 @@ onMounted(() => {
       }
     }
   })
+}
+
+watch(
+  () => props.isLoading,
+  (newVal, oldVal) => {
+    if (oldVal === true && newVal === false) {
+      // Loading just finished, canvas will be re-rendered, recreate chart
+      nextTick(() => {
+        createChart()
+      })
+    }
+  }
+)
+
+onMounted(() => {
+  createChart()
 })
 
 onUnmounted(() => {
@@ -222,6 +245,7 @@ onUnmounted(() => {
 <style scoped>
 .chart-canvas {
   max-height: 300px;
-  width: 100%; /* Ensures the canvas stretches across the available width */
+  width: 100%;
+  /* Ensures the canvas stretches across the available width */
 }
 </style>

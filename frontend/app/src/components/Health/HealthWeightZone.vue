@@ -136,7 +136,6 @@ const serverSettingsStore = useServerSettingsStore()
 const isLoadingNewWeight = ref(false)
 const isLoading = ref(false)
 const userHealthWeightNumber = ref(0)
-const userHealthWeightPaginationNumber = ref(0)
 const userHealthWeightPagination = ref([])
 const pageNumber = ref(1)
 const totalPages = ref(1)
@@ -153,7 +152,6 @@ async function updateHealthWeightPagination() {
     )
     userHealthWeightPagination.value = weightDataPagination.records
     userHealthWeightNumber.value = weightDataPagination.total
-    userHealthWeightPaginationNumber.value = userHealthWeightPagination.value.length
     totalPages.value = Math.ceil(userHealthWeightNumber.value / numRecords)
   } catch (error) {
     push.error(`${t('healthWeightZoneComponent.errorFetchingHealthWeight')} - ${error}`)
@@ -173,7 +171,6 @@ function updateWeightListAdded(createdWeight) {
       array[index] = newEntry
     } else {
       array.unshift(newEntry)
-      userHealthWeightPaginationNumber.value++
       userHealthWeightNumber.value++
     }
   }
@@ -197,7 +194,6 @@ function updateWeightListDeleted(deletedWeight) {
   userHealthWeightPagination.value = userHealthWeightPagination.value.filter(
     (weight) => weight.id !== deletedWeight
   )
-  userHealthWeightPaginationNumber.value--
   userHealthWeightNumber.value--
 }
 

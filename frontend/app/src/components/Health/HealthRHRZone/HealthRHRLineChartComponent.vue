@@ -4,7 +4,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 // Import the components
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
@@ -88,6 +88,12 @@ const chartData = computed(() => {
     labels.push(`${createdAt.getDate()}/${createdAt.getMonth() + 1}/${createdAt.getFullYear()}`)
   }
 
+  // If only one data point, duplicate it to show as a horizontal line instead of a dot
+  if (data.length === 1) {
+    data.push(data[0])
+    labels.push(labels[0])
+  }
+
   const label = t('generalItems.RHRLabel') + ' (' + t('generalItems.unitsBpm') + ')'
 
   const datasets = [
@@ -126,7 +132,14 @@ watch(
   { deep: true }
 )
 
-onMounted(() => {
+function createChart() {
+  if (!chartCanvas.value) return
+
+  if (myChart) {
+    myChart.destroy()
+    myChart = null
+  }
+
   myChart = new Chart(chartCanvas.value.getContext('2d'), {
     type: 'line',
     data: chartData.value,
@@ -217,6 +230,23 @@ onMounted(() => {
       }
     }
   })
+}
+
+// Watch for loading state changes to recreate chart when canvas is re-rendered
+watch(
+  () => props.isLoading,
+  (newVal, oldVal) => {
+    if (oldVal === true && newVal === false) {
+      // Loading just finished, canvas will be re-rendered, recreate chart
+      nextTick(() => {
+        createChart()
+      })
+    }
+  }
+)
+
+onMounted(() => {
+  createChart()
 })
 
 onUnmounted(() => {

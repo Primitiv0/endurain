@@ -61,60 +61,6 @@ class TestGetHealthSleepNumber:
         assert exc_info.value.detail == "Database error occurred"
 
 
-class TestGetAllHealthSleepByUserId:
-    """
-    Test suite for get_all_health_sleep_by_user_id function.
-    """
-
-    def test_get_all_health_sleep_by_user_id_success(self, mock_db):
-        """
-        Test successful retrieval of all health sleep records for user.
-        """
-        # Arrange
-        user_id = 1
-        mock_sleep1 = MagicMock(spec=health_sleep_models.HealthSleep)
-        mock_sleep2 = MagicMock(spec=health_sleep_models.HealthSleep)
-        mock_db.execute.return_value.scalars.return_value.all.return_value = [
-            mock_sleep1,
-            mock_sleep2,
-        ]
-
-        # Act
-        result = health_sleep_crud.get_all_health_sleep_by_user_id(user_id, mock_db)
-
-        # Assert
-        assert result == [mock_sleep1, mock_sleep2]
-        mock_db.execute.assert_called_once()
-
-    def test_get_all_health_sleep_by_user_id_empty(self, mock_db):
-        """
-        Test retrieval when user has no health sleep records.
-        """
-        # Arrange
-        user_id = 1
-        mock_db.execute.return_value.scalars.return_value.all.return_value = []
-
-        # Act
-        result = health_sleep_crud.get_all_health_sleep_by_user_id(user_id, mock_db)
-
-        # Assert
-        assert result == []
-
-    def test_get_all_health_sleep_by_user_id_exception(self, mock_db):
-        """
-        Test exception handling in get_all_health_sleep_by_user_id.
-        """
-        # Arrange
-        user_id = 1
-        mock_db.execute.side_effect = SQLAlchemyError("Database error")
-
-        # Act & Assert
-        with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_all_health_sleep_by_user_id(user_id, mock_db)
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-
 class TestGetHealthSleepWithPagination:
     """
     Test suite for get_health_sleep_with_pagination function.

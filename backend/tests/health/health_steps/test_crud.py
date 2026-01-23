@@ -60,67 +60,6 @@ class TestGetHealthStepsNumber:
         assert exc_info.value.detail == "Database error occurred"
 
 
-class TestGetAllHealthStepsByUserId:
-    """
-    Test suite for get_all_health_steps_by_user_id function.
-    """
-
-    def test_get_all_health_steps_by_user_id_success(self, mock_db):
-        """
-        Test successful retrieval of all health steps records for user.
-        """
-        # Arrange
-        user_id = 1
-        mock_steps1 = MagicMock(spec=health_steps_models.HealthSteps)
-        mock_steps2 = MagicMock(spec=health_steps_models.HealthSteps)
-
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = [mock_steps1, mock_steps2]
-        mock_execute = MagicMock()
-        mock_execute.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_execute
-
-        # Act
-        result = health_steps_crud.get_all_health_steps_by_user_id(user_id, mock_db)
-
-        # Assert
-        assert result == [mock_steps1, mock_steps2]
-        mock_db.execute.assert_called_once()
-
-    def test_get_all_health_steps_by_user_id_empty(self, mock_db):
-        """
-        Test retrieval when user has no health steps records.
-        """
-        # Arrange
-        user_id = 1
-        mock_scalars = MagicMock()
-        mock_scalars.all.return_value = []
-        mock_execute = MagicMock()
-        mock_execute.scalars.return_value = mock_scalars
-        mock_db.execute.return_value = mock_execute
-
-        # Act
-        result = health_steps_crud.get_all_health_steps_by_user_id(user_id, mock_db)
-
-        # Assert
-        assert result == []
-
-    def test_get_all_health_steps_by_user_id_exception(self, mock_db):
-        """
-        Test exception handling in get_all_health_steps_by_user_id.
-        """
-        # Arrange
-        user_id = 1
-        mock_db.execute.side_effect = SQLAlchemyError("Database error")
-
-        # Act & Assert
-        with pytest.raises(HTTPException) as exc_info:
-            health_steps_crud.get_all_health_steps_by_user_id(user_id, mock_db)
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert exc_info.value.detail == "Database error occurred"
-
-
 class TestGetHealthStepsWithPagination:
     """
     Test suite for get_health_steps_with_pagination function.
