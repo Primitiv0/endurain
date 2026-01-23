@@ -1,8 +1,10 @@
 from typing import Annotated, Callable
 from datetime import date
 
-from fastapi import APIRouter, Depends, Security, HTTPException, status
+from fastapi import APIRouter, Depends, Security, HTTPException, status, Query
 from sqlalchemy.orm import Session
+
+import health.constants as health_constants
 
 import health.health_weight.schema as health_weight_schema
 import health.health_weight.crud as health_weight_crud
@@ -14,53 +16,6 @@ import core.dependencies as core_dependencies
 
 # Define the API router
 router = APIRouter()
-
-
-@router.get(
-    "",
-    response_model=health_weight_schema.HealthWeightListResponse,
-    status_code=status.HTTP_200_OK,
-)
-async def read_health_weight_all(
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:read"])
-    ],
-    token_user_id: Annotated[
-        int,
-        Depends(auth_security.get_sub_from_access_token),
-    ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
-) -> health_weight_schema.HealthWeightListResponse:
-    """
-    Retrieve all health weight records for the authenticated user with total count.
-
-    This endpoint fetches all weight measurements associated with the currently
-    authenticated user from the database, along with the total count of records.
-
-    Args:
-        _check_scopes: Security dependency that verifies the user has 'health:read' scope.
-        token_user_id: The user ID extracted from the access token.
-        db: Database session dependency for executing queries.
-
-    Returns:
-        HealthWeightListResponse: An object containing the total count and list of
-            all health weight records belonging to the authenticated user.
-
-    Raises:
-        HTTPException: May be raised by dependencies if authentication fails or
-            if the user lacks required permissions.
-    """
-    # Get the total count and records from the database
-    total = health_weight_crud.get_health_weight_number(token_user_id, db)
-    records = health_weight_crud.get_all_health_weight_by_user_id(token_user_id, db)
-
-    # Pydantic will convert ORM models to HealthWeightRead via from_attributes=True
-    return health_weight_schema.HealthWeightListResponse(
-        total=total, records=records  # type: ignore[arg-type]
-    )
 
 
 @router.get(
@@ -85,6 +40,10 @@ async def read_health_weight_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    interval: Annotated[
+        health_constants.Interval | None,
+        Query(description="Filter by goal interval"),
+    ] = None,
 ) -> health_weight_schema.HealthWeightListResponse:
     """
     Retrieve weight health records for the authenticated user with pagination and total count.
@@ -100,6 +59,7 @@ async def read_health_weight_all_pagination(
         _validate_pagination_values (Callable): Dependency that validates pagination parameters.
         token_user_id (int): The user ID extracted from the access token.
         db (Session): The database session dependency.
+        interval (health_constants.Interval | None): Optional filter by goal interval.
 
     Returns:
         HealthWeightListResponse: A response object containing:
@@ -115,7 +75,7 @@ async def read_health_weight_all_pagination(
     # Get the total count and paginated records from the database
     total = health_weight_crud.get_health_weight_number(token_user_id, db)
     records = health_weight_crud.get_health_weight_with_pagination(
-        token_user_id, db, page_number, num_records
+        token_user_id, db, page_number, num_records, interval
     )
 
     # Pydantic will convert ORM models to HealthStepsRead via from_attributes=True

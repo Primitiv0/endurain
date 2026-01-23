@@ -5,6 +5,10 @@ from sqlalchemy import func, desc, select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+import health.constants as health_constants
+
+import health.utils as health_utils
+
 import health.health_weight.schema as health_weight_schema
 import health.health_weight.models as health_weight_models
 import health.health_weight.utils as health_weight_utils
@@ -117,15 +121,20 @@ def get_health_weight_with_pagination(
     db: Session,
     page_number: int = 1,
     num_records: int = 5,
+    interval: health_constants.Interval | None = None,
 ) -> list[health_weight_models.HealthWeight]:
     """
-    Retrieve paginated health weight records for a user.
+    Retrieve paginated health weight records for a user. If interval is
+    provided, filter records starting from the calculated start date. If no
+    interval is provided, default to the last 7 days.
 
     Args:
         user_id: User ID to fetch records for.
         db: Database session.
         page_number: Page number to retrieve (1-indexed).
         num_records: Number of records per page.
+        interval: Optional filter by goal interval. If not provided, defaults
+            to "last_7_days".
 
     Returns:
         List of HealthWeight models for the requested page.
@@ -141,6 +150,18 @@ def get_health_weight_with_pagination(
         .offset((page_number - 1) * num_records)
         .limit(num_records)
     )
+
+    if interval is not None:
+        stmt = stmt.where(
+            health_weight_models.HealthWeight.date
+            >= health_utils.get_start_date_for_interval(interval.value)
+        )
+    else:
+        stmt = stmt.where(
+            health_weight_models.HealthWeight.date
+            >= health_utils.get_start_date_for_interval("last_7_days")
+        )
+
     return db.execute(stmt).scalars().all()
 
 

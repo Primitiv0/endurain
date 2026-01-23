@@ -63,16 +63,8 @@
 
     <!-- Include the HealthWeightZone -->
     <HealthWeightZone
-      :userHealthWeight="userHealthWeight"
-      :userHealthWeightPagination="userHealthWeightPagination"
       :userHealthTargets="userHealthTargets"
-      :isLoading="isLoading"
-      :totalPages="totalPagesWeight"
-      :pageNumber="pageNumberWeight"
-      @createdWeight="updateWeightListAdded"
-      @deletedWeight="updateWeightListDeleted"
-      @editedWeight="updateWeightListEdited"
-      @pageNumberChanged="setPageNumberWeight"
+      :isLoadingParent="isLoading"
       @setWeightTarget="setWeightTarget"
       v-if="activeSection === 'weight' && !isLoading"
     />
@@ -95,7 +87,6 @@ import HealthWeightZone from '../components/Health/HealthWeightZone.vue'
 import BackButtonComponent from '@/components/GeneralComponents/BackButtonComponent.vue'
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 import { health_sleep } from '@/services/health_sleepService'
-import { health_weight } from '@/services/health_weightService'
 import { health_steps } from '@/services/health_stepsService'
 import { health_targets } from '@/services/health_targetsService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
@@ -117,13 +108,6 @@ const totalPagesSleep = ref(1)
 // RHR variables
 const pageNumberRHR = ref(1)
 const totalPagesRHR = ref(1)
-// Weight variables
-const isHealthWeightUpdatingLoading = ref(true)
-const userHealthWeightNumber = ref(0)
-const userHealthWeight = ref([])
-const userHealthWeightPagination = ref([])
-const pageNumberWeight = ref(1)
-const totalPagesWeight = ref(1)
 // Steps variables
 const isHealthStepsUpdatingLoading = ref(true)
 const userHealthStepsNumber = ref(0)
@@ -137,10 +121,8 @@ const userHealthTargets = ref(null)
 function updateActiveSection(section) {
   activeSection.value = section
   router.push({ query: { tab: section } })
-  if (pageNumberWeight.value !== 1 || pageNumberSteps.value !== 1) {
-    pageNumberWeight.value = 1
+  if (pageNumberSteps.value !== 1) {
     pageNumberSteps.value = 1
-    updateHealthWeightPagination()
     updateHealthStepsPagination()
   }
 }
@@ -218,76 +200,6 @@ function setPageNumberSleep(page) {
 // RHR functions
 function setPageNumberRHR(page) {
   pageNumberRHR.value = page
-}
-
-// Weight functions
-async function updateHealthWeightPagination() {
-  try {
-    isHealthWeightUpdatingLoading.value = true
-    const weightDataPagination = await health_weight.getUserHealthWeightWithPagination(
-      pageNumberWeight.value,
-      numRecords
-    )
-    userHealthWeightPagination.value = weightDataPagination.records
-    isHealthWeightUpdatingLoading.value = false
-  } catch (error) {
-    push.error(`${t('healthView.errorFetchingHealthWeight')} - ${error}`)
-  }
-}
-
-async function fetchHealthWeight() {
-  try {
-    const weightData = await health_weight.getUserHealthWeight()
-    userHealthWeight.value = weightData.records
-    userHealthWeightNumber.value = weightData.total
-    await updateHealthWeightPagination()
-    totalPagesWeight.value = Math.ceil(userHealthWeightNumber.value / numRecords)
-  } catch (error) {
-    push.error(`${t('healthView.errorFetchingHealthWeight')} - ${error}`)
-  }
-}
-
-function updateWeightListAdded(createdWeight) {
-  const updateOrAdd = (array, newEntry) => {
-    const index = array.findIndex((item) => item.id === newEntry.id)
-    if (index !== -1) {
-      array[index] = newEntry
-    } else {
-      array.unshift(newEntry)
-    }
-  }
-  if (userHealthWeightPagination.value) {
-    updateOrAdd(userHealthWeightPagination.value, createdWeight)
-  } else {
-    userHealthWeightPagination.value = [createdWeight]
-  }
-  if (userHealthWeight.value) {
-    updateOrAdd(userHealthWeight.value, createdWeight)
-  } else {
-    userHealthWeight.value = [createdWeight]
-  }
-  userHealthWeightNumber.value = userHealthWeight.value.length
-}
-
-function updateWeightListEdited(editedWeight) {
-  const indexPagination = userHealthWeightPagination.value.findIndex(
-    (weight) => weight.id === editedWeight.id
-  )
-  const index = userHealthWeight.value.findIndex((weight) => weight.id === editedWeight.id)
-  userHealthWeightPagination.value[indexPagination] = editedWeight
-  userHealthWeight.value[index] = editedWeight
-}
-
-function updateWeightListDeleted(deletedWeight) {
-  userHealthWeightPagination.value = userHealthWeightPagination.value.filter(
-    (weight) => weight.id !== deletedWeight
-  )
-  userHealthWeight.value = userHealthWeight.value.filter((weight) => weight.id !== deletedWeight)
-  userHealthWeightNumber.value--
-}
-
-function setPageNumberWeight(page) {
-  pageNumberWeight.value = page
 }
 
 // Steps functions
@@ -417,7 +329,6 @@ function setSleepTarget(sleepTarget) {
 // Watch functions
 watch(pageNumberSleep, updateHealthSleepPagination, { immediate: false })
 watch(pageNumberSteps, updateHealthStepsPagination, { immediate: false })
-watch(pageNumberWeight, updateHealthWeightPagination, { immediate: false })
 
 onMounted(async () => {
   if (route.query.tab && typeof route.query.tab === 'string') {
@@ -425,11 +336,9 @@ onMounted(async () => {
   }
   await fetchHealthSleep()
   await fetchHealthSteps()
-  await fetchHealthWeight()
   await fetchHealthTargets()
   isHealthSleepUpdatingLoading.value = false
   isHealthStepsUpdatingLoading.value = false
-  isHealthWeightUpdatingLoading.value = false
   isLoading.value = false
 })
 </script>

@@ -4,5 +4,6 @@
   "modalWeightTargetLabel": "Enter your weight target",
   "labelNumberOfHealthWeightWeight1": "There is a total of ",
   "labelNumberOfHealthWeightWeight2": " weight measure(s) inserted (",
-  "labelNumberOfHealthWeightWeight3": " loaded):"
+  "labelNumberOfHealthWeightWeight3": " loaded):",
+  "errorFetchingHealthWeight": "Error fetching health data"
 }

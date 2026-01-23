@@ -37,33 +37,46 @@
         @numberToEmitAction="submitSetWeightTarget"
       />
 
-      <LoadingComponent v-if="isLoading" />
+      <LoadingComponent v-if="isLoadingParent && isLoading" />
       <div v-else>
-        <!-- Checking if userHealthWeight is loaded and has length -->
-        <div v-if="userHealthWeight && userHealthWeight.length" class="mt-3">
-          <!-- show graph -->
-          <HealthWeightLineChartComponent
-            :userHealthTargets="userHealthTargets"
-            :userHealthWeight="userHealthWeight"
-            :isLoading="isLoading"
-          />
+        <!-- Checking if userHealthWeightPagination is loaded and has length -->
+        <!-- show graph -->
+        <HealthWeightLineChartComponent
+          class="mt-3"
+          :userHealthTargets="userHealthTargets"
+          :userHealthWeight="userHealthWeightPagination"
+          :isLoading="isLoading"
+          v-if="userHealthWeightPagination && userHealthWeightPagination.length"
+        />
 
-          <br />
-          <p>
+        <div class="d-flex align-items-center justify-content-between mt-3">
+          <span>
             {{ $t('healthWeightZoneComponent.labelNumberOfHealthWeightWeight1')
-            }}{{ userHealthWeight.length
-            }}{{ $t('healthWeightZoneComponent.labelNumberOfHealthWeightWeight2')
             }}{{ userHealthWeightPagination.length
+            }}{{ $t('healthWeightZoneComponent.labelNumberOfHealthWeightWeight2')
+            }}{{ userHealthWeightNumber
             }}{{ $t('healthWeightZoneComponent.labelNumberOfHealthWeightWeight3') }}
-          </p>
+          </span>
 
-          <!-- Displaying loading new weight if applicable -->
-          <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewWeight">
-            <li class="list-group-item rounded">
-              <LoadingComponent />
-            </li>
-          </ul>
+          <form>
+            <select class="form-select" v-model="weightFilter">
+              <option value="last_7_days">{{ $t('healthView.filter_last_7_days') }}</option>
+              <option value="last_30_days">{{ $t('healthView.filter_last_30_days') }}</option>
+              <option value="last_90_days">{{ $t('healthView.filter_last_90_days') }}</option>
+              <option value="last_year">{{ $t('healthView.filter_last_year') }}</option>
+              <option value="all_time">{{ $t('healthView.filter_all_time') }}</option>
+            </select>
+          </form>
+        </div>
 
+        <!-- Displaying loading new weight if applicable -->
+        <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewWeight">
+          <li class="list-group-item rounded">
+            <LoadingComponent />
+          </li>
+        </ul>
+
+        <div v-if="userHealthWeightPagination && userHealthWeightPagination.length" class="mt-3">
           <!-- list zone -->
           <ul
             class="my-3 list-group list-group-flush"
@@ -93,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import HealthWeightAddEditModalComponent from './HealthWeightZone/HealthWeightAddEditModalComponent.vue'
 import HealthWeightLineChartComponent from './HealthWeightZone/HealthWeightLineChartComponent.vue'
@@ -102,66 +115,106 @@ import LoadingComponent from '../GeneralComponents/LoadingComponent.vue'
 import NoItemsFoundComponent from '../GeneralComponents/NoItemsFoundComponents.vue'
 import PaginationComponent from '../GeneralComponents/PaginationComponent.vue'
 import ModalComponentNumberInput from '../Modals/ModalComponentNumberInput.vue'
+// import stores
+import { health_weight } from '@/services/health_weightService'
+import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 
 const props = defineProps({
-  userHealthWeight: {
-    type: [Object, null],
-    required: true
-  },
-  userHealthWeightPagination: {
-    type: [Object, null],
-    required: true
-  },
   userHealthTargets: {
     type: [Object, null],
     required: true
   },
-  isLoading: {
+  isLoadingParent: {
     type: Boolean,
-    required: true
-  },
-  totalPages: {
-    type: Number,
-    required: true
-  },
-  pageNumber: {
-    type: Number,
     required: true
   }
 })
 
-const emit = defineEmits([
-  'createdWeight',
-  'deletedWeight',
-  'editedWeight',
-  'pageNumberChanged',
-  'setWeightTarget'
-])
+const emit = defineEmits(['setWeightTarget'])
 
 const { t } = useI18n()
+const serverSettingsStore = useServerSettingsStore()
 const isLoadingNewWeight = ref(false)
+const isLoading = ref(false)
+const userHealthWeightNumber = ref(0)
+const userHealthWeightPagination = ref([])
+const pageNumber = ref(1)
+const totalPages = ref(1)
+const numRecords = serverSettingsStore.serverSettings.num_records_per_page || 25
+const weightFilter = ref('last_7_days')
+
+async function updateHealthWeightPagination() {
+  try {
+    isLoading.value = true
+    const weightDataPagination = await health_weight.getUserHealthWeightWithPagination(
+      pageNumber.value,
+      numRecords,
+      weightFilter.value
+    )
+    userHealthWeightPagination.value = weightDataPagination.records
+    userHealthWeightNumber.value = userHealthWeightPagination.value.length
+    totalPages.value = Math.ceil(userHealthWeightNumber.value / numRecords)
+  } catch (error) {
+    push.error(`${t('healthWeightZoneComponent.errorFetchingHealthWeight')} - ${error}`)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 function updateIsLoadingNewWeight(isLoadingNewWeightNewValue) {
   isLoadingNewWeight.value = isLoadingNewWeightNewValue
 }
 
 function updateWeightListAdded(createdWeight) {
-  emit('createdWeight', createdWeight)
-}
-
-function updateWeightListDeleted(deletedWeight) {
-  emit('deletedWeight', deletedWeight)
+  const updateOrAdd = (array, newEntry) => {
+    const index = array.findIndex((item) => item.id === newEntry.id)
+    if (index !== -1) {
+      array[index] = newEntry
+    } else {
+      array.unshift(newEntry)
+      userHealthWeightNumber.value++
+    }
+  }
+  isLoadingNewWeight.value = true
+  if (userHealthWeightPagination.value) {
+    updateOrAdd(userHealthWeightPagination.value, createdWeight)
+  } else {
+    userHealthWeightPagination.value = [createdWeight]
+  }
+  isLoadingNewWeight.value = false
 }
 
 function updateWeightListEdited(editedWeight) {
-  emit('editedWeight', editedWeight)
+  const index = userHealthWeightPagination.value.findIndex(
+    (weight) => weight.id === editedWeight.id
+  )
+  userHealthWeightPagination.value[index] = editedWeight
+}
+
+function updateWeightListDeleted(deletedWeight) {
+  userHealthWeightPagination.value = userHealthWeightPagination.value.filter(
+    (weight) => weight.id !== deletedWeight
+  )
+  userHealthWeightNumber.value--
 }
 
 function setPageNumber(page) {
-  emit('pageNumberChanged', page)
+  pageNumber.value = page
 }
 
 function submitSetWeightTarget(weightTarget) {
   emit('setWeightTarget', weightTarget)
 }
+
+function handleFilterChange(newFilter) {
+  pageNumber.value = 1
+  updateHealthWeightPagination()
+}
+
+watch(pageNumber, updateHealthWeightPagination, { immediate: false })
+watch(weightFilter, handleFilterChange, { immediate: false })
+
+onMounted(async () => {
+  await updateHealthWeightPagination()
+})
 </script>

@@ -6,11 +6,10 @@ import {
 } from '@/utils/serviceUtils'
 
 export const health_weight = {
-  getUserHealthWeight() {
-    return fetchGetRequest('health/weight')
-  },
-  getUserHealthWeightWithPagination(pageNumber, numRecords) {
-    return fetchGetRequest(`health/weight/page_number/${pageNumber}/num_records/${numRecords}`)
+  getUserHealthWeightWithPagination(pageNumber, numRecords, filter) {
+    return fetchGetRequest(
+      `health/weight/page_number/${pageNumber}/num_records/${numRecords}?interval=${filter}`
+    )
   },
   createHealthWeight(data) {
     return fetchPostRequest('health/weight', data)
