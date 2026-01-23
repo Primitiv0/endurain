@@ -89,11 +89,11 @@ def get_users_with_pagination(
         .limit(num_records)
     )
 
-    if not show_inactive:
+    if show_inactive is False:
         stmt = stmt.where(users_models.Users.active.is_(True))
-    if not show_email_unverified:
+    if show_email_unverified is False:
         stmt = stmt.where(users_models.Users.email_verified.is_(True))
-    if not show_pending_approval:
+    if show_pending_approval is False:
         stmt = stmt.where(users_models.Users.pending_admin_approval.is_(False))
 
     return db.execute(stmt).scalars().all()
