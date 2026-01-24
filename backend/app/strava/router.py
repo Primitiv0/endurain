@@ -242,7 +242,7 @@ async def import_bikes_from_strava_export(
 async def import_shoes_from_strava_export(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sid_from_access_token),
+        Depends(auth_security.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -256,15 +256,19 @@ async def import_shoes_from_strava_export(
         # Get shoes from Strava export CSV file
         shoes_list = strava_gear_utils.iterate_over_shoes_csv()
 
+        #core_logger.print_to_log_and_console("Shoe list created.") # testing code
         # Transform shoes list to list of Gear schema objects
         if shoes_list:
             shoes = strava_gear_utils.transform_csv_shoe_gear_to_schema_gear(
                 shoes_list, token_user_id, db
             )
-
+            #core_logger.print_to_log_and_console("Shoe list converted to schema gear.") # testing code
             # Add shoes to the database
             if shoes:
                 gears_crud.create_multiple_gears(shoes, token_user_id, db)
+ 
+        #core_logger.print_to_log_and_console("Shoes added to db.") # testing code
+ 
 
         # Define variables for moving the shoes file
         processed_dir = core_config.FILES_PROCESSED_DIR
@@ -326,7 +330,7 @@ async def import_activities_and_media_from_strava_export(
         users_existing_gear_nickname_to_id = strava_bulk_import_utils.create_gear_dictionary_for_bulk_import(token_user_id, db)
 
         # Queue files for processing
-        number_of_queued_files = strava_bulk_import_utils.queue_bulk_export_activities_for_import(token_user_id, websocket_manager, db, strava_activities_dict, users_existing_gear_nickname_to_id, import_time, background_tasks)
+        number_of_queued_files = strava_bulk_import_utils.queue_bulk_export_activities_for_import(token_user_id, ws_manager, db, strava_activities_dict, users_existing_gear_nickname_to_id, import_time, background_tasks)
 
         # Log a success message that explains processing will continue elsewhere.
         core_logger.print_to_log_and_console(f"Strava bulk import initiated for {number_of_queued_files} files.  Processing of files will continue in the background.")

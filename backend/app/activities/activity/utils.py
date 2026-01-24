@@ -39,6 +39,8 @@ import activities.activity_streams.schema as activity_streams_schema
 
 import activities.activity_workout_steps.crud as activity_workout_steps_crud
 
+import strava.bulk_import_utils as strava_bulk_import_utils
+
 import websocket.manager as websocket_manager
 
 import gpx.utils as gpx_utils
