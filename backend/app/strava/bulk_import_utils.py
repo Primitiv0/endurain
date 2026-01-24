@@ -1,5 +1,7 @@
 import os
+import asyncio
 import csv
+import time
 from datetime import datetime
 from fastapi import HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
@@ -76,7 +78,7 @@ def iterate_over_activities_csv() -> dict:
                         return None
                     _, strava_act_file_name = os.path.split(row['Filename'])  # strips path, returns filename with extension.
                     strava_activities_dict[strava_act_file_name] = row  # Store activity information in a dictionary using filename as the key
-            core_logger.print_to_log_and_console(f"Strava activities csv file parsed, and it is {len(strava_activities_dict)} rows long")
+            core_logger.print_to_log_and_console(f"Strava bulk import: Strava activities csv file parsed, and it is {len(strava_activities_dict)} rows long")
             return strava_activities_dict
         except Exception as err:
             strava_activities_dict = None
@@ -127,12 +129,11 @@ def queue_bulk_export_activities_for_import(
     strava_activities_dict: dict, 
     users_existing_gear_nickname_to_id: dict,
     import_time: str, 
-    background_tasks: BackgroundTasks,
 ) -> int:
     """
-    Queues files located in the Strava bulk import activities directory for processing.
+    Queues files located in the Strava bulk import activities directory for processing.  Process all files sequentially in single thread (similar to activity/utils/process_all_files_sync).
 
-    Returns: Number of files that were queued.
+    Returns: Number of files that were queued (which is not used currently by the calling function)
     """
     # Function to queue files for importing from a Strava bulk export. 
     # Returns the number of files to process, for log messages.
@@ -153,7 +154,7 @@ def queue_bulk_export_activities_for_import(
 
     # Get total file count and log it
     totalfilecount=len(filelist)
-    core_logger.print_to_log_and_console(f"Found {totalfilecount} files in the {strava_activities_import_dir}.")
+    core_logger.print_to_log_and_console(f"Strava bulk import: Found {totalfilecount} files in the {strava_activities_import_dir}.")
 
     # Build a list of importable files
     skippedprocessingcount=0
@@ -164,7 +165,7 @@ def queue_bulk_export_activities_for_import(
         # Check if file is one we can process
         _, file_extension = os.path.splitext(file_path)
         if file_extension not in supported_file_formats:
-            core_logger.print_to_log_and_console(f"Skipping file {file_path} - due to not having a supported file extension. Supported extensions are: {supported_file_formats}.")
+            core_logger.print_to_log_and_console(f"Strava bulk import: Skipping file {file_path} - due to not having a supported file extension. Supported extensions are: {supported_file_formats}.")
             skippedprocessingcount+=1
             continue
         else:
@@ -173,9 +174,9 @@ def queue_bulk_export_activities_for_import(
     # Check if there are any importable files and log status
     number_of_importable_files = len(importable_files)
     if number_of_importable_files == 0: 
-        core_logger.print_to_log_and_console(f"There are no importable files in {strava_activities_import_dir} directory - aborting import.", "warning")
+        core_logger.print_to_log_and_console(f"Strava bulk import:There are no importable files in {strava_activities_import_dir} directory - aborting import.", "warning")
         return 0
-    core_logger.print_to_log_and_console(f"Skipped a total of {skippedprocessingcount} files due to not having a supported file extension. There are now {number_of_importable_files} files to queue for processing. ")
+    core_logger.print_to_log_and_console(f"Strava bulk import: Skipped a total of {skippedprocessingcount} files due to not having a supported file extension. There are now {number_of_importable_files} files to queue for processing. ")
 
     # Iterate over each importable file and queue import
     filenumber=0
@@ -185,21 +186,22 @@ def queue_bulk_export_activities_for_import(
         file_path = os.path.join(strava_activities_import_dir, filename)
 
         if os.path.isfile(file_path):
-            core_logger.print_to_log_and_console(f"Queuing file number {filenumber} for processing: {file_path}")
-            # Build dictionary for import progress status reporting in logs
-            file_progress_dict = {'filenumber': filenumber, 'totalfilecount': number_of_importable_files }
+            core_logger.print_to_log_and_console(f"Strava bulk import: Processing file {filenumber} of {number_of_importable_files} - {file_path}")
             # Parse and store the activity
-            background_tasks.add_task(
-                activities_utils.parse_and_store_activity_from_file,
-                token_user_id,
-                file_path,
-                websocket_manager,
-                db,
-                strava_activities=strava_activities_dict,
-                import_initiated_time=import_time,
-                users_existing_gear_nickname_to_id=users_existing_gear_nickname_to_id,
-                file_progress_dict=file_progress_dict,
+            asyncio.run(
+                activities_utils.parse_and_store_activity_from_file(
+                    token_user_id,
+                    file_path,
+                    websocket_manager,
+                    db,
+                    strava_activities=strava_activities_dict,
+                    import_initiated_time=import_time,
+                    users_existing_gear_nickname_to_id=users_existing_gear_nickname_to_id,
+                    #file_progress_dict=file_progress_dict, # TESTING REMOVAL OF THIS
+                )
             )
+            # Small delay between files
+            time.sleep(0.1)
             queuedforprocessingcount+=1
     
     return queuedforprocessingcount
@@ -239,7 +241,7 @@ def build_metadata_dict(
                     strava_activity_metadata["gear_id"]=users_existing_gear_nickname_to_id[activity_gear][0]
             else:
                     strava_activity_metadata["gear_id"]=None
-                    core_logger.print_to_log_and_console(f"Gear for activity {file_base_name}, which activities.csv shows as {activity_gear}, was not found in the user's existing gear. Not adding gear to activity.")
+                    core_logger.print_to_log_and_console(f"Bulk file import: Gear for activity {file_base_name}, which activities.csv shows as {activity_gear}, was not found in the user's existing gear. Not adding gear to activity.")
         else:
             strava_activity_metadata["gear_id"]=None
         import_dict = build_import_dictionary(file_base_name, import_initiated_time, True, strava_activities)

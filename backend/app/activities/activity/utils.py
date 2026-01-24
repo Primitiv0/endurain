@@ -403,7 +403,7 @@ async def parse_and_store_activity_from_file(
     strava_activities: dict = None,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
     import_initiated_time: str = None,  # String containing the time the Strava bulk import was initiated.
     users_existing_gear_nickname_to_id: dict = None,  # Dictionary containing gear nickname to ID, needed for Strava bulk import
-    file_progress_dict: dict = None,  # Dictionary containing information on file processing count, to allow logs to show at least mediocre import progress messages (primarily for Strava bulk import).  Dictionary structure - {'filenumber': filenumber, 'totalfilecount': totalfilecount }
+    #file_progress_dict: dict = None,  # Dictionary containing information on file processing count, to allow logs to show at least mediocre import progress messages (primarily for Strava bulk import).  Dictionary structure - {'filenumber': filenumber, 'totalfilecount': totalfilecount }
     activity_name: str | None = None,
 ):
     """
@@ -421,11 +421,8 @@ async def parse_and_store_activity_from_file(
         # Get pathless file name with extension, as this is the dictionary key for Strava's bulk import activities dictionary.
         _, file_base_name = os.path.split(file_path)
 
-        # Print import progress information to log
-        if file_progress_dict is not None:
-            core_logger.print_to_log_and_console(f"Bulk file import: Now beginning processing file number {file_progress_dict['filenumber']} of {file_progress_dict['totalfilecount']} total. File: {file_base_name}")
-        else: 
-            core_logger.print_to_log_and_console(f"Bulk file import: Beginning processing of {file_base_name}.")
+        # Print import progress information to log  # Bulk imports already print a processing status.
+        # core_logger.print_to_log_and_console(f"Bulk file import: Beginning processing of {file_base_name}.")
 
         garmin_connect_activity_id = None
 
@@ -1266,7 +1263,7 @@ def process_all_files_sync(
         total_files = len(file_paths)
         for idx, file_path in enumerate(file_paths, 1):
             core_logger.print_to_log_and_console(
-                f"Processing file {idx}/{total_files}: " f"{file_path}"   # TO DO: Check if the text should be changed to "queuing file for processing"
+                f"Processing file {idx}/{total_files}: " f"{file_path}" 
             )
             asyncio.run(
                 parse_and_store_activity_from_file(

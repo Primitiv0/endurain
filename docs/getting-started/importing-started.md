@@ -15,23 +15,18 @@ Read on to learn more about these two import options.
 To perform a generic bulk import:
 - Place .fit, .tcx, .gz and/or .gpx files into the data/activity_files/bulk_import folder. Create the folder if needed.
 - In the "Settings" menu select "Import".
-- Click "Import" next to "Bulk Import".
+- Click "Import activities" next to "Bulk Import".
 - Check the logs for detailed messages regarding the import.
 
 ### Notes on the generic bulk import
 
-.fit files are preferred. I noticed that Strava/Garmin Connect process of converting .fit to .gpx introduces additional data to the activity file leading to minor variances in the data, like for example additional 
-meters in distance and elevation gain. 
+.fit files are preferred. I noticed that Strava/Garmin Connect process of converting .fit to .gpx introduces additional data to the activity file leading to minor variances in the data, like for example additional meters in distance and elevation gain. 
 
 **There is currently no mechanism to undo or revert an import.**  Thus, we advise backing up your database before importing if you have any doubts about the process or whether duplicates exist. 
 
-After the files are processed, the files are moved to the processed folder
+After the files are processed, the files are renamed and moved. Activity files that were successfully imported will be renamed and moved to the data/activity_files/processed directory. Files that resulted in an error during import should be moved to the data/activity_files/bulk_import/import_errors folder.
 
-The generic bulk import currently only imports data present in the .fit, .tcx or .gpx files - no external metadata or other media are imported.
-
-Activity files that were successfully imported will be renamed and moved to the data/activity_files/processed directory.
-
-Files that resulted in an error during import should be moved to the data/activity_files/bulk_import/import_errors folder
+The generic bulk import currently only imports data contained in the .fit, .tcx or .gpx files - no external metadata or other media are imported.
 
 While each file present in the import directory will only be imported once (and then moved to a storage directory), the bulk import does not check for duplicates while importing. Thus, activities that are already present in Endurain will be imported again (and will default be hidden, with a notification prompting the user to review).
 
@@ -83,7 +78,7 @@ Strava allows shoe names to be blank, but Endurain does not. Thus, shoes with a 
 
 #### Notes on importing gear
 
-NOTE: There is currently no mechanism to undo a gear import.
+IMPORTANT: There is currently no mechanism to undo a gear import.
 
 All gear will be imported as active, as Strava does not export the active/inactive status of the gear.
 
@@ -104,7 +99,7 @@ At the present time, importing activities and media from a Strava bulk export is
 To perform an import of activities and media: 
 - Place the extracted contents of a Strava bulk export .zip file in the data/strava_import folder. Create the folder if needed. 
 - Consider performing a test import before attempting to import a large set of files; see notes below on how to do this.
-- If you want imported activities to be linked to gear (bikes or shoes), ensure that any bikes or shoes referred to in activities are already present in Endurain. 
+- If you want imported activities to be linked to gear (bikes or shoes), ensure that any bikes or shoes referred to in activities are already present in Endurain before importing the activities. 
 - In the "Settings" menu select "Import".
 - Click "Strava bulk import" next to "Strava bulk import (Beta)".
 - Status messages about the import, including progress messages and why any activities or media were not imported, can be found in the logs.
@@ -135,9 +130,9 @@ Thus, to perform a test import:
 
 #### Strava bulk import limitations 
 
-**The Endurain website will likely be unresponsive while the import proceeds** (fields on pages requiring database calls will not load). Logs (and the console) are updated as each file is processed; watching the logs will let you see how quickly files are being processed. Note that large imports may take many hours, so plan accordingly. 
+**IMPORTANT: We advise backing up your database, or using a test Endurain install, before importing data: There is currently no mechanism to undo or revert an import.**
 
-**We advise backing up your database, or using a test Endurain install, before importing data: There is currently no mechanism to undo or revert an import.**
+Note that large imports may take many hours, depending on server hardware.  Watch the logs to see detailed information.
 
 While each file present in the import directory will only be imported once (and then moved to a storage directory), the bulk import of Strava activities does not check for duplicates while importing. Thus, activities that are already present in Endurain will be imported again (and, if the start times match, be marked as hidden and a notification sent to the user).
 
@@ -146,3 +141,5 @@ The bulk import of Strava activities and media does not create gear.  Please imp
 If you had unnamed shoes in Strava, note that they will be renamed by the shoe gear import routine, and thus will not be matched with activities during a bulk activity import.  The best fix for this at the present time is, unfortunately, to edit the activities.csv file manually and add the new shoe name to the relevant rows in activities.csv (Strava formats shoe gear in the activities.csv file as: "{brand} {model} {name}").  Sorry.
 
 Comments associated with media are not imported (Endurain does not currently allow comments on media). FYI: Comments associated with media are stored in Strava's media.csv file.
+
+While notifications will be sent to the user as items are imported, it is advised to check the log for full detailed information on the import and its progress; logs (and the console) are updated as each file is processed.

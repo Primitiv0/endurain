@@ -1,8 +1,13 @@
 import os
+
 from datetime import datetime, timedelta, timezone, date
 from typing import Annotated, Callable
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Security
 from sqlalchemy.orm import Session
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 from stravalib.exc import AccessUnauthorized
 
@@ -31,6 +36,8 @@ import websocket.manager as websocket_manager
 # Define the API router
 router = APIRouter()
 
+# Define the thread pool executor with 2 workers
+executor = ThreadPoolExecutor(max_workers=2)
 
 @router.put(
     "/link",
@@ -312,12 +319,11 @@ async def import_activities_and_media_from_strava_export(
         websocket_manager.WebSocketManager,
         Depends(websocket_manager.get_websocket_manager),
     ],
-    background_tasks: BackgroundTasks,
 ):
     try:
         # Get time of import initiation to pass to function for recording in import_data dictionary
         import_time = datetime.now().isoformat()
-        core_logger.print_to_log_and_console(f"Strava bulk import initiated at {import_time}.")
+        core_logger.print_to_log_and_console(f"Strava bulk import: Initiated at {import_time}.")
 
         # Parse activities data from activities.csv into a dictionary
         strava_activities_dict = strava_bulk_import_utils.iterate_over_activities_csv()
@@ -330,13 +336,28 @@ async def import_activities_and_media_from_strava_export(
         users_existing_gear_nickname_to_id = strava_bulk_import_utils.create_gear_dictionary_for_bulk_import(token_user_id, db)
 
         # Queue files for processing
-        number_of_queued_files = strava_bulk_import_utils.queue_bulk_export_activities_for_import(token_user_id, ws_manager, db, strava_activities_dict, users_existing_gear_nickname_to_id, import_time, background_tasks)
+        #number_of_queued_files = strava_bulk_import_utils.queue_bulk_export_activities_for_import(token_user_id, ws_manager, db, strava_activities_dict, users_existing_gear_nickname_to_id, import_time)
+        # Submit ONE task that processes all files
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(
+            executor,
+            partial(
+                strava_bulk_import_utils.queue_bulk_export_activities_for_import,
+                token_user_id, 
+                ws_manager, 
+                db, 
+                strava_activities_dict, 
+                users_existing_gear_nickname_to_id, 
+                import_time
+            ),
+        )
+
 
         # Log a success message that explains processing will continue elsewhere.
-        core_logger.print_to_log_and_console(f"Strava bulk import initiated for {number_of_queued_files} files.  Processing of files will continue in the background.")
+        core_logger.print_to_log_and_console(f"Strava bulk import initiated. Processing of files will continue in the background.")
 
         # Return a success message
-        return {"Strava import initiated for all files found in the strava_import directory. Processing of files will continue in the background."}
+        return {"Strava import initiated. Processing of files will continue in the background."}
     except Exception as err:
         # Log the exception
         core_logger.print_to_log_and_console(
