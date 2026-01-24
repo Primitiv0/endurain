@@ -1,6 +1,6 @@
 # Importing data
 
-Endurain allows users to upload individual files via the web interface for importing.  
+Endurain allows users to upload individual files via the web interface for easy web-based importing.  
 
 If a user wants to import multiple files at the same time, there are two bulk import options currently available:
 
@@ -8,7 +8,7 @@ If a user wants to import multiple files at the same time, there are two bulk im
 
 *Importing from a Strava bulk export* - Allows users to import gear, activities, activity metadata, and media from a Strava bulk export.
 
-Read on to learn more about these two import options.
+Both of these options currently require placing files on the server directly.  Read on to learn more about these two import options.
 
 ## Generic bulk import and file upload
 
@@ -28,7 +28,7 @@ After the files are processed, the files are renamed and moved. Activity files t
 
 The generic bulk import currently only imports data contained in the .fit, .tcx or .gpx files - no external metadata or other media are imported.
 
-While each file present in the import directory will only be imported once (and then moved to a storage directory), the bulk import does not check for duplicates while importing. Thus, activities that are already present in Endurain will be imported again (and will default be hidden, with a notification prompting the user to review).
+While each file present in the import directory will only be imported once (and then moved to a storage directory), the bulk import does not check for duplicates while importing. Thus, activities that are already present in Endurain will be imported again (and will default be hidden if their start time matches an existing activity's start time, with a notification prompting the user to review).
 
 GEOCODES API has a limit of 1 Request/Second on the free plan, so if you have a large number of files, it might not be possible to import all in the same action
 
@@ -42,7 +42,7 @@ Recommended procedure for importing a Strava bulk export:
 1. Read the instructions below, including notes on limitations and known issues.
 2. Backup your database and other core files.  There is currently no mechanism to roll-back or undo a bulk import.
 3. Import, or manually create, any gear that was present in Strava.
-4. Import activities and media that were in Strava.
+4. Import activities and media that were in Strava, ideally performing a small test import first.
 
 ### Importing gear from a Strava bulk export
 
@@ -92,7 +92,7 @@ Gear that is already present in Endurain due to having an active link with Strav
 
 ### Importing activities and media from a Strava bulk export
 
-At the present time, importing activities and media from a Strava bulk export is implemented as a very early beta feature - use with extreme caution.  Please read the entire section below, especially the limitations.
+At the present time, importing activities and media from a Strava bulk export is implemented as a very early beta feature that has undergone only limited testing - use with extreme caution.  Please read the entire section below, especially the limitations.
 
 **We advise backing up your database, or using a test install of Endurain, before importing data.  There is currently no mechanism to undo or revert an import.**
 
@@ -119,7 +119,7 @@ Activity files that resulted in an error during import should be moved to the da
 
 #### Performing a test import
 
-You may import as many or as few activities as you want during any given import by placing only the activity files you want imported into the data/strava_import/activities directory. The importer looks for importable (i.e., .gpx, .fit, etc.) files in the activities folder and only then looks to see if each file has importable metadata and/or media present in the activities.csv file.
+You may import as many or as few activities as you want during any given import by placing only the activity files that you want imported into the data/strava_import/activities directory. The importer looks for importable (i.e., .gpx, .fit, etc.) files in the activities folder and only then looks to see if each file has importable metadata and/or media present in the activities.csv file.
 
 Thus, to perform a test import:
 - Place only a few activity files into the data/strava_import/activities folder.
