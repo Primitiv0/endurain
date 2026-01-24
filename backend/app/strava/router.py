@@ -296,20 +296,17 @@ async def import_shoes_from_strava_export(
 
 @router.post("/import/activities", status_code=201)
 async def import_activities_and_media_from_strava_export(
-    token_user_id: Annotated[
-        int,
-        Depends(session_security.get_user_id_from_access_token),
-    ],
-    check_scopes: Annotated[
-        Callable, Security(session_security.check_scopes, scopes=["activities:write"])
+    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    _check_scopes: Annotated[
+        Callable, Security(auth_security.check_scopes, scopes=["activities:write"])
     ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
-    websocket_manager: Annotated[
-        websocket_schema.WebSocketManager,
-        Depends(websocket_schema.get_websocket_manager),
+    ws_manager: Annotated[
+        websocket_manager.WebSocketManager,
+        Depends(websocket_manager.get_websocket_manager),
     ],
     background_tasks: BackgroundTasks,
 ):

@@ -12,7 +12,7 @@ import core.logger as core_logger
 import core.database as core_database
 import core.dependencies as core_dependencies
 
-import users.user.crud as users_crud
+import users.users.crud as users_crud
 
 import strava.utils as strava_utils
 import strava.athlete_utils as strava_athlete_utils
@@ -26,13 +26,13 @@ import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
 import activities.activity_media.crud as activity_media_crud
 
-import session.security as session_security
+import auth.security as auth_security
 
-import users.user_integrations.crud as user_integrations_crud
+import users.users_integrations.crud as user_integrations_crud
 
 from core.database import SessionLocal
 
-import websocket.schema as websocket_schema
+import websocket.manager as websocket_manager
 
 from fastapi import (
     APIRouter,
@@ -88,10 +88,7 @@ def iterate_over_activities_csv() -> dict:
 
 
 def create_gear_dictionary_for_bulk_import(
-    token_user_id: Annotated[
-    int,
-    Depends(session_security.get_user_id_from_access_token),
-    ],
+    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -121,14 +118,8 @@ def create_gear_dictionary_for_bulk_import(
     return users_existing_gear_nickname_to_id
 
 def queue_bulk_export_activities_for_import(
-    token_user_id: Annotated[
-    int,
-    Depends(session_security.get_user_id_from_access_token),
-    ],
-    websocket_manager: Annotated[
-        websocket_schema.WebSocketManager,
-        Depends(websocket_schema.get_websocket_manager),
-    ],
+    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    websocket_manager: websocket_manager.WebSocketManager,
     db: Annotated[
         Session,
         Depends(core_database.get_db),
