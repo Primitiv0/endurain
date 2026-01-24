@@ -1,0 +1,8 @@
+{
+  "addStepsModalTitle": "Schritte hinzufügen",
+  "editStepsModalTitle": "Schritte bearbeiten",
+  "addStepsLabel": "Schritte",
+  "addStepsDateLabel": "Datum",
+  "successAddSteps": "Schritte hinzugefügt",
+  "errorAddSteps": "Fehler beim Hinzufügen der Schritte"
+}

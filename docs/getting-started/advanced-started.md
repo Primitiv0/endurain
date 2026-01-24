@@ -19,6 +19,10 @@ Table below shows supported environment variables. Variables marked with optiona
 | UID | 1000 | Yes | User ID for mounted volumes. Default is 1000 |
 | GID | 1000 | Yes | Group ID for mounted volumes. Default is 1000 |
 | TZ | UTC | Yes | Timezone definition. Useful for TZ calculation for activities that do not have coordinates associated, like indoor swim or weight training. If not specified UTC will be used. List of available time zones [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). Format `Europe/Lisbon` expected |
+| FRONTEND_DIR | `/app/frontend/dist` | Yes | You will only need to change this value if installing using bare metal method |
+| BACKEND_DIR | `/app/backend` | Yes | You will only need to change this value if installing using bare metal method |
+| DATA_DIR | `/app/backend/data` | Yes | You will only need to change this value if installing using bare metal method |
+| LOGS_DIR | `/app/backend/logs` | Yes | You will only need to change this value if installing using bare metal method |
 | ENDURAIN_HOST | No default set | `No` | Required for internal communication and Strava. For Strava https must be used. Host or local ip (example: http://192.168.1.10:8080 or https://endurain.com) |
 | REVERSE_GEO_PROVIDER | nominatim | Yes | Defines reverse geo provider. Expects <a href="https://geocode.maps.co/">geocode</a>, photon or nominatim. photon can be the <a href="https://photon.komoot.io">SaaS by komoot</a> or a self hosted version like a <a href="https://github.com/rtuszik/photon-docker">self hosted version</a>. Like photon, Nominatim can be the <a href="https://nominatim.openstreetmap.org/">SaaS</a> or a self hosted version |
 | PHOTON_API_HOST | photon.komoot.io | Yes | API host for photon. By default it uses the <a href="https://photon.komoot.io">SaaS by komoot</a> |
@@ -27,38 +31,32 @@ Table below shows supported environment variables. Variables marked with optiona
 | NOMINATIM_API_USE_HTTPS | true | Yes | Protocol used by Nominatim. By default uses HTTPS to be inline with what <a href="https://nominatim.openstreetmap.org">SaaS</a> expects |
 | GEOCODES_MAPS_API | changeme | Yes | <a href="https://geocode.maps.co/">Geocode maps</a> offers a free plan consisting of 1 Request/Second. Registration necessary. |
 | REVERSE_GEO_RATE_LIMIT | 1 | Yes | Change this if you have a paid Geocode maps tier. Other providers also use this variable. Keep it as is if you use photon or Nominatim to keep 1 request per second | 
-| DB_TYPE | postgres | Yes | mariadb or postgres |
-| DB_HOST | postgres | Yes | mariadb or postgres |
+| DB_HOST | postgres | Yes | postgres |
 | DB_PORT | 5432 | Yes | 3306 or 5432 |
 | DB_USER | endurain | Yes | N/A |
-| DB_PASSWORD | No default set | `No` | N/A |
+| DB_PASSWORD | No default set | `No` | Database password. Alternatively, use `DB_PASSWORD_FILE` for Docker secrets |
 | DB_DATABASE | endurain | Yes | N/A |
-| SECRET_KEY | No default set | `No` | Run `openssl rand -hex 32` on a terminal to get a secret |
-| FERNET_KEY | No default set | `No` | Run `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on a terminal to get a secret or go to [https://fernetkeygen.com](https://fernetkeygen.com). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=` |
+| SECRET_KEY | No default set | `No` | Run `openssl rand -hex 32` on a terminal to get a secret. Alternatively, use `SECRET_KEY_FILE` for Docker secrets |
+| FERNET_KEY | No default set | `No` | Run `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on a terminal to get a secret or go to [https://fernetkeygen.com](https://fernetkeygen.com). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=`. Alternatively, use `FERNET_KEY_FILE` for Docker secrets |
 | ALGORITHM | HS256 | Yes | Currently only HS256 is supported |
 | ACCESS_TOKEN_EXPIRE_MINUTES | 15 | Yes | Time in minutes |
 | REFRESH_TOKEN_EXPIRE_DAYS | 7 | Yes | Time in days |
+| SESSION_IDLE_TIMEOUT_ENABLED | false | Yes | Enforce idle timeouts (supported values are `true` and `false`) |
+| SESSION_IDLE_TIMEOUT_HOURS | 1 | Yes | Time in hours |
+| SESSION_ABSOLUTE_TIMEOUT_HOURS | 24 | Yes | Time in hours |
 | JAEGER_ENABLED | false | Yes | N/A |
 | JAEGER_PROTOCOL | http | Yes | N/A |
 | JAEGER_HOST | jaeger | Yes | N/A |
 | JAEGER_PORT | 4317 | Yes | N/A |
 | BEHIND_PROXY | false | Yes | Change to true if behind reverse proxy |
-| ENVIRONMENT | production | Yes | "production" and "development" allowed. "development" allows connections from localhost:8080 and localhost:5173 at the CORS level |
+| ENVIRONMENT | production | Yes | `production`, `demo` and `development` allowed. `development` allows connections from localhost:8080 and localhost:5173 at the CORS level. `demo` equals to `production` except it does not return user sessions |
 | SMTP_HOST | No default set | Yes | The SMTP host of your email provider. Example `smtp.protonmail.ch` |
 | SMTP_PORT | 587 | Yes | The SMTP port of your email provider. Default is 587 |
 | SMTP_USERNAME | No default set | Yes | The username of your SMTP email provider, probably your email address |
-| SMTP_PASSWORD | No default set | Yes | The password of your SMTP email provider. Some providers allow the use of your account password, others require the creation of an app password. Please refer to your provider documentation |
+| SMTP_PASSWORD | No default set | Yes | The password of your SMTP email provider. Some providers allow the use of your account password, others require the creation of an app password. Please refer to your provider documentation. Alternatively, use `SMTP_PASSWORD_FILE` for Docker secrets |
 | SMTP_SECURE | true | Yes | By default it uses secure communications. Accepted values are `true` and `false` |
 | SMTP_SECURE_TYPE | starttls | Yes | If SMTP_SECURE is set you can set the communication type. Accepted values are `starttls` and `ssl` |
-
-Table below shows the obligatory environment variables for mariadb container. You should set them based on what was also set for the Endurain container.
-
-| Environemnt variable  | Default value | Optional | Notes |
-| --- | --- | --- | --- |
-| MYSQL_ROOT_PASSWORD | changeme | `No` | N/A |
-| MYSQL_DATABASE | endurain | `No` | N/A |
-| MYSQL_USER | endurain | `No` | N/A |
-| MYSQL_PASSWORD | changeme | `No` | N/A |
+| LOG_LEVEL | info | Yes | Supported levels: critical, error, warning, info, debug, trace |
 
 Table below shows the obligatory environment variables for postgres container. You should set them based on what was also set for the Endurain container.
 
@@ -75,6 +73,84 @@ Frontend dependencies:
 
 - To check npm dependencies used, use npm file (package.json)
 - Logo created on Canva
+
+## Session Timeout Configuration (Optional)
+
+By default, Endurain sessions last 7 days without enforcing idle timeouts.
+For enhanced security, you can enable automatic session expiration:
+
+**Environment Variables:**
+
+- `SESSION_IDLE_TIMEOUT_ENABLED`: Enable timeout enforcement (default: `false`)
+- `SESSION_IDLE_TIMEOUT_HOURS`: Logout after inactivity (default: `1`)
+- `SESSION_ABSOLUTE_TIMEOUT_HOURS`: Force re-login after duration (default: `24`)
+
+**Example:**
+
+```yaml
+environment:
+  SESSION_IDLE_TIMEOUT_ENABLED: "true"
+  SESSION_IDLE_TIMEOUT_HOURS: "2"
+  SESSION_ABSOLUTE_TIMEOUT_HOURS: "48"
+```
+
+## Docker Secrets Support
+
+Endurain supports [Docker secrets](https://docs.docker.com/compose/how-tos/use-secrets/) for securely managing sensitive environment variables. For the following environment variables, you can use `_FILE` variants that read the secret from a file instead of storing it directly in environment variables:
+
+- `DB_PASSWORD` → `DB_PASSWORD_FILE`
+- `SECRET_KEY` → `SECRET_KEY_FILE`
+- `FERNET_KEY` → `FERNET_KEY_FILE`
+- `SMTP_PASSWORD` → `SMTP_PASSWORD_FILE`
+
+### Using File-Based Secrets
+
+Use file-based secrets to securely manage sensitive environment variables:
+
+1. **Create a secrets directory with proper permissions:**
+
+```bash
+mkdir -p secrets
+chmod 700 secrets
+```
+
+2. **Create secret files with strong passwords:**
+
+```bash
+# Use randomly generated passwords, not hardcoded ones
+echo "$(openssl rand -base64 32)" > secrets/db_password.txt
+echo "$(openssl rand -hex 32)" > secrets/secret_key.txt
+echo "$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")" > secrets/fernet_key.txt
+
+# Set secure file permissions
+chmod 600 secrets/*.txt
+chown $(id -u):$(id -g) secrets/*.txt
+```
+
+3. **Configure docker-compose.yml:**
+
+```yaml
+services:
+  endurain:
+    environment:
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - SECRET_KEY_FILE=/run/secrets/secret_key
+      - FERNET_KEY_FILE=/run/secrets/fernet_key
+    secrets:
+      - db_password
+      - secret_key
+      - fernet_key
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  secret_key:
+    file: ./secrets/secret_key.txt
+  fernet_key:
+    file: ./secrets/fernet_key.txt
+```
+
+**Note**: When using `_FILE` variants, the original environment variables (e.g., `DB_PASSWORD`) are not needed. The application will automatically read from the file specified by the `_FILE` environment variable.
 
 ## Volumes
 

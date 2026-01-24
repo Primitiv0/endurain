@@ -20,34 +20,61 @@
         <a
           href="#"
           class="nav-link link-body-emphasis"
+          :class="{ active: activeSection === 'sleep' }"
+          @click.prevent="changeActive('sleep')"
+        >
+          <font-awesome-icon :icon="['fas', 'bed']" />
+          <span class="ms-1">{{ $t('healthSideBarComponent.sleepSection') }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a
+          href="#"
+          class="nav-link link-body-emphasis"
+          :class="{ active: activeSection === 'rhr' }"
+          @click.prevent="changeActive('rhr')"
+        >
+          <font-awesome-icon :icon="['fas', 'heart-pulse']" />
+          <span class="ms-1">{{ $t('healthSideBarComponent.RHRSection') }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a
+          href="#"
+          class="nav-link link-body-emphasis"
+          :class="{ active: activeSection === 'steps' }"
+          @click.prevent="changeActive('steps')"
+        >
+          <font-awesome-icon :icon="['fas', 'shoe-prints']" />
+          <span class="ms-1">{{ $t('healthSideBarComponent.stepsSection') }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a
+          href="#"
+          class="nav-link link-body-emphasis"
           :class="{ active: activeSection === 'weight' }"
           @click.prevent="changeActive('weight')"
         >
           <font-awesome-icon :icon="['fas', 'weight']" />
-          <span class="ms-1">{{ $t('healthSideBarComponent.weightSection') }}</span>
+          <span class="ms-2">{{ $t('healthSideBarComponent.weightSection') }}</span>
         </a>
       </li>
     </ul>
   </div>
 </template>
 
-<script>
-export default {
-  props: {
-    activeSection: {
-      type: String,
-      required: true
-    }
-  },
-  emits: ['update-active-section'],
-  setup(props, { emit }) {
-    function changeActive(section) {
-      emit('update-active-section', section)
-    }
-
-    return {
-      changeActive
-    }
+<script setup>
+const props = defineProps({
+  activeSection: {
+    type: String,
+    required: true
   }
+})
+
+const emit = defineEmits(['updateActiveSection'])
+
+function changeActive(section) {
+  emit('updateActiveSection', section)
 }
 </script>

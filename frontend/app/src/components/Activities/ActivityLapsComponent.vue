@@ -76,7 +76,7 @@
           <th
             scope="col"
             style="width: 10%"
-            v-if="!activityTypeIsSwimming(activity) && activity !== 13"
+            v-if="!activityTypeIsSwimming(activity) && activityTypeNotRowing(activity)"
           >
             {{ $t('activityLapsComponent.labelLapElev') }}
           </th>
@@ -148,7 +148,7 @@ const props = defineProps({
     required: true
   },
   units: {
-    type: Number,
+    type: String,
     required: true
   }
 })

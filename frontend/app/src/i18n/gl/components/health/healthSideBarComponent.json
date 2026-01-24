@@ -1,4 +1,7 @@
 {
-  "dashboardSection": "Dashboard",
-  "weightSection": "Weight"
+  "dashboardSection": "Taboleiro",
+  "sleepSection": "Durmir",
+  "RHRSection": "Pulso en repouso",
+  "stepsSection": "Pasos",
+  "weightSection": "Peso"
 }

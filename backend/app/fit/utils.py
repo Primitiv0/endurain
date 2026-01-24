@@ -1,8 +1,8 @@
 import fitdecode
+from enum import Enum
 
 from fastapi import HTTPException, status
-from datetime import datetime, timedelta
-import time as timelib
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from timezonefinder import TimezoneFinder
 from zoneinfo import ZoneInfo, available_timezones
@@ -15,13 +15,14 @@ import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
 
 import activities.activity_workout_steps.schema as activity_workout_steps_schema
 
-import users.user_default_gear.utils as user_default_gear_utils
+import users.users_default_gear.utils as user_default_gear_utils
 
 import garmin.utils as garmin_utils
 
 import gears.gear.crud as gears_crud
 
-import users.user_privacy_settings.schema as users_privacy_settings_schema
+import users.users_privacy_settings.models as users_privacy_settings_models
+import users.users_privacy_settings.utils as users_privacy_settings_utils
 
 import core.logger as core_logger
 
@@ -31,9 +32,9 @@ import core.config as core_config
 def create_activity_objects(
     sessions_records: dict,
     user_id: int,
-    user_privacy_settings: users_privacy_settings_schema.UsersPrivacySettings,
-    garmin_activity_id: int = None,
-    garminconnect_gear: dict = None,
+    user_privacy_settings: users_privacy_settings_models.UsersPrivacySettings,
+    garmin_activity_id: int | None = None,
+    garminconnect_gear: dict | None = None,
     db: Session = None,
 ) -> list:
     try:
@@ -92,6 +93,7 @@ def create_activity_objects(
                 session_record["session"]["total_timer_time"],
                 session_record["session"]["activity_type"],
                 session_record["split_summary"],
+                session_record["lengths"],
             )
 
             if activity_type != 3 and activity_type != 7:
@@ -160,10 +162,8 @@ def create_activity_objects(
                     workout_feeling=session_record["session"]["workout_feeling"],
                     workout_rpe=session_record["session"]["workout_rpe"],
                     calories=session_record["session"]["calories"],
-                    visibility=(
+                    visibility=users_privacy_settings_utils.visibility_to_int(
                         user_privacy_settings.default_activity_visibility
-                        if user_privacy_settings.default_activity_visibility is not None
-                        else 0
                     ),
                     gear_id=gear_id,
                     strava_gear_id=None,
@@ -187,6 +187,10 @@ def create_activity_objects(
                     hide_workout_sets_steps=user_privacy_settings.hide_activity_workout_sets_steps
                     or False,
                     hide_gear=user_privacy_settings.hide_activity_gear or False,
+                    tracker_manufacturer=session_record["file_id"].get(
+                        "manufacturer", None
+                    ),
+                    tracker_model=str(session_record["file_id"].get("product", None)),
                 ),
                 "is_elevation_set": session_record["is_elevation_set"],
                 "ele_waypoints": session_record["ele_waypoints"],
@@ -303,6 +307,8 @@ def split_records_by_activity(parsed_data: dict) -> dict:
             "split_summary": parsed_data["split_summary"],
             "workout_steps": parsed_data["workout_steps"],
             "sets": parsed_data["sets"],
+            "lengths": parsed_data["lengths"],
+            "file_id": parsed_data["file_id"],
         }
 
         # Only parse arrays if the respective flag is set
@@ -428,13 +434,16 @@ def split_records_by_activity(parsed_data: dict) -> dict:
     return sessions_records
 
 
-def parse_fit_file(file: str, db: Session) -> dict:
+def parse_fit_file(
+    file: str, db: Session, activity_name_input: str | None = None
+) -> dict:
     try:
         # Initialize default values for various variables
         sessions = []
         time_offset = 0
         last_waypoint_time = None
-        activity_name = "Workout"
+        activity_name = activity_name_input if activity_name_input else "Workout"
+        resting_heart_rate = None
 
         # Arrays to store waypoint data
         lat_lon_waypoints = []
@@ -462,6 +471,18 @@ def parse_fit_file(file: str, db: Session) -> dict:
 
         # Array to store exercises titles
         exercises_titles = []
+
+        # Array to store lengths
+        lengths = []
+
+        # Array to store intraday steps
+        intraday_steps = []
+
+        # Array to store intraday heart rate
+        intraday_heart_rate = []
+
+        # Dictionary to store file ID data
+        file_id = {}
 
         # Initialize variables to store previous latitude and longitude
         prev_latitude, prev_longitude = None, None
@@ -711,6 +732,20 @@ def parse_fit_file(file: str, db: Session) -> dict:
                         time_offset = parse_frame_device_settings(frame)
                         time_offset = interpret_time_offset(time_offset)
 
+                    if frame.name == "length":
+                        lengths.append(parse_frame_length(frame))
+
+                    if frame.name == "file_id":
+                        file_id = parse_frame_file_id(frame)
+
+                    if frame.name == "monitoring":
+                        steps, heart_rate = parse_frame_monitoring(frame, fit_data.last_timestamp)
+                        intraday_steps.extend(steps)
+                        intraday_heart_rate.extend(heart_rate)
+
+                    if frame.name == "monitoring_hr_data":
+                        resting_heart_rate = parse_frame_monitoring_hr_data(frame)
+
         # Check if exercises titles is not none
         if exercises_titles:
             activity_exercise_titles_crud.create_activity_exercise_titles(
@@ -740,6 +775,11 @@ def parse_fit_file(file: str, db: Session) -> dict:
             "split_summary": split_summary,
             "sets": sets,
             "workout_steps": workout_steps,
+            "lengths": lengths,
+            "file_id": file_id,
+            "intraday_steps": intraday_steps,
+            "intraday_heart_rate": intraday_heart_rate,
+            "resting_heart_rate": resting_heart_rate,
         }
     except HTTPException as http_err:
         raise http_err
@@ -768,10 +808,12 @@ def parse_frame_session(frame):
             activity_type = "virtual_ride"
         elif activity_type == "cycling" and sub_sport == "commuting":
             activity_type = "commuting_ride"
-        elif activity_type == "cycling" and sub_sport == "indoor_cycling":
-            activity_type = "indoor_ride"
         elif activity_type == "cycling" and sub_sport == "mixed_surface":
             activity_type = "mixed_surface_ride"
+        elif (
+            activity_type == "generic" and sub_sport == "breathing"
+        ) or activity_type == 62:
+            activity_type = "hiit"
         elif activity_type == 64 and sub_sport == 85:
             activity_type = "padel"
         else:
@@ -803,7 +845,7 @@ def parse_frame_session(frame):
         get_value_from_frame(frame, "normalized_power"),
         get_value_from_frame(frame, "enhanced_avg_speed"),
         get_value_from_frame(frame, "enhanced_max_speed"),
-        get_value_from_frame(frame, "workout_feeling"),
+        get_value_from_frame(frame, "workout_feel"),
         get_value_from_frame(frame, "workout_rpe"),
     )
 
@@ -1045,6 +1087,84 @@ def parse_frame_device_settings(frame):
     return get_value_from_frame(frame, "time_offset")
 
 
+def parse_frame_length(frame):
+    return {
+        "message_index": get_value_from_frame(frame, "message_index"),
+        "start_time": get_value_from_frame(frame, "start_time"),
+        "total_elapsed_time": get_value_from_frame(frame, "total_elapsed_time"),
+        "total_timer_time": get_value_from_frame(frame, "total_timer_time"),
+        "total_strokes": get_value_from_frame(frame, "total_strokes"),
+        "avg_speed": get_value_from_frame(frame, "avg_speed"),
+        "swim_stroke": get_value_from_frame(frame, "swim_stroke"),
+        "avg_swimming_cadence": get_value_from_frame(frame, "avg_swimming_cadence"),
+        "length_type": get_value_from_frame(frame, "length_type"),
+    }
+
+
+def parse_frame_file_id(frame):
+    return {
+        "type": get_value_from_frame(frame, "type"),
+        "manufacturer": get_value_from_frame(frame, "manufacturer"),
+        "product": get_value_from_frame(frame, "product"),
+        "serial_number": get_value_from_frame(frame, "serial_number"),
+        "time_created": get_value_from_frame(frame, "time_created"),
+    }
+
+
+def parse_frame_monitoring(frame, last_timestamp):
+    steps = []
+    heart_rate = []
+
+    data = {}
+    for field in frame.fields:
+        data.update({field.name: field.value})
+        for sf in getattr(field.field, "subfields", []) or []:
+            data.update({sf.name: sf.render(field.raw_value)})
+
+    # Reconstruct timestamp with timestamp_16.
+    current_timestamp = None
+    if data.get("timestamp_16") is not None:
+        current_timestamp = (last_timestamp & 0xffff0000) | data["timestamp_16"]
+        if current_timestamp < last_timestamp:
+            current_timestamp += 0x10000
+    else:
+        current_timestamp = last_timestamp
+        
+    timestamp = datetime.fromtimestamp(
+        current_timestamp + fitdecode.FIT_UTC_REFERENCE, 
+        tz=timezone.utc,
+    )
+
+    if data.get("steps"):
+        steps.append({
+            "steps": data.get("steps"),
+            "active_time": data.get("active_time"),
+            "active_calories": data.get("active_calories"),
+            "current_activity_type_intensity": data.get("current_activity_type_intensity"),
+            "activity_type": data.get("activity_type"),
+            "intensity": data.get("intensity"),
+            "distance": data.get("distance"),
+            "duration_min": data.get("duration_min"),
+            "timestamp": timestamp,
+        })
+
+    if data.get("heart_rate"):
+        heart_rate.append({
+            "heart_rate": data.get("heart_rate"),
+            "timestamp": timestamp,
+        })
+    
+    return steps, heart_rate
+
+
+def parse_frame_monitoring_hr_data(frame):
+    return {
+        "timestamp": get_value_from_frame(frame, "timestamp"),
+        "resting_heart_rate": get_value_from_frame(frame, "resting_heart_rate"),
+        "current_day_resting_heart_rate": get_value_from_frame(frame, "current_day_resting_heart_rate"),
+    }
+
+
 def interpret_time_offset(raw_offset):
     # Check for two's complement representation (values > 2^31)
     if raw_offset != 0 and raw_offset is not None:
@@ -1083,10 +1203,21 @@ def append_if_not_none(waypoint_list, time, value, key):
         waypoint_list.append({"time": time, key: value})
 
 
-def calculate_pace(distance, total_timer_time, activity_type, split_summary):
+def calculate_pace(distance, total_timer_time, activity_type, split_summary, lengths):
     if distance:
-        if activity_type != "lap_swimming":
+        if activity_type != "lap_swimming" or (
+            activity_type == "lap_swimming" and not split_summary and not lengths
+        ):
             return total_timer_time, total_timer_time / distance
+        if activity_type == "lap_swimming" and lengths:
+            # Swimming pace calculation based on lengths
+            time_active = 0
+            for length in lengths:
+                if length["length_type"] == "active":
+                    time_active += length["total_timer_time"]
+
+            return time_active, time_active / distance
+        # Swimming pace calculation based on split summary
         time_active = 0
         for split in split_summary:
             if split["split_type"] != 4:

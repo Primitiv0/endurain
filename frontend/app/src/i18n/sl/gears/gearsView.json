@@ -1,0 +1,13 @@
+{
+  "title": "Oprema",
+  "buttonAddGear": "Dodaj opremo",
+  "subTitleSearchGearByNickname": "Išči opremo po vzdevku",
+  "placeholderSearchGearByNickname": "Vzdevek",
+  "buttonSearchGear": "Išči opremo",
+  "displayUserNumberOfGears1": "Skupno število opreme je ",
+  "displayUserNumberOfGears2": " kosov opreme (",
+  "displayUserNumberOfGears3": " naloženo):",
+  "successGearDeleted": "Oprema uspešno izbrisana",
+  "errorGearNotFound": "Oprema ni najdena",
+  "errorFetchingGears": "Napaka pri pridobivanju opreme"
+}

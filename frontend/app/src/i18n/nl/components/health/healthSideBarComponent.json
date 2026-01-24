@@ -1,4 +1,7 @@
 {
   "dashboardSection": "Dashboard",
+  "sleepSection": "Slaap",
+  "RHRSection": "Hartslag in rust",
+  "stepsSection": "Stappen",
   "weightSection": "Gewicht"
 }

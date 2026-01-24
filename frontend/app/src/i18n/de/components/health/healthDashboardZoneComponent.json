@@ -1,4 +1,8 @@
 {
+  "sleep": "Schlaf heute",
+  "noSleepTarget": "Kein Schlafziel",
+  "restingHeartRate": "Ruheherzfrequenz",
+  "avgSkinTemperatureDeviation": "Hauttemp. Abw.",
   "weight": "Gewicht",
   "noWeightData": "Keine Gewichtsdaten",
   "noWeightTarget": "Kein Gewichtsziel",
@@ -9,5 +13,8 @@
   "bmiOverweight": "Übergewichtig",
   "bmiObesityClass1": "Fettleibigkeit (Klasse 1)",
   "bmiObesityClass2": "Fettleibigkeit (Klasse 2)",
-  "bmiObesityClass3": "Fettleibigkeit (Klasse 3)"
+  "bmiObesityClass3": "Fettleibigkeit (Klasse 3)",
+  "steps": "Schritte heute",
+  "stepsTargetLabel": "Schritte",
+  "noStepsTarget": "Kein Schritte-Ziel"
 }

@@ -1,0 +1,9 @@
+{
+  "buttonAddSleep": "Slaap toevoegen",
+  "buttonSleepTarget": "Slaap doel",
+  "modalSleepTargetHoursLabel": "uren",
+  "modalSleepTargetMinutesLabel": "minuten",
+  "labelNumberOfHealthSleep1": "Er is een totaal van ",
+  "labelNumberOfHealthSleep2": " slaap invoergegevens geplaatst (",
+  "labelNumberOfHealthSleep3": " geladen):"
+}

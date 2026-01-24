@@ -1,0 +1,14 @@
+{
+  "labelLapNumber": "Krog",
+  "labelLapIntensity": "Intenzivnost",
+  "labelLapDistance": "Razdalja",
+  "labelLapTime": "Čas",
+  "labelLapPace": "Tempo",
+  "labelLapSpeed": "Hitrost",
+  "labelLapElevation": "Nadmorska višina",
+  "labelLapElev": "Elev",
+  "labelLapAvgHr": "Povprečen srčni utrip",
+  "labelLapHR": "HR",
+  "labelLapStrokeRate": "Frekvenca zamahov",
+  "labelLapSR": "SR"
+}

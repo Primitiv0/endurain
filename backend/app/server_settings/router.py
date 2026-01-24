@@ -1,109 +1,203 @@
 import os
+import aiofiles.os
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, Security, UploadFile
+import aiofiles
+from fastapi import (
+    APIRouter,
+    Depends,
+    Security,
+    UploadFile,
+    HTTPException,
+    Request,
+    status,
+)
 from sqlalchemy.orm import Session
+
+from safeuploads import FileValidator
+from safeuploads.exceptions import FileValidationError
 
 import server_settings.schema as server_settings_schema
 import server_settings.crud as server_settings_crud
 import server_settings.utils as server_settings_utils
 
-import session.security as session_security
+import auth.security as auth_security
 
 import core.database as core_database
 import core.logger as core_logger
 import core.config as core_config
+import core.file_uploads as core_file_uploads
 
 # Define the API router
 router = APIRouter()
 
 
-@router.get("", response_model=server_settings_schema.ServerSettingsRead)
+@router.get(
+    "",
+    response_model=server_settings_schema.ServerSettingsRead,
+    status_code=status.HTTP_200_OK,
+)
 async def read_server_settings(
-    check_scopes: Annotated[
+    _check_scopes: Annotated[
         Callable,
-        Security(session_security.check_scopes, scopes=["server_settings:read"]),
+        Security(auth_security.check_scopes, scopes=["server_settings:read"]),
     ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
-):
-    # Get the server_settings from the database
-    return server_settings_utils.get_server_settings(db)
+) -> server_settings_schema.ServerSettingsRead:
+    """
+    Get current server settings.
+
+    Requires admin authentication with server_settings:read scope.
+
+    Returns:
+        Current server settings configuration with decrypted API key.
+    """
+    return server_settings_utils.get_server_settings_for_admin(db)
 
 
-@router.put("", response_model=server_settings_schema.ServerSettingsRead)
+@router.get(
+    "/tile_maps_templates",
+    response_model=list[server_settings_schema.TileMapsTemplate],
+    status_code=status.HTTP_200_OK,
+)
+async def list_tile_maps_templates(
+    _check_scopes: Annotated[
+        Callable,
+        Security(auth_security.check_scopes, scopes=["server_settings:read"]),
+    ],
+) -> list[server_settings_schema.TileMapsTemplate]:
+    """
+    Retrieve available tile map templates for server settings.
+
+    This endpoint returns a list of all available tile map templates that can
+    be used for configuring map display options in server settings.
+
+    Returns:
+        List of tile map template configurations available for the server.
+
+    Raises:
+        HTTPException: If the user lacks the required 'server_settings:read'
+        scope.
+    """
+    return server_settings_utils.get_tile_maps_templates()
+
+
+@router.put(
+    "",
+    response_model=server_settings_schema.ServerSettingsRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def edit_server_settings(
-    server_settings_attributtes: server_settings_schema.ServerSettingsEdit,
-    check_scopes: Annotated[
+    request: Request,
+    server_settings_attributes: server_settings_schema.ServerSettingsEdit,
+    _check_scopes: Annotated[
         Callable,
-        Security(session_security.check_scopes, scopes=["server_settings:write"]),
+        Security(auth_security.check_scopes, scopes=["server_settings:write"]),
     ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
-):
-    # Update the server_settings in the database
-    return server_settings_crud.edit_server_settings(server_settings_attributtes, db)
+) -> server_settings_schema.ServerSettingsRead:
+    """
+    Update server settings.
+
+    Requires admin authentication with server_settings:write scope.
+
+    Args:
+        request: FastAPI request object for accessing app state.
+        server_settings_attributes: Settings to update.
+
+    Returns:
+        Updated server settings configuration.
+    """
+    result = server_settings_crud.edit_server_settings(server_settings_attributes, db)
+
+    # Update allowed tile domains in app.state if tileserver_url changed
+    if server_settings_attributes.tileserver_url is not None:
+        try:
+            request.app.state.allowed_tile_domains = (
+                server_settings_utils.get_allowed_tile_domains(db)
+            )
+            core_logger.print_to_log(
+                f"Updated allowed tile domains: {request.app.state.allowed_tile_domains}"
+            )
+        except Exception as e:
+            core_logger.print_to_log(
+                f"Error updating tile domains in app.state: {e}", "error", exc=e
+            )
+
+    return result
 
 
 @router.post(
     "/upload/login",
-    status_code=201,
+    response_model=dict[str, str],
+    status_code=status.HTTP_201_CREATED,
 )
 async def upload_login_photo(
     file: UploadFile,
-    check_scopes: Annotated[
+    _check_scopes: Annotated[
         Callable,
-        Security(session_security.check_scopes, scopes=["server_settings:write"]),
+        Security(auth_security.check_scopes, scopes=["server_settings:write"]),
     ],
-):
-    try:
-        # Ensure the 'server_images' directory exists
-        upload_dir = core_config.SERVER_IMAGES_DIR
-        os.makedirs(upload_dir, exist_ok=True)
+    db: Annotated[
+        Session,
+        Depends(core_database.get_db),
+    ],
+) -> dict[str, str]:
+    """
+    Upload custom login page photo.
 
-        # Build the full path with the name "login.png"
-        file_path = os.path.join(upload_dir, "login.png")
+    Requires admin authentication with server_settings:write scope.
 
-        # Save the uploaded file with the name "login.png"
-        with open(file_path, "wb") as save_file:
-            save_file.write(file.file.read())
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in upload_login_photo: {err}", "error", exc=err
-        )
+    Args:
+        file: Image file to upload.
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise err
+    Returns:
+        Full file path where file was saved.
+    """
+    # Save file using centralized file upload handler
+    await core_file_uploads.save_image_file_and_validate_it(
+        file, core_config.SERVER_IMAGES_DIR, "login.png"
+    )
+
+    server_settings_crud.update_server_settings_login_photo_set(True, db)
+
+    return {"message": "Login photo uploaded successfully."}
 
 
 @router.delete(
     "/upload/login",
-    status_code=200,
+    response_model=None,
+    status_code=status.HTTP_204_NO_CONTENT,
 )
 async def delete_login_photo(
-    check_scopes: Annotated[
+    _check_scopes: Annotated[
         Callable,
-        Security(session_security.check_scopes, scopes=["server_settings:write"]),
+        Security(auth_security.check_scopes, scopes=["server_settings:write"]),
     ],
-):
-    try:
-        # Build the full path to the file
-        file_path = os.path.join(core_config.SERVER_IMAGES_DIR, "login.png")
+    db: Annotated[
+        Session,
+        Depends(core_database.get_db),
+    ],
+) -> None:
+    """
+    Delete custom login page photo.
 
-        # Check if the file exists
-        if os.path.exists(file_path):
-            # Delete the file
-            os.remove(file_path)
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in delete_login_photo: {err}", "error", exc=err
-        )
+    Requires admin authentication with server_settings:write scope.
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise err
+    Returns:
+        Success confirmation message.
+
+    Raises:
+        HTTPException: If deletion fails.
+    """
+    await core_file_uploads.delete_files_by_pattern(
+        core_config.SERVER_IMAGES_DIR, "login.png"
+    )
+
+    server_settings_crud.update_server_settings_login_photo_set(False, db)

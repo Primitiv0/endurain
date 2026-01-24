@@ -1,8 +1,10 @@
 import os, secrets, hashlib
 import apprise
 from typing import List
+from urllib.parse import quote
 
 import core.logger as core_logger
+import core.config as core_config
 
 
 class AppriseService:
@@ -10,10 +12,10 @@ class AppriseService:
         self.smtp_host = os.getenv("SMTP_HOST")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.smtp_username = os.getenv("SMTP_USERNAME")
-        self.smtp_password = os.getenv("SMTP_PASSWORD")
+        self.smtp_password = core_config.read_secret("SMTP_PASSWORD")
         self.smtp_secure = os.getenv("SMTP_SECURE", "true").lower()
         self.smtp_secure_type = os.getenv("SMTP_SECURE_TYPE", "starttls").lower()
-        self.frontend_host = os.getenv("ENDURAIN_HOST")
+        self.frontend_host = core_config.ENDURAIN_HOST
 
     def _build_smtp_url(self) -> str:
         """
@@ -60,8 +62,8 @@ class AppriseService:
             params.append(f"mode={self.smtp_secure_type}")
 
         # Add query parameters
-        params.append(f"user={self.smtp_username}")
-        params.append(f"pass={self.smtp_password}")
+        params.append(f"user={quote(self.smtp_username)}")
+        params.append(f"pass={quote(self.smtp_password)}")
         params.append(f"smtp={self.smtp_host}")
         params.append(f"port={self.smtp_port}")
         params.append("name=Endurain")

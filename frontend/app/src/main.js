@@ -11,7 +11,7 @@ import { registerSW } from 'virtual:pwa-register'
 registerSW()
 
 import 'bootstrap/dist/css/bootstrap.min.css'
-import 'bootstrap/dist/js/bootstrap.bundle.min.js'
+//import 'bootstrap/dist/js/bootstrap.bundle.min.js' // Not needed
 
 import 'leaflet/dist/leaflet.css'
 
@@ -67,11 +67,27 @@ async function initApp() {
   const authStore = useAuthStore()
   authStore.loadUserFromStorage(i18n)
 
+  // OAuth 2.1: Restore tokens on app initialization
+  // Access and CSRF tokens are stored in-memory only, so they're lost on page refresh.
+  // If user is authenticated but has no access token, refresh to get new tokens.
+  if (authStore.isAuthenticated && !authStore.getAccessToken()) {
+    try {
+      await authStore.refreshAccessToken()
+      // Set up WebSocket after token is available
+      authStore.setUserWebsocket()
+    } catch (error) {
+      // If refresh fails, clear user and redirect to login
+      console.error('Failed to restore session on app init:', error)
+      authStore.clearUser(i18n)
+      router.push('/login?sessionExpired=true')
+    }
+  }
+
   const themeStore = useThemeStore()
   themeStore.loadThemeFromStorage()
 
   const serverSettingsStore = useServerSettingsStore()
-  serverSettingsStore.loadServerSettingsFromServer()
+  await serverSettingsStore.loadServerSettingsFromServer()
 
   // Setup router
   app.use(router)

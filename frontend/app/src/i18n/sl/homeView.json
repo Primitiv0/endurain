@@ -1,0 +1,18 @@
+{
+  "title": "Endurain",
+  "buttonAddActivity": "Dodaj dejavnost",
+  "fieldLabelUploadFileType": "Naloži datoteko .gpx, .fit, .tcx ali .gz",
+  "radioUserActivities": "Moje dejavnosti",
+  "radioFollowerActivities": "Dejavnosti sledilcev",
+  "pillIsHidden": "Skrito",
+  "successActivityAdded": "Dejavnost je bila uspešno dodana",
+  "errorActivityAdded": "Napaka pri dodajanju dejavnosti",
+  "refreshingActivities": "Osveževanje dejavnosti iz povezanih storitev",
+  "successActivitiesRefreshed": "Dejavnosti so bile uspešno osvežene",
+  "errorActivityNotFound": "Dejavnosti ni bilo mogoče najti",
+  "processingActivity": "Obdelujem dejavnost",
+  "successActivityDeleted": "Dejavnost je bila uspešno izbrisana",
+  "errorFetchingUserStats": "Napaka pri pridobivanju statističnih podatkov uporabnika",
+  "errorFetchingUserActivities": "Napaka pri pridobivanju dejavnosti uporabnika",
+  "errorFetchingMedia": "Napaka pri pridobivanju medijev za dejavnost"
+}

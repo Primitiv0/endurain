@@ -1,0 +1,15 @@
+{
+  "unknownProviderIcon": "Unbekanntes Anbieter-Icon",
+  "providerTypeBadgeLabel": "Identitätsanbietertyp",
+  "linkedAtLabel": "Datum und Uhrzeit, an dem Anbieter verbunden wurde",
+  "linkedAt": "Verbunden",
+  "lastLoginLabel": "Datum und Uhrzeit der letzten Anmeldung mit diesem Anbieter",
+  "lastLogin": "Zuletzt verwendet",
+  "neverUsedLabel": "Dieser Anbieter wurde noch nie zum Login verwendet",
+  "neverUsed": "Niemals verwendet",
+  "deleteButtonAriaLabel": "Lösche {provider} Identitätsanbieter Verbindung",
+  "modalDeleteTitle": "Identitätsanbieter löschen",
+  "modalDeleteBody1": "Sind Sie sicher, dass Sie die Verbindung trennen möchten",
+  "modalDeleteBody2": "? Der Benutzer kann sich nicht mehr mit diesem Anbieter anmelden.",
+  "modalDeleteButton": "Anbieterverbindung löschen"
+}

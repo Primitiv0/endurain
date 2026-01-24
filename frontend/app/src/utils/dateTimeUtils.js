@@ -1,11 +1,5 @@
 import { DateTime } from 'luxon'
 
-/**
- * Formats a date string into a localized date format.
- *
- * @param {string} dateString - The date string to be formatted.
- * @returns {string} The formatted date string.
- */
 export function formatDateShort(dateString) {
   // Create a DateTime object from the date string
   const date = DateTime.fromISO(dateString, { setZone: true })
@@ -22,11 +16,6 @@ export function formatDateMed(dateString) {
   return date.toLocaleString(DateTime.DATE_MED)
 }
 
-/**
- * Formats a given date string into a time string.
- * @param {string} dateString - The date string to be formatted.
- * @returns {string} The formatted time string.
- */
 export function formatTime(dateString) {
   // Create a DateTime object from the date string and preserve its time zone offset
   const date = DateTime.fromISO(dateString, { setZone: true })
@@ -35,13 +24,6 @@ export function formatTime(dateString) {
   return date.toLocaleString(DateTime.TIME_SIMPLE)
 }
 
-/**
- * Calculates the time difference between two given timestamps.
- *
- * @param {string} startTime - The start timestamp.
- * @param {string} endTime - The end timestamp.
- * @returns {string} The formatted time difference.
- */
 export function calculateTimeDifference(startTime, endTime) {
   // Create new Date objects from the timestamps
   const startDateTime = new Date(startTime)
@@ -62,12 +44,6 @@ export function calculateTimeDifference(startTime, endTime) {
   return `${hours}h ${minutes}m`
 }
 
-/**
- * Converts a given number of seconds into a minutes:seconds format.
- *
- * @param {number} totalSeconds - The total number of seconds.
- * @returns {string} The formatted time string in minutes:seconds.
- */
 export function formatSecondsToMinutes(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
@@ -82,12 +58,6 @@ export function formatSecondsToMinutes(totalSeconds) {
   return `${minutes}m ${formattedSeconds}s`
 }
 
-/**
- * Converts a total number of seconds to the equivalent whole hours.
- *
- * @param {number} totalSeconds - The total number of seconds to convert.
- * @returns {number} The number of whole hours represented by the input seconds. Returns 0 if less than one hour.
- */
 export function formatSecondsToOnlyHours(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600)
 
@@ -97,30 +67,71 @@ export function formatSecondsToOnlyHours(totalSeconds) {
   return 0
 }
 
-/**
- * Gets the start date (Monday) of the week for a given date object, in UTC.
- * @param {Date} date - The input data object.
- * @returns {Date} - The data object for the Monday of that week (UTC).
- 
-export function getWeekStartDate(date) {
-	return DateTime.fromJSDate(date, { zone: 'utc' }).startOf('week').toJSDate();
-}*/
+export function returnHoursMinutesFromSeconds(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+
+  return { hours, minutes }
+}
+
+export function returnSecondsFromHoursMinutes(hours, minutes) {
+  return hours * 3600 + minutes * 60
+}
 
 /**
- * Gets the start date of the week for a given date object, respecting the specified first day of week, in UTC.
- * @param {Date} date - The input date object.
- * @param {number} firstDayOfWeek - The first day of week (0 = Sunday, 1 = Monday, etc.).
- * @returns {Date} - The date object for the start of that week (UTC).
+ * Formats seconds into a human-readable duration string without seconds.
+ *
+ * @param {number} seconds - The total number of seconds to format.
+ * @returns {string} Formatted duration string (e.g., "2h 30m" or "45m").
  */
-export function getWeekStartDate(date, firstDayOfWeek = 0) {
+export function formatDuration(seconds) {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  return `${minutes}m`
+}
+
+/**
+ * Formats a duration in seconds to a HH:mm string format.
+ *
+ * @param {number} seconds - The duration in seconds to format.
+ * @returns {string} The formatted duration as a string in HH:mm format (e.g., "02:30").
+ *
+ * @example
+ * formatDurationHHmm(9000) // Returns "02:30"
+ * formatDurationHHmm(3661) // Returns "01:01"
+ */
+export function formatDurationHHmm(seconds) {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+
+  const formattedHours = String(hours).padStart(2, '0')
+  const formattedMinutes = String(minutes).padStart(2, '0')
+
+  return `${formattedHours}:${formattedMinutes}`
+}
+
+export function getWeekStartDate(date, firstDayOfWeek = 'monday') {
   const dt = DateTime.fromJSDate(date, { zone: 'utc' })
 
   // Get the current day of the week (1 = Monday, 7 = Sunday in Luxon)
   const currentDayOfWeek = dt.weekday
 
-  // Convert firstDayOfWeek parameter to Luxon format
-  // 0 (Sunday) -> 7, 1 (Monday) -> 1, 2 (Tuesday) -> 2, etc.
-  const luxonFirstDayOfWeek = firstDayOfWeek === 0 ? 7 : firstDayOfWeek
+  // Map string day names to Luxon weekday numbers (1 = Monday, 7 = Sunday)
+  const dayMap = {
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+    sunday: 7
+  }
+
+  // Convert firstDayOfWeek string to Luxon format
+  const luxonFirstDayOfWeek = dayMap[firstDayOfWeek.toLowerCase()] || 1
 
   // Calculate days to subtract to get to the start of the week
   let daysToSubtract = (currentDayOfWeek - luxonFirstDayOfWeek + 7) % 7
@@ -128,45 +139,17 @@ export function getWeekStartDate(date, firstDayOfWeek = 0) {
   return dt.minus({ days: daysToSubtract }).toJSDate()
 }
 
-/**
- * Gets the end date (start of next week) for a given JavaScript Date object's week, in UTC.
- * This means it's the first day of the next week, making the range exclusive for the end date.
- * @param {Date} jsDate - The input JavaScript Date object.
- * @returns {Date} - The JavaScript Date object for the start of the next week (UTC).
- 
-export function getWeekEndDate(jsDate) {
-	return DateTime.fromJSDate(jsDate, { zone: 'utc' }).startOf('week').plus({ days: 7 }).toJSDate();
-}*/
-/**
- * Gets the end date (start of next week) for a given JavaScript Date object's week, in UTC.
- * This means it's the first day of the next week, making the range exclusive for the end date.
- * @param {Date} jsDate - The input JavaScript Date object.
- * @param {number} firstDayOfWeek - The first day of week (0 = Sunday, 1 = Monday, etc.).
- * @returns {Date} - The JavaScript Date object for the start of the next week (UTC).
- */
-export function getWeekEndDate(jsDate, firstDayOfWeek = 0) {
+export function getWeekEndDate(jsDate, firstDayOfWeek = 'monday') {
   const weekStart = getWeekStartDate(jsDate, firstDayOfWeek)
   return DateTime.fromJSDate(weekStart, { zone: 'utc' }).plus({ days: 7 }).toJSDate()
 }
 
-/**
- * Navigates to the previous or next week based on the specified first day of week.
- * @param {Date} currentDate - The current date.
- * @param {number} direction - Direction to navigate (-1 for previous, 1 for next).
- * @param {number} firstDayOfWeek - The first day of week (0 = Sunday, 1 = Monday, etc.).
- * @returns {Date} - The new date after navigation.
- */
-export function navigateWeek(currentDate, direction, firstDayOfWeek = 0) {
+export function navigateWeek(currentDate, direction, firstDayOfWeek = 'monday') {
   return DateTime.fromJSDate(currentDate, { zone: 'utc' })
     .plus({ days: 7 * direction })
     .toJSDate()
 }
 
-/**
- * Gets the start date (1st) of the month for a given JavaScript Date object, in UTC.
- * @param {Date} jsDate - The input JavaScript Date object.
- * @returns {Date} - The JavaScript Date object for the first day of that month (UTC).
- */
 export function getMonthStartDate(jsDate) {
   return DateTime.fromJSDate(jsDate, { zone: 'utc' }).startOf('month').toJSDate()
 }
@@ -184,24 +167,12 @@ export function getMonthEndDate(jsDate) {
     .toJSDate()
 }
 
-/**
- * Formats a Date object into a string with the format "YYYY-MM".
- *
- * @param {Date} date - The date to format.
- * @returns {string} The formatted date string in "YYYY-MM" format.
- */
 export function formatDateToMonthString(date) {
   let year = date.getFullYear()
   let month = String(date.getMonth() + 1).padStart(2, '0')
   return `${year}-${month}`
 }
 
-/**
- * Formats a Date object into an ISO date string (YYYY-MM-DD).
- *
- * @param {Date} date - The date to format.
- * @returns {string} The formatted date string in ISO format.
- */
 export function formatDateISO(date) {
   let year = date.getFullYear()
   let month = String(date.getMonth() + 1).padStart(2, '0')

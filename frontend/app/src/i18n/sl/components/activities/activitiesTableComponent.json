@@ -1,0 +1,12 @@
+{
+  "headerType": "Vrsta",
+  "headerName": "Ime",
+  "headerLocation": "Lokacija",
+  "headerStartTime": "Začetni čas",
+  "headerDuration": "Trajanje",
+  "headerDistance": "Razdalja",
+  "headerPace": "Tempo/Hitrost",
+  "headerCalories": "Kalorije",
+  "headerElevation": "Višinska razlika",
+  "headerAvgHr": "Povpr. SR"
+}

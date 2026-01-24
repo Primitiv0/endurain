@@ -12,9 +12,9 @@ import sign_up_tokens.email_messages as sign_up_tokens_email_messages
 import sign_up_tokens.schema as sign_up_tokens_schema
 import sign_up_tokens.crud as sign_up_tokens_crud
 
-import users.user.crud as users_crud
-import users.user.models as users_models
-import users.user.utils as users_utils
+import users.users.crud as users_crud
+import users.users.models as users_models
+import users.users.utils as users_utils
 
 import core.apprise as core_apprise
 import core.logger as core_logger
@@ -45,7 +45,7 @@ def create_sign_up_token(user_id: int, db: Session) -> str:
 
 
 async def send_sign_up_email(
-    user: users_models.User, email_service: core_apprise.AppriseService, db: Session
+    user: users_models.Users, email_service: core_apprise.AppriseService, db: Session
 ) -> bool:
     # Check if email service is configured
     if not email_service.is_configured():
@@ -77,7 +77,7 @@ async def send_sign_up_email(
 
 
 async def send_sign_up_admin_approval_email(
-    user: users_models.User, email_service: core_apprise.AppriseService, db: Session
+    user: users_models.Users, email_service: core_apprise.AppriseService, db: Session
 ) -> None:
     # Check if email service is configured
     if not email_service.is_configured():
@@ -86,7 +86,7 @@ async def send_sign_up_admin_approval_email(
             detail="Email service is not configured",
         )
 
-    admins = users_utils.get_admin_users(db)
+    admins = users_utils.get_admin_users_or_404(db)
 
     # Send email to all admin users
     for admin in admins:
@@ -115,7 +115,7 @@ async def send_sign_up_approval_email(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Email service is not configured",
         )
-    
+
     # Get user info
     user = users_crud.get_user_by_id(user_id, db)
 
@@ -171,10 +171,8 @@ def use_sign_up_token(token: str, db: Session) -> int:
 
 
 def delete_invalid_tokens_from_db():
-    # Create a new database session
-    db = SessionLocal()
-
-    try:
+    # Create a new database session using context manager
+    with SessionLocal() as db:
         # Get num tokens deleted
         num_deleted = sign_up_tokens_crud.delete_expired_sign_up_tokens(db)
 
@@ -183,6 +181,3 @@ def delete_invalid_tokens_from_db():
             core_logger.print_to_log_and_console(
                 f"Deleted {num_deleted} expired sign up tokens", "info"
             )
-    finally:
-        # Ensure the session is closed after use
-        db.close()

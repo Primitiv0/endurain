@@ -1,0 +1,13 @@
+{
+  "title": "Utrustning",
+  "buttonAddGear": "Lägg till utrustning",
+  "subTitleSearchGearByNickname": "Sök utrustning efter smeknamn",
+  "placeholderSearchGearByNickname": "Smeknamn",
+  "buttonSearchGear": "Sök utrustning",
+  "displayUserNumberOfGears1": "Det finns totalt ",
+  "displayUserNumberOfGears2": " utrustning (",
+  "displayUserNumberOfGears3": " vald):",
+  "successGearDeleted": "Utrustning borttagen",
+  "errorGearNotFound": "Utrustning hittades inte",
+  "errorFetchingGears": "Fel vid hämtning av utrustning"
+}

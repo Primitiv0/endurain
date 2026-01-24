@@ -1,0 +1,20 @@
+{
+  "labelWorkoutStepType": "Vrsta koraka",
+  "labelWorkoutStepTime": "Čas koraka",
+  "labelWorkoutStepReps": "Ponavljanja koraka",
+  "labelWorkoutStepIntensity": "Intenzivnost",
+  "labelWorkoutStepNotes": "Opombe",
+  "labelWorkoutStepExerciseName": "Ime vaje koraka",
+  "labelWorkoutStepExerciseWeight": "Teža",
+  "labelWorkoutStepSwimStroke": "Plavalni slog koraka",
+  "labelWorkoutSetType": "Vrsta serije",
+  "labelWorkoutSetTime": "Čas serije",
+  "labelWorkoutSetReps": "Ponavljanja serije",
+  "labelWorkoutSetExerciseName": "Ime vaje serije",
+  "labelWorkoutSetExerciseWeight": "Teža serije",
+  "labelWorkoutSetTypeMobile": "Vrsta",
+  "labelWorkoutSetTimeMobile": "Čas",
+  "labelWorkoutSetRepsMobile": "Ponavljanja",
+  "labelWorkoutSetExerciseNameMobile": "Ime",
+  "labelWorkoutSetExerciseWeightMobile": "Teža"
+}

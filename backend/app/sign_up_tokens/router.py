@@ -5,40 +5,45 @@ from fastapi import (
     Depends,
     HTTPException,
     status,
+    Request,
 )
 from sqlalchemy.orm import Session
 
-import users.user.crud as users_crud
-import users.user.utils as users_utils
-import users.user.schema as users_schema
-import users.user_integrations.crud as user_integrations_crud
-import users.user_default_gear.crud as user_default_gear_crud
-import users.user_privacy_settings.crud as users_privacy_settings_crud
+import users.users.crud as users_crud
+import users.users.utils as users_utils
+import users.users.schema as users_schema
 
 import notifications.utils as notifications_utils
-
-import health_targets.crud as health_targets_crud
 
 import sign_up_tokens.utils as sign_up_tokens_utils
 import sign_up_tokens.schema as sign_up_tokens_schema
 
+import auth.password_hasher as auth_password_hasher
+
 import server_settings.utils as server_settings_utils
 
-import core.database as core_database
 import core.apprise as core_apprise
+import core.database as core_database
+import core.rate_limit as core_rate_limit
 
-import websocket.schema as websocket_schema
+import websocket.manager as websocket_manager
 
 # Define the API router
 router = APIRouter()
 
 
 @router.post("/sign-up/request", status_code=201)
+@core_rate_limit.limiter.limit(core_rate_limit.SIGNUP_LIMIT)
 async def signup(
-    user: users_schema.UserSignup,
+    request: Request,
+    user: users_schema.UsersSignup,
     email_service: Annotated[
         core_apprise.AppriseService,
         Depends(core_apprise.get_email_service),
+    ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -50,11 +55,12 @@ async def signup(
     and trigger ancillary actions such as sending verification/approval emails and notifying admins.
 
     Parameters
-    - user (users_schema.UserSignup): The payload containing the user's sign-up information.
+    - user (users_schema.UsersSignup): The payload containing the user's sign-up information.
     - email_service (core_apprise.AppriseService): Injected email service used to send
         verification and admin approval emails.
-    - websocket_manager (websocket_schema.WebSocketManager): Injected manager used to send
+    - websocket_manager (websocket_manager.WebSocketManager): Injected manager used to send
         real-time notifications (e.g., admin approval requests).
+    - password_hasher (auth_password_hasher.PasswordHasher): Injected password hasher used to hash user passwords.
     - db (Session): Database session/connection used to create the user and related records.
 
     Behavior and side effects
@@ -97,7 +103,7 @@ async def signup(
         callers and tests should account for these side effects (e.g., by using transactions, fakes, or mocks).
     """
     # Get server settings to check if signup is enabled
-    server_settings = server_settings_utils.get_server_settings(db)
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
 
     # Check if signup is enabled
     if not server_settings.signup_enabled:
@@ -107,19 +113,12 @@ async def signup(
         )
 
     # Create the user in the database
-    created_user = users_crud.create_signup_user(user, server_settings, db)
+    created_user = users_crud.create_signup_user(
+        user, server_settings, password_hasher, db
+    )
 
-    # Create the user integrations in the database
-    user_integrations_crud.create_user_integrations(created_user.id, db)
-
-    # Create the user privacy settings
-    users_privacy_settings_crud.create_user_privacy_settings(created_user.id, db)
-
-    # Create the user health targets
-    health_targets_crud.create_health_targets(created_user.id, db)
-
-    # Create the user default gear
-    user_default_gear_crud.create_user_default_gear(created_user.id, db)
+    # Create default data for the user
+    users_utils.create_user_default_data(created_user.id, db)
 
     # Return appropriate response based on server configuration
     response_data = {"message": "User created successfully."}
@@ -161,8 +160,8 @@ async def verify_email(
         Depends(core_apprise.get_email_service),
     ],
     websocket_manager: Annotated[
-        websocket_schema.WebSocketManager,
-        Depends(websocket_schema.get_websocket_manager),
+        websocket_manager.WebSocketManager,
+        Depends(websocket_manager.get_websocket_manager),
     ],
     db: Annotated[
         Session,
@@ -170,7 +169,7 @@ async def verify_email(
     ],
 ):
     # Get server settings
-    server_settings = server_settings_utils.get_server_settings(db)
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
     if not server_settings.signup_require_email_verification:
         raise HTTPException(
             status_code=status.HTTP_412_PRECONDITION_FAILED,

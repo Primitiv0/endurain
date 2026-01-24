@@ -1,0 +1,12 @@
+{
+  "addNewGoal": "Aggiungi nuovo obiettivo",
+  "filterByActivityType": "Filter by activity type",
+  "filterByGoalType": "Filter by goal type",
+  "filterAll": "All",
+  "filterByInterval": "Filter by interval",
+  "clearFilters": "Clear filters",
+  "labelNumberOfGoals1": "Hai ",
+  "labelNumberOfGoals2": " obiettivo/i impostati:",
+  "successGoalDeleted": "Obiettivo eliminato con successo",
+  "errorFetchingGoals": "Errore nel recupero degli obiettivi"
+}

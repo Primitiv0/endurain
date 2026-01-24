@@ -1,0 +1,16 @@
+{
+  "dateLabel": "Date",
+  "labelGarminConnect": "Garmin Connect",
+  "detailsTitle": "Details",
+  "bmiLabel": "BMI",
+  "bodyFatLabel": "Body fat",
+  "bodyWaterLabel": "Body water",
+  "boneMassLabel": "Bone mass",
+  "muscleMassLabel": "Muscle mass",
+  "modalDeleteWeightTitle": "Elimina peso",
+  "modalDeleteWeightBody": "Sei sicuro di voler eliminare la voce di peso per ",
+  "successDeleteWeight": "Peso eliminato",
+  "errorDeleteWeight": "Non è stato possibile eliminare la voce di peso",
+  "successEditWeight": "Peso modificato",
+  "errorEditWeight": "Non è stato possibile modificare la voce di peso"
+}

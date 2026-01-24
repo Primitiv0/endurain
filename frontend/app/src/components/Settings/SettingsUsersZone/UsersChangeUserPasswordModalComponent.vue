@@ -164,10 +164,14 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 // Import Notivue push
 import { push } from 'notivue'
+// Importing stores
+import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 // Importing the services
 import { users } from '@/services/usersService'
 // Importing the components
 import UsersPasswordRequirementsComponent from '@/components/Settings/SettingsUsersZone/UsersPasswordRequirementsComponent.vue'
+// Importing validation utilities
+import { isValidPassword, passwordsMatch, buildPasswordRequirements } from '@/utils/validationUtils'
 
 // Define props
 const props = defineProps({
@@ -179,17 +183,24 @@ const props = defineProps({
 
 // Composition API setup
 const { t } = useI18n()
+const serverSettingsStore = useServerSettingsStore()
 const newPassword = ref('')
 const newPasswordRepeat = ref('')
-const regex =
-  /^(?=.*[A-Z])(?=.*\d)(?=.*[ !\"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])[A-Za-z\d !"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]{8,}$/
+const passwordType = serverSettingsStore.serverSettings.password_type
+const passMinLength =
+  props.user.access_type === 'admin'
+    ? serverSettingsStore.serverSettings.password_length_admin_users
+    : serverSettingsStore.serverSettings.password_length_regular_users
+const passRequirements = buildPasswordRequirements(passwordType, passMinLength)
 const isNewPasswordValid = computed(() => {
-  return regex.test(newPassword.value)
+  if (!newPassword.value) return true
+  return isValidPassword(newPassword.value, passRequirements)
 })
 const isNewPasswordRepeatValid = computed(() => {
-  return regex.test(newPasswordRepeat.value)
+  if (!newPasswordRepeat.value) return true
+  return isValidPassword(newPasswordRepeat.value, passRequirements)
 })
-const isPasswordMatch = computed(() => newPassword.value === newPasswordRepeat.value)
+const isPasswordMatch = computed(() => passwordsMatch(newPassword.value, newPasswordRepeat.value))
 
 const showNewPassword = ref(false)
 const showNewPasswordRepeat = ref(false)

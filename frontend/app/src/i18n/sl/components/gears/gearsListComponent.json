@@ -1,0 +1,16 @@
+{
+  "gearListTypeLabel": "Vrsta",
+  "gearListTypeOption1": "Kolo",
+  "gearListTypeOption2": "Čevlji",
+  "gearListTypeOption3": "Neoprenska obleka",
+  "gearListTypeOption4": "Lopar",
+  "gearListTypeOption5": "Smuči",
+  "gearListTypeOption6": "Deska za sneg",
+  "gearListTypeOption7": "Jadranje na deski",
+  "gearListTypeOption8": "Deska za vodne športe",
+  "gearListGearIsInactiveBadge": "Neaktivna",
+  "gearListModalDeleteGearTitle": "Izbriši opremo",
+  "gearListModalDeleteGearBody": "Ali ste prepričani, da želite izbrisati opremo ",
+  "gearListGearDeleteSuccessMessage": "Oprema uspešno izbrisana",
+  "gearListGearDeleteErrorMessage": "Napaka pri brisanju opreme"
+}

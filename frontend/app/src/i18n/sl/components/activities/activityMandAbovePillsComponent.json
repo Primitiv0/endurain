@@ -1,0 +1,16 @@
+{
+  "labelPillGraphs": "Grafi",
+  "labelPillLaps": "Krogi",
+  "labelPillWorkoutSets": "Nizi",
+  "labelGraph": "Grafi podatkov o dejavnosti",
+  "labelGraphHR": "Srčni utrip",
+  "labelHRZones": "Območja srčnega utripa",
+  "labelGraphPower": "Moč",
+  "labelGraphCadence": "Kadenca",
+  "labelGraphElevation": "Nadmorska višina",
+  "labelGraphVelocity": "Hitrost",
+  "labelGraphPace": "Tempo",
+  "labelGraphHRZone": "Cona",
+  "errorMessageProcessingActivityStreams": "Napaka pri obdelavi tokov dejavnosti",
+  "labelGraphStrokeRate": "Frekvenca zamahov"
+}

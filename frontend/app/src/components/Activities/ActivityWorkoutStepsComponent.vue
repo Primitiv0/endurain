@@ -18,7 +18,9 @@
             v-if="
               (activity.activity_type === 10 ||
                 activity.activity_type === 19 ||
-                activity.activity_type === 20) &&
+                activity.activity_type === 20 ||
+                activity.activity_type === 41 ||
+                activity.activity_type === 46) &&
               activityActivityWorkoutSteps &&
               activityActivityWorkoutSteps.length > 0
             "
@@ -29,7 +31,9 @@
             v-if="
               (activity.activity_type === 10 ||
                 activity.activity_type === 19 ||
-                activity.activity_type === 20) &&
+                activity.activity_type === 20 ||
+                activity.activity_type === 41 ||
+                activity.activity_type === 46) &&
               activityActivityWorkoutSteps &&
               activityActivityWorkoutSteps.length > 0
             "
@@ -96,7 +100,9 @@
             v-if="
               (activity.activity_type === 10 ||
                 activity.activity_type === 19 ||
-                activity.activity_type === 20) &&
+                activity.activity_type === 20 ||
+                activity.activity_type === 41 ||
+                activity.activity_type === 46) &&
               activityActivityWorkoutSteps &&
               activityActivityWorkoutSteps.length > 0
             "
@@ -114,7 +120,9 @@
             v-if="
               (activity.activity_type === 10 ||
                 activity.activity_type === 19 ||
-                activity.activity_type === 20) &&
+                activity.activity_type === 20 ||
+                activity.activity_type === 41 ||
+                activity.activity_type === 46) &&
               activityActivityWorkoutSteps &&
               activityActivityWorkoutSteps.length > 0
             "
@@ -203,7 +211,9 @@
             v-if="
               (activity.activity_type === 10 ||
                 activity.activity_type === 19 ||
-                activity.activity_type === 20) &&
+                activity.activity_type === 20 ||
+                activity.activity_type === 41 ||
+                activity.activity_type === 46) &&
               activityActivitySets &&
               activityActivitySets.length > 0
             "
@@ -240,7 +250,9 @@
             v-if="
               (activity.activity_type === 10 ||
                 activity.activity_type === 19 ||
-                activity.activity_type === 20) &&
+                activity.activity_type === 20 ||
+                activity.activity_type === 41 ||
+                activity.activity_type === 46) &&
               activityActivitySets &&
               activityActivitySets.length > 0
             "
@@ -344,8 +356,8 @@ export default {
       required: true
     },
     units: {
-      type: Number,
-      default: 1
+      type: String,
+      default: 'metric'
     },
     activityActivityExerciseTitles: {
       type: [Object, null],

@@ -1,6 +1,8 @@
 {
   "buttonAddWeight": "Gewicht hinzufügen",
-  "labelNumberOfHealthDataWeight1": "Insgesamt ",
-  "labelNumberOfHealthDataWeight2": " Gewichtsmessung(en) hinzugefügt (",
-  "labelNumberOfHealthDataWeight3": " geladen):"
+  "buttonWeightTarget": "Zielgewicht",
+  "modalWeightTargetLabel": "Gib dein Gewichtsziel ein",
+  "labelNumberOfHealthWeightWeight1": "Es gibt insgesamt ",
+  "labelNumberOfHealthWeightWeight2": " Gewichtsmessung(en) hinzugefügt (",
+  "labelNumberOfHealthWeightWeight3": " geladen):"
 }

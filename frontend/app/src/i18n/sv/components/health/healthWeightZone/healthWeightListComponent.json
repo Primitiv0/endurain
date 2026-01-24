@@ -1,0 +1,16 @@
+{
+  "dateLabel": "Datum",
+  "labelGarminConnect": "Garmin Connect",
+  "detailsTitle": "Detaljer",
+  "bmiLabel": "BMI",
+  "bodyFatLabel": "Kroppsfett",
+  "bodyWaterLabel": "Kroppsvatten",
+  "boneMassLabel": "Benmassa",
+  "muscleMassLabel": "Muskelmassa",
+  "modalDeleteWeightTitle": "Ta bort vikt",
+  "modalDeleteWeightBody": "Är du säker på att du vill ta bort viktregistreringen för ",
+  "successDeleteWeight": "Vikt borttagen",
+  "errorDeleteWeight": "Det gick inte att ta bort viktregistreringen",
+  "successEditWeight": "Vikt ändrad",
+  "errorEditWeight": "Det gick inte att redigera viktregistreringen"
+}

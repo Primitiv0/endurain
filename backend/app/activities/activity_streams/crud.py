@@ -13,7 +13,7 @@ import activities.activity.schema as activities_schema
 
 import server_settings.utils as server_settings_utils
 
-import users.user.crud as users_crud
+import users.users.crud as users_crud
 
 import core.logger as core_logger
 
@@ -167,7 +167,7 @@ def get_activities_streams(
 def get_public_activity_streams(activity_id: int, db: Session):
     try:
         # Check if public sharable links are enabled in server settings
-        server_settings = server_settings_utils.get_server_settings(db)
+        server_settings = server_settings_utils.get_server_settings_or_404(db)
 
         # Return None if public sharable links are disabled
         if not server_settings.public_shareable_links:
@@ -363,13 +363,20 @@ def transform_activity_streams(activity_stream, activity, db):
 
 def transform_activity_streams_hr(activity_stream, activity, db):
     """
-    Transforms an activity stream by calculating the percentage of time spent in each heart rate zone based on user details.
+    Transforms an activity stream by calculating the percentage of time spent
+    in each heart rate zone based on user details.
     Args:
-        activity_stream: The activity stream object containing waypoints with heart rate data.
-        activity: The activity object associated with the stream, used to retrieve the user ID.
+        activity_stream: The activity stream object containing waypoints with
+        heart rate data.
+        activity: The activity object associated with the stream, used to
+        retrieve the user ID.
         db: The database session or connection used to fetch user details.
     Returns:
-        The activity stream object with an added 'hr_zone_percentages' attribute, which contains the percentage of time spent in each heart rate zone and their respective HR boundaries. If waypoints or user details are missing, returns the original activity stream unchanged.
+        The activity stream object with an added 'hr_zone_percentages'
+        attribute, which contains the percentage of time spent in each heart
+        rate zone and their respective HR boundaries.
+        If waypoints or user details are missing, returns the original activity
+        stream unchanged.
     Notes:
         - Heart rate zones are calculated using the formula: max_heart_rate = 220 - age.
         - The function expects waypoints to be a list of dicts with an "hr" key.
@@ -383,14 +390,21 @@ def transform_activity_streams_hr(activity_stream, activity, db):
 
     # Get the user details to calculate heart rate zones
     detail_user = users_crud.get_user_by_id(activity.user_id, db)
-    if not detail_user or not detail_user.birthdate:
-        # If user details are not available or birthdate is missing, return the activity stream as is
+    if not detail_user:
+        # If user details are not available, return the activity stream as is
         return activity_stream
 
-    # Calculate the maximum heart rate based on the user's birthdate
-    year = int(detail_user.birthdate.split("-")[0])
-    current_year = datetime.datetime.now().year
-    max_heart_rate = 220 - (current_year - year)
+    # Use user's max_heart_rate if set, otherwise calculate based on age formula
+    if detail_user.max_heart_rate:
+        max_heart_rate = detail_user.max_heart_rate
+    elif detail_user.birthdate:
+        # Calculate the maximum heart rate based on the user's birthdate
+        year = detail_user.birthdate.year
+        current_year = datetime.datetime.now().year
+        max_heart_rate = 220 - (current_year - year)
+    else:
+        # If neither max_heart_rate nor birthdate is available, return the activity stream as is
+        return activity_stream
 
     # Calculate heart rate zones based on the maximum heart rate
     zone_1 = max_heart_rate * 0.6
@@ -418,6 +432,17 @@ def transform_activity_streams_hr(activity_stream, activity, db):
     ]
     zone_percentages = [round((count / total) * 100, 2) for count in zone_counts]
 
+    # Calculate time in seconds for each zone using the percentage of total_timer_time
+    has_timer_time = hasattr(activity, "total_timer_time") and activity.total_timer_time
+    if has_timer_time:
+        zone_time_seconds = [
+            int((percent / 100) * float(activity.total_timer_time))
+            for percent in zone_percentages
+        ]
+    else:
+        # Fallback: no time calculation possible
+        zone_time_seconds = [0, 0, 0, 0, 0]
+
     # Calculate zone HR boundaries for display
     zone_hr = {
         "zone_1": f"< {int(zone_1)}",
@@ -427,11 +452,31 @@ def transform_activity_streams_hr(activity_stream, activity, db):
         "zone_5": f">= {int(zone_4)}",
     }
     activity_stream.hr_zone_percentages = {
-        "zone_1": {"percent": zone_percentages[0], "hr": zone_hr["zone_1"]},
-        "zone_2": {"percent": zone_percentages[1], "hr": zone_hr["zone_2"]},
-        "zone_3": {"percent": zone_percentages[2], "hr": zone_hr["zone_3"]},
-        "zone_4": {"percent": zone_percentages[3], "hr": zone_hr["zone_4"]},
-        "zone_5": {"percent": zone_percentages[4], "hr": zone_hr["zone_5"]},
+        "zone_1": {
+            "percent": zone_percentages[0],
+            "hr": zone_hr["zone_1"],
+            "time_seconds": zone_time_seconds[0],
+        },
+        "zone_2": {
+            "percent": zone_percentages[1],
+            "hr": zone_hr["zone_2"],
+            "time_seconds": zone_time_seconds[1],
+        },
+        "zone_3": {
+            "percent": zone_percentages[2],
+            "hr": zone_hr["zone_3"],
+            "time_seconds": zone_time_seconds[2],
+        },
+        "zone_4": {
+            "percent": zone_percentages[3],
+            "hr": zone_hr["zone_4"],
+            "time_seconds": zone_time_seconds[3],
+        },
+        "zone_5": {
+            "percent": zone_percentages[4],
+            "hr": zone_hr["zone_5"],
+            "time_seconds": zone_time_seconds[4],
+        },
     }
 
     return activity_stream
@@ -440,7 +485,7 @@ def transform_activity_streams_hr(activity_stream, activity, db):
 def get_public_activity_stream_by_type(activity_id: int, stream_type: int, db: Session):
     try:
         # Check if public sharable links are enabled in server settings
-        server_settings = server_settings_utils.get_server_settings(db)
+        server_settings = server_settings_utils.get_server_settings_or_404(db)
 
         # Return None if public sharable links are disabled
         if not server_settings.public_shareable_links:

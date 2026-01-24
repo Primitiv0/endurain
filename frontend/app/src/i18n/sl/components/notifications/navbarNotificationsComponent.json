@@ -1,0 +1,6 @@
+{
+  "errorFetchingNotificationsPagination": "Napaka pri pridobivanju obvestil s strani",
+  "errorFetchingNotificationsNumber": "Napaka pri pridobivanju števila obvestil",
+  "errorFetchingNotificationById": "Napaka pri pridobivanju obvestila po ID-ju",
+  "errorFetchingMessageFromWebSocket": "Napaka pri pridobivanju sporočila iz WebSocket-a"
+}

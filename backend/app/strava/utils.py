@@ -10,19 +10,17 @@ import core.logger as core_logger
 import activities.activity.schema as activities_schema
 import activities.activity.crud as activities_crud
 
-import users.user_integrations.schema as user_integrations_schema
-import users.user_integrations.crud as user_integrations_crud
+import users.users_integrations.crud as user_integrations_crud
+import users.users_integrations.models as user_integrations_models
 
-import users.user.crud as users_crud
+import users.users.crud as users_crud
 
 from core.database import SessionLocal
 
 
 def refresh_strava_tokens(is_startup: bool = False):
-    # Create a new database session
-    db = SessionLocal()
-
-    try:
+    # Create a new database session using context manager
+    with SessionLocal() as db:
         # Get all users
         users = users_crud.get_all_users(db)
 
@@ -30,9 +28,6 @@ def refresh_strava_tokens(is_startup: bool = False):
         if users:
             for user in users:
                 refresh_user_strava_token(user.id, db, is_startup)
-    finally:
-        # Ensure the session is closed after use
-        db.close()
 
 
 def refresh_user_strava_token(user_id: int, db: Session, is_startup: bool = False):
@@ -116,7 +111,7 @@ def fetch_and_validate_activity(
 
 def fetch_user_integrations_and_validate_token(
     user_id: int, db: Session
-) -> user_integrations_schema.UsersIntegrations | None:
+) -> user_integrations_models.UsersIntegrations | None:
     # Get the user integrations by user ID
     user_integrations = user_integrations_crud.get_user_integrations_by_user_id(
         user_id, db
@@ -138,7 +133,7 @@ def fetch_user_integrations_and_validate_token(
 
 
 def create_strava_client(
-    user_integrations: user_integrations_schema.UsersIntegrations,
+    user_integrations: user_integrations_models.UsersIntegrations,
 ) -> Client:
     # Convert to epoch timestamp
     epoch_time = (

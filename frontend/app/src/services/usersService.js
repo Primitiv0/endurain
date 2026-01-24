@@ -3,16 +3,12 @@ import {
   fetchPostRequest,
   fetchPutRequest,
   fetchDeleteRequest,
-  fetchPostFileRequest,
-  API_URL
+  fetchPostFileRequest
 } from '@/utils/serviceUtils'
 import { fetchPublicGetRequest } from '@/utils/servicePublicUtils'
 
 export const users = {
   // Users authenticated
-  getUsersNumber() {
-    return fetchGetRequest('users/number')
-  },
   getUsersWithPagination(pageNumber, numRecords) {
     return fetchGetRequest(`users/page_number/${pageNumber}/num_records/${numRecords}`)
   },

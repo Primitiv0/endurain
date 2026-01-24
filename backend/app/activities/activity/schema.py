@@ -59,9 +59,7 @@ class Activity(BaseModel):
     tracker_manufacturer: str | None = None
     tracker_model: str | None = None
 
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = {"from_attributes": True}
 
 
 class ActivityDistances(BaseModel):
@@ -73,6 +71,13 @@ class ActivityDistances(BaseModel):
     rowing: float
     snow_ski: float
     snowboard: float
+    windsurf: float
+    stand_up_paddleboarding: float
+    surfing: float
+    kayaking: float
+    sailing: float
+    snowshoeing: float
+    inline_skating: float
 
 
 class ActivityEdit(BaseModel):
@@ -82,6 +87,7 @@ class ActivityEdit(BaseModel):
     name: str
     activity_type: int
     visibility: int | None = None
+    is_hidden: bool | None = None
     gear_id: int | None = None
     hide_start_time: bool | None = None
     hide_location: bool | None = None

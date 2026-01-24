@@ -1,10 +1,11 @@
 {
   "usersSection": "Gebruikers",
   "serverSettingsSection": "Serverinstellingen",
+  "identityProvidersSection": "Identity Providers",
   "generalSection": "Algemeen",
   "myProfileSection": "Mijn profiel",
   "myGoals": "My Goals",
   "securitySection": "Beveiliging",
   "integrationsSection": "Integraties",
-  "importSection": "Import"
+  "importSection": "Importeren"
 }

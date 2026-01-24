@@ -2,13 +2,9 @@
   <footer :class="{ 'py-5 bg-body-tertiary': enableBackground }">
     <div class="container">
       <p class="text-center text-muted">
-        &copy;
         {{ new Date().getFullYear() === 2023 ? '2023' : '2023 - ' + new Date().getFullYear() }}
-        Endurain •
-        <a
-          class="link-body-emphasis"
-          href="https://github.com/joaovitoriasilva/endurain"
-          role="button"
+        Endurain&reg; •
+        <a class="link-body-emphasis" href="https://github.com/endurain-project" role="button"
           ><font-awesome-icon :icon="['fab', 'fa-github']"
         /></a>
         •
@@ -23,18 +19,14 @@
         <a class="link-body-emphasis" href="https://discord.gg/6VUjUq2uZR"
           ><font-awesome-icon :icon="['fab', 'fa-discord']"
         /></a>
-        • v0.15.1
+        • v0.17.3
       </p>
       <p class="text-center text-muted">
-        <img
-          src="/src/assets/strava/api_logo_cptblWith_strava_horiz_light.png"
-          alt="Compatible with STRAVA image"
-          height="25"
-        />
+        <img :src="INTEGRATION_LOGOS.strava" alt="Compatible with STRAVA image" height="25" />
         •
         <img
           class="ms-2"
-          src="/src/assets/garminconnect/Garmin_connect_badge_print_RESOURCE_FILE-01.png"
+          :src="INTEGRATION_LOGOS.garminConnectBadge"
           alt="Works with Garmin Connect image"
           height="25"
         />
@@ -43,13 +35,13 @@
   </footer>
 </template>
 
-<script>
-export default {
-  props: {
-    enableBackground: {
-      type: Boolean,
-      default: true
-    }
+<script setup>
+import { INTEGRATION_LOGOS } from '@/constants/integrationLogoConstants'
+
+defineProps({
+  enableBackground: {
+    type: Boolean,
+    default: true
   }
-}
+})
 </script>

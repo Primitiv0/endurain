@@ -6,17 +6,8 @@
           width="auto"
           height="auto"
           :src="loginPhotoUrl"
-          alt="Square signup image"
+          alt="Endurain sign up illustration"
           class="img-fluid rounded"
-          v-if="serverSettingsStore.serverSettings.login_photo_set"
-        />
-        <img
-          width="auto"
-          height="auto"
-          src="/src/assets/login.png"
-          alt="Square signup image"
-          class="img-fluid rounded"
-          v-else
         />
       </div>
       <div class="col form-signin m-3">
@@ -126,8 +117,11 @@
                 <option value="de">{{ $t('generalItems.languageOption4') }}</option>
                 <option value="fr">{{ $t('generalItems.languageOption5') }}</option>
                 <option value="gl">{{ $t('generalItems.languageOption10') }}</option>
+                <option value="it">{{ $t('generalItems.languageOption11') }}</option>
                 <option value="nl">{{ $t('generalItems.languageOption6') }}</option>
                 <option value="pt">{{ $t('generalItems.languageOption3') }}</option>
+                <option value="sl">{{ $t('generalItems.languageOption12') }}</option>
+                <option value="sv">{{ $t('generalItems.languageOption13') }}</option>
                 <option value="es">{{ $t('generalItems.languageOption7') }}</option>
                 <option value="us">{{ $t('generalItems.languageOption1') }}</option>
               </select>
@@ -160,9 +154,9 @@
             <!-- Gender field -->
             <div class="form-floating mb-3">
               <select class="form-select" id="gender" v-model="signUpGender">
-                <option value="1">{{ $t('generalItems.genderMale') }}</option>
-                <option value="2">{{ $t('generalItems.genderFemale') }}</option>
-                <option value="3">{{ $t('generalItems.genderUnspecified') }}</option>
+                <option value="male">{{ $t('generalItems.genderMale') }}</option>
+                <option value="female">{{ $t('generalItems.genderFemale') }}</option>
+                <option value="unspecified">{{ $t('generalItems.genderUnspecified') }}</option>
               </select>
               <label for="gender">{{ $t('signupView.gender') }}</label>
             </div>
@@ -170,8 +164,8 @@
             <!-- Units field -->
             <div class="form-floating mb-3">
               <select class="form-select" id="units" v-model="signUpUnits">
-                <option value="1">{{ $t('signupView.metric') }}</option>
-                <option value="2">{{ $t('signupView.imperial') }}</option>
+                <option value="metric">{{ $t('signupView.metric') }}</option>
+                <option value="imperial">{{ $t('signupView.imperial') }}</option>
               </select>
               <label for="units">{{ $t('signupView.units') }}</label>
             </div>
@@ -180,7 +174,7 @@
             <!-- metric -->
             <div
               class="input-group mb-3"
-              v-if="Number(serverSettingsStore.serverSettings.units) === 1"
+              v-if="serverSettingsStore.serverSettings.units === 'metric'"
             >
               <div class="form-floating flex-grow-1">
                 <input
@@ -253,22 +247,22 @@
                 v-model="signUpFirstDayOfWeek"
                 required
               >
-                <option :value="0">{{ $t('generalItems.firstDayOfWeekOption0') }}</option>
-                <option :value="1">{{ $t('generalItems.firstDayOfWeekOption1') }}</option>
-                <option :value="2">{{ $t('generalItems.firstDayOfWeekOption2') }}</option>
-                <option :value="3">{{ $t('generalItems.firstDayOfWeekOption3') }}</option>
-                <option :value="4">{{ $t('generalItems.firstDayOfWeekOption4') }}</option>
-                <option :value="5">{{ $t('generalItems.firstDayOfWeekOption5') }}</option>
-                <option :value="6">{{ $t('generalItems.firstDayOfWeekOption6') }}</option>
+                <option value="sunday">{{ $t('generalItems.firstDayOfWeekOption0') }}</option>
+                <option value="monday">{{ $t('generalItems.firstDayOfWeekOption1') }}</option>
+                <option value="tuesday">{{ $t('generalItems.firstDayOfWeekOption2') }}</option>
+                <option value="wednesday">{{ $t('generalItems.firstDayOfWeekOption3') }}</option>
+                <option value="thursday">{{ $t('generalItems.firstDayOfWeekOption4') }}</option>
+                <option value="friday">{{ $t('generalItems.firstDayOfWeekOption5') }}</option>
+                <option value="saturday">{{ $t('generalItems.firstDayOfWeekOption6') }}</option>
               </select>
               <label for="firstDayOfWeek">{{ $t('signupView.firstDayOfWeek') }}</label>
             </div>
             <!-- currency field -->
             <div class="form-floating mb-3">
               <select class="form-select" name="currency" v-model="signUpCurrency" required>
-                <option :value="1">{{ $t('generalItems.currencyEuro') }}</option>
-                <option :value="2">{{ $t('generalItems.currencyDollar') }}</option>
-                <option :value="3">{{ $t('generalItems.currencyPound') }}</option>
+                <option value="euro">{{ $t('generalItems.currencyEuro') }}</option>
+                <option value="dollar">{{ $t('generalItems.currencyDollar') }}</option>
+                <option value="pound">{{ $t('generalItems.currencyPound') }}</option>
               </select>
               <label for="currency">{{ $t('signupView.currency') }}</label>
             </div>
@@ -300,121 +294,308 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+<script setup lang="ts">
+/**
+ * User registration view with form validation and optional profile fields.
+ * Handles user signup with required and optional information including personal details,
+ * preferences, and physical attributes. Supports both metric and imperial unit systems.
+ */
+
+import { ref, computed, onMounted, type Ref, type ComputedRef } from 'vue'
+import { useRouter, type Router } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 import { signUp as signUpService } from '@/services/signUpService'
 import { cmToFeetInches, feetAndInchesToCm } from '@/utils/unitsUtils'
+import {
+  isValidEmail,
+  sanitizeInput,
+  isValidPassword,
+  buildPasswordRequirements
+} from '@/utils/validationUtils'
+import { HTTP_STATUS, QUERY_PARAM_TRUE, extractStatusCode } from '@/constants/httpConstants'
+import type { ErrorWithResponse } from '@/types'
+import defaultLoginImage from '@/assets/login.png'
 
-// Variables
-const router = useRouter()
+/**
+ * User signup request data structure.
+ *
+ * @property name - User's full name.
+ * @property username - Unique username (lowercase).
+ * @property email - User's email address (lowercase).
+ * @property password - User's password.
+ * @property preferred_language - Preferred language code (e.g., 'us', 'pt', 'es').
+ * @property city - User's city of residence.
+ * @property birthdate - User's birth date in ISO format.
+ * @property gender - Gender identifier (male, female, unspecified).
+ * @property units - Unit system preference (metric, imperial).
+ * @property height - User's height in centimeters.
+ * @property first_day_of_week - First day of week (sunday, monday, etc.).
+ * @property currency - Currency preference (euro, dollar, pound).
+ */
+interface SignUpRequestData {
+  name: string
+  username: string
+  email: string
+  password: string
+  preferred_language: string
+  city: string | null
+  birthdate: string | null
+  gender: string
+  units: string
+  height: number | null
+  first_day_of_week: string
+  currency: string
+}
+
+/**
+ * Signup API response structure.
+ *
+ * @property email_verification_required - Whether email verification is required.
+ * @property admin_approval_required - Whether admin approval is required.
+ */
+interface SignUpResponse {
+  email_verification_required: boolean
+  admin_approval_required: boolean
+}
+
+/**
+ * Login route query parameters for post-signup redirect.
+ *
+ * @property emailVerificationSent - Email verification status flag.
+ * @property adminApprovalRequired - Admin approval status flag.
+ */
+interface LoginQueryParams {
+  emailVerificationSent?: string
+  adminApprovalRequired?: string
+  [key: string]: string | undefined
+}
+
+const router: Router = useRouter()
 const { t } = useI18n()
 const serverSettingsStore = useServerSettingsStore()
+
+/** Loading state during form submission. */
 const isLoading = ref(false)
-const signUpName = ref(null)
-const signUpUsername = ref(null)
-const signUpEmail = ref(null)
-const signUpPassword = ref(null)
+
+/** User's full name. */
+const signUpName = ref('')
+
+/** User's username. */
+const signUpUsername = ref('')
+
+/** User's email address. */
+const signUpEmail = ref('')
+
+/** User's password. */
+const signUpPassword = ref('')
+
+/** User's preferred language. */
 const signUpPreferredLanguage = ref('us')
-const signUpCity = ref(null)
-const signUpBirthdate = ref(null)
-const signUpGender = ref(1)
+
+/** User's city. */
+const signUpCity = ref('')
+
+/** User's birth date. */
+const signUpBirthdate = ref('')
+
+/** User's gender (male, female, unspecified). */
+const signUpGender = ref('male')
+
+/** User's unit preference (metric, imperial). */
 const signUpUnits = ref(serverSettingsStore.serverSettings.units)
-const signUpHeightCms = ref(null)
-const signUpHeightFeet = ref(null)
-const signUpHeightInches = ref(null)
-const signUpFirstDayOfWeek = ref(1)
+
+/** User's height in centimeters. */
+const signUpHeightCms = ref<number | null>(null)
+
+/** User's height in feet (imperial). */
+const signUpHeightFeet = ref<number | null>(null)
+
+/** User's height in inches (imperial). */
+const signUpHeightInches = ref<number | null>(null)
+
+/** First day of week preference (sunday, monday, etc.). */
+const signUpFirstDayOfWeek = ref('monday')
+
+/** Currency preference (euro, dollar, pound). */
 const signUpCurrency = ref(serverSettingsStore.serverSettings.currency)
-const isFeetValid = computed(() => signUpHeightFeet.value >= 0 && signUpHeightFeet.value <= 10)
-const isInchesValid = computed(
-  () => signUpHeightInches.value >= 0 && signUpHeightInches.value <= 11
-)
-const isEmailValid = computed(() => {
-  if (!signUpEmail.value) return true
-  const emailRegex = /^[^\s@]{1,}@[^\s@]{2,}\.[^\s@]{2,}$/
-  return emailRegex.test(signUpEmail.value)
-})
+
+/** Password visibility toggle state. */
 const showPassword = ref(false)
-// Toggle password visibility
-const togglePasswordVisibility = () => {
-  showPassword.value = !showPassword.value
-}
-const isPasswordValid = computed(() => {
-  if (!signUpPassword.value) return true
-  const regex =
-    /^(?=.*[A-Z])(?=.*\d)(?=.*[ !\"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~])[A-Za-z\d !"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]{8,}$/
-  return regex.test(signUpPassword.value)
-})
+
+/** Optional fields section visibility state. */
 const showOptionalFields = ref(false)
 
-const loginPhotoUrl = computed(() =>
-  serverSettingsStore.serverSettings.login_photo_set
-    ? `${window.env.ENDURAIN_HOST}/server_images/login.png`
-    : null
-)
+/**
+ * Validates feet input for imperial height.
+ *
+ * @returns `true` if feet value is between 0 and 10, or `null`.
+ */
+const isFeetValid = computed(() => {
+  if (signUpHeightFeet.value === null) return true
+  return signUpHeightFeet.value >= 0 && signUpHeightFeet.value <= 10
+})
 
-// Handle form submission
-const submitForm = async () => {
-  if (Number(serverSettingsStore.serverSettings.units) === 1) {
-    const { feet, inches } = cmToFeetInches(signUpHeightCms.value)
-    signUpHeightFeet.value = feet
-    signUpHeightInches.value = inches
+/**
+ * Validates inches input for imperial height.
+ *
+ * @returns `true` if inches value is between 0 and 11, or `null`.
+ */
+const isInchesValid = computed(() => {
+  if (signUpHeightInches.value === null) return true
+  return signUpHeightInches.value >= 0 && signUpHeightInches.value <= 11
+})
+
+/**
+ * Validates email format using RFC 5322 compliant regex.
+ *
+ * @returns `true` if email is valid or empty.
+ */
+const isEmailValid = computed(() => {
+  if (!signUpEmail.value) return true
+  return isValidEmail(signUpEmail.value)
+})
+
+/**
+ * Validates password strength using centralized validation.
+ * Applies password requirements based on server settings and policy type.
+ *
+ * @returns `true` if password meets server-configured requirements or is empty.
+ */
+const isPasswordValid = computed(() => {
+  if (!signUpPassword.value) return true
+
+  const passwordType = serverSettingsStore.serverSettings.password_type
+  const minLength = serverSettingsStore.serverSettings.password_length_regular_users
+  const requirements = buildPasswordRequirements(passwordType, minLength)
+
+  return isValidPassword(signUpPassword.value, requirements)
+})
+
+/**
+ * Computes the login photo URL from server settings.
+ *
+ * @returns Custom photo URL from server if set, otherwise default image.
+ */
+const loginPhotoUrl = computed(() => {
+  return serverSettingsStore.serverSettings.login_photo_set
+    ? `${window.env.ENDURAIN_HOST}/server_images/login.png`
+    : defaultLoginImage
+})
+
+/**
+ * Toggles password visibility between plain text and masked.
+ *
+ * @returns void
+ */
+const togglePasswordVisibility = (): void => {
+  showPassword.value = !showPassword.value
+}
+
+// ============================================================================
+// Methods - Form Submission
+// ============================================================================
+
+/**
+ * Handles form submission for user signup.
+ * Converts height units, sanitizes inputs, submits data, and redirects on success.
+ *
+ * @returns A promise that resolves when signup is complete.
+ * @throws {ErrorWithResponse} When signup fails or validation errors occur.
+ */
+const submitForm = async (): Promise<void> => {
+  // Convert height units based on server settings
+  if (serverSettingsStore.serverSettings.units === 'metric') {
+    // Metric system: convert cm to feet/inches for storage
+    if (signUpHeightCms.value !== null) {
+      const { feet, inches } = cmToFeetInches(signUpHeightCms.value)
+      signUpHeightFeet.value = feet
+      signUpHeightInches.value = inches
+    }
   } else {
-    signUpHeightCms.value = feetAndInchesToCm(signUpHeightFeet.value, signUpHeightInches.value)
+    // Imperial system: convert feet/inches to cm for storage
+    if (signUpHeightFeet.value !== null && signUpHeightInches.value !== null) {
+      const heightInCm = feetAndInchesToCm(signUpHeightFeet.value, signUpHeightInches.value)
+      signUpHeightCms.value = Number(heightInCm)
+    }
   }
+
   try {
     isLoading.value = true
 
-    // Prepare data for submission
-    const data = {
-      name: signUpName.value,
-      username: signUpUsername.value.toLowerCase(),
-      email: signUpEmail.value.toLowerCase(),
-      password: signUpPassword.value,
+    // Sanitize and prepare data for submission
+    const data: SignUpRequestData = {
+      name: sanitizeInput(signUpName.value),
+      username: sanitizeInput(signUpUsername.value.toLowerCase()),
+      email: sanitizeInput(signUpEmail.value.toLowerCase()),
+      password: signUpPassword.value, // Don't sanitize password
       preferred_language: signUpPreferredLanguage.value,
-      city: signUpCity.value || null,
+      city: signUpCity.value ? sanitizeInput(signUpCity.value) : null,
       birthdate: signUpBirthdate.value || null,
       gender: signUpGender.value,
       units: signUpUnits.value,
-      height: signUpHeightCms.value || null,
+      height: signUpHeightCms.value,
       first_day_of_week: signUpFirstDayOfWeek.value,
       currency: signUpCurrency.value
     }
 
-    const response = await signUpService.signUpRequest(data)
+    const response: SignUpResponse = await signUpService.signUpRequest(data)
 
     push.success(t('signupView.success'))
 
-    // Redirect to login with appropriate query parameters
-    const queryParams = {}
+    // Build query parameters for login redirect
+    const queryParams: LoginQueryParams = {}
     if (response.email_verification_required) {
-      queryParams.emailVerificationSent = 'true'
+      queryParams.emailVerificationSent = QUERY_PARAM_TRUE
     }
     if (response.admin_approval_required) {
-      queryParams.adminApprovalRequired = 'true'
+      queryParams.adminApprovalRequired = QUERY_PARAM_TRUE
     }
 
-    router.push({ name: 'login', query: queryParams })
+    await router.push({ name: 'login', query: queryParams })
   } catch (error) {
-    if (error.toString().includes('409')) {
-      push.error(t('signupView.errorUserExists'))
-    } else if (error.toString().includes('403')) {
-      push.error(t('signupView.errorSignupDisabled'))
-    } else if (error.toString().includes('400')) {
-      push.error(t('signupView.errorValidation'))
-    } else {
-      push.error(`${t('signupView.errorGeneral')} - ${error}`)
-    }
+    handleSignUpError(error as ErrorWithResponse)
   } finally {
     isLoading.value = false
   }
 }
 
+/**
+ * Handles signup errors and displays appropriate error messages.
+ *
+ * @param error - Error object with response data.
+ * @returns void
+ */
+const handleSignUpError = (error: ErrorWithResponse): void => {
+  const statusCode = extractStatusCode(error)
+
+  switch (statusCode) {
+    case HTTP_STATUS.CONFLICT:
+      push.error(t('signupView.errorUserExists'))
+      break
+    case HTTP_STATUS.FORBIDDEN:
+      push.error(t('signupView.errorSignupDisabled'))
+      break
+    case HTTP_STATUS.BAD_REQUEST:
+      push.error(t('signupView.errorValidation'))
+      break
+    default:
+      push.error(`${t('signupView.errorGeneral')} - ${error}`)
+  }
+}
+
+// ============================================================================
+// Lifecycle Hooks
+// ============================================================================
+
+/**
+ * Component mounted lifecycle hook.
+ * Checks if signup is enabled and redirects to login if disabled.
+ *
+ * @returns void
+ */
 onMounted(() => {
-  // Check if signup is enabled
   if (!serverSettingsStore.serverSettings.signup_enabled) {
     push.error(t('signupView.signupDisabled'))
     router.push('/login')

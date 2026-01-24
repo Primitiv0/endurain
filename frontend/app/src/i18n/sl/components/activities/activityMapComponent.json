@@ -1,0 +1,8 @@
+{
+  "modalMediaDeleteTitle": "Izbriši medij",
+  "modalMediaDeleteBody1": "Ali ste prepričani, da želite izbrisati medij z ID ",
+  "modalMediaDeleteBody2": " in nazivom ",
+  "errorFetchingActivityStream": "Napaka pri pridobivanju podatkov o toku dejavnosti",
+  "mediaDeletedSuccessfully": "Medij je bil uspešno izbrisan",
+  "errorDeletingMedia": "Napaka pri brisanju medija"
+}

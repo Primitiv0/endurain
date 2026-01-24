@@ -5,9 +5,10 @@
   "activityTypeSwim": "Natação",
   "activityTypeWalk": "Caminhada",
   "activityTypeStrength": "Força",
-  "intervalOption1": "Diário",
-  "intervalOption2": "Semanal",
-  "intervalOption3": "Mensal",
-  "intervalOption4": "Anual",
+  "activityTypeCardio": "Cardio",
+  "intervalDaily": "Diário",
+  "intervalWeekly": "Semanal",
+  "intervalMonthly": "Mensal",
+  "intervalYearly": "Anual",
   "activities": "atividades"
 }

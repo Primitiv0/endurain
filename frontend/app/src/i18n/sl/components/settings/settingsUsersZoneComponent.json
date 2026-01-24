@@ -1,0 +1,10 @@
+{
+  "buttonAddUser": "Dodaj uporabnika",
+  "labelSearchUsersByUsername": "Išči uporabnike po uporabniškem imenu",
+  "labelNumberOfUsers1": "Skupno število uporabnikov je ",
+  "labelNumberOfUsers2": " uporabnik(ov) (",
+  "labelNumberOfUsers3": " naloženo):",
+  "successUserAdded": "Uporabnik uspešno dodan",
+  "successUserDeleted": "Uporabnik uspešno izbrisan",
+  "errorFetchingUsers": "Napaka pri pridobivanju uporabnikov"
+}

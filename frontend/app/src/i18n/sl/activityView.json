@@ -1,0 +1,13 @@
+{
+  "labelGear": "Oprema",
+  "labelGearNotSet": "Ni nastavljeno",
+  "modalLabelDeleteGear": "Odstrani opremo iz dejavnosti",
+  "modalLabelDeleteGearBody": "Ali ste prepričani, da želite odstraniti opremo iz dejavnosti?",
+  "modalLabelDeleteGearButton": "Odstrani opremo",
+  "successMessageGearAdded": "Oprema dodana k dejavnosti",
+  "successMessageGearDeleted": "Oprema odstranjena iz dejavnosti",
+  "errorMessageDeleteGear": "Napaka pri brisanju opreme iz dejavnosti",
+  "errorMessageActivityNotFound": "Dejavnosti ni mogoče najti",
+  "alertPrivacyMessage": "V tej dejavnosti imate skrite informacije. Vi jih lahko vidite, drugi pa ne.",
+  "isHiddenMessage": "Ta dejavnost je skrita. Verjetno zato, ker je podvojena ali pa jo je skril uporabnik."
+}

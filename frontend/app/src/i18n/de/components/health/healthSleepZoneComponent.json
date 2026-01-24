@@ -1,0 +1,9 @@
+{
+  "buttonAddSleep": "Schlafdaten hinzufügen",
+  "buttonSleepTarget": "Schlafziel",
+  "modalSleepTargetHoursLabel": "Stunden",
+  "modalSleepTargetMinutesLabel": "Minuten",
+  "labelNumberOfHealthSleep1": "Es gibt insgesamt ",
+  "labelNumberOfHealthSleep2": " Schlafeinträge eingefügt (",
+  "labelNumberOfHealthSleep3": " geladen):"
+}

@@ -1,56 +1,125 @@
-from pydantic import BaseModel
+"""Profile Pydantic schemas for MFA and profile operations."""
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictStr,
+    StrictBool,
+    field_validator,
+)
 
 
 class MFARequest(BaseModel):
-    mfa_code: str
+    """
+    Request model for MFA verification.
+
+    Attributes:
+        mfa_code: The MFA code to verify (6-digit TOTP or
+            9-char backup code).
+    """
+
+    mfa_code: StrictStr = Field(
+        ...,
+        min_length=6,
+        max_length=9,
+        description="MFA code (6-digit TOTP or XXXX-XXXX)",
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    @field_validator("mfa_code")
+    @classmethod
+    def validate_mfa_code_format(cls, v: str) -> str:
+        """
+        Validate MFA code format.
+
+        Args:
+            v: MFA code to validate.
+
+        Returns:
+            Validated MFA code.
+
+        Raises:
+            ValueError: If code format is invalid.
+        """
+        normalized = v.strip().upper()
+        # 6-digit TOTP
+        if len(normalized) == 6 and normalized.isdigit():
+            return normalized
+        # 9-char backup code (XXXX-XXXX)
+        if len(normalized) == 9 and normalized[4] == "-":
+            return normalized
+        raise ValueError("MFA code must be 6-digit TOTP or XXXX-XXXX")
 
 
 class MFASetupRequest(BaseModel):
-    mfa_code: str
+    """
+    Request model for MFA setup verification.
+
+    Attributes:
+        mfa_code: The 6-digit MFA code to verify during
+            setup.
+    """
+
+    mfa_code: StrictStr = Field(
+        ...,
+        min_length=6,
+        max_length=6,
+        pattern=r"^\d{6}$",
+        description="6-digit TOTP code",
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
 
 
 class MFASetupResponse(BaseModel):
-    secret: str
-    qr_code: str
-    app_name: str = "Endurain"
+    """
+    Response model for MFA setup initialization.
 
+    Attributes:
+        secret: The MFA secret key.
+        qr_code: Base64-encoded QR code image for setup.
+        app_name: Application name for MFA setup.
+    """
 
-class MFADisableRequest(BaseModel):
-    mfa_code: str
+    secret: StrictStr = Field(
+        ...,
+        description="TOTP secret key",
+    )
+    qr_code: StrictStr = Field(
+        ...,
+        description="Base64-encoded QR code image",
+    )
+    app_name: StrictStr = Field(
+        default="Endurain",
+        description="Application name for MFA",
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
 
 
 class MFAStatusResponse(BaseModel):
-    mfa_enabled: bool
+    """
+    Response model for MFA status.
 
+    Attributes:
+        mfa_enabled: Whether MFA is enabled for the user.
+    """
 
-class MFASecretStore:
-    """Temporary storage for MFA secrets during setup process"""
+    mfa_enabled: StrictBool = Field(
+        ...,
+        description="Whether MFA is enabled",
+    )
 
-    def __init__(self):
-        self._store = {}
-
-    def add_secret(self, user_id: int, secret: str):
-        self._store[user_id] = secret
-
-    def get_secret(self, user_id: int):
-        return self._store.get(user_id)
-
-    def delete_secret(self, user_id: int):
-        if user_id in self._store:
-            del self._store[user_id]
-
-    def has_secret(self, user_id: int):
-        return user_id in self._store
-
-    def clear_all(self):
-        self._store.clear()
-
-    def __repr__(self):
-        return f"{self._store}"
-
-
-def get_mfa_secret_store():
-    return mfa_secret_store
-
-
-mfa_secret_store = MFASecretStore()
+    model_config = ConfigDict(
+        extra="forbid",
+    )

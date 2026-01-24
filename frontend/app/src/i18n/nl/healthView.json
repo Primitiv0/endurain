@@ -1,5 +1,13 @@
 {
   "title": "Gezondheid",
-  "errorFetchingHealthData": "Fout bij het ophalen van gezondheidsgegevens",
-  "errorFetchingHealthTargets": "Fout bij ophalen van gezondheidsdoelen"
+  "errorFetchingHealthSteps": "Fout bij het ophalen van gezondheid stappen",
+  "errorFetchingHealthWeight": "Fout bij het ophalen van gezondheidsgegevens",
+  "errorFetchingHealthSleep": "Fout bij het ophalen van gezondheid slaap",
+  "errorFetchingHealthTargets": "Fout bij ophalen van gezondheidsdoelen",
+  "successUpdatingWeightTarget": "Gewicht doelstelling succesvol bijgewerkt",
+  "errorUpdatingWeightTarget": "Fout bij het bijwerken van het streefgewicht",
+  "successUpdatingStepsTarget": "Doelstelling stappen succesvol bijgewerkt",
+  "errorUpdatingStepsTarget": "Fout bij bijwerken stappendoel",
+  "successUpdatingSleepTarget": "Slaapdoel succesvol bijgewerkt",
+  "errorUpdatingSleepTarget": "Fout bij bijwerken slaap doel"
 }

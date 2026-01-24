@@ -14,9 +14,9 @@ import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import activities.activity.crud as activities_crud
 
-import users.user.crud as users_crud
+import users.users.crud as users_crud
 
-import websocket.schema as websocket_schema
+import websocket.manager as websocket_manager
 
 from core.database import SessionLocal
 
@@ -26,7 +26,7 @@ async def fetch_and_process_activities_by_dates(
     start_date: datetime,
     end_date: datetime,
     user_id: int,
-    websocket_manager: websocket_schema.WebSocketManager,
+    ws_manager: websocket_manager.WebSocketManager,
     db: Session,
 ) -> list[activities_schema.Activity] | None:
     try:
@@ -56,6 +56,7 @@ async def fetch_and_process_activities_by_dates(
     for activity in garmin_activities:
         # Get the activity ID
         activity_id = activity["activityId"]
+        activity_name = activity["activityName"]
 
         # Check if the activity is already stored in the database
         activity_db = activities_crud.get_activity_by_garminconnect_id_from_user_id(
@@ -110,10 +111,11 @@ async def fetch_and_process_activities_by_dates(
                 await activities_utils.parse_and_store_activity_from_file(
                     user_id,
                     full_file_path,
-                    websocket_manager,
+                    ws_manager,
                     db,
                     True,
                     activity_gear,
+                    activity_name,
                 )
                 or []
             )
@@ -123,44 +125,41 @@ async def fetch_and_process_activities_by_dates(
 
 
 async def retrieve_garminconnect_users_activities_for_days(days: int):
-    # Create a new database session
-    db = SessionLocal()
-    websocket_manager = websocket_schema.get_websocket_manager()
+    ws_manager = websocket_manager.get_websocket_manager()
 
-    try:
-        # Get all users
-        users = users_crud.get_all_users(db)
+    # Create a new database session using context manager
+    with SessionLocal() as db:
+        try:
+            # Get all users
+            users = users_crud.get_all_users(db)
 
-        # Calculate the start date and end date
-        calculated_start_date = datetime.now(timezone.utc) - timedelta(days=days)
-        calculated_end_date = datetime.now(timezone.utc)
+            # Calculate the start date and end date
+            calculated_start_date = datetime.now(timezone.utc) - timedelta(days=days)
+            calculated_end_date = datetime.now(timezone.utc)
 
-        # Iterate through all users
-        for user in users:
-            try:
-                await get_user_garminconnect_activities_by_dates(
-                    calculated_start_date,
-                    calculated_end_date,
-                    user.id,
-                    websocket_manager,
-                    db,
-                )
-            except Exception as err:
-                # Log specific errors for each user
-                core_logger.print_to_log(
-                    f"Error processing activities for user {user.id} in retrieve_garminconnect_users_activities_for_days: {err}",
-                    "error",
-                    exc=err,
-                )
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Error getting users in retrieve_garminconnect_users_activities_for_days: {err}",
-            "error",
-            exc=err,
-        )
-    finally:
-        # Ensure the session is closed after use
-        db.close()
+            # Iterate through all users
+            for user in users:
+                try:
+                    await get_user_garminconnect_activities_by_dates(
+                        calculated_start_date,
+                        calculated_end_date,
+                        user.id,
+                        ws_manager,
+                        db,
+                    )
+                except Exception as err:
+                    # Log specific errors for each user
+                    core_logger.print_to_log(
+                        f"Error processing activities for user {user.id} in retrieve_garminconnect_users_activities_for_days: {err}",
+                        "error",
+                        exc=err,
+                    )
+        except Exception as err:
+            core_logger.print_to_log(
+                f"Error getting users in retrieve_garminconnect_users_activities_for_days: {err}",
+                "error",
+                exc=err,
+            )
 
 
 def get_user_garminconnect_client(user_id: int, db: Session):
@@ -196,7 +195,7 @@ async def get_user_garminconnect_activities_by_dates(
     start_date: datetime,
     end_date: datetime,
     user_id: int,
-    websocket_manager: websocket_schema.WebSocketManager,
+    ws_manager: websocket_manager.WebSocketManager,
     db: Session,
 ) -> list[activities_schema.Activity] | None:
     try:
@@ -205,8 +204,15 @@ async def get_user_garminconnect_activities_by_dates(
 
         if garminconnect_client is not None:
             # Fetch Garmin Connect activities for the specified date range
-            garminconnect_activities_processed = await fetch_and_process_activities_by_dates(
-                garminconnect_client, start_date, end_date, user_id, websocket_manager, db
+            garminconnect_activities_processed = (
+                await fetch_and_process_activities_by_dates(
+                    garminconnect_client,
+                    start_date,
+                    end_date,
+                    user_id,
+                    ws_manager,
+                    db,
+                )
             )
 
             # Log the start of the activities processing

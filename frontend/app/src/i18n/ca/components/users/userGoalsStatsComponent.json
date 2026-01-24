@@ -1,13 +1,14 @@
 {
   "title": "Objectius",
-  "activityTypeRun": "Córrer",
+  "activityTypeRun": "Correr",
   "activityTypeBike": "Bici",
   "activityTypeSwim": "Natació",
   "activityTypeWalk": "Caminar",
   "activityTypeStrength": "Força",
-  "intervalOption1": "Diari",
-  "intervalOption2": "Setmanal",
-  "intervalOption3": "Mensual",
-  "intervalOption4": "Anual",
+  "activityTypeCardio": "Cardio",
+  "intervalDaily": "Diari",
+  "intervalWeekly": "Setmanal",
+  "intervalMonthly": "Mensual",
+  "intervalYearly": "Anual",
   "activities": "activitats"
 }

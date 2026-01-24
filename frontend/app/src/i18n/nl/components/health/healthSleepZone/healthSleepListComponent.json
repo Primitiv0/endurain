@@ -1,0 +1,10 @@
+{
+  "labelDate": "Datum",
+  "sleepStagesTitle": "Slaapfasen",
+  "modalDeleteSleepTitle": "Verwijder de slaapstand",
+  "modalDeleteSleepBody": "Weet u zeker dat u de slaapstand wilt verwijderen voor ",
+  "successDeleteSleep": "Slaapstand verwijderd",
+  "errorDeleteSleep": "Het was niet mogelijk om de slaapstand te verwijderen",
+  "successEditSleep": "Slaapstand gewijzigd",
+  "errorEditSleep": "Het was niet mogelijk om de slaapstand aan te passen"
+}

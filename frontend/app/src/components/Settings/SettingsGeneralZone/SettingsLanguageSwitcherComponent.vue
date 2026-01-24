@@ -31,8 +31,11 @@ export default {
       { value: 'de', label: t('generalItems.languageOption4') },
       { value: 'fr', label: t('generalItems.languageOption5') },
       { value: 'gl', label: t('generalItems.languageOption10') },
+      { value: 'it', label: t('generalItems.languageOption11') },
       { value: 'nl', label: t('generalItems.languageOption6') },
       { value: 'pt', label: t('generalItems.languageOption3') },
+      { value: 'sl', label: t('generalItems.languageOption12') },
+      { value: 'sv', label: t('generalItems.languageOption13') },
       { value: 'es', label: t('generalItems.languageOption7') },
       { value: 'us', label: t('generalItems.languageOption1') }
     ])

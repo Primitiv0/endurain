@@ -1,6 +1,7 @@
 import gzip
 import os
 import shutil
+import asyncio
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -22,10 +23,10 @@ import activities.activity.schema as activities_schema
 import activities.activity.crud as activities_crud
 import activities.activity.models as activities_models
 
-import users.user.crud as users_crud
+import users.users.crud as users_crud
 
-import users.user_privacy_settings.crud as users_privacy_settings_crud
-import users.user_privacy_settings.schema as users_privacy_settings_schema
+import users.users_privacy_settings.crud as users_privacy_settings_crud
+import users.users_privacy_settings.models as users_privacy_settings_models
 
 import activities.activity_laps.crud as activity_laps_crud
 
@@ -38,9 +39,7 @@ import activities.activity_streams.schema as activity_streams_schema
 
 import activities.activity_workout_steps.crud as activity_workout_steps_crud
 
-import strava.bulk_import_utils as strava_bulk_import_utils
-
-import websocket.schema as websocket_schema
+import websocket.manager as websocket_manager
 
 import gpx.utils as gpx_utils
 import tcx.utils as tcx_utils
@@ -51,6 +50,8 @@ import gears.gear.schema as gears_schema
 
 import core.logger as core_logger
 import core.config as core_config
+import core.database as core_database
+import core.sanitization as core_sanitization
 
 # Global Activity Type Mappings (ID to Name)
 ACTIVITY_ID_TO_NAME = {
@@ -93,6 +94,13 @@ ACTIVITY_ID_TO_NAME = {
     37: "Ice Skate",
     38: "Soccer",
     39: "Padel",
+    40: "Treadmill",
+    41: "Cardio training",
+    42: "Kayaking",
+    43: "Sailing",
+    44: "Snow shoeing",
+    45: "Inline skating",
+    46: "HIIT",
     # Add other mappings as needed based on the full list in define_activity_type comments if required
     # "AlpineSki",
     # "BackcountrySki",
@@ -194,6 +202,7 @@ ACTIVITY_NAME_TO_ID.update(
         "pickleball": 26,
         "commuting_ride": 27,
         "indoor_ride": 28,
+        "indoor_cycling": 28,
         "mixed_surface_ride": 29,
         "windsurf": 30,
         "windsurfing": 30,
@@ -208,6 +217,7 @@ ACTIVITY_NAME_TO_ID.update(
         "e_bike": 35,
         "ebike": 35,
         "e_bike_ride": 35,
+        "e_bike_fitness": 35,
         "emountainbikeride": 36,
         "e_bike_mountain": 36,
         "ebikemountain": 36,
@@ -218,6 +228,18 @@ ACTIVITY_NAME_TO_ID.update(
         "padel": 39,
         "padelball": 39,
         "paddelball": 39,
+        "treadmill": 40,
+        "cardio_training": 41,
+        "kayaking": 42,
+        "sailing": 43,
+        "sail": 43,
+        "snowshoeing": 44,
+        "snowshoe": 44,
+        "inline_skating": 45,
+        "inlineskate": 45,
+        "hiit": 46,
+        "high_intensity_interval_training": 46,
+        "highintensityintervaltraining": 46,
     }
 )
 
@@ -232,11 +254,17 @@ def transform_schema_activity_to_model_activity(
     if activity.created_at is not None:
         created_date = activity.created_at
 
+    # Sanitize markdown fields to prevent XSS
+    sanitized_description = core_sanitization.sanitize_markdown(activity.description)
+    sanitized_private_notes = core_sanitization.sanitize_markdown(
+        activity.private_notes
+    )
+
     # Create a new activity object
     new_activity = activities_models.Activity(
         user_id=activity.user_id,
-        description=activity.description,
-        private_notes=activity.private_notes,
+        description=sanitized_description,
+        private_notes=sanitized_private_notes,
         distance=activity.distance,
         name=activity.name,
         activity_type=activity.activity_type,
@@ -303,7 +331,9 @@ def serialize_activity(activity: activities_schema.Activity):
             dt = dt.replace(tzinfo=ZoneInfo("UTC"))
         return dt.astimezone(timezone).strftime("%Y-%m-%dT%H:%M:%S")
 
-    def convert_to_datetime_if_string(dt):
+    def convert_to_datetime_if_string(dt: str | datetime | None) -> datetime:
+        if dt is None:
+            raise ValueError("Datetime cannot be None")
         if isinstance(dt, str):
             return datetime.fromisoformat(dt)
         return dt
@@ -364,14 +394,15 @@ def handle_gzipped_file(
 async def parse_and_store_activity_from_file(
     token_user_id: int,
     file_path: str,
-    websocket_manager: websocket_schema.WebSocketManager,
+    websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
     from_garmin: bool = False,
-    garminconnect_gear: dict = None,
+    garminconnect_gear: dict | None = None,
     strava_activities: dict = None,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
     import_initiated_time: str = None,  # String containing the time the Strava bulk import was initiated.
     users_existing_gear_nickname_to_id: dict = None,  # Dictionary containing gear nickname to ID, needed for Strava bulk import
     file_progress_dict: dict = None,  # Dictionary containing information on file processing count, to allow logs to show at least mediocre import progress messages (primarily for Strava bulk import).  Dictionary structure - {'filenumber': filenumber, 'totalfilecount': totalfilecount }
+    activity_name: str | None = None,
 ):
     """
     The core function to parse and store activities that are being imported from a file.
@@ -424,6 +455,7 @@ async def parse_and_store_activity_from_file(
                 file_extension,
                 file_path,
                 db,
+                activity_name,
             )
 
             # Build supplemental metadata. Check if a Strava bulk import is in progress, and if so check to see if any additional information can be added to the activity.
@@ -463,8 +495,12 @@ async def parse_and_store_activity_from_file(
                             split_records_by_activity,
                             token_user_id,
                             user_privacy_settings,
-                            int(garmin_connect_activity_id),
-                            garminconnect_gear,
+                            (
+                                int(garmin_connect_activity_id)
+                                if garmin_connect_activity_id
+                                else None
+                            ),
+                            garminconnect_gear if garminconnect_gear else None,
                             db,
                         )
                     else:
@@ -558,9 +594,15 @@ async def parse_and_store_activity_from_file(
 async def parse_and_store_activity_from_uploaded_file(
     token_user_id: int,
     file: UploadFile,
-    websocket_manager: websocket_schema.WebSocketManager,
+    websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
 ):
+    # Validate filename exists
+    if file.filename is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename is required",
+        )
 
     # Get file extension
     _, file_extension = os.path.splitext(file.filename)
@@ -701,11 +743,12 @@ def move_file(new_dir: str, new_filename: str, file_path: str):
 
 def parse_file(
     token_user_id: int,
-    user_privacy_settings: users_privacy_settings_schema.UsersPrivacySettings,
+    user_privacy_settings: users_privacy_settings_models.UsersPrivacySettings,
     file_extension: str,
     filename: str,
     db: Session,
-) -> dict:
+    activity_name: str | None = None,
+) -> dict | None:
     try:
         if filename.lower() != "bulk_import/__init__.py":
             core_logger.print_to_log(f"Parsing file: {filename}")
@@ -717,6 +760,7 @@ def parse_file(
                     token_user_id,
                     user_privacy_settings,
                     db,
+                    activity_name,
                 )
             elif file_extension.lower() == ".tcx":
                 parsed_info = tcx_utils.parse_tcx_file(
@@ -724,17 +768,17 @@ def parse_file(
                     token_user_id,
                     user_privacy_settings,
                     db,
+                    activity_name,
                 )
             elif file_extension.lower() == ".fit":
                 # Parse the FIT file
-                parsed_info = fit_utils.parse_fit_file(filename, db)
+                parsed_info = fit_utils.parse_fit_file(filename, db, activity_name)
             else:
                 # file extension not supported raise an HTTPException with a 406 Not Acceptable status code
                 raise HTTPException(
                     status_code=status.HTTP_406_NOT_ACCEPTABLE,
                     detail="File extension not supported. Supported file extensions are .gpx, .fit and .tcx",
                 )
-                return None  # Can't return parsed info if we haven't parsed anything
             return parsed_info
         else:
             return None
@@ -751,7 +795,9 @@ def parse_file(
 
 
 async def store_activity(
-    parsed_info: dict, websocket_manager: websocket_schema.WebSocketManager, db: Session
+    parsed_info: dict,
+    websocket_manager: websocket_manager.WebSocketManager,
+    db: Session,
 ):
     # create the activity in the database
     created_activity = await activities_crud.create_activity(
@@ -759,7 +805,7 @@ async def store_activity(
     )
 
     # Check if created_activity is None
-    if created_activity is None:
+    if created_activity is None or created_activity.id is None:
         # Log the error
         core_logger.print_to_log(
             "Error in store_activity - activity is None, error creating activity",
@@ -847,12 +893,12 @@ def calculate_activity_distances(activities: list[activities_schema.Activity]):
     # Initialize the distances
     run = bike = swim = walk = hike = rowing = snow_ski = snowboard = windsurf = (
         stand_up_paddleboarding
-    ) = surfing = 0.0
+    ) = surfing = kayaking = sailing = snowshoeing = inline_skating = 0.0
 
     if activities is not None:
         # Calculate the distances
         for activity in activities:
-            if activity.activity_type in [1, 2, 3, 34]:
+            if activity.activity_type in [1, 2, 3, 34, 40]:
                 run += activity.distance
             elif activity.activity_type in [4, 5, 6, 7, 27, 28, 29, 35, 36]:
                 bike += activity.distance
@@ -874,6 +920,14 @@ def calculate_activity_distances(activities: list[activities_schema.Activity]):
                 stand_up_paddleboarding += activity.distance
             elif activity.activity_type in [33]:
                 surfing += activity.distance
+            elif activity.activity_type in [42]:
+                kayaking += activity.distance
+            elif activity.activity_type in [43]:
+                sailing += activity.distance
+            elif activity.activity_type in [44]:
+                snowshoeing += activity.distance
+            elif activity.activity_type in [45]:
+                inline_skating += activity.distance
 
     # Return the distances
     return activities_schema.ActivityDistances(
@@ -886,6 +940,12 @@ def calculate_activity_distances(activities: list[activities_schema.Activity]):
         snow_ski=snow_ski,
         snowboard=snowboard,
         windsurf=windsurf,
+        stand_up_paddleboarding=stand_up_paddleboarding,
+        surfing=surfing,
+        kayaking=kayaking,
+        sailing=sailing,
+        snowshoeing=snowshoeing,
+        inline_skating=inline_skating,
     )
 
 
@@ -956,7 +1016,9 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
 
     # Make the request and get the response
     try:
-        headers = {"User-Agent": "Endurain"}
+        headers = {
+            "User-Agent": f"Endurain/{core_config.API_VERSION} (ReverseGeocoding)"
+        }
         # Make the request and get the response
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
@@ -1181,3 +1243,44 @@ def set_activity_name_based_on_activity_type(activity_type_id: int) -> str:
 
     # If type is not 10 (Workout), return the mapping with " workout" suffix
     return mapping + " workout" if mapping != "Workout" else mapping
+
+
+def process_all_files_sync(
+    user_id: int,
+    file_paths: list[str],
+    websocket_manager: websocket_manager.WebSocketManager,
+    import_initiated_time: str = None,  # String containing the time the Strava bulk import was initiated.
+):
+    """
+    Process all files sequentially in single thread.
+
+    Args:
+        user_id: User ID.
+        file_paths: List of file paths to process.
+        websocket_manager: WebSocket manager instance.
+    """
+    db = next(core_database.get_db())
+    try:
+        total_files = len(file_paths)
+        for idx, file_path in enumerate(file_paths, 1):
+            core_logger.print_to_log_and_console(
+                f"Processing file {idx}/{total_files}: " f"{file_path}"   # TO DO: Check if the text should be changed to "queuing file for processing"
+            )
+            asyncio.run(
+                parse_and_store_activity_from_file(
+                    user_id,
+                    file_path,
+                    websocket_manager,
+                    db,
+                    import_initiated_time=import_initiated_time,
+                )
+            )
+            # Small delay between files
+            time.sleep(0.1)
+
+        core_logger.print_to_log_and_console(
+            f"Bulk import completed: {total_files} files "
+            f"processed for user {user_id}"
+        )
+    finally:
+        db.close()

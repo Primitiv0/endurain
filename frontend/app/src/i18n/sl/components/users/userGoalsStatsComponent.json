@@ -1,0 +1,14 @@
+{
+  "title": "Cilji",
+  "activityTypeRun": "Tek",
+  "activityTypeBike": "Kolesarjenje",
+  "activityTypeSwim": "Plavanje",
+  "activityTypeWalk": "Hoja",
+  "activityTypeStrength": "Vadba za moč",
+  "activityTypeCardio": "Kardio",
+  "intervalDaily": "Daily",
+  "intervalWeekly": "Weekly",
+  "intervalMonthly": "Monthly",
+  "intervalYearly": "Yearly",
+  "activities": "aktivnosti"
+}

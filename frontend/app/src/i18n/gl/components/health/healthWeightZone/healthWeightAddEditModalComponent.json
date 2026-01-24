@@ -1,8 +1,14 @@
 {
-  "addWeightModalTitle": "Add weight",
-  "editWeightModalTitle": "Edit weight",
-  "addWeightWeightLabel": "Weight",
-  "addWeightDateLabel": "Date",
-  "successAddWeight": "Weight added",
-  "errorAddWeight": "Error adding weight"
+  "addWeightModalTitle": "Engadir peso",
+  "editWeightModalTitle": "Editar peso",
+  "addWeightWeightLabel": "Peso",
+  "addWeightDateLabel": "Data",
+  "addWeightHiddenItemsLabel": "Detalles",
+  "addWeightBMILabel": "IMC",
+  "addWeightBodyFatLabel": "Graxa corporal",
+  "addWeightBodyWaterLabel": "Porcentaxe de auga",
+  "addWeightBoneMassLabel": "Masa ósea",
+  "addWeightMuscleMassLabel": "Masa muscular",
+  "successAddWeight": "Peso engadido",
+  "errorAddWeight": "Erro ao engadir o peso"
 }

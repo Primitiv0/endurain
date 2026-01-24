@@ -19,10 +19,10 @@ class SignUpToken(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="User ID that the sign-up token belongs to",
+        comment="User ID that the sign up token belongs to",
     )
     token_hash = Column(
-        String(length=128), nullable=False, comment="Hashed sign-up token"
+        String(length=128), nullable=False, comment="Hashed sign up token"
     )
     created_at = Column(
         DateTime, nullable=False, comment="Token creation date (datetime)"
@@ -37,5 +37,5 @@ class SignUpToken(Base):
         comment="Token usage status (False - unused, True - used)",
     )
 
-    # Define a relationship to the User model
-    user = relationship("User", back_populates="sign_up_tokens")
+    # Define a relationship to the Users model
+    users = relationship("Users", back_populates="sign_up_tokens")

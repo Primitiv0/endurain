@@ -1,0 +1,19 @@
+{
+  "addEditGearComponentModalAddTitle": "Dodaj komponento opreme",
+  "addEditGearComponentModalEditTitle": "Uredi komponento opreme",
+  "addEditGearComponentModalAddEditTypeLabel": "Vrsta",
+  "addEditGearComponentModalAddEditBrandLabel": "Znamka",
+  "addEditGearComponentModalAddEditModelLabel": "Model",
+  "addEditGearComponentModalAddEditPurchaseDateLabel": "Datum nakupa",
+  "addEditGearComponentModalAddEditExpectedDistanceLabel": "Pričakovana razdalja",
+  "addEditGearComponentModalAddEditExpectedTimeLabel": "Pričakovani čas",
+  "addEditGearComponentModalAddEditPurchaseValueLabel": "Vrednost nakupa",
+  "addEditGearComponentModalAddEditRetiredDateLabel": "Datum upokojitve",
+  "addEditGearComponentModalAddEditIsActiveLabel": "Je aktivna",
+  "successGearComponentAdded": "Komponenta opreme uspešno dodana",
+  "successGearComponentEdited": "Komponenta opreme uspešno urejena",
+  "errorGearComponentAdd": "Napaka pri dodajanju komponente opreme",
+  "gearComponentListGearEditSuccessMessage": "Komponenta opreme uspešno urejena",
+  "gearComponentListGearEditErrorMessage": "Napaka pri urejanju komponente opreme",
+  "retiredDateAfterPurchaseDateError": "Datum upokojitve mora biti po datumu nakupa"
+}

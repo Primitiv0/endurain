@@ -105,6 +105,7 @@
               "
               v-model="newEditGearComponentBrand"
               maxlength="250"
+              required
             />
             <!-- model fields -->
             <label for="gearComponentModelAddEdit"
@@ -126,6 +127,7 @@
               "
               v-model="newEditGearComponentModel"
               maxlength="250"
+              required
             />
             <!-- purchase date fields -->
             <label for="gearComponentPurchaseDateAddEdit"
@@ -169,7 +171,7 @@
                   max="100000"
                   step="1"
                 />
-                <span class="input-group-text" v-if="authStore.user.units === 1">{{
+                <span class="input-group-text" v-if="authStore.user.units === 'metric'">{{
                   $t('generalItems.unitsKm')
                 }}</span>
                 <span class="input-group-text" v-else>{{ $t('generalItems.unitsMiles') }}</span>
@@ -226,10 +228,10 @@
                 step="0.01"
                 inputmode="decimal"
               />
-              <span class="input-group-text" v-if="authStore.user.currency === 1">{{
+              <span class="input-group-text" v-if="authStore.user.currency === 'euro'">{{
                 $t('generalItems.currencyEuroSymbol')
               }}</span>
-              <span class="input-group-text" v-else-if="authStore.user.currency === 2">{{
+              <span class="input-group-text" v-else-if="authStore.user.currency === 'dollar'">{{
                 $t('generalItems.currencyDollarSymbol')
               }}</span>
               <span class="input-group-text" v-else>{{
@@ -287,6 +289,16 @@
               class="btn btn-success"
               name="addGearComponent"
               data-bs-dismiss="modal"
+              :disabled="
+                newEditGearComponentType === null ||
+                newEditGearComponentType === '' ||
+                newEditGearComponentBrand === null ||
+                newEditGearComponentBrand === '' ||
+                newEditGearComponentModel === null ||
+                newEditGearComponentModel === '' ||
+                newEditGearComponentPurchaseDate === null ||
+                newEditGearComponentPurchaseDate === ''
+              "
               v-if="action === 'add'"
             >
               {{ $t('gearComponentAddEditModalComponent.addEditGearComponentModalAddTitle') }}
@@ -296,6 +308,16 @@
               class="btn btn-success"
               name="editGearComponent"
               data-bs-dismiss="modal"
+              :disabled="
+                newEditGearComponentType === null ||
+                newEditGearComponentType === '' ||
+                newEditGearComponentBrand === null ||
+                newEditGearComponentBrand === '' ||
+                newEditGearComponentModel === null ||
+                newEditGearComponentModel === '' ||
+                newEditGearComponentPurchaseDate === null ||
+                newEditGearComponentPurchaseDate === ''
+              "
               v-else
             >
               {{ $t('gearComponentAddEditModalComponent.addEditGearComponentModalEditTitle') }}
@@ -508,7 +530,7 @@ function handleSubmit() {
     return
   }
 
-  if (Number(authStore?.user?.units) === 1) {
+  if (authStore?.user?.units === 'metric') {
     newEditGearComponentExpectedDistanceMiles.value = kmToMiles(
       newEditGearComponentExpectedDistanceKms.value
     )

@@ -3,6 +3,12 @@
   "editWeightModalTitle": "Gewicht Wijzigen",
   "addWeightWeightLabel": "Gewicht",
   "addWeightDateLabel": "Datum",
+  "addWeightHiddenItemsLabel": "Details",
+  "addWeightBMILabel": "BMI",
+  "addWeightBodyFatLabel": "Lichaamsvet",
+  "addWeightBodyWaterLabel": "Lichaam water",
+  "addWeightBoneMassLabel": "Botmassa",
+  "addWeightMuscleMassLabel": "Spiermassa",
   "successAddWeight": "Gewicht toegevoegd",
   "errorAddWeight": "Fout bij gewicht toevoegen"
 }

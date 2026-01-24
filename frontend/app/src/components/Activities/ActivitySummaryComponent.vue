@@ -73,11 +73,7 @@
           role="button"
           v-if="activity.garminconnect_activity_id"
         >
-          <img
-            src="/src/assets/garminconnect/Garmin_Connect_app_1024x1024-02.png"
-            alt="Garmin Connect logo"
-            height="22"
-          />
+          <img :src="INTEGRATION_LOGOS.garminConnectApp" alt="Garmin Connect logo" height="22" />
         </a>
         <div>
           <button
@@ -173,14 +169,22 @@
     </h1>
 
     <!-- Activity description -->
-    <p v-if="activity.description">{{ activity.description }}</p>
+    <div v-if="activity.description" class="mt-2">
+      <MarkdownContentComponent
+        :content="activity.description"
+        :aria-label="$t('activitySummaryComponent.activityDescription')"
+      />
+    </div>
 
     <div v-if="activity.private_notes">
       <hr />
       <h6 class="text-body-secondary">
         {{ $t('activitySummaryComponent.privateNotes') }}
       </h6>
-      <p>{{ activity.private_notes }}</p>
+      <MarkdownContentComponent
+        :content="activity.private_notes"
+        :aria-label="$t('activitySummaryComponent.privateNotes')"
+      />
       <hr />
     </div>
 
@@ -195,6 +199,8 @@
           activity.activity_type != 18 &&
           activity.activity_type != 19 &&
           activity.activity_type != 20 &&
+          activity.activity_type != 41 &&
+          activity.activity_type != 46 &&
           activityTypeNotRacquet(activity)
         "
       >
@@ -202,7 +208,7 @@
           {{ $t('activitySummaryComponent.activityDistance') }}
         </span>
         <br />
-        <span>{{ formatDistance(t, activity, authStore.user.units) }}</span>
+        <span>{{ formatDistance(t, activity, units) }}</span>
       </div>
       <!-- calories -->
       <div class="col" v-else>
@@ -227,7 +233,7 @@
             {{ $t('activitySummaryComponent.activityEleGain') }}
           </span>
           <br />
-          <span>{{ formatElevation(t, activity.elevation_gain, authStore.user.units) }}</span>
+          <span>{{ formatElevation(t, activity.elevation_gain, units) }}</span>
         </div>
         <!-- pace -->
         <div
@@ -237,6 +243,10 @@
             activity.activity_type != 18 &&
             activity.activity_type != 19 &&
             activity.activity_type != 20 &&
+            activityTypeNotWindsurf(activity) &&
+            activity.activity_type != 41 &&
+            activity.activity_type != 46 &&
+            activityTypeNotSailing(activity) &&
             activityTypeNotRacquet(activity)
           "
         >
@@ -244,7 +254,15 @@
             {{ $t('activitySummaryComponent.activityPace') }}
           </span>
           <br />
-          {{ formatPace(t, activity, authStore.user.units) }}
+          {{ formatPace(t, activity, units) }}
+        </div>
+        <!-- avg_speed sailing activities -->
+        <div v-else-if="activityTypeIsWindsurf(activity) || activityTypeIsSailing(activity)">
+          <span class="fw-lighter">
+            {{ $t('activitySummaryComponent.activityAvgSpeed') }}
+          </span>
+          <br />
+          <span>{{ formatAverageSpeed(t, activity, units) }}</span>
         </div>
         <!-- avg_hr -->
         <div v-else>
@@ -265,6 +283,8 @@
         activity.activity_type != 18 &&
         activity.activity_type != 19 &&
         activity.activity_type != 20 &&
+        activity.activity_type != 41 &&
+        activity.activity_type != 46 &&
         activityTypeNotRacquet(activity)
       "
     >
@@ -299,7 +319,7 @@
       <div class="col border-start border-opacity-50" v-if="activityTypeIsRunning(activity)">
         <span class="fw-lighter">{{ $t('activitySummaryComponent.activityEleGain') }}</span>
         <br />
-        <span>{{ formatElevation(t, activity.elevation_gain, authStore.user.units) }}</span>
+        <span>{{ formatElevation(t, activity.elevation_gain, units) }}</span>
       </div>
       <!-- avg_speed cycling activities -->
       <div class="col border-start border-opacity-50" v-if="activityTypeIsCycling(activity)">
@@ -307,7 +327,7 @@
           {{ $t('activitySummaryComponent.activityAvgSpeed') }}
         </span>
         <br />
-        <span>{{ formatAverageSpeed(t, activity, authStore.user.units) }}</span>
+        <span>{{ formatAverageSpeed(t, activity, units) }}</span>
       </div>
       <!-- calories -->
       <div class="col border-start border-opacity-50">
@@ -336,6 +356,9 @@ import UserAvatarComponent from '@/components/Users/UserAvatarComponent.vue'
 import ModalComponentUploadFile from '@/components/Modals/ModalComponentUploadFile.vue'
 import EditActivityModalComponent from '@/components/Activities/Modals/EditActivityModalComponent.vue'
 import ModalComponent from '@/components/Modals/ModalComponent.vue'
+import MarkdownContentComponent from '@/components/GeneralComponents/MarkdownContentComponent.vue'
+// Importing constants
+import { INTEGRATION_LOGOS } from '@/constants/integrationLogoConstants'
 // Importing the services
 import { users } from '@/services/usersService'
 import { activities } from '@/services/activitiesService'
@@ -356,6 +379,10 @@ import {
   activityTypeIsRunning,
   activityTypeNotRunning,
   activityTypeNotRacquet,
+  activityTypeNotWindsurf,
+  activityTypeIsWindsurf,
+  activityTypeNotSailing,
+  activityTypeIsSailing,
   formatName
 } from '@/utils/activityUtils'
 import { formatDateMed, formatTime, formatSecondsToMinutes } from '@/utils/dateTimeUtils'
@@ -371,8 +398,8 @@ const props = defineProps({
     required: true
   },
   units: {
-    type: Number,
-    default: 1
+    type: String,
+    default: 'metric'
   }
 })
 
@@ -409,7 +436,7 @@ onMounted(async () => {
 // Methods
 async function submitDeleteActivity() {
   try {
-    userActivity.value = await activities.deleteActivity(props.activity.id)
+    await activities.deleteActivity(props.activity.id)
     if (props.source === 'activity') {
       return router.push({
         path: '/',

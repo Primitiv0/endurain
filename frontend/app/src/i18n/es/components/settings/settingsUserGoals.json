@@ -1,7 +1,12 @@
 {
-  "addNewGoal": "Add new goal",
-  "labelNumberOfGoals1": "You have ",
-  "labelNumberOfGoals2": " goal(s) set:",
-  "successGoalDeleted": "Goal deleted successfully",
-  "errorFetchingGoals": "Error fetching goals"
+  "addNewGoal": "Añadir nuevo objetivo",
+  "filterByActivityType": "Filter by activity type",
+  "filterByGoalType": "Filter by goal type",
+  "filterAll": "All",
+  "filterByInterval": "Filter by interval",
+  "clearFilters": "Clear filters",
+  "labelNumberOfGoals1": "Tienes ",
+  "labelNumberOfGoals2": " objetivo(s) establecidos:",
+  "successGoalDeleted": "Objetivo eliminado correctamente",
+  "errorFetchingGoals": "Error obteniendo objetivos"
 }

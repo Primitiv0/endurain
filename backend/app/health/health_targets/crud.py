@@ -1,0 +1,120 @@
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+
+import health.health_targets.models as health_targets_models
+import health.health_targets.schema as health_targets_schema
+
+import core.decorators as core_decorators
+
+
+@core_decorators.handle_db_errors
+def get_health_targets_by_user_id(
+    user_id: int, db: Session
+) -> health_targets_models.HealthTargets | None:
+    """
+    Retrieve health targets for a specific user.
+
+    Args:
+        user_id: The ID of the user to fetch targets for.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The HealthTargets model if found, None otherwise.
+
+    Raises:
+        HTTPException: 500 error if database query fails.
+    """
+    # Get the health_targets from the database
+    stmt = select(health_targets_models.HealthTargets).where(
+        health_targets_models.HealthTargets.user_id == user_id
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+@core_decorators.handle_db_errors
+def create_health_targets(
+    user_id: int, db: Session
+) -> health_targets_models.HealthTargets:
+    """
+    Create new health targets for a user.
+
+    Args:
+        user_id: The ID of the user to create targets for.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The created HealthTargetsRead schema.
+
+    Raises:
+        HTTPException: 409 error if targets already exist.
+        HTTPException: 500 error if database operation fails.
+    """
+    try:
+        # Create a new health_target
+        db_health_targets = health_targets_models.HealthTargets(
+            user_id=user_id,
+        )
+
+        # Add the health_targets to the database
+        db.add(db_health_targets)
+        db.commit()
+        db.refresh(db_health_targets)
+
+        # Return the health_targets
+        return db_health_targets
+    except IntegrityError as integrity_error:
+        # Rollback the transaction
+        db.rollback()
+
+        # Raise an HTTPException with a 409 Conflict status code
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Duplicate entry error. Check if there is "
+            "already an entry created for the user",
+        ) from integrity_error
+
+
+@core_decorators.handle_db_errors
+def edit_health_target(
+    health_target: health_targets_schema.HealthTargetsUpdate,
+    user_id: int,
+    db: Session,
+) -> health_targets_models.HealthTargets:
+    """
+    Update health targets for a specific user.
+
+    Args:
+        health_target: Schema with fields to update.
+        user_id: The ID of the user to update targets for.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The updated HealthTargets model.
+
+    Raises:
+        HTTPException: 404 error if targets not found.
+        HTTPException: 500 error if database operation fails.
+    """
+    # Get the user health target from the database
+    db_health_target = get_health_targets_by_user_id(user_id, db)
+
+    if db_health_target is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User health target not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Dictionary of the fields to update if they are not None
+    health_target_data = health_target.model_dump(exclude_unset=True)
+    # Iterate over the fields and update dynamically
+    for key, value in health_target_data.items():
+        setattr(db_health_target, key, value)
+
+    # Commit the transaction
+    db.commit()
+    db.refresh(db_health_target)
+
+    return db_health_target

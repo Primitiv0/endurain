@@ -1,0 +1,18 @@
+{
+  "title": "Endurain",
+  "buttonAddActivity": "Lägg till aktivitet",
+  "fieldLabelUploadFileType": "Ladda upp .gpx, .fit, .tcx eller .gz-fil",
+  "radioUserActivities": "Mina aktiviteter",
+  "radioFollowerActivities": "Följares aktiviteter",
+  "pillIsHidden": "Dold",
+  "successActivityAdded": "Aktivitet har lagts till",
+  "errorActivityAdded": "Kunde inte lägga till aktivitet",
+  "refreshingActivities": "Uppdaterar aktiviteter från kopplade tjänster",
+  "successActivitiesRefreshed": "Aktiviteter uppdaterade",
+  "errorActivityNotFound": "Aktivitet hittades inte",
+  "processingActivity": "Bearbetar aktivitet",
+  "successActivityDeleted": "Aktivitet har tagits bort",
+  "errorFetchingUserStats": "Fel vid hämtning av användarstatistik",
+  "errorFetchingUserActivities": "Fel vid hämtning av användaraktiviteter",
+  "errorFetchingMedia": "Fel vid hämtning av media för aktivitet"
+}

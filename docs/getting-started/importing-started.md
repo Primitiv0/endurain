@@ -87,9 +87,9 @@ NOTE: There is currently no mechanism to undo a gear import.
 
 All gear will be imported as active, as Strava does not export the active/inactive status of the gear.
 
-Note that Endurain does not allow the "+" character in gear field names, and thus all +'s will be replaced with spaces on import.  All beginning and ending space characters (" ") will be removed on import as well.
+Note that Endurain does not allow the `+` character in gear field names, and thus +'s will removed from all fields and replaced with spaces (" ") on import.  All beginning and ending space characters (" ") will be removed on import as well.
 
-Endurain does not allow duplicate gear nicknames, regardless of case (e.g., "Ilves" and "ilves" would not be allowed). Gear with duplicate nicknames will not be imported (i.e., only the first item with a given nickname will be imported).
+Endurain does not allow duplicate gear nicknames, case insensitively (e.g., `Ilves` and `ilves` would not be allowed) and regardless of gear type (e.g., `Ilves` the bike and `ilves` the shoe would not be allowed). Gear with duplicate nicknames will not be imported (i.e., only the first item with a given nickname will be imported).
 
 The import routine checks for duplicate items, and should not import duplicates. Thus it should be safe to re-import the same file multiple times. However, due to the renaming of un-named shoes, repeated imports of the same shoe file will create duplicate entries of any unnamed shoes present. 
 

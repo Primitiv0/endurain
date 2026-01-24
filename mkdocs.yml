@@ -1,17 +1,74 @@
 site_name: Endurain documentation
-repo_url: https://github.com/joaovitoriasilva/endurain
+repo_url: https://github.com/endurain-project/endurain
 theme:
-  name: mkdocs
-  color_mode: auto
-  user_color_mode_toggle: true
+  name: material
+  icon:
+    admonition:
+      alert: material/alert
+      note: material/information
+      tip: material/lightbulb-on
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            separate_signature: true
 nav:
   - Home: index.md
   - Hosting Guide:
     - Getting started easy: getting-started/getting-started.md
     - Getting started advanced: getting-started/advanced-started.md
     - Getting started importing: getting-started/importing-started.md
+    - Bare-Metal installation guide: getting-started/bare-metal.md
+    - Proxmox community script: https://community-scripts.github.io/ProxmoxVE/scripts?id=endurain&category=Gaming+%26+Leisure
+    - MariaDB to Postgres migration: getting-started/maria-to-postgres-migration.md
+  - Features:
+    - Single Sign-On (SSO): features/single-sign-on.md
+    - Sleep Scoring: features/sleep-scoring.md
   - Integrations:
     - 3rd party apps: integrations/3rd-party-apps.md
     - 3rd party services: integrations/3rd-party-services.md
-  - Developer guide: developer-guide.md
+  - Developer guide: 
+    - Setup a development environment: developer-guide/setup-dev-env.md
+    - Authentication: developer-guide/authentication.md
+    - Supported types: developer-guide/supported-types.md
+    - Import development notes: developer-guide/import-dev-notes.md
   - Gallery: gallery.md
+  - Reference:
+    - Health:
+      - Health sleep: reference/health/health_sleep.md
+      - Health steps: reference/health/health_steps.md
+      - Health targets: reference/health/health_targets.md
+      - Health weight: reference/health/health_weight.md
+    - Profile: reference/profile.md
+    - Users:
+      - Users: reference/users/users.md
+      - Users default gear: reference/users/users_default_gear.md
+      - Users goals: reference/users/users_goals.md
+      - Users identity providers: reference/users/users_identity_providers.md
+      - Users integrations: reference/users/users_integrations.md
+      - Users privacy settings: reference/users/users_privacy_settings.md
+      - Users sessions:
+        - Users sessions: reference/users/users_sessions/users_sessions.md
+        - Users sessions rotated refresh tokens: reference/users/users_sessions/rotated_refresh_tokens.md
+    - WebSocket: reference/websocket.md

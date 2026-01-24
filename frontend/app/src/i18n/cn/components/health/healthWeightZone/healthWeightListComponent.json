@@ -1,9 +1,16 @@
 {
+  "dateLabel": "Date",
   "labelGarminConnect": "Garmin Connect",
-  "modalDeleteWeightTitle": "Delete weight",
-  "modalDeleteWeightBody": "Are you sure you want to delete weight entry for ",
-  "successDeleteWeight": "Weight deleted",
-  "errorDeleteWeight": "It was not possible to delete weight entry",
-  "successEditWeight": "Weight edited",
-  "errorEditWeight": "It was not possible to edit weight entry"
+  "detailsTitle": "Details",
+  "bmiLabel": "BMI",
+  "bodyFatLabel": "Body fat",
+  "bodyWaterLabel": "Body water",
+  "boneMassLabel": "Bone mass",
+  "muscleMassLabel": "Muscle mass",
+  "modalDeleteWeightTitle": "删除体重记录",
+  "modalDeleteWeightBody": "确定要删除此体重记录吗？",
+  "successDeleteWeight": "体重记录已删除",
+  "errorDeleteWeight": "无法删除体重记录",
+  "successEditWeight": "体重记录已编辑",
+  "errorEditWeight": "无法编辑体重记录"
 }

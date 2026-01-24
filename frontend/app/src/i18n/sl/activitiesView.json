@@ -1,0 +1,14 @@
+{
+  "title": "Aktivnosti",
+  "filterLabelType": "Vrsta",
+  "filterOptionAllTypes": "Vse vrste",
+  "filterLabelFromDate": "Od datuma",
+  "filterLabelToDate": "Do datuma",
+  "filterLabelNameLocation": "Ime ali lokacija",
+  "filterPlaceholderNameLocation": "npr. Jutranji tek",
+  "buttonClear": "Počisti",
+  "buttonApply": "Uporabi",
+  "errorFailedFetchActivityTypes": "Pridobivanje vrst aktivnosti ni uspelo",
+  "errorUpdatingActivities": "Posodabljanje aktivnosti ni uspelo",
+  "errorFetchingActivities": "Pridobivanje uporabniških aktivnosti ni uspelo"
+}

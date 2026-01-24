@@ -1,0 +1,20 @@
+{
+  "sleep": "Today's sleep",
+  "noSleepTarget": "No sleep target",
+  "restingHeartRate": "Resting heart rate",
+  "avgSkinTemperatureDeviation": ".",
+  "weight": "Teža",
+  "noWeightData": "Ni podatkov o teži",
+  "noWeightTarget": "Ni ciljne teže",
+  "noHeightDefined": "Višina uporabnika ni določena",
+  "bmi": "ITM",
+  "bmiUnderweight": "Podhranjenost",
+  "bmiNormalWeight": "Normalna teža",
+  "bmiOverweight": "Prekomerna teža",
+  "bmiObesityClass1": "Debelost (Razred 1)",
+  "bmiObesityClass2": "Debelost (Razred 2)",
+  "bmiObesityClass3": "Ekstremna debelost (Razred 3)",
+  "steps": "Današnji koraki",
+  "stepsTargetLabel": "steps",
+  "noStepsTarget": ""
+}
