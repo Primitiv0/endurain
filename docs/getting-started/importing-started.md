@@ -142,4 +142,4 @@ If you had unnamed shoes in Strava, note that they will be renamed by the shoe g
 
 Comments associated with media are not imported (Endurain does not currently allow comments on media). FYI: Comments associated with media are stored in Strava's media.csv file.
 
-While notifications will be sent to the user as items are imported, it is advised to check the log for full detailed information on the import and its progress; logs (and the console) are updated as each file is processed.
+While notifications will be sent to the user as items are imported, it is advised to check the log for full detailed information on the import and its progress; logs (and the console) are updated as each file is processed. 

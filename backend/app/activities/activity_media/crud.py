@@ -220,7 +220,15 @@ def create_activity_medias(
         ) from err
 
 def create_activity_media_from_strava_bulk_import(activity_id: int, media_strava_filename: str, media_path_from_strava: str, db: Session):
-    #core_logger.print_to_log_and_console(f"Media import: Beginning processing of {media_path_from_strava}")  # TESTING CODE
+    """
+    Imports a media file that is attached to an activity that has just been imported via the Strava bulk import routines. 
+
+    Note that the imported activity must be created before this function is called, as the activity_id must be known for media import to be successful.
+
+    Returns: nothing
+    """
+
+    core_logger.print_to_log_and_console(f"Media import: Beginning processing of {media_path_from_strava}", "debug")  # TESTING CODE
     try:
         # Ensure the 'data/activity_media' directory exists
         final_media_dir = core_config.ACTIVITY_MEDIA_DIR
@@ -231,7 +239,7 @@ def create_activity_media_from_strava_bulk_import(activity_id: int, media_strava
         new_file_path = os.path.join(final_media_dir, new_file_name)
 
         if os.path.exists(media_path_from_strava):
-            #core_logger.print_to_log_and_console(f"Media import: Media file exists - {media_path_from_strava}") # testing code
+            core_logger.print_to_log_and_console(f"Media import: Media file exists - {media_path_from_strava}", "debug") # testing code
             # Move the file
             try:
                 shutil.move(media_path_from_strava, new_file_path)
@@ -239,7 +247,7 @@ def create_activity_media_from_strava_bulk_import(activity_id: int, media_strava
                 # Log the file move exception
                 core_logger.print_to_log(f"Bulk file import media import: error moving file {media_path_from_strava} - {str(err)}", "error")
                 return
-            #core_logger.print_to_log_and_console(f"Media import: Media file {media_path_from_strava} has been moved to {new_file_path}")  # testing code
+            core_logger.print_to_log_and_console(f"Media import: Media file {media_path_from_strava} has been moved to {new_file_path}", "debug")  # testing code
 
             # Add media file to db
             create_activity_media(activity_id, new_file_path, db)

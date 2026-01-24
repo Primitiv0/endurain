@@ -52,7 +52,7 @@ def iterate_over_activities_csv() -> dict:
     """
     Parses information in a Strava activities.csv file.
 
-    Returns: Dictionary that contains the activities.csv file data.
+    Returns: Dictionary that contains the activities.csv file data.  Dictionary uses each activity's filename as the key.
     """
     # Ensure the 'strava_import' directory exists (.csv files will be here)
     strava_import_dir = core_config.STRAVA_BULK_IMPORT_DIR
@@ -65,7 +65,7 @@ def iterate_over_activities_csv() -> dict:
     # Importing data from Strava activities file.
     # Using Python's core CSV module here - https://docs.python.org/3/library/csv.html
     if os.path.isfile(strava_activities_file):
-        #core_logger.print_to_log_and_console(f"Strava {strava_activities_file_name} file present. Going to try to parse it.") #Testing code.
+        core_logger.print_to_log_and_console(f"Strava {strava_activities_file_name} file present. Going to try to parse it.", "debug") #Testing code.
         try:
             strava_activities_dict = {}
             with open(strava_activities_file, newline='') as csvfile:
@@ -74,7 +74,7 @@ def iterate_over_activities_csv() -> dict:
                 for row in strava_activities_csv:    # Must process CSV file object while file is still open.
                     # Check to see if file has headers that will be used during parsing of the file.
                     if ('Filename' not in row) or ('Activity Description' not in row) or ('Activity Gear' not in row) or ('Activity ID' not in row) or ('Media' not in row) or ('Activity Date' not in row) or ('Activity Name' not in row) or ('Activity Type' not in row):
-                        core_logger.print_to_log_and_console(f"Aborting Strava bulk activities import: Proper headers not found in {strava_activities_file}.  File should have 'Filename', 'Activity Date', 'Activity Description', 'Activity Gear', 'Activity ID', 'Activity Name', 'Activity Type', and 'Media'.")
+                        core_logger.print_to_log_and_console(f"Aborting Strava bulk activities import: Proper headers not found in {strava_activities_file}.  File should have 'Filename', 'Activity Date', 'Activity Description', 'Activity Gear', 'Activity ID', 'Activity Name', 'Activity Type', and 'Media'.", "error")
                         return None
                     _, strava_act_file_name = os.path.split(row['Filename'])  # strips path, returns filename with extension.
                     strava_activities_dict[strava_act_file_name] = row  # Store activity information in a dictionary using filename as the key
@@ -85,7 +85,7 @@ def iterate_over_activities_csv() -> dict:
             core_logger.print_to_log_and_console(f"Strava activities CSV parsing failed with error: {err}.", "error")
             return None
     else:
-        core_logger.print_to_log_and_console(f"Strava activities file not found. File should be at: {strava_activities_file}")
+        core_logger.print_to_log_and_console(f"Strava bulk import: Strava activities file not found. File should be at: {strava_activities_file}", "error")
         return None
 
 
@@ -99,7 +99,7 @@ def create_gear_dictionary_for_bulk_import(
     """
     Creates a dictionary that links gear nicknames in Endurain to their Endurain gear IDs. 
 
-    The dictionary includes both base Endurain gear nickname and the gearn name smoosh ("{brand} {model} {name}") that Strava uses for its shoe gear listing in activities.csv
+    The dictionary includes both base Endurain gear nickname and the gear name smoosh ("{brand} {model} {name}") that Strava uses for its shoe gear listing in activities.csv
 
     Returns: Dictionary that uses the gear name as a key to look up the gear ID.
     """
@@ -131,12 +131,10 @@ def queue_bulk_export_activities_for_import(
     import_time: str, 
 ) -> int:
     """
-    Queues files located in the Strava bulk import activities directory for processing.  Process all files sequentially in single thread (similar to activity/utils/process_all_files_sync).
+    Queues files located in the Strava bulk import activities directory for processing.  Process all files sequentially in single thread (similar to activity/utils.process_all_files_sync()).
 
     Returns: Number of files that were queued (which is not used currently by the calling function)
     """
-    # Function to queue files for importing from a Strava bulk export. 
-    # Returns the number of files to process, for log messages.
 
     # Ensure the 'strava_import/activities' directory exists (activity files will be here)
     strava_activities_import_dir = core_config.STRAVA_BULK_IMPORT_ACTIVITIES_DIR
@@ -165,7 +163,7 @@ def queue_bulk_export_activities_for_import(
         # Check if file is one we can process
         _, file_extension = os.path.splitext(file_path)
         if file_extension not in supported_file_formats:
-            core_logger.print_to_log_and_console(f"Strava bulk import: Skipping file {file_path} - due to not having a supported file extension. Supported extensions are: {supported_file_formats}.")
+            core_logger.print_to_log_and_console(f"Strava bulk import: Skipping file {file_path} - due to not having a supported file extension. Supported extensions are: {supported_file_formats}.", "warning")
             skippedprocessingcount+=1
             continue
         else:
@@ -202,12 +200,13 @@ def queue_bulk_export_activities_for_import(
             )
             # Small delay between files
             time.sleep(0.1)
-            queuedforprocessingcount+=1
-    
+
+    core_logger.print_to_log_and_console(f"Strava bulk import: Import complete! A total of {filenumber} files were processed.")
+
     return queuedforprocessingcount
 
 def build_metadata_dict(
-    file_base_name: str, # String with the base filename being processed (also key to strav_activities dictionary)
+    file_base_name: str, # String with the base filename being processed (also key to strava_activities dictionary)
     strava_activities: dict,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
     import_initiated_time: str,  # String containing the time the Strava bulk import was initiated.
     users_existing_gear_nickname_to_id: dict = None,  # Dictionary containing gear nickname to ID, needed for Strava bulk import
@@ -217,11 +216,11 @@ def build_metadata_dict(
 
     The field strava_activity_metadata["metadata_found_in_csv"] identifies whether there was an entry for this activity in the activities.csv file or not.
 
-    Returns: Dictionary that contains  the gear name as a key to look up the gear ID.
+    Returns: Dictionary that contains the gear name as a key to look up the gear ID.
     """
     strava_activity_metadata = {}
     if strava_activities.get(file_base_name):  # We have information on the activity
-        #core_logger.print_to_log_and_console(f"TESTING CODE: Inside metadata dict building if statemment: {strava_activities.get(file_base_name)}")
+        core_logger.print_to_log_and_console(f"TESTING CODE: Inside metadata dict building if statemment: {strava_activities.get(file_base_name)}", "debug")
         # Strava bulk import notes:
         #     Importing Strava activity id to the activity's "strava_activity_id" field results in Endurain thinking the activity is linked to Strava via the Strava active linking mechanism.
         #     Strava media will be worked on after the activity has been created, so it is not dealt with here.
@@ -290,11 +289,11 @@ def append_bulk_import_metadata_to_activity(
     activity_metadata_dict: dict, # A dictionary containing parsed information from a Strava activities.csv file
 )   -> dict:
     """
-    Function adds metadata to a parsed activity file that is about to be imported via the bulk import routine.
+    Function adds metadata to a parsed activity file that is about to be imported via the parse_and_store_activity_from_file() import routine.
     
-    The function's primary purpose is to add metadata from a Strava activities.csv file to a parsed activity file that is about to be imported.
+    The function's primary purpose (i.e., why it was created) is to add metadata from a Strava activities.csv file to a parsed activity file from a Strava bulk import activity that is about to be imported.
 
-    But it also adds the import_info dictionary metadata to all activities, so it is called in all cases during a bulk import. 
+    But this function also adds the import_info dictionary metadata to all generic bulk import activities, so it is called in all cases during a bulk import. 
 
     The activity_metadata_dict is originally formed by the build_metadata_dict function, so see that function for contents / keys / etc.
 
@@ -307,24 +306,24 @@ def append_bulk_import_metadata_to_activity(
         #    if activity["activity"].import_info is None and activity_metadata_dict.get("import_dict"):
     Note that basic bulk imports will not have many of these field names in activity_metadata_dict, so ensure that they are checked for existence before value checking.
 
-    I am leaving some testing code commented here, due to the high liklihood that this may be something we will need to look at in the future.
+    I am leaving some testing code commented here, due to the high liklihood that this may be something we will need to look at in the future. -F-Stop
 
     Returns the activity (as a dictionary)
     """
-    #core_logger.print_to_log_and_console(f"TESTING CODE: Activity metadata is: {activity["activity"]}")  # Testing code
-    #core_logger.print_to_log_and_console(f"TESTING CODE: Strava extracted metadata is: {activity_metadata_dict}")  # Testing code
+    #core_logger.print_to_log_and_console(f"TESTING CODE: Activity metadata is: {activity["activity"]}", "debug")  # Testing code
+    #core_logger.print_to_log_and_console(f"TESTING CODE: Strava extracted metadata is: {activity_metadata_dict}", "debug")  # Testing code
     if activity_metadata_dict.get("name"):
         activity["activity"].name = activity_metadata_dict["name"]    
-        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for NAME") # Testing code
+        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for NAME", "debug") # Testing code
     if activity_metadata_dict.get("description"):
         activity["activity"].description = activity_metadata_dict["description"]    
-        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for DESCRIPTION") # Testing code
+        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for DESCRIPTION", "debug") # Testing code
     if activity_metadata_dict.get("gear_id"):
         activity["activity"].gear_id = activity_metadata_dict["gear_id"]    
-        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for GEAR ID") # Testing code
+        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for GEAR ID", "debug") # Testing code
     if activity_metadata_dict.get("import_dict"):
         activity["activity"].import_info = activity_metadata_dict["import_dict"]    
-        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for IMPORT DICT") # Testing code
+        #core_logger.print_to_log_and_console(f"TESTING CODE: Added metadata from Strava to the activity for IMPORT DICT", "debug") # Testing code
     return activity
 
 

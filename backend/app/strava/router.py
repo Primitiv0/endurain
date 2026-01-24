@@ -320,8 +320,16 @@ async def import_activities_and_media_from_strava_export(
         Depends(websocket_manager.get_websocket_manager),
     ],
 ):
+    """
+    Starts an import of activity and media files contained in a Strava bulk export.
+
+    Queues up files for import via strava/bulk_import_utils.queue_bulk_export_activities_for_import() function.
+
+    Actual import is done by the primary activity/utils.parse_and_store_activity_from_file() function
+
+    """
     try:
-        # Get time of import initiation to pass to function for recording in import_data dictionary
+        # Get time of import initiation to pass to function for recording in import_data dictionary, ensuring all activities imported via this bulk import action share an identical import time.
         import_time = datetime.now().isoformat()
         core_logger.print_to_log_and_console(f"Strava bulk import: Initiated at {import_time}.")
 
@@ -335,9 +343,7 @@ async def import_activities_and_media_from_strava_export(
         # Create gear list here, so it does not have to be done separately for every single activity that is imported (AND because Strava has a wacked format for shoe naming in their export)
         users_existing_gear_nickname_to_id = strava_bulk_import_utils.create_gear_dictionary_for_bulk_import(token_user_id, db)
 
-        # Queue files for processing
-        #number_of_queued_files = strava_bulk_import_utils.queue_bulk_export_activities_for_import(token_user_id, ws_manager, db, strava_activities_dict, users_existing_gear_nickname_to_id, import_time)
-        # Submit ONE task that processes all files
+        # Queue files for processing.  Submit ONE task that processes all files
         loop = asyncio.get_event_loop()
         loop.run_in_executor(
             executor,
@@ -352,12 +358,11 @@ async def import_activities_and_media_from_strava_export(
             ),
         )
 
-
         # Log a success message that explains processing will continue elsewhere.
         core_logger.print_to_log_and_console(f"Strava bulk import initiated. Processing of files will continue in the background.")
 
         # Return a success message
-        return {"Strava import initiated. Processing of files will continue in the background."}
+        return {"Strava bulk import initiated. Processing of files will continue in the background."}
     except Exception as err:
         # Log the exception
         core_logger.print_to_log_and_console(
