@@ -28,15 +28,13 @@ router = APIRouter()
 
 
 @router.get(
-    "/page_number/{page_number}/num_records/{num_records}",
+    "",
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersListResponse,
 )
 async def read_users_all_pagination(
-    page_number: int,
-    num_records: int,
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
+    _validate_pagination_values_on_query: Annotated[
+        Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     _check_scopes: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["users:read"])
@@ -45,6 +43,14 @@ async def read_users_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    page_number: Annotated[
+        int | None,
+        Query(description="Pagination page number"),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(description="Number of records per page"),
+    ] = None,
     show_inactive: Annotated[
         bool | None,
         Query(description="Filter by inactive status"),
@@ -70,11 +76,11 @@ async def read_users_all_pagination(
     Retrieve paginated list of all users.
 
     Args:
-        page_number: Page number to retrieve.
-        num_records: Number of records per page.
         _validate_pagination_values: Pagination validation.
         _check_scopes: Authorization check.
         db: Database session dependency.
+        page_number: Optional page number to retrieve.
+        num_records: Optional number of records per page.
         show_inactive: Optional filter by inactive status.
         show_email_unverified: Optional filter by email verification status.
         show_pending_approval: Optional filter by pending approval status.

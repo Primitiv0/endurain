@@ -59,35 +59,35 @@ def get_users_number(db: Session) -> int:
 @core_decorators.handle_db_errors
 def get_users_with_pagination(
     db: Session,
-    page_number: int = 1,
-    num_records: int = 5,
+    page_number: int | None = None,
+    num_records: int | None = None,
     show_inactive: bool | None = True,
     show_email_unverified: bool | None = True,
     show_pending_approval: bool | None = True,
 ) -> list[users_models.Users]:
     """
-    Retrieve paginated list of users.
+    Retrieve a paginated list of users with optional filtering.
 
     Args:
-        db: SQLAlchemy database session.
-        page_number: Page number to retrieve (1-indexed).
-        num_records: Number of records per page.
-        show_inactive: Whether to include inactive users.
-        show_email_unverified: Whether to include email unverified users.
-        show_pending_approval: Whether to include users pending admin approval.
+        db (Session): Database session for executing queries.
+        page_number (int | None): The page number for pagination (1-indexed).
+            If None, pagination is not applied. Defaults to None.
+        num_records (int | None): The number of records per page.
+            If None, pagination is not applied. Defaults to None.
+        show_inactive (bool | None): If False, excludes inactive users.
+            Defaults to True (includes inactive users).
+        show_email_unverified (bool | None): If False, excludes users with
+            unverified emails. Defaults to True (includes email unverified
+            users).
+        show_pending_approval (bool | None): If False, excludes users pending
+            admin approval. Defaults to True (includes pending approval users).
 
     Returns:
-        List of User models for the requested page.
-
-    Raises:
-        HTTPException: 500 error if database query fails.
+        list[users_models.Users]: A list of User objects matching the specified
+            criteria, ordered by username. Returns an empty list if no users
+            match the filters.
     """
-    stmt = (
-        select(users_models.Users)
-        .order_by(users_models.Users.username)
-        .offset((page_number - 1) * num_records)
-        .limit(num_records)
-    )
+    stmt = select(users_models.Users)
 
     if show_inactive is False:
         stmt = stmt.where(users_models.Users.active.is_(True))
@@ -95,6 +95,11 @@ def get_users_with_pagination(
         stmt = stmt.where(users_models.Users.email_verified.is_(True))
     if show_pending_approval is False:
         stmt = stmt.where(users_models.Users.pending_admin_approval.is_(False))
+
+    stmt = stmt.order_by(users_models.Users.username)
+
+    if page_number is not None and num_records is not None:
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
     return db.execute(stmt).scalars().all()
 
