@@ -9,28 +9,31 @@
     >
       <font-awesome-icon :icon="['fas', 'filter']" />
     </button>
-    <ul class="dropdown-menu ps-3">
-      <li v-for="option in options" :key="option.id">
-        <div class="form-check">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            :id="option.id"
-            :checked="modelValue[option.id]"
-            @change="handleChange(option.id, ($event.target as HTMLInputElement).checked)"
-          />
-          <label class="form-check-label" :for="option.id">
-            {{ option.label }}
-          </label>
-        </div>
-      </li>
+    <ul class="dropdown-menu dropdown-menu-end">
+      <template v-for="option in options" :key="option.id">
+        <li class="dropdown-item" v-if="option.id !== 'divider'">
+          <div class="form-check">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              :id="option.id"
+              :checked="modelValue[option.id]"
+              @change="handleChange(option.id, ($event.target as HTMLInputElement).checked)"
+            />
+            <label class="form-check-label" :for="option.id">
+              {{ option.label }}
+            </label>
+          </div>
+        </li>
+        <li v-else>
+          <hr class="dropdown-divider" />
+        </li>
+      </template>
     </ul>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
 /**
  * Represents a single filter option.
  *
@@ -54,8 +57,6 @@ interface Props {
   modelValue: Record<string, boolean>
   ariaLabel?: string
 }
-
-const { t } = useI18n()
 
 const props = withDefaults(defineProps<Props>(), {
   ariaLabel: 'Filter options'

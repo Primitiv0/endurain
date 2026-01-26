@@ -58,7 +58,12 @@ def get_users_number(db: Session) -> int:
 
 @core_decorators.handle_db_errors
 def get_users_with_pagination(
-    db: Session, page_number: int = 1, num_records: int = 5
+    db: Session,
+    page_number: int = 1,
+    num_records: int = 5,
+    show_inactive: bool | None = True,
+    show_email_unverified: bool | None = True,
+    show_pending_approval: bool | None = True,
 ) -> list[users_models.Users]:
     """
     Retrieve paginated list of users.
@@ -67,6 +72,9 @@ def get_users_with_pagination(
         db: SQLAlchemy database session.
         page_number: Page number to retrieve (1-indexed).
         num_records: Number of records per page.
+        show_inactive: Whether to include inactive users.
+        show_email_unverified: Whether to include email unverified users.
+        show_pending_approval: Whether to include users pending admin approval.
 
     Returns:
         List of User models for the requested page.
@@ -80,6 +88,14 @@ def get_users_with_pagination(
         .offset((page_number - 1) * num_records)
         .limit(num_records)
     )
+
+    if show_inactive is False:
+        stmt = stmt.where(users_models.Users.active.is_(True))
+    if show_email_unverified is False:
+        stmt = stmt.where(users_models.Users.email_verified.is_(True))
+    if show_pending_approval is False:
+        stmt = stmt.where(users_models.Users.pending_admin_approval.is_(False))
+
     return db.execute(stmt).scalars().all()
 
 
