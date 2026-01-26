@@ -13,10 +13,12 @@ class TestReadHealthWeightAll:
     Test suite for read_health_weight_all endpoint.
     """
 
-    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number")
+    @patch(
+        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
+    )
     @patch(
         "health.health_weight.router.health_weight_crud."
-        "get_all_health_weight_by_user_id"
+        "get_health_weight_with_pagination_by_user_id"
     )
     def test_read_health_weight_all_success(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
@@ -70,7 +72,9 @@ class TestReadHealthWeightAll:
         assert data["total"] == 2
         assert len(data["records"]) == 2
 
-    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number")
+    @patch(
+        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
+    )
     @patch(
         "health.health_weight.router.health_weight_crud."
         "get_all_health_weight_by_user_id"
@@ -103,10 +107,12 @@ class TestReadHealthWeightAllPagination:
     Test suite for read_health_weight_all_pagination endpoint.
     """
 
-    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number")
+    @patch(
+        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
+    )
     @patch(
         "health.health_weight.router.health_weight_crud."
-        "get_health_weight_with_pagination"
+        "get_health_weight_with_pagination_by_user_id"
     )
     def test_read_health_weight_all_pagination_success(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
@@ -135,7 +141,7 @@ class TestReadHealthWeightAllPagination:
 
         # Act
         response = fast_api_client.get(
-            "/health_weight/page_number/1/num_records/5",
+            "/health_weight?page_number=1&num_records=5",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -147,10 +153,12 @@ class TestReadHealthWeightAllPagination:
         assert data["page_number"] == 1
         assert len(data["records"]) == 1
 
-    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number")
+    @patch(
+        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
+    )
     @patch(
         "health.health_weight.router.health_weight_crud."
-        "get_health_weight_with_pagination"
+        "get_health_weight_with_pagination_by_user_id"
     )
     def test_read_health_weight_all_pagination_different_page(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
@@ -164,7 +172,7 @@ class TestReadHealthWeightAllPagination:
 
         # Act
         response = fast_api_client.get(
-            "/health_weight/page_number/2/num_records/10",
+            "/health_weight?page_number=2&num_records=10",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -175,7 +183,7 @@ class TestReadHealthWeightAllPagination:
         assert data["num_records"] == 10
         assert data["page_number"] == 2
         assert data["records"] == []
-        mock_get_paginated.assert_called_once_with(1, ANY, 2, 10)
+        mock_get_paginated.assert_called_once_with(1, ANY, 2, 10, None)
 
 
 class TestCreateHealthWeight:
@@ -184,7 +192,9 @@ class TestCreateHealthWeight:
     """
 
     @patch("health.health_weight.router.health_weight_crud.create_health_weight")
-    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_date")
+    @patch(
+        "health.health_weight.router.health_weight_crud.get_health_weight_by_date_and_user_id"
+    )
     def test_create_health_weight_success(
         self,
         mock_get_by_date,
@@ -222,7 +232,9 @@ class TestCreateHealthWeight:
         assert data["weight"] == 75.5
 
     @patch("health.health_weight.router.health_weight_crud.edit_health_weight")
-    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_date")
+    @patch(
+        "health.health_weight.router.health_weight_crud.get_health_weight_by_date_and_user_id"
+    )
     def test_create_health_weight_updates_existing(
         self, mock_get_by_date, mock_edit, fast_api_client, fast_api_app
     ):

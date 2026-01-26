@@ -40,7 +40,7 @@ def get_all_health_weight(
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_number(
+def get_health_weight_number_by_user_id(
     user_id: int, db: Session, interval: health_constants.Interval | None = None
 ) -> int:
     """
@@ -127,39 +127,38 @@ def get_health_weight_by_id_and_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_with_pagination(
+def get_health_weight_with_pagination_by_user_id(
     user_id: int,
     db: Session,
-    page_number: int = 1,
-    num_records: int = 5,
+    page_number: int | None = None,
+    num_records: int | None = None,
     interval: health_constants.Interval | None = None,
 ) -> list[health_weight_models.HealthWeight]:
     """
-    Retrieve paginated health weight records for a user. If interval is
-    provided, filter records starting from the calculated start date. If no
-    interval is provided, default to the last 7 days.
+    Retrieve health weight records for a specific user with optional pagination
+        and filtering.
 
     Args:
-        user_id: User ID to fetch records for.
-        db: Database session.
-        page_number: Page number to retrieve (1-indexed).
-        num_records: Number of records per page.
-        interval: Optional filter by goal interval. If not provided, defaults
-            to "last_7_days".
+        user_id (int): The ID of the user whose health weight records are to be
+            retrieved.
+        db (Session): The database session used to execute the query.
+        page_number (int | None, optional): The page number for pagination
+            (1-indexed).
+            If provided, num_records must also be provided. Defaults to None.
+        num_records (int | None, optional): The number of records per page.
+            If provided, page_number must also be provided. Defaults to None.
+        interval (health_constants.Interval | None, optional): The time
+            interval to filter records.
+            If provided, only records from the start of the interval to present
+            are returned. Defaults to None.
 
     Returns:
-        List of HealthWeight models for the requested page.
-
-    Raises:
-        HTTPException: If database error occurs.
+        list[health_weight_models.HealthWeight]: A list of health weight
+            records sorted by date in descending order, optionally paginated.
     """
     # Get the health_weight from the database
-    stmt = (
-        select(health_weight_models.HealthWeight)
-        .where(health_weight_models.HealthWeight.user_id == user_id)
-        .order_by(desc(health_weight_models.HealthWeight.date))
-        .offset((page_number - 1) * num_records)
-        .limit(num_records)
+    stmt = select(health_weight_models.HealthWeight).where(
+        health_weight_models.HealthWeight.user_id == user_id
     )
 
     if interval is not None:
@@ -167,17 +166,17 @@ def get_health_weight_with_pagination(
             health_weight_models.HealthWeight.date
             >= health_utils.get_start_date_for_interval(interval.value)
         )
-    else:
-        stmt = stmt.where(
-            health_weight_models.HealthWeight.date
-            >= health_utils.get_start_date_for_interval("last_7_days")
-        )
+
+    stmt = stmt.order_by(desc(health_weight_models.HealthWeight.date))
+
+    if page_number is not None and num_records is not None:
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
     return db.execute(stmt).scalars().all()
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_by_date(
+def get_health_weight_by_date_and_user_id(
     user_id: int, date: str, db: Session
 ) -> health_weight_models.HealthWeight | None:
     """

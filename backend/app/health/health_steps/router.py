@@ -18,18 +18,16 @@ router = APIRouter()
 
 
 @router.get(
-    "/page_number/{page_number}/num_records/{num_records}",
+    "",
     response_model=health_steps_schema.HealthStepsListResponse,
     status_code=status.HTTP_200_OK,
 )
 async def read_health_steps_all_pagination(
-    page_number: int,
-    num_records: int,
     _check_scopes: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["health:read"])
     ],
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
+    _validate_pagination_values_on_query: Annotated[
+        Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     token_user_id: Annotated[
         int,
@@ -39,6 +37,14 @@ async def read_health_steps_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    page_number: Annotated[
+        int | None,
+        Query(description="Pagination page number"),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(description="Number of records per page"),
+    ] = None,
     interval: Annotated[
         health_constants.Interval | None,
         Query(description="Filter by goal interval"),
@@ -47,37 +53,38 @@ async def read_health_steps_all_pagination(
     """
     Retrieve paginated health steps records for the authenticated user.
 
-    This endpoint returns a paginated list of health steps data for the user
-    identified by the access token. It enforces proper authentication,
-    authorization (health:read scope), and pagination parameter validation.
+    This endpoint fetches health steps data with optional pagination and
+    filtering. Access is restricted to users with the 'health:read' scope.
 
     Args:
-        page_number (int): The page number to retrieve (1-indexed).
-        num_records (int): The number of records per page.
-        _check_scopes (Callable): Dependency that validates the user has
+        _check_scopes: Security dependency that validates the user has
             'health:read' scope.
-        _validate_pagination_values (Callable): Dependency that validates
+        _validate_pagination_values_on_query: Dependency that validates
             pagination parameters.
-        token_user_id (int): The user ID extracted from the access token.
-        db (Session): Database session dependency.
-        interval (health_constants.Interval | None): Optional filter by goal
+        token_user_id: The ID of the authenticated user extracted from the
+            access token.
+        db: Database session for executing queries.
+        page_number: Optional pagination page number to retrieve specific page
+            of results.
+        num_records: Optional number of records per page for pagination.
+        interval: Optional filter to retrieve records within a specific goal
             interval.
 
     Returns:
         HealthStepsListResponse: A response object containing:
-            - total (int): The total number of health steps records for the
-                user.
-            - num_records (int): Number of records returned in this response.
-            - page_number (int): Page number of the current response.
-            - records (list): A list of paginated health steps records.
-
+            - total: Total count of records matching the filter criteria
+            - num_records: Number of records returned per page
+            - page_number: Current page number
+            - records: List of paginated HealthStepsRead objects
     Raises:
-        HTTPException: If authentication fails, authorization is denied, or
-            pagination parameters are invalid.
+        HTTPException: If the user lacks required 'health:read' scope or if
+            pagination values are invalid.
     """
     # Get the total count and paginated records from the database
-    total = health_steps_crud.get_health_steps_number(token_user_id, db, interval)
-    records = health_steps_crud.get_health_steps_with_pagination(
+    total = health_steps_crud.get_health_steps_number_by_user_id(
+        token_user_id, db, interval
+    )
+    records = health_steps_crud.get_health_steps_with_pagination_by_user_id(
         token_user_id, db, page_number, num_records, interval
     )
 
@@ -86,7 +93,7 @@ async def read_health_steps_all_pagination(
         total=total,
         num_records=num_records,
         page_number=page_number,
-        records=records,  # type: ignore[arg-type]
+        records=records,
     )
 
 
@@ -138,7 +145,7 @@ async def create_health_steps(
     date_str = health_steps.date.isoformat()
 
     # Check if health_steps for this date already exists
-    steps_for_date = health_steps_crud.get_health_steps_by_date(
+    steps_for_date = health_steps_crud.get_health_steps_by_date_and_user_id(
         token_user_id, date_str, db
     )
 

@@ -32,7 +32,7 @@ class TestReadHealthTargetsAll:
 
         # Act
         response = fast_api_client.get(
-            "/health_targets/",
+            "/health/targets/",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -57,7 +57,7 @@ class TestReadHealthTargetsAll:
 
         # Act
         response = fast_api_client.get(
-            "/health_targets/",
+            "/health/targets/",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -86,7 +86,7 @@ class TestReadHealthTargetsAll:
 
         # Act
         response = fast_api_client.get(
-            "/health_targets/",
+            "/health/targets/",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -122,7 +122,7 @@ class TestUpdateHealthTargets:
 
         # Act
         response = fast_api_client.put(
-            "/health_targets/",
+            "/health/targets/",
             json={
                 "id": 1,
                 "user_id": 1,
@@ -159,7 +159,7 @@ class TestUpdateHealthTargets:
 
         # Act
         response = fast_api_client.put(
-            "/health_targets/",
+            "/health/targets/",
             json={
                 "id": 1,
                 "user_id": 1,
@@ -192,7 +192,7 @@ class TestUpdateHealthTargets:
 
         # Act
         response = fast_api_client.put(
-            "/health_targets/",
+            "/health/targets/",
             json={
                 "id": 1,
                 "user_id": 1,
@@ -225,7 +225,7 @@ class TestUpdateHealthTargets:
 
         # Act
         response = fast_api_client.put(
-            "/health_targets/",
+            "/health/targets/",
             json={
                 "id": 1,
                 "user_id": 1,
@@ -256,7 +256,7 @@ class TestUpdateHealthTargets:
 
         # Act
         response = fast_api_client.put(
-            "/health_targets/",
+            "/health/targets/",
             json={
                 "id": 1,
                 "user_id": 1,

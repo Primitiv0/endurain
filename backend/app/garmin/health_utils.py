@@ -82,7 +82,7 @@ def fetch_and_process_bc_by_dates(
             source=health_weight_schema.Source.GARMIN,
         )
 
-        health_weight_db = health_weight_crud.get_health_weight_by_date(
+        health_weight_db = health_weight_crud.get_health_weight_by_date_and_user_id(
             user_id, str(health_weight.date), db
         )
 
@@ -159,7 +159,7 @@ def fetch_and_process_ds_by_dates(
             source=health_steps_schema.Source.GARMIN,
         )
 
-        health_steps_db = health_steps_crud.get_health_steps_by_date(
+        health_steps_db = health_steps_crud.get_health_steps_by_date_and_user_id(
             user_id, str(health_steps.date), db
         )
 
@@ -456,7 +456,7 @@ def fetch_and_process_sleep_by_dates(
             ),
         )
 
-        health_sleep_db = health_sleep_crud.get_health_sleep_by_date(
+        health_sleep_db = health_sleep_crud.get_health_sleep_by_date_and_user_id(
             user_id, str(health_sleep.date), db
         )
 

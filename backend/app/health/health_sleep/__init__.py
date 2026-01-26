@@ -6,9 +6,9 @@ sleep tracking including sleep duration, stages, quality metrics,
 heart rate, SpO2, and sleep scoring.
 
 Exports:
-    - CRUD: get_health_sleep_number,
+    - CRUD: get_health_sleep_number_by_user_id,
       get_health_sleep_by_id_and_user_id,
-      get_health_sleep_with_pagination, get_health_sleep_by_date,
+      get_health_sleep_with_pagination_by_user_id, get_health_sleep_by_date_and_user_id,
       create_health_sleep, edit_health_sleep, delete_health_sleep
     - Schemas: HealthSleepBase, HealthSleepCreate, HealthSleepUpdate,
       HealthSleepRead, HealthSleepListResponse, HealthSleepStage
@@ -17,10 +17,10 @@ Exports:
 """
 
 from .crud import (
-    get_health_sleep_number,
+    get_health_sleep_number_by_user_id,
     get_health_sleep_by_id_and_user_id,
-    get_health_sleep_with_pagination,
-    get_health_sleep_by_date,
+    get_health_sleep_with_pagination_by_user_id,
+    get_health_sleep_by_date_and_user_id,
     create_health_sleep,
     edit_health_sleep,
     delete_health_sleep,
@@ -41,10 +41,10 @@ from .schema import (
 
 __all__ = [
     # CRUD operations
-    "get_health_sleep_number",
+    "get_health_sleep_number_by_user_id",
     "get_health_sleep_by_id_and_user_id",
-    "get_health_sleep_with_pagination",
-    "get_health_sleep_by_date",
+    "get_health_sleep_with_pagination_by_user_id",
+    "get_health_sleep_by_date_and_user_id",
     "create_health_sleep",
     "edit_health_sleep",
     "delete_health_sleep",

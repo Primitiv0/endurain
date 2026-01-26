@@ -19,18 +19,16 @@ router = APIRouter()
 
 
 @router.get(
-    "/page_number/{page_number}/num_records/{num_records}",
+    "",
     response_model=health_sleep_schema.HealthSleepListResponse,
     status_code=status.HTTP_200_OK,
 )
 async def read_health_sleep_all_pagination(
-    page_number: int,
-    num_records: int,
     _check_scopes: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["health:read"])
     ],
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
+    _validate_pagination_values_on_query: Annotated[
+        Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     token_user_id: Annotated[
         int,
@@ -40,39 +38,54 @@ async def read_health_sleep_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    page_number: Annotated[
+        int | None,
+        Query(description="Pagination page number"),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(description="Number of records per page"),
+    ] = None,
     interval: Annotated[
         health_constants.Interval | None,
         Query(description="Filter by goal interval"),
     ] = None,
 ) -> health_sleep_schema.HealthSleepListResponse:
     """
-    Retrieve all health sleep records for a user with pagination.
+    Retrieve paginated health sleep records for the authenticated user.
 
-    This endpoint fetches paginated health sleep records for the authenticated user.
-    It requires 'health:read' scope and validates pagination parameters.
+    This endpoint fetches health sleep data with optional pagination and
+    filtering. Access is restricted to users with the 'health:read' scope.
 
     Args:
-        page_number (int): The page number to retrieve (1-indexed).
-        num_records (int): The number of records to return per page.
-        _check_scopes (Callable): Dependency that validates the required OAuth scopes.
-        _validate_pagination_values (Callable): Dependency that validates pagination parameters.
-        token_user_id (int): The user ID extracted from the access token.
-        db (Session): Database session dependency.
+        _check_scopes: Security dependency that validates the user has
+            'health:read' scope.
+        _validate_pagination_values_on_query: Dependency that validates
+            pagination parameters.
+        token_user_id: The ID of the authenticated user extracted from the
+            access token.
+        db: Database session for executing queries.
+        page_number: Optional pagination page number to retrieve specific page
+            of results.
+        num_records: Optional number of records per page for pagination.
+        interval: Optional filter to retrieve records within a specific goal
+            interval.
 
     Returns:
-        HealthSleepListResponse: Response containing:
-            - total (int): Total number of health sleep records for the user.
-            - num_records (int): Number of records returned in this response.
-            - page_number (int): Page number of the current response.
-            - records (list): List of health sleep records for the requested page.
-
+        HealthSleepListResponse: A response object containing:
+            - total: Total count of records matching the filter criteria
+            - num_records: Number of records returned per page
+            - page_number: Current page number
+            - records: List of paginated HealthSleepRead objects
     Raises:
-        HTTPException: If authentication fails or required scopes are missing.
-        HTTPException: If pagination values are invalid.
+        HTTPException: If the user lacks required 'health:read' scope or if
+            pagination values are invalid.
     """
     # Get the total count and records from the database
-    total = health_sleep_crud.get_health_sleep_number(token_user_id, db, interval)
-    records = health_sleep_crud.get_health_sleep_with_pagination(
+    total = health_sleep_crud.get_health_sleep_number_by_user_id(
+        token_user_id, db, interval
+    )
+    records = health_sleep_crud.get_health_sleep_with_pagination_by_user_id(
         token_user_id, db, page_number, num_records, interval
     )
 
@@ -81,7 +94,7 @@ async def read_health_sleep_all_pagination(
         total=total,
         num_records=num_records,
         page_number=page_number,
-        records=records,  # type: ignore[arg-type]
+        records=records,
     )
 
 
@@ -133,7 +146,7 @@ async def create_health_sleep(
     date_str = health_sleep.date.isoformat()  # type: ignore[union-attr]
 
     # Check if health_sleep for this date already exists
-    sleep_for_date = health_sleep_crud.get_health_sleep_by_date(
+    sleep_for_date = health_sleep_crud.get_health_sleep_by_date_and_user_id(
         token_user_id, date_str, db
     )
 
