@@ -202,6 +202,32 @@ def get_health_weight_by_date_and_user_id(
 
 
 @core_decorators.handle_db_errors
+def get_latest_weight_by_user_id(
+    user_id: int, db: Session
+) -> health_weight_models.HealthWeight | None:
+    """
+    Get most recent weight record for dashboard display.
+
+    Args:
+        user_id: User ID to fetch latest weight for.
+        db: Database session.
+
+    Returns:
+        HealthWeight model if found, None otherwise.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    stmt = (
+        select(health_weight_models.HealthWeight)
+        .where(health_weight_models.HealthWeight.user_id == user_id)
+        .order_by(desc(health_weight_models.HealthWeight.date))
+        .limit(1)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+@core_decorators.handle_db_errors
 def create_health_weight(
     user_id: int, health_weight: health_weight_schema.HealthWeightCreate, db: Session
 ) -> health_weight_models.HealthWeight:

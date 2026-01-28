@@ -2,43 +2,28 @@
   <h1>{{ $t('healthView.title') }}</h1>
   <div class="row row-gap-3">
     <!-- Include the HealthSideBarComponent -->
-    <HealthSideBarComponent
-      :activeSection="activeSection"
-      @updateActiveSection="updateActiveSection"
-    />
+    <HealthSideBarComponent :activeSection="activeSection" @updateActiveSection="updateActiveSection" />
 
     <LoadingComponent v-if="isLoading" />
 
-    <!-- Include the HealthDashboardZone
+    <!-- Include the HealthDashboardZone -->
     <HealthDashboardZone :userHealthTargets="userHealthTargets" :isLoadingParent="isLoading"
-      v-if="activeSection === 'dashboard' && !isLoading" /> -->
+      v-if="activeSection === 'dashboard' && !isLoading" />
 
     <!-- Include the HealthSleepZone -->
-    <HealthSleepZone
-      :userHealthTargets="userHealthTargets"
-      :isLoadingParent="isLoading"
-      @setSleepTarget="setSleepTarget"
-      v-if="activeSection === 'sleep' && !isLoading"
-    />
+    <HealthSleepZone :userHealthTargets="userHealthTargets" :isLoadingParent="isLoading"
+      @setSleepTarget="setSleepTarget" v-if="activeSection === 'sleep' && !isLoading" />
 
     <!-- Include the HealthRHRZone -->
     <HealthRHRZone :isLoadingParent="isLoading" v-if="activeSection === 'rhr' && !isLoading" />
 
     <!-- Include the HealthStepsZone -->
-    <HealthStepsZone
-      :userHealthTargets="userHealthTargets"
-      :isLoadingParent="isLoading"
-      @setStepsTarget="setStepsTarget"
-      v-if="activeSection === 'steps' && !isLoading"
-    />
+    <HealthStepsZone :userHealthTargets="userHealthTargets" :isLoadingParent="isLoading"
+      @setStepsTarget="setStepsTarget" v-if="activeSection === 'steps' && !isLoading" />
 
     <!-- Include the HealthWeightZone -->
-    <HealthWeightZone
-      :userHealthTargets="userHealthTargets"
-      :isLoadingParent="isLoading"
-      @setWeightTarget="setWeightTarget"
-      v-if="activeSection === 'weight' && !isLoading"
-    />
+    <HealthWeightZone :userHealthTargets="userHealthTargets" :isLoadingParent="isLoading"
+      @setWeightTarget="setWeightTarget" v-if="activeSection === 'weight' && !isLoading" />
   </div>
   <!-- back button -->
   <BackButtonComponent />

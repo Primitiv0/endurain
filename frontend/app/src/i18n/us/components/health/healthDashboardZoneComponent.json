@@ -1,7 +1,7 @@
 {
-  "sleep": "Today's sleep",
+  "sleep": "Sleep",
   "noSleepTarget": "No sleep target",
-  "restingHeartRate": "Resting heart rate",
+  "restingHeartRate": "Resting HR",
   "avgSkinTemperatureDeviation": "Skin temp. dev.",
   "weight": "Weight",
   "noWeightData": "No weight data",
@@ -14,7 +14,8 @@
   "bmiObesityClass1": "Obesity (Class 1)",
   "bmiObesityClass2": "Obesity (Class 2)",
   "bmiObesityClass3": "Extreme Obesity (Class 3)",
-  "steps": "Today's steps",
+  "steps": "Steps",
   "stepsTargetLabel": "steps",
-  "noStepsTarget": "No steps target"
+  "noStepsTarget": "No steps target",
+  "errorFetchingHealthDailyStats": "Error fetching health daily stats"
 }

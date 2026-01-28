@@ -2,8 +2,10 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     StrictInt,
+    StrictFloat,
     Field,
 )
+from datetime import datetime
 
 
 class HealthListResponse(BaseModel):
@@ -27,6 +29,161 @@ class HealthListResponse(BaseModel):
     page_number: StrictInt | None = Field(
         default=None,
         description="Current page number",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class HealthSleepDashboard(BaseModel):
+    """
+    Latest sleep metrics for dashboard display.
+
+    Attributes:
+        total_sleep_seconds: Total sleep duration in seconds.
+        resting_heart_rate: Resting heart rate in bpm.
+        hrv_status: Heart rate variability status.
+        avg_skin_temp_deviation: Skin temp deviation in celsius.
+    """
+
+    total_sleep_seconds: StrictInt | None = Field(
+        default=None,
+        description="Total sleep duration in seconds",
+    )
+    resting_heart_rate: StrictInt | None = Field(
+        default=None,
+        description="Resting heart rate in bpm",
+    )
+    hrv_status: str | None = Field(
+        default=None,
+        description="Heart rate variability status",
+    )
+    avg_skin_temp_deviation: StrictFloat | None = Field(
+        default=None,
+        description="Average skin temperature deviation",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class HealthWeightDashboard(BaseModel):
+    """
+    Latest weight metrics for dashboard display.
+
+    Attributes:
+        weight: Weight in kilograms.
+        bmi: Body Mass Index.
+    """
+
+    weight: StrictFloat | None = Field(
+        default=None,
+        description="Weight in kilograms",
+    )
+    bmi: StrictFloat | None = Field(
+        default=None,
+        description="Body Mass Index",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class HealthStepsDashboard(BaseModel):
+    """
+    Latest steps for dashboard display.
+
+    Attributes:
+        steps: Number of steps taken.
+    """
+
+    steps: StrictInt | None = Field(
+        default=None,
+        description="Number of steps taken",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class HealthFastingDashboard(BaseModel):
+    """
+    Active or latest fasting session for dashboard display.
+
+    Attributes:
+        id: Unique identifier for the fasting record.
+        fast_start_time: Start time of fast.
+        fast_end_time: End time of fast (null if ongoing).
+        status: Current status of the fasting session.
+        actual_duration_seconds: Actual fasting duration in seconds.
+    """
+
+    id: StrictInt = Field(
+        ...,
+        description="Unique identifier for the fasting record",
+    )
+    fast_start_time: datetime = Field(
+        ...,
+        description="Start time of fast",
+    )
+    fast_end_time: datetime | None = Field(
+        default=None,
+        description="End time of fast (null if ongoing)",
+    )
+    status: str = Field(
+        ...,
+        description="Current status of the fasting session",
+    )
+    actual_duration_seconds: StrictInt | None = Field(
+        default=None,
+        description="Actual fasting duration in seconds",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class HealthDashboardResponse(BaseModel):
+    """
+    Consolidated dashboard response with current health metrics.
+
+    Attributes:
+        sleep: Latest sleep data.
+        weight: Latest weight data.
+        steps: Latest steps data.
+        fasting: Active or most recent fasting session.
+    """
+
+    sleep: HealthSleepDashboard | None = Field(
+        default=None,
+        description="Latest sleep metrics",
+    )
+    weight: HealthWeightDashboard | None = Field(
+        default=None,
+        description="Latest weight metrics",
+    )
+    steps: HealthStepsDashboard | None = Field(
+        default=None,
+        description="Latest steps data",
+    )
+    fasting: HealthFastingDashboard | None = Field(
+        default=None,
+        description="Active or latest fasting session",
     )
 
     model_config = ConfigDict(
