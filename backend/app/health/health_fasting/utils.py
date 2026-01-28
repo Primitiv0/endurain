@@ -26,7 +26,7 @@ def calculate_streaks(user_id: int, db: Session) -> tuple[int, int]:
         return 0, 0
 
     # Get unique dates
-    dates = sorted(set(fast.date for fast in completed_fasts))
+    dates = sorted(set(fast.fast_start_time for fast in completed_fasts))
 
     if not dates:
         return 0, 0

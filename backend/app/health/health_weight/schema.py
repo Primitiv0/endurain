@@ -9,6 +9,8 @@ from pydantic import (
 )
 from datetime import date as datetime_date
 
+import health.schema as health_schema
+
 
 class Source(Enum):
     """
@@ -137,26 +139,19 @@ class HealthWeightUpdate(HealthWeightRead):
     """
 
 
-class HealthWeightListResponse(BaseModel):
+class HealthWeightListResponse(health_schema.HealthListResponse):
     """
     Response model for listing health weight records.
 
+    Extends the base HealthListResponse to provide a typed response containing
+    a list of weight records. This model is used when returning multiple weight
+    entries from API endpoints.
+
     Attributes:
-        total (StrictInt): Total number of weight records for the user.
-        num_records (StrictInt | None): Number of records in this response.
-        page_number (StrictInt | None): Current page number.
-        records (list[HealthWeightRead]): List of health weight records.
+        records: A list of HealthWeightRead objects representing individual
+        weight records.
     """
 
-    total: StrictInt = Field(
-        ..., description="Total number of weight records for the user"
-    )
-    num_records: StrictInt | None = Field(
-        default=None, description="Number of records in this response"
-    )
-    page_number: StrictInt | None = Field(
-        default=None, description="Current page number"
-    )
     records: list[HealthWeightRead] = Field(
         ..., description="List of health weight records"
     )

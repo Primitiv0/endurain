@@ -46,7 +46,7 @@ def get_health_fasting_number_by_user_id(
 
     if interval is not None:
         stmt = stmt.where(
-            health_fasting_models.HealthFasting.date
+            health_fasting_models.HealthFasting.fast_start_time
             >= health_utils.get_start_date_for_interval(interval.value)
         )
 
@@ -106,7 +106,8 @@ def get_health_fasting_by_user_id(
 
     Returns:
         list[health_fasting_models.HealthFasting]: A list of health fasting
-            records sorted by date in descending order, optionally paginated.
+            records sorted by fast_start_time in descending order, optionally
+            paginated.
     """
     # Get the health_fasting from the database
     stmt = select(health_fasting_models.HealthFasting).where(
@@ -115,11 +116,11 @@ def get_health_fasting_by_user_id(
 
     if interval is not None:
         stmt = stmt.where(
-            health_fasting_models.HealthFasting.date
+            health_fasting_models.HealthFasting.fast_start_time
             >= health_utils.get_start_date_for_interval(interval.value)
         )
 
-    stmt = stmt.order_by(desc(health_fasting_models.HealthFasting.date))
+    stmt = stmt.order_by(desc(health_fasting_models.HealthFasting.fast_start_time))
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
@@ -149,7 +150,7 @@ def get_active_fasting_by_user_id(
             health_fasting_models.HealthFasting.user_id == user_id,
             health_fasting_models.HealthFasting.status == "in_progress",
         )
-        .order_by(desc(health_fasting_models.HealthFasting.fast_start_time_utc))
+        .order_by(desc(health_fasting_models.HealthFasting.fast_start_time))
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -242,14 +243,14 @@ def get_completed_fasting_ordered_by_date_and_user_id(
     user_id: int, db: Session
 ) -> list[health_fasting_models.HealthFasting]:
     """
-    Get all completed fasting sessions ordered by date ascending.
+    Get all completed fasting sessions ordered by fast_start_time ascending.
 
     Args:
         user_id: User ID to fetch records for.
         db: Database session.
 
     Returns:
-        List of completed HealthFasting models ordered by date.
+        List of completed HealthFasting models ordered by fast_start_time.
 
     Raises:
         HTTPException: If database error occurs.
@@ -260,7 +261,7 @@ def get_completed_fasting_ordered_by_date_and_user_id(
             health_fasting_models.HealthFasting.user_id == user_id,
             health_fasting_models.HealthFasting.status == "completed",
         )
-        .order_by(health_fasting_models.HealthFasting.date)
+        .order_by(health_fasting_models.HealthFasting.fast_start_time)
     )
     return db.execute(stmt).scalars().all()
 
@@ -390,13 +391,12 @@ def complete_health_fasting(
         )
 
     # Calculate actual duration
-    start_time = db_health_fasting.fast_start_time_utc
-    end_time = complete_data.fast_end_time_utc
+    start_time = db_health_fasting.fast_start_time
+    end_time = complete_data.fast_end_time
     actual_duration = int((end_time - start_time).total_seconds())
 
     # Update the record
-    db_health_fasting.fast_end_time_utc = complete_data.fast_end_time_utc
-    db_health_fasting.fast_end_time_local = complete_data.fast_end_time_local
+    db_health_fasting.fast_end_time = complete_data.fast_end_time
     db_health_fasting.status = complete_data.status
     db_health_fasting.actual_duration_seconds = actual_duration
     if complete_data.notes:

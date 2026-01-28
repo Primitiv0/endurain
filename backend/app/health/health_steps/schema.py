@@ -2,6 +2,8 @@ from enum import Enum
 from pydantic import BaseModel, ConfigDict, StrictInt, Field, model_validator
 from datetime import date as datetime_date
 
+import health.schema as health_schema
+
 
 class Source(Enum):
     """
@@ -98,32 +100,19 @@ class HealthStepsUpdate(HealthStepsRead):
     """
 
 
-class HealthStepsListResponse(BaseModel):
+class HealthStepsListResponse(health_schema.HealthListResponse):
     """
     Response model for listing health steps records.
 
+    Extends the base HealthListResponse to provide a typed response containing
+    a list of steps records. This model is used when returning multiple steps
+    entries from API endpoints.
+
     Attributes:
-        total (StrictInt): Total number of steps records for the user.
-        num_records (StrictInt | None): Number of records in this response.
-        page_number (StrictInt | None): Current page number.
-        records (list[HealthStepsRead]): List of health steps records.
+        records: A list of HealthStepsRead objects representing individual
+        steps records.
     """
 
-    total: StrictInt = Field(
-        ..., description="Total number of steps records for the user"
-    )
-    num_records: StrictInt | None = Field(
-        default=None, description="Number of records in this response"
-    )
-    page_number: StrictInt | None = Field(
-        default=None, description="Current page number"
-    )
     records: list[HealthStepsRead] = Field(
         ..., description="List of health steps records"
-    )
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        extra="forbid",
-        validate_assignment=True,
     )

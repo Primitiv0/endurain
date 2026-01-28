@@ -14,7 +14,9 @@ from pydantic import (
     StrictStr,
     Field,
 )
-from datetime import datetime, date as datetime_date
+from datetime import datetime
+
+import health.schema as health_schema
 
 
 class Source(Enum):
@@ -79,39 +81,23 @@ class HealthFastingBase(BaseModel):
     Base schema for health fasting data.
 
     Attributes:
-        date: Calendar date of the fasting session.
-        fast_start_time_utc: Start time of fast in UTC.
-        fast_end_time_utc: End time of fast in UTC.
-        fast_start_time_local: Start time of fast in local timezone.
-        fast_end_time_local: End time of fast in local timezone.
+        fast_start_time: Start time of fast.
+        fast_end_time: End time of fast.
         target_duration_seconds: Target fasting duration in seconds.
         actual_duration_seconds: Actual fasting duration in seconds.
         fasting_type: Type of fasting protocol.
         status: Current status of the fasting session.
-        timezone: User timezone for local time display.
         notes: Optional notes about the fasting session.
         source: Data source for the record.
     """
 
-    date: datetime_date | None = Field(
+    fast_start_time: datetime | None = Field(
         default=None,
-        description="Calendar date of the fasting session",
+        description="Start time of fast",
     )
-    fast_start_time_utc: datetime | None = Field(
+    fast_end_time: datetime | None = Field(
         default=None,
-        description="Start time of fast in UTC",
-    )
-    fast_end_time_utc: datetime | None = Field(
-        default=None,
-        description="End time of fast in UTC (null if ongoing)",
-    )
-    fast_start_time_local: datetime | None = Field(
-        default=None,
-        description="Start time of fast in local timezone",
-    )
-    fast_end_time_local: datetime | None = Field(
-        default=None,
-        description="End time of fast in local timezone",
+        description="End time of fast (null if ongoing)",
     )
     target_duration_seconds: StrictInt | None = Field(
         default=None,
@@ -131,11 +117,6 @@ class HealthFastingBase(BaseModel):
     status: FastingStatus | None = Field(
         default=None,
         description="Current status of the fasting session",
-    )
-    timezone: StrictStr | None = Field(
-        default=None,
-        max_length=50,
-        description="User timezone for local time display",
     )
     notes: StrictStr | None = Field(
         default=None,
@@ -159,7 +140,7 @@ class HealthFastingCreate(HealthFastingBase):
     """
     Schema for creating a new fasting session.
 
-    Requires start time and sets defaults for date and status.
+    Requires start time and sets defaults for status.
     """
 
     @model_validator(mode="after")
@@ -171,12 +152,10 @@ class HealthFastingCreate(HealthFastingBase):
             The validated model instance with defaults set.
 
         Raises:
-            ValueError: If fast_start_time_utc is not provided.
+            ValueError: If fast_start_time is not provided.
         """
-        if self.fast_start_time_utc is None:
-            raise ValueError("fast_start_time_utc is required")
-        if self.date is None:
-            self.date = datetime_date.today()
+        if self.fast_start_time is None:
+            raise ValueError("fast_start_time is required")
         if self.status is None:
             self.status = FastingStatus.IN_PROGRESS
         if self.source is None:
@@ -216,19 +195,14 @@ class HealthFastingComplete(BaseModel):
     Schema for completing or ending a fasting session.
 
     Attributes:
-        fast_end_time_utc: End time of fast in UTC.
-        fast_end_time_local: End time of fast in local timezone.
+        fast_end_time: End time of fast.
         status: Final status of the fasting session.
         notes: Optional notes about the fasting session.
     """
 
-    fast_end_time_utc: datetime = Field(
+    fast_end_time: datetime = Field(
         ...,
-        description="End time of fast in UTC",
-    )
-    fast_end_time_local: datetime | None = Field(
-        default=None,
-        description="End time of fast in local timezone",
+        description="End time of fast",
     )
     status: FastingStatus = Field(
         default=FastingStatus.COMPLETED,
@@ -247,38 +221,22 @@ class HealthFastingComplete(BaseModel):
     )
 
 
-class HealthFastingListResponse(BaseModel):
+class HealthFastingListResponse(health_schema.HealthListResponse):
     """
-    Response model for listing fasting records.
+    Response model for listing health fasting records.
+
+    Extends the base HealthListResponse to provide a typed response containing
+    a list of fasting records. This model is used when returning multiple
+    fasting entries from API endpoints.
 
     Attributes:
-        total: Total number of fasting records for the user.
-        num_records: Number of records in this response.
-        page_number: Current page number.
-        records: List of fasting records.
+        records: A list of HealthFastingRead objects representing individual
+        fasting records.
     """
 
-    total: StrictInt = Field(
-        ...,
-        description="Total number of fasting records for the user",
-    )
-    num_records: StrictInt | None = Field(
-        default=None,
-        description="Number of records in this response",
-    )
-    page_number: StrictInt | None = Field(
-        default=None,
-        description="Current page number",
-    )
     records: list[HealthFastingRead] = Field(
         ...,
         description="List of fasting records",
-    )
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        extra="forbid",
-        validate_assignment=True,
     )
 
 

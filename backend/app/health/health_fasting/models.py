@@ -18,16 +18,12 @@ class HealthFasting(Base):
     Attributes:
         id: Primary key.
         user_id: Foreign key to users table.
-        date: Calendar date of the fasting session.
-        fast_start_time_utc: Start time of fast in UTC.
-        fast_end_time_utc: End time of fast in UTC (null if ongoing).
-        fast_start_time_local: Start time of fast in local timezone.
-        fast_end_time_local: End time of fast in local timezone.
+        fast_start_time: Start time of fast.
+        fast_end_time: End time of fast (null if ongoing).
         target_duration_seconds: User's target fasting duration.
         actual_duration_seconds: Calculated duration when completed.
         fasting_type: Type of fasting protocol.
         status: Current status of the fasting session.
-        timezone: User's timezone for local time display.
         notes: Optional notes about the fasting session.
         source: Data source for the record.
         user: Relationship to Users model.
@@ -45,26 +41,13 @@ class HealthFasting(Base):
         index=True,
         comment="User ID that the health_fasting belongs",
     )
-    date: Mapped[date_type] = mapped_column(
+    fast_start_time: Mapped[datetime] = mapped_column(
         nullable=False,
-        index=True,
-        comment="Calendar date of the fasting session",
+        comment="Start time of fast",
     )
-    fast_start_time_utc: Mapped[datetime] = mapped_column(
-        nullable=False,
-        comment="Start time of fast in UTC",
-    )
-    fast_end_time_utc: Mapped[datetime | None] = mapped_column(
+    fast_end_time: Mapped[datetime | None] = mapped_column(
         nullable=True,
-        comment="End time of fast in UTC (null if ongoing)",
-    )
-    fast_start_time_local: Mapped[datetime | None] = mapped_column(
-        nullable=True,
-        comment="Start time of fast in local timezone",
-    )
-    fast_end_time_local: Mapped[datetime | None] = mapped_column(
-        nullable=True,
-        comment="End time of fast in local timezone",
+        comment="End time of fast (null if ongoing)",
     )
     target_duration_seconds: Mapped[int | None] = mapped_column(
         nullable=True,
@@ -84,11 +67,6 @@ class HealthFasting(Base):
         nullable=False,
         default="in_progress",
         comment="Status: in_progress, completed, broken, cancelled",
-    )
-    timezone: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True,
-        comment="User timezone for local time display",
     )
     notes: Mapped[str | None] = mapped_column(
         String(500),
