@@ -7,7 +7,7 @@ step tracking including daily step counts and data sources.
 Exports:
     - CRUD: get_health_steps_number_by_user_id,
       get_health_steps_by_id_and_user_id,
-      get_health_steps_with_pagination_by_user_id, get_health_steps_by_date_and_user_id,
+      get_health_steps_by_user_id, get_health_steps_by_date_and_user_id,
       create_health_steps, edit_health_steps, delete_health_steps
     - Schemas: HealthStepsBase, HealthStepsCreate, HealthStepsUpdate,
       HealthStepsRead, HealthStepsListResponse
@@ -18,7 +18,7 @@ Exports:
 from .crud import (
     get_health_steps_number_by_user_id,
     get_health_steps_by_id_and_user_id,
-    get_health_steps_with_pagination_by_user_id,
+    get_health_steps_by_user_id,
     get_health_steps_by_date_and_user_id,
     create_health_steps,
     edit_health_steps,
@@ -38,7 +38,7 @@ __all__ = [
     # CRUD operations
     "get_health_steps_number_by_user_id",
     "get_health_steps_by_id_and_user_id",
-    "get_health_steps_with_pagination_by_user_id",
+    "get_health_steps_by_user_id",
     "get_health_steps_by_date_and_user_id",
     "create_health_steps",
     "edit_health_steps",

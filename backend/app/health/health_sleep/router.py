@@ -52,7 +52,7 @@ async def read_health_sleep_all_pagination(
     ] = None,
 ) -> health_sleep_schema.HealthSleepListResponse:
     """
-    Retrieve paginated health sleep records for the authenticated user.
+    Retrieve health sleep records for the authenticated user.
 
     This endpoint fetches health sleep data with optional pagination and
     filtering. Access is restricted to users with the 'health:read' scope.
@@ -85,7 +85,7 @@ async def read_health_sleep_all_pagination(
     total = health_sleep_crud.get_health_sleep_number_by_user_id(
         token_user_id, db, interval
     )
-    records = health_sleep_crud.get_health_sleep_with_pagination_by_user_id(
+    records = health_sleep_crud.get_health_sleep_by_user_id(
         token_user_id, db, page_number, num_records, interval
     )
 

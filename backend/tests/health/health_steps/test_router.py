@@ -14,9 +14,7 @@ class TestReadHealthStepsAll:
     @patch(
         "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
-    @patch(
-        "health.health_steps.router.health_steps_crud.get_health_steps_with_pagination_by_user_id"
-    )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_success(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -56,9 +54,7 @@ class TestReadHealthStepsAll:
     @patch(
         "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
-    @patch(
-        "health.health_steps.router.health_steps_crud.get_health_steps_with_pagination_by_user_id"
-    )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_empty(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -90,9 +86,7 @@ class TestReadHealthStepsAllPagination:
     @patch(
         "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
-    @patch(
-        "health.health_steps.router.health_steps_crud.get_health_steps_with_pagination_by_user_id"
-    )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_pagination_success(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -127,9 +121,7 @@ class TestReadHealthStepsAllPagination:
     @patch(
         "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
-    @patch(
-        "health.health_steps.router.health_steps_crud.get_health_steps_with_pagination_by_user_id"
-    )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_pagination_different_page(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
     ):

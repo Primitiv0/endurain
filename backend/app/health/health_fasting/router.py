@@ -8,11 +8,14 @@ including CRUD operations, active fast tracking, and statistics.
 from typing import Annotated, Callable
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, Security, HTTPException, status
+from fastapi import APIRouter, Depends, Security, HTTPException, status, Query
 from sqlalchemy.orm import Session
+
+import health.constants as health_constants
 
 import health.health_fasting.schema as health_fasting_schema
 import health.health_fasting.crud as health_fasting_crud
+import health.health_fasting.utils as health_fasting_utils
 
 import auth.security as auth_security
 
@@ -28,51 +31,12 @@ router = APIRouter()
     response_model=health_fasting_schema.HealthFastingListResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_fasting_all(
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:read"])
-    ],
-    token_user_id: Annotated[
-        int,
-        Depends(auth_security.get_sub_from_access_token),
-    ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
-) -> health_fasting_schema.HealthFastingListResponse:
-    """
-    Retrieve all fasting records for the authenticated user.
-
-    Args:
-        _check_scopes: Security dependency for health:read scope.
-        token_user_id: User ID from the access token.
-        db: Database session dependency.
-
-    Returns:
-        HealthFastingListResponse with total count and all records.
-    """
-    total = health_fasting_crud.get_health_fasting_number(token_user_id, db)
-    records = health_fasting_crud.get_all_health_fasting_by_user_id(token_user_id, db)
-
-    return health_fasting_schema.HealthFastingListResponse(
-        total=total, records=records  # type: ignore[arg-type]
-    )
-
-
-@router.get(
-    "/page_number/{page_number}/num_records/{num_records}",
-    response_model=health_fasting_schema.HealthFastingListResponse,
-    status_code=status.HTTP_200_OK,
-)
 async def read_health_fasting_all_pagination(
-    page_number: int,
-    num_records: int,
     _check_scopes: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["health:read"])
     ],
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
+    _validate_pagination_values_on_query: Annotated[
+        Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     token_user_id: Annotated[
         int,
@@ -82,31 +46,61 @@ async def read_health_fasting_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    page_number: Annotated[
+        int | None,
+        Query(description="Pagination page number"),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(description="Number of records per page"),
+    ] = None,
+    interval: Annotated[
+        health_constants.Interval | None,
+        Query(description="Filter by goal interval"),
+    ] = None,
 ) -> health_fasting_schema.HealthFastingListResponse:
     """
-    Retrieve paginated fasting records for the authenticated user.
+    Retrieve health fasting records for the authenticated user.
+
+    This endpoint fetches health fasting data with optional pagination and
+    filtering. Access is restricted to users with the 'health:read' scope.
 
     Args:
-        page_number: Page number to retrieve (1-indexed).
-        num_records: Number of records per page.
-        _check_scopes: Security dependency for health:read scope.
-        _validate_pagination_values: Validates pagination parameters.
-        token_user_id: User ID from the access token.
-        db: Database session dependency.
+        _check_scopes: Security dependency that validates the user has
+            'health:read' scope.
+        _validate_pagination_values_on_query: Dependency that validates
+            pagination parameters.
+        token_user_id: The ID of the authenticated user extracted from the
+            access token.
+        db: Database session for executing queries.
+        page_number: Optional pagination page number to retrieve specific page
+            of results.
+        num_records: Optional number of records per page for pagination.
+        interval: Optional filter to retrieve records within a specific goal
+            interval.
 
     Returns:
-        HealthFastingListResponse with paginated records.
+        HealthFastingListResponse: A response object containing:
+            - total: Total count of records matching the filter criteria
+            - num_records: Number of records returned per page
+            - page_number: Current page number
+            - records: List of paginated HealthFastingRead objects
+    Raises:
+        HTTPException: If the user lacks required 'health:read' scope or if
+            pagination values are invalid.
     """
-    total = health_fasting_crud.get_health_fasting_number(token_user_id, db)
-    records = health_fasting_crud.get_health_fasting_with_pagination(
-        token_user_id, db, page_number, num_records
+    total = health_fasting_crud.get_health_fasting_number_by_user_id(
+        token_user_id, db, interval
+    )
+    records = health_fasting_crud.get_health_fasting_by_user_id(
+        token_user_id, db, page_number, num_records, interval
     )
 
     return health_fasting_schema.HealthFastingListResponse(
         total=total,
         num_records=num_records,
         page_number=page_number,
-        records=records,  # type: ignore[arg-type]
+        records=records,
     )
 
 
@@ -178,10 +172,14 @@ async def read_fasting_stats(
     avg_duration = health_fasting_crud.get_avg_fasting_duration(token_user_id, db)
 
     # Calculate streaks
-    current_streak, longest_streak = _calculate_streaks(token_user_id, db)
+    current_streak, longest_streak = health_fasting_utils.calculate_streaks(
+        token_user_id, db
+    )
 
     # Calculate completion rate
-    total_started = health_fasting_crud.get_health_fasting_number(token_user_id, db)
+    total_started = health_fasting_crud.get_health_fasting_number_by_user_id(
+        token_user_id, db
+    )
     completion_rate = (total_fasts / total_started * 100) if total_started > 0 else 0.0
 
     return health_fasting_schema.HealthFastingStatsResponse(
@@ -192,61 +190,6 @@ async def read_fasting_stats(
         total_fasting_seconds=total_fasting_seconds,
         completion_rate=round(completion_rate, 1),
     )
-
-
-def _calculate_streaks(user_id: int, db: Session) -> tuple[int, int]:
-    """
-    Calculate current and longest fasting streaks.
-
-    Args:
-        user_id: User ID to calculate streaks for.
-        db: Database session.
-
-    Returns:
-        Tuple of (current_streak, longest_streak).
-    """
-    completed_fasts = health_fasting_crud.get_completed_fasting_ordered_by_date(
-        user_id, db
-    )
-
-    if not completed_fasts:
-        return 0, 0
-
-    # Get unique dates
-    dates = sorted(set(fast.date for fast in completed_fasts))
-
-    if not dates:
-        return 0, 0
-
-    longest_streak = 1
-    current_streak = 1
-    temp_streak = 1
-
-    for i in range(1, len(dates)):
-        if dates[i] - dates[i - 1] == timedelta(days=1):
-            temp_streak += 1
-            longest_streak = max(longest_streak, temp_streak)
-        else:
-            temp_streak = 1
-
-    # Check if current streak is still active (last fast was today or yesterday)
-    from datetime import date
-
-    today = date.today()
-    last_fast_date = dates[-1]
-
-    if last_fast_date == today or last_fast_date == today - timedelta(days=1):
-        # Count backwards from the end
-        current_streak = 1
-        for i in range(len(dates) - 1, 0, -1):
-            if dates[i] - dates[i - 1] == timedelta(days=1):
-                current_streak += 1
-            else:
-                break
-    else:
-        current_streak = 0
-
-    return current_streak, longest_streak
 
 
 @router.get(

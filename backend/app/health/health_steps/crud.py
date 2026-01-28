@@ -72,7 +72,7 @@ def get_health_steps_by_id_and_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_health_steps_with_pagination_by_user_id(
+def get_health_steps_by_user_id(
     user_id: int,
     db: Session,
     page_number: int | None = None,

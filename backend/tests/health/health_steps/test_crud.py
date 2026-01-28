@@ -62,7 +62,7 @@ class TestGetHealthStepsNumber:
 
 class TestGetHealthStepsWithPagination:
     """
-    Test suite for get_health_steps_with_pagination_by_user_id function.
+    Test suite for get_health_steps_by_user_id function.
     """
 
     def test_get_health_steps_with_pagination_success(self, mock_db):
@@ -83,7 +83,7 @@ class TestGetHealthStepsWithPagination:
         mock_db.execute.return_value = mock_execute
 
         # Act
-        result = health_steps_crud.get_health_steps_with_pagination_by_user_id(
+        result = health_steps_crud.get_health_steps_by_user_id(
             user_id, mock_db, page_number, num_records
         )
 
@@ -104,9 +104,7 @@ class TestGetHealthStepsWithPagination:
         mock_db.execute.return_value = mock_execute
 
         # Act
-        result = health_steps_crud.get_health_steps_with_pagination_by_user_id(
-            user_id, mock_db
-        )
+        result = health_steps_crud.get_health_steps_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == []
@@ -114,7 +112,7 @@ class TestGetHealthStepsWithPagination:
 
     def test_get_health_steps_with_pagination_exception(self, mock_db):
         """
-        Test exception handling in get_health_steps_with_pagination_by_user_id.
+        Test exception handling in get_health_steps_by_user_id.
         """
         # Arrange
         user_id = 1
@@ -122,9 +120,7 @@ class TestGetHealthStepsWithPagination:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_steps_crud.get_health_steps_with_pagination_by_user_id(
-                user_id, mock_db
-            )
+            health_steps_crud.get_health_steps_by_user_id(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert exc_info.value.detail == "Database error occurred"

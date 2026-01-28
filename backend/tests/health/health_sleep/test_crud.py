@@ -63,7 +63,7 @@ class TestGetHealthSleepNumber:
 
 class TestGetHealthSleepWithPagination:
     """
-    Test suite for get_health_sleep_with_pagination_by_user_id function.
+    Test suite for get_health_sleep_by_user_id function.
     """
 
     def test_get_health_sleep_with_pagination_success(self, mock_db):
@@ -82,7 +82,7 @@ class TestGetHealthSleepWithPagination:
         ]
 
         # Act
-        result = health_sleep_crud.get_health_sleep_with_pagination_by_user_id(
+        result = health_sleep_crud.get_health_sleep_by_user_id(
             user_id, mock_db, page_number, num_records
         )
 
@@ -99,16 +99,14 @@ class TestGetHealthSleepWithPagination:
         mock_db.execute.return_value.scalars.return_value.all.return_value = []
 
         # Act
-        result = health_sleep_crud.get_health_sleep_with_pagination_by_user_id(
-            user_id, mock_db
-        )
+        result = health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db)
 
         # Assert
         mock_db.execute.assert_called_once()
 
     def test_get_health_sleep_with_pagination_exception(self, mock_db):
         """
-        Test exception handling in get_health_sleep_with_pagination_by_user_id.
+        Test exception handling in get_health_sleep_by_user_id.
         """
         # Arrange
         user_id = 1
@@ -116,9 +114,7 @@ class TestGetHealthSleepWithPagination:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_health_sleep_with_pagination_by_user_id(
-                user_id, mock_db
-            )
+            health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 

@@ -1,4 +1,4 @@
-"""your_migration_message
+"""health_fasting migration
 
 Revision ID: 895a29b12c8c
 Revises: 262ec21a6c15

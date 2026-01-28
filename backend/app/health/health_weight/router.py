@@ -85,7 +85,7 @@ async def read_health_weight_all_pagination(
     total = health_weight_crud.get_health_weight_number_by_user_id(
         token_user_id, db, interval
     )
-    records = health_weight_crud.get_health_weight_with_pagination_by_user_id(
+    records = health_weight_crud.get_health_weight_by_user_id(
         token_user_id, db, page_number, num_records, interval
     )
 

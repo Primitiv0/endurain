@@ -84,7 +84,7 @@ async def read_health_steps_all_pagination(
     total = health_steps_crud.get_health_steps_number_by_user_id(
         token_user_id, db, interval
     )
-    records = health_steps_crud.get_health_steps_with_pagination_by_user_id(
+    records = health_steps_crud.get_health_steps_by_user_id(
         token_user_id, db, page_number, num_records, interval
     )
 

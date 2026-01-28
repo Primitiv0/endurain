@@ -169,7 +169,7 @@ class TestGetAllHealthWeightByUserId:
 
 class TestGetHealthWeightWithPagination:
     """
-    Test suite for get_health_weight_with_pagination_by_user_id function.
+    Test suite for get_health_weight_by_user_id function.
     """
 
     def test_get_health_weight_with_pagination_success(self, mock_db):
@@ -190,7 +190,7 @@ class TestGetHealthWeightWithPagination:
         mock_db.execute.return_value = mock_execute
 
         # Act
-        result = health_weight_crud.get_health_weight_with_pagination_by_user_id(
+        result = health_weight_crud.get_health_weight_by_user_id(
             user_id, mock_db, page_number, num_records
         )
 
@@ -211,9 +211,7 @@ class TestGetHealthWeightWithPagination:
         mock_db.execute.return_value = mock_execute
 
         # Act
-        result = health_weight_crud.get_health_weight_with_pagination_by_user_id(
-            user_id, mock_db
-        )
+        result = health_weight_crud.get_health_weight_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == []
@@ -221,7 +219,7 @@ class TestGetHealthWeightWithPagination:
 
     def test_get_health_weight_with_pagination_exception(self, mock_db):
         """
-        Test exception handling in get_health_weight_with_pagination_by_user_id.
+        Test exception handling in get_health_weight_by_user_id.
         """
         # Arrange
         user_id = 1
@@ -229,9 +227,7 @@ class TestGetHealthWeightWithPagination:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_weight_crud.get_health_weight_with_pagination_by_user_id(
-                user_id, mock_db
-            )
+            health_weight_crud.get_health_weight_by_user_id(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert exc_info.value.detail == "Database error occurred"

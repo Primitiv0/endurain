@@ -17,8 +17,7 @@ class TestReadHealthWeightAll:
         "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
     )
     @patch(
-        "health.health_weight.router.health_weight_crud."
-        "get_health_weight_with_pagination_by_user_id"
+        "health.health_weight.router.health_weight_crud." "get_health_weight_by_user_id"
     )
     def test_read_health_weight_all_success(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
@@ -111,8 +110,7 @@ class TestReadHealthWeightAllPagination:
         "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
     )
     @patch(
-        "health.health_weight.router.health_weight_crud."
-        "get_health_weight_with_pagination_by_user_id"
+        "health.health_weight.router.health_weight_crud." "get_health_weight_by_user_id"
     )
     def test_read_health_weight_all_pagination_success(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
@@ -157,8 +155,7 @@ class TestReadHealthWeightAllPagination:
         "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
     )
     @patch(
-        "health.health_weight.router.health_weight_crud."
-        "get_health_weight_with_pagination_by_user_id"
+        "health.health_weight.router.health_weight_crud." "get_health_weight_by_user_id"
     )
     def test_read_health_weight_all_pagination_different_page(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
