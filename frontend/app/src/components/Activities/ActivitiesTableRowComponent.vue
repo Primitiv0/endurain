@@ -13,7 +13,9 @@
   </td>
   <td>{{ formatLocation(t, activity) }}</td>
   <td class="d-none d-md-table-cell">{{ formatDateTime(t, activity.start_time_tz_applied) }}</td>
-  <td class="d-none d-md-table-cell">{{ formatDuration(t, activity.total_timer_time) }}</td>
+  <td class="d-none d-md-table-cell">
+    {{ formatSecondsToHoursMinutes(t, activity.total_timer_time) }}
+  </td>
   <td class="d-none d-md-table-cell">{{ formatDistance(t, activity, authStore.user.units) }}</td>
   <td class="d-none d-md-table-cell">
     <span
@@ -46,7 +48,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
 // Importing the utils
 import {
-  formatDuration,
+  formatSecondsToHoursMinutes,
   formatDateTime,
   formatDistance,
   formatElevation,

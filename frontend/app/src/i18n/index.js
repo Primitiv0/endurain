@@ -47,6 +47,10 @@ const componentPaths = {
   healthSleepAddEditModalComponent:
     'components/health/healthSleepZone/healthSleepAddEditModalComponent.json',
   healthRHRZoneComponent: 'components/health/healthRHRZoneComponent.json',
+  healthFastingZoneComponent: 'components/health/healthFastingZoneComponent.json',
+  healthFastingListComponent: 'components/health/healthFastingZone/healthFastingListComponent.json',
+  healthFastingAddEditModalComponent:
+    'components/health/healthFastingZone/healthFastingAddEditModalComponent.json',
   // Navbar components
   navbarBottomMobileComponent: 'components/navbar/navbarBottomMobileComponent.json',
   navbarComponent: 'components/navbar/navbarComponent.json',

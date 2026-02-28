@@ -12,7 +12,7 @@ import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vu
 import { Chart, registerables } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
 Chart.register(...registerables, zoomPlugin)
-import { formatDuration, formatDurationHHmm } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutes, formatSecondsToHHmm } from '@/utils/dateTimeUtils'
 
 const props = defineProps({
   userHealthTargets: {
@@ -149,7 +149,7 @@ function createChart() {
           ticks: {
             stepSize: 3600, // 1 hour in seconds
             callback: function (value) {
-              return formatDurationHHmm(value)
+              return formatSecondsToHHmm(value)
             }
           },
           grid: {
@@ -187,7 +187,7 @@ function createChart() {
                 return `${label}: N/A`
               }
 
-              return `${label}: ${formatDuration(value)}`
+              return `${label}: ${formatSecondsToHoursMinutes(value)}`
             }
           }
         },

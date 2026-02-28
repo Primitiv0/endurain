@@ -42,6 +42,14 @@
       @setWeightTarget="setWeightTarget"
       v-if="activeSection === 'weight' && !isLoading"
     />
+
+    <!-- Include the HealthFastingZone -->
+    <HealthFastingZone
+      :userHealthTargets="userHealthTargets"
+      :isLoadingParent="isLoading"
+      @setFastingTarget="setFastingTarget"
+      v-if="activeSection === 'fasting' && !isLoading"
+    />
   </div>
   <!-- back button -->
   <BackButtonComponent />
@@ -58,6 +66,7 @@ import HealthSleepZone from '../components/Health/HealthSleepZone.vue'
 import HealthRHRZone from '@/components/Health/HealthRHRZone.vue'
 import HealthStepsZone from '../components/Health/HealthStepsZone.vue'
 import HealthWeightZone from '../components/Health/HealthWeightZone.vue'
+import HealthFastingZone from '../components/Health/HealthFastingZone.vue'
 import BackButtonComponent from '@/components/GeneralComponents/BackButtonComponent.vue'
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 import { health_targets } from '@/services/health_targetsService'
@@ -129,6 +138,21 @@ function setSleepTarget(sleepTarget) {
     push.success(t('healthView.successUpdatingSleepTarget'))
   } catch (error) {
     push.error(`${t('healthView.errorUpdatingSleepTarget')} - ${error}`)
+  }
+}
+
+function setFastingTarget(fastingTarget) {
+  const data = {
+    id: userHealthTargets.value.id,
+    user_id: userHealthTargets.value.user_id,
+    fasting: fastingTarget
+  }
+  try {
+    health_targets.setUserHealthTargets(data)
+    userHealthTargets.value.fasting = fastingTarget
+    push.success(t('healthView.successUpdatingFastingTarget'))
+  } catch (error) {
+    push.error(`${t('healthView.errorUpdatingFastingTarget')} - ${error}`)
   }
 }
 

@@ -60,6 +60,17 @@
           <span class="ms-2">{{ $t('healthSideBarComponent.weightSection') }}</span>
         </a>
       </li>
+      <li class="nav-item">
+        <a
+          href="#"
+          class="nav-link link-body-emphasis"
+          :class="{ active: activeSection === 'fasting' }"
+          @click.prevent="changeActive('fasting')"
+        >
+          <font-awesome-icon :icon="['fas', 'utensils']" />
+          <span class="ms-2">{{ $t('healthSideBarComponent.fastingSection') }}</span>
+        </a>
+      </li>
     </ul>
   </div>
 </template>

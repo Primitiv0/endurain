@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 
 import { Chart, registerables } from 'chart.js'
 import 'chartjs-adapter-date-fns'
-import { formatTime, formatDuration } from '@/utils/dateTimeUtils'
+import { formatTime, formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 
 Chart.register(...registerables)
 
@@ -231,7 +231,7 @@ onMounted(() => {
               return [
                 `Start: ${dataPoint.startTimeStr}`,
                 `End: ${dataPoint.endTimeStr}`,
-                `Duration: ${formatDuration(dataPoint.duration)}`
+                `Duration: ${formatSecondsToHoursMinutes(dataPoint.duration)}`
               ]
             }
           }

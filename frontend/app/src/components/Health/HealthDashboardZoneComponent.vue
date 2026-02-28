@@ -8,7 +8,7 @@
             <h4>{{ $t('healthDashboardZoneComponent.sleep') }}</h4>
           </div>
           <div class="card-body">
-            <h1 v-if="todaySleep">{{ formatDuration(todaySleep) }}</h1>
+            <h1 v-if="todaySleep">{{ formatSecondsToHoursMinutes(todaySleep) }}</h1>
             <h1 v-else>{{ $t('generalItems.labelNoData') }}</h1>
           </div>
           <div class="card-footer text-body-secondary">
@@ -19,7 +19,7 @@
                 v-if="todaySleep < userHealthTargets.sleep"
               />
               <font-awesome-icon :icon="['fas', 'angle-up']" class="me-1" v-else />
-              {{ formatDuration(userHealthTargets.sleep) }}
+              {{ formatSecondsToHoursMinutes(userHealthTargets.sleep) }}
             </span>
             <span v-else>{{ $t('healthDashboardZoneComponent.noSleepTarget') }}</span>
           </div>
@@ -165,7 +165,7 @@ import { push } from 'notivue'
 // Importing the stores
 import { useAuthStore } from '@/stores/authStore'
 import { kgToLbs } from '@/utils/unitsUtils'
-import { formatDuration } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey } from '@/utils/healthUtils'
 //
 import { health } from '@/services/healthService'
@@ -201,20 +201,20 @@ onMounted(async () => {
     console.log('Health Dashboard Data:', healthDashboardData.value)
 
     // Process steps data
-    todaySteps.value = healthDashboardData.value.steps.steps
+    todaySteps.value = healthDashboardData.value.steps?.steps
       ? healthDashboardData.value.steps.steps
       : null
     // Process sleep data
-    todaySleep.value = healthDashboardData.value.sleep.total_sleep_seconds
+    todaySleep.value = healthDashboardData.value.sleep?.total_sleep_seconds
       ? healthDashboardData.value.sleep.total_sleep_seconds
       : null
-    restingHeartRate.value = healthDashboardData.value.sleep.resting_heart_rate
+    restingHeartRate.value = healthDashboardData.value.sleep?.resting_heart_rate
       ? healthDashboardData.value.sleep.resting_heart_rate
       : null
-    hrvStatus.value = healthDashboardData.value.sleep.hrv_status
+    hrvStatus.value = healthDashboardData.value.sleep?.hrv_status
       ? healthDashboardData.value.sleep.hrv_status
       : null
-    avgSkinTempDeviation.value = healthDashboardData.value.sleep.avg_skin_temp_deviation
+    avgSkinTempDeviation.value = healthDashboardData.value.sleep?.avg_skin_temp_deviation
       ? healthDashboardData.value.sleep.avg_skin_temp_deviation
       : null
     // Process weight data

@@ -31,7 +31,7 @@
           {{ $t('activityBellowMPillsComponent.labelElapsedTime') }}
         </span>
         <span>
-          <b>{{ formatSecondsToMinutes(activity.total_elapsed_time) }}</b>
+          <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</b>
         </span>
       </div>
       <div class="d-flex justify-content-between mt-3" v-if="activity.total_timer_time">
@@ -39,7 +39,7 @@
           {{ $t('activityBellowMPillsComponent.labelMovingTime') }}
         </span>
         <span>
-          <b>{{ formatSecondsToMinutes(activity.total_timer_time) }}</b>
+          <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_timer_time) }}</b>
         </span>
       </div>
       <hr />
@@ -97,7 +97,7 @@
           {{ $t('activityBellowMPillsComponent.labelMovingTime') }}
         </span>
         <span>
-          <b>{{ formatSecondsToMinutes(activity.total_elapsed_time) }}</b>
+          <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</b>
         </span>
       </div>
       <div class="d-flex justify-content-between mt-3" v-if="activity.total_timer_time">
@@ -105,7 +105,7 @@
           {{ $t('activityBellowMPillsComponent.labelElapsedTime') }}
         </span>
         <span>
-          <b>{{ formatSecondsToMinutes(activity.total_timer_time) }}</b>
+          <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_timer_time) }}</b>
         </span>
       </div>
       <hr />
@@ -319,7 +319,7 @@ import {
   activityTypeIsWindsurf,
   activityTypeNotWindsurf
 } from '@/utils/activityUtils'
-import { formatSecondsToMinutes } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutesSeconds } from '@/utils/dateTimeUtils'
 import { metersToFeet } from '@/utils/unitsUtils'
 
 // Define props

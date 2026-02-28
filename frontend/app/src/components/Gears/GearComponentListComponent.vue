@@ -59,9 +59,9 @@
           }}{{ formatDistanceRaw(t, gearComponent.expected_kms, authStore.user.units) }}</span
         >
         <span v-if="gearComponent.expected_kms && gear.gear_type === 4"
-          >{{ formatSecondsToOnlyHours(gearComponentTime)
+          >{{ formatSecondsToHours(gearComponentTime)
           }}{{ t('gearComponentListComponent.gearComponentOf')
-          }}{{ formatSecondsToOnlyHours(gearComponent.expected_kms) }}</span
+          }}{{ formatSecondsToHours(gearComponent.expected_kms) }}</span
         >
         <span v-if="gearComponent.retired_date"> @ {{ gearComponent.retired_date }}</span>
         <div
@@ -162,7 +162,7 @@ import {
   getGearWindsurfComponentType,
   getGearWindsurfComponentAvatar
 } from '@/utils/gearComponentsUtils'
-import { formatSecondsToOnlyHours } from '@/utils/dateTimeUtils'
+import { formatSecondsToHours } from '@/utils/dateTimeUtils'
 import ModalComponent from '@/components/Modals/ModalComponent.vue'
 import GearComponentAddEditModalComponent from '@/components/Gears/GearComponentAddEditModalComponent.vue'
 

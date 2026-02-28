@@ -137,7 +137,7 @@
             </span>
             <span v-else>
               <strong> {{ $t('gearView.labelTime') }}: </strong>
-              <span>{{ formatSecondsToMinutes(gearTime) }}</span>
+              <span>{{ formatSecondsToHoursMinutesSeconds(gearTime) }}</span>
             </span>
             <span class="mt-2" v-if="gear?.brand"
               ><strong>{{ $t('gearView.labelBrand') }}:</strong> {{ gear?.brand }}</span
@@ -310,7 +310,11 @@ import PaginationComponent from '@/components/GeneralComponents/PaginationCompon
 import { gears } from '@/services/gearsService'
 import { gearsComponents } from '@/services/gearsComponentsService'
 import { activities } from '@/services/activitiesService'
-import { formatDateMed, formatTime, formatSecondsToMinutes } from '@/utils/dateTimeUtils'
+import {
+  formatDateMed,
+  formatTime,
+  formatSecondsToHoursMinutesSeconds
+} from '@/utils/dateTimeUtils'
 import { kmToMiles } from '@/utils/unitsUtils'
 import { formatName } from '@/utils/activityUtils'
 import { getGearAvatar } from '@/constants/gearAvatarConstants'

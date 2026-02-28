@@ -1,0 +1,15 @@
+{
+  "addFastingModalTitle": "Start fasting",
+  "editFastingModalTitle": "Edit fasting",
+  "addFastingTypeLabel": "Fasting type",
+  "addFastingStartTimeLabel": "Start time",
+  "addFastingNotesLabel": "Notes (optional)",
+  "customDurationLabel": "Custom duration",
+  "hours": "hours",
+  "fast": "fast",
+  "eat": "eat",
+  "extended": "Extended",
+  "custom": "Custom",
+  "successAddFasting": "Fasting started",
+  "errorAddFasting": "Error starting fasting"
+}

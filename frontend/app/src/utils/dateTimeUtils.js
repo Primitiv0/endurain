@@ -44,7 +44,7 @@ export function calculateTimeDifference(startTime, endTime) {
   return `${hours}h ${minutes}m`
 }
 
-export function formatSecondsToMinutes(totalSeconds) {
+export function formatSecondsToHoursMinutesSeconds(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = Math.floor(totalSeconds % 60)
@@ -58,7 +58,19 @@ export function formatSecondsToMinutes(totalSeconds) {
   return `${minutes}m ${formattedSeconds}s`
 }
 
-export function formatSecondsToOnlyHours(totalSeconds) {
+export function formatSecondsToHoursMinutes(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+
+  const formattedMinutes = minutes < 10 && hours > 0 ? `0${minutes}` : minutes
+
+  if (hours > 0) {
+    return `${hours}h ${formattedMinutes}m`
+  }
+  return `${minutes}m`
+}
+
+export function formatSecondsToHours(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600)
 
   if (hours > 0) {
@@ -79,31 +91,16 @@ export function returnSecondsFromHoursMinutes(hours, minutes) {
 }
 
 /**
- * Formats seconds into a human-readable duration string without seconds.
- *
- * @param {number} seconds - The total number of seconds to format.
- * @returns {string} Formatted duration string (e.g., "2h 30m" or "45m").
- */
-export function formatDuration(seconds) {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`
-  }
-  return `${minutes}m`
-}
-
-/**
  * Formats a duration in seconds to a HH:mm string format.
  *
  * @param {number} seconds - The duration in seconds to format.
  * @returns {string} The formatted duration as a string in HH:mm format (e.g., "02:30").
  *
  * @example
- * formatDurationHHmm(9000) // Returns "02:30"
- * formatDurationHHmm(3661) // Returns "01:01"
+ * formatSecondsToHHmm(9000) // Returns "02:30"
+ * formatSecondsToHHmm(3661) // Returns "01:01"
  */
-export function formatDurationHHmm(seconds) {
+export function formatSecondsToHHmm(seconds) {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
 

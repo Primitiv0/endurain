@@ -224,7 +224,7 @@
           {{ $t('activitySummaryComponent.activityTime') }}
         </span>
         <br />
-        <span>{{ formatSecondsToMinutes(activity.total_elapsed_time) }}</span>
+        <span>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</span>
       </div>
       <div class="col border-start border-opacity-50">
         <!-- elevation -->
@@ -385,7 +385,11 @@ import {
   activityTypeIsSailing,
   formatName
 } from '@/utils/activityUtils'
-import { formatDateMed, formatTime, formatSecondsToMinutes } from '@/utils/dateTimeUtils'
+import {
+  formatDateMed,
+  formatTime,
+  formatSecondsToHoursMinutesSeconds
+} from '@/utils/dateTimeUtils'
 
 // Props
 const props = defineProps({

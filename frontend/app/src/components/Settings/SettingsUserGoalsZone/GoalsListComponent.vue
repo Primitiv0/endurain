@@ -86,7 +86,7 @@
           </span>
           <span v-if="goal.goal_type == 'duration'"
             >{{ $t('goalsAddEditGoalModalComponent.addEditGoalModalDurationLabel') }} -
-            {{ formatDuration(goal.goal_duration) }}</span
+            {{ formatSecondsToHoursMinutes(goal.goal_duration) }}</span
           >
         </div>
       </div>
@@ -137,7 +137,7 @@ import ModalComponent from '@/components/Modals/ModalComponent.vue'
 import GoalsAddEditGoalModalComponent from '@/components/Settings/SettingsUserGoalsZone/GoalsAddEditGoalModalComponent.vue'
 
 import { metersToKm, metersToMiles, metersToFeet } from '@/utils/unitsUtils'
-import { formatDuration } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 
 import { userGoals as userGoalService } from '@/services/userGoalsService'
 

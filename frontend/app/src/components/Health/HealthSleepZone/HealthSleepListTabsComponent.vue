@@ -103,7 +103,7 @@
             <p class="mb-1">
               <span class="fw-semibold"> {{ $t('healthSleepListTabsComponent.deepLabel') }}: </span>
               <span v-if="userHealthSleep.deep_sleep_seconds">
-                {{ formatDuration(userHealthSleep.deep_sleep_seconds) }}
+                {{ formatSecondsToHoursMinutes(userHealthSleep.deep_sleep_seconds) }}
                 -
                 {{ $t(getScoreStatusI18nKey(userHealthSleep.deep_percentage_score)) }}
               </span>
@@ -113,7 +113,7 @@
             <p class="mb-1">
               <span class="fw-semibold"> {{ $t('healthSleepListTabsComponent.REMLabel') }}: </span>
               <span v-if="userHealthSleep.rem_sleep_seconds">
-                {{ formatDuration(userHealthSleep.rem_sleep_seconds) }}
+                {{ formatSecondsToHoursMinutes(userHealthSleep.rem_sleep_seconds) }}
                 -
                 {{ $t(getScoreStatusI18nKey(userHealthSleep.rem_percentage_score)) }}
               </span>
@@ -128,7 +128,7 @@
                 {{ $t('healthSleepListTabsComponent.lightLabel') }}:
               </span>
               <span v-if="userHealthSleep.light_sleep_seconds">
-                {{ formatDuration(userHealthSleep.light_sleep_seconds) }}
+                {{ formatSecondsToHoursMinutes(userHealthSleep.light_sleep_seconds) }}
                 -
                 {{ $t(getScoreStatusI18nKey(userHealthSleep.light_percentage_score)) }}
               </span>
@@ -140,7 +140,7 @@
                 {{ $t('healthSleepListTabsComponent.awakeLabel') }}:
               </span>
               <span v-if="userHealthSleep.awake_sleep_seconds">
-                {{ formatDuration(userHealthSleep.awake_sleep_seconds) }}
+                {{ formatSecondsToHoursMinutes(userHealthSleep.awake_sleep_seconds) }}
                 -
                 {{ $t(getScoreStatusI18nKey(userHealthSleep.awake_count_score)) }}
               </span>
@@ -311,7 +311,7 @@
 </template>
 
 <script setup>
-import { formatDuration } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey, getScoreStatusI18nKey } from '@/utils/healthUtils'
 
 const props = defineProps({

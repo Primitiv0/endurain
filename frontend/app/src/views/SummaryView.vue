@@ -116,7 +116,7 @@
       <div class="col-lg col-md-4 col-sm-6">
         <ActivitiesSummaryTotalsSectionComponent
           :title="t('summaryView.metricTotalDuration')"
-          :subTitle="formatDuration(t, summaryData.total_duration)"
+          :subTitle="formatSecondsToHoursMinutes(t, summaryData.total_duration)"
         />
       </div>
       <div class="col-lg col-md-4 col-sm-6">
@@ -222,7 +222,7 @@ import NoItemsFoundComponents from '@/components/GeneralComponents/NoItemsFoundC
 // Import utility functions for formatting and date handling
 import {
   formatRawDistance,
-  formatDuration,
+  formatSecondsToHoursMinutes,
   formatElevation,
   formatCalories
 } from '@/utils/activityUtils'

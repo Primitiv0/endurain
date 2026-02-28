@@ -4,7 +4,7 @@
       <div class="d-flex align-items-center">
         <div>
           <div class="fw-bold">
-            <span>{{ formatDuration(userHealthSleep.total_sleep_seconds) }}</span>
+            <span>{{ formatSecondsToHoursMinutes(userHealthSleep.total_sleep_seconds) }}</span>
           </div>
           <span>
             {{ $t('healthSleepListComponent.labelDate') }}:
@@ -96,7 +96,7 @@ import { push } from 'notivue'
 import { health_sleep } from '@/services/health_sleepService'
 // Import constants
 import { INTEGRATION_LOGOS } from '@/constants/integrationLogoConstants'
-import { formatDuration, formatDateShort } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutes, formatDateShort } from '@/utils/dateTimeUtils'
 
 const props = defineProps({
   userHealthSleep: {
