@@ -13,8 +13,11 @@
           </div>
           <div class="card-footer text-body-secondary">
             <span v-if="userHealthTargets && userHealthTargets['sleep']">
-              <font-awesome-icon :icon="['fas', 'angle-down']" class="me-1"
-                v-if="todaySleep < userHealthTargets.sleep" />
+              <font-awesome-icon
+                :icon="['fas', 'angle-down']"
+                class="me-1"
+                v-if="todaySleep < userHealthTargets.sleep"
+              />
               <font-awesome-icon :icon="['fas', 'angle-up']" class="me-1" v-else />
               {{ formatDuration(userHealthTargets.sleep) }}
             </span>
@@ -73,22 +76,34 @@
             <h1 v-else>{{ $t('generalItems.labelNotApplicable') }}</h1>
           </div>
           <div class="card-footer text-body-secondary">
-            <font-awesome-icon :icon="['fas', 'angle-down']" class="me-1"
-              v-if="userHealthTargets && currentWeight && currentWeight > userHealthTargets.weight" />
-            <font-awesome-icon :icon="['fas', 'angle-up']" class="me-1"
-              v-else-if="userHealthTargets && currentWeight && currentWeight <= userHealthTargets.weight" />
-            <span v-if="
-              userHealthTargets &&
-              userHealthTargets['weight'] &&
-              authStore?.user?.units === 'metric'
-            ">
+            <font-awesome-icon
+              :icon="['fas', 'angle-down']"
+              class="me-1"
+              v-if="userHealthTargets && currentWeight && currentWeight > userHealthTargets.weight"
+            />
+            <font-awesome-icon
+              :icon="['fas', 'angle-up']"
+              class="me-1"
+              v-else-if="
+                userHealthTargets && currentWeight && currentWeight <= userHealthTargets.weight
+              "
+            />
+            <span
+              v-if="
+                userHealthTargets &&
+                userHealthTargets['weight'] &&
+                authStore?.user?.units === 'metric'
+              "
+            >
               {{ userHealthTargets.weight }} {{ $t('generalItems.unitsKg') }}
             </span>
-            <span v-else-if="
-              userHealthTargets &&
-              userHealthTargets['weight'] &&
-              authStore?.user?.units === 'imperial'
-            ">
+            <span
+              v-else-if="
+                userHealthTargets &&
+                userHealthTargets['weight'] &&
+                authStore?.user?.units === 'imperial'
+              "
+            >
               {{ kgToLbs(userHealthTargets.weight) }} {{ $t('generalItems.unitsLbs') }}
             </span>
             <span v-else>{{ $t('healthDashboardZoneComponent.noWeightTarget') }}</span>
@@ -126,8 +141,11 @@
           </div>
           <div class="card-footer text-body-secondary">
             <span v-if="userHealthTargets && userHealthTargets['steps']">
-              <font-awesome-icon :icon="['fas', 'angle-down']" class="me-1"
-                v-if="todaySteps < userHealthTargets.steps" />
+              <font-awesome-icon
+                :icon="['fas', 'angle-down']"
+                class="me-1"
+                v-if="todaySteps < userHealthTargets.steps"
+              />
               <font-awesome-icon :icon="['fas', 'angle-up']" class="me-1" v-else />
               {{ userHealthTargets.steps }}
               {{ $t('healthDashboardZoneComponent.stepsTargetLabel') }}
@@ -149,7 +167,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { kgToLbs } from '@/utils/unitsUtils'
 import { formatDuration } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey } from '@/utils/healthUtils'
-// 
+//
 import { health } from '@/services/healthService'
 
 const props = defineProps({
@@ -183,12 +201,22 @@ onMounted(async () => {
     console.log('Health Dashboard Data:', healthDashboardData.value)
 
     // Process steps data
-    todaySteps.value = healthDashboardData.value.steps.steps ? healthDashboardData.value.steps.steps : null
+    todaySteps.value = healthDashboardData.value.steps.steps
+      ? healthDashboardData.value.steps.steps
+      : null
     // Process sleep data
-    todaySleep.value = healthDashboardData.value.sleep.total_sleep_seconds ? healthDashboardData.value.sleep.total_sleep_seconds : null
-    restingHeartRate.value = healthDashboardData.value.sleep.resting_heart_rate ? healthDashboardData.value.sleep.resting_heart_rate : null
-    hrvStatus.value = healthDashboardData.value.sleep.hrv_status ? healthDashboardData.value.sleep.hrv_status : null
-    avgSkinTempDeviation.value = healthDashboardData.value.sleep.avg_skin_temp_deviation ? healthDashboardData.value.sleep.avg_skin_temp_deviation : null
+    todaySleep.value = healthDashboardData.value.sleep.total_sleep_seconds
+      ? healthDashboardData.value.sleep.total_sleep_seconds
+      : null
+    restingHeartRate.value = healthDashboardData.value.sleep.resting_heart_rate
+      ? healthDashboardData.value.sleep.resting_heart_rate
+      : null
+    hrvStatus.value = healthDashboardData.value.sleep.hrv_status
+      ? healthDashboardData.value.sleep.hrv_status
+      : null
+    avgSkinTempDeviation.value = healthDashboardData.value.sleep.avg_skin_temp_deviation
+      ? healthDashboardData.value.sleep.avg_skin_temp_deviation
+      : null
     // Process weight data
     if (healthDashboardData.value.weight?.weight) {
       currentWeight.value = healthDashboardData.value.weight.weight
@@ -213,7 +241,6 @@ onMounted(async () => {
       }
     }
     // Process fasting data (if needed)
-
   } catch (error) {
     push.error(`${t('healthDashboardZoneComponent.errorFetchingHealthDailyStats')} - ${error}`)
   } finally {
