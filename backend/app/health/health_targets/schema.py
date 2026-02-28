@@ -9,6 +9,7 @@ class HealthTargetsBase(BaseModel):
         weight: Target weight in kg.
         steps: Target daily steps count.
         sleep: Target sleep duration in seconds.
+        fasting: Target fasting duration in seconds.
     """
 
     weight: StrictFloat | None = Field(
@@ -19,6 +20,12 @@ class HealthTargetsBase(BaseModel):
     )
     sleep: StrictInt | None = Field(
         default=None, ge=0, le=86400, description="Target sleep duration in seconds"
+    )
+    fasting: StrictInt | None = Field(
+        default=None,
+        ge=0,
+        le=259200,
+        description="Target fasting duration in seconds (max 72h)",
     )
 
     model_config = ConfigDict(

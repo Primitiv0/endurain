@@ -11,10 +11,10 @@ class TestReadHealthStepsAll:
     Test suite for read_health_steps_all endpoint.
     """
 
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_number")
     @patch(
-        "health.health_steps.router.health_steps_crud.get_all_health_steps_by_user_id"
+        "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_success(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -51,10 +51,10 @@ class TestReadHealthStepsAll:
         assert data["total"] == 2
         assert len(data["records"]) == 2
 
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_number")
     @patch(
-        "health.health_steps.router.health_steps_crud.get_all_health_steps_by_user_id"
+        "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_empty(
         self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -83,10 +83,10 @@ class TestReadHealthStepsAllPagination:
     Test suite for read_health_steps_all_pagination endpoint.
     """
 
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_number")
     @patch(
-        "health.health_steps.router.health_steps_crud.get_health_steps_with_pagination"
+        "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_pagination_success(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -106,7 +106,7 @@ class TestReadHealthStepsAllPagination:
 
         # Act
         response = fast_api_client.get(
-            "/health_steps/page_number/1/num_records/5",
+            "/health_steps?page_number=1&num_records=5",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -118,10 +118,10 @@ class TestReadHealthStepsAllPagination:
         assert data["page_number"] == 1
         assert len(data["records"]) == 1
 
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_number")
     @patch(
-        "health.health_steps.router.health_steps_crud.get_health_steps_with_pagination"
+        "health.health_steps.router.health_steps_crud.get_health_steps_number_by_user_id"
     )
+    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_user_id")
     def test_read_health_steps_all_pagination_different_page(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -134,7 +134,7 @@ class TestReadHealthStepsAllPagination:
 
         # Act
         response = fast_api_client.get(
-            "/health_steps/page_number/2/num_records/10",
+            "/health_steps?page_number=2&num_records=10",
             headers={"Authorization": "Bearer mock_token"},
         )
 
@@ -145,7 +145,7 @@ class TestReadHealthStepsAllPagination:
         assert data["num_records"] == 10
         assert data["page_number"] == 2
         assert data["records"] == []
-        mock_get_paginated.assert_called_once_with(1, ANY, 2, 10)
+        mock_get_paginated.assert_called_once_with(1, ANY, 2, 10, None)
 
 
 class TestCreateHealthSteps:
@@ -154,7 +154,9 @@ class TestCreateHealthSteps:
     """
 
     @patch("health.health_steps.router.health_steps_crud.create_health_steps")
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_date")
+    @patch(
+        "health.health_steps.router.health_steps_crud.get_health_steps_by_date_and_user_id"
+    )
     def test_create_health_steps_success(
         self,
         mock_get_by_date,
@@ -191,7 +193,9 @@ class TestCreateHealthSteps:
         assert data["steps"] == 10000
 
     @patch("health.health_steps.router.health_steps_crud.edit_health_steps")
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_date")
+    @patch(
+        "health.health_steps.router.health_steps_crud.get_health_steps_by_date_and_user_id"
+    )
     def test_create_health_steps_updates_existing(
         self, mock_get_by_date, mock_edit, fast_api_client, fast_api_app
     ):
@@ -226,7 +230,9 @@ class TestCreateHealthSteps:
         mock_edit.assert_called_once()
 
     @patch("health.health_steps.router.health_steps_crud.create_health_steps")
-    @patch("health.health_steps.router.health_steps_crud.get_health_steps_by_date")
+    @patch(
+        "health.health_steps.router.health_steps_crud.get_health_steps_by_date_and_user_id"
+    )
     def test_create_health_steps_missing_date_uses_today(
         self, mock_get_by_date, mock_create, fast_api_client, fast_api_app
     ):

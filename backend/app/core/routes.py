@@ -25,6 +25,8 @@ import followers.router as followers_router
 import garmin.router as garmin_router
 import gears.gear.router as gears_router
 import gears.gear_components.router as gear_components_router
+import health.router as health_router
+import health.health_fasting.router as health_fasting_router
 import health.health_sleep.router as health_sleep_router
 import health.health_weight.router as health_weight_router
 import health.health_steps.router as health_steps_router
@@ -130,6 +132,12 @@ router.include_router(
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(
+    health_router.router,
+    prefix=core_config.ROOT_PATH + "/health",
+    tags=["health"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
     health_sleep_router.router,
     prefix=core_config.ROOT_PATH + "/health/sleep",
     tags=["health_sleep"],
@@ -148,8 +156,14 @@ router.include_router(
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(
+    health_fasting_router.router,
+    prefix=core_config.ROOT_PATH + "/health/fasting",
+    tags=["health_fasting"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
     health_targets_router.router,
-    prefix=core_config.ROOT_PATH + "/health_targets",
+    prefix=core_config.ROOT_PATH + "/health/targets",
     tags=["health_targets"],
     dependencies=[Depends(auth_security.validate_access_token)],
 )

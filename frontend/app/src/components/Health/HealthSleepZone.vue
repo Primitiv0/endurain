@@ -38,65 +38,91 @@
         @fieldsToEmitAction="submitSetSleepTarget"
       />
 
-      <LoadingComponent v-if="isLoading" />
-      <div v-else>
-        <!-- Checking if userHealthSleepPagination is loaded and has length -->
-        <div v-if="userHealthSleepPagination && userHealthSleepPagination.length" class="mt-3">
-          <!-- show graph -->
-          <HealthSleepBarChartComponent
-            :userHealthTargets="userHealthTargets"
-            :userHealthSleep="userHealthSleep"
-            :isLoading="isLoading"
-          />
+      <LoadingComponent class="mt-3" v-if="isLoadingParent || isLoading" />
+      <!-- Checking if userHealthSleepPagination is loaded and has length -->
+      <!-- show graph -->
+      <HealthSleepBarChartComponent
+        class="mt-3"
+        :userHealthTargets="userHealthTargets"
+        :userHealthSleep="userHealthSleepPagination"
+        :isLoading="isLoading"
+        v-else-if="userHealthSleepPagination && userHealthSleepPagination.length"
+      />
 
-          <br />
-          <p>
-            {{ $t('healthSleepZoneComponent.labelNumberOfHealthSleep1') }}{{ userHealthSleep.length
+      <div class="row row-gap-3 mt-3 align-items-center">
+        <div class="col-sm-7">
+          <span>
+            {{ $t('healthSleepZoneComponent.labelNumberOfHealthSleep1') }}{{ userHealthSleepNumber
             }}{{ $t('healthSleepZoneComponent.labelNumberOfHealthSleep2')
             }}{{ userHealthSleepPagination.length
             }}{{ $t('healthSleepZoneComponent.labelNumberOfHealthSleep3') }}
-          </p>
+          </span>
+        </div>
 
-          <!-- Displaying loading new sleep if applicable -->
-          <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewSleep">
-            <li class="list-group-item rounded">
-              <LoadingComponent />
-            </li>
-          </ul>
+        <div class="col">
+          <form class="d-flex">
+            <select class="form-select" v-model="intervalFilter">
+              <option value="last_7_days">{{ $t('healthView.filter_last_7_days') }}</option>
+              <option value="last_30_days">{{ $t('healthView.filter_last_30_days') }}</option>
+              <option value="last_90_days">{{ $t('healthView.filter_last_90_days') }}</option>
+              <option value="last_year">{{ $t('healthView.filter_last_year') }}</option>
+              <option value="all_time">{{ $t('healthView.filter_all_time') }}</option>
+            </select>
 
-          <!-- list zone -->
-          <ul
-            class="my-3 list-group list-group-flush"
-            v-for="userHealthSleep in userHealthSleepPagination"
-            :key="userHealthSleep.id"
-            :data="userHealthSleep"
-          >
-            <!--<HealthSleepTimelineChartComponent
+            <select class="form-select ms-2" v-model="paginationFilter">
+              <option value="disabled">{{ $t('healthView.paginationDisabled') }}</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </form>
+        </div>
+      </div>
+
+      <!-- Displaying loading new sleep if applicable -->
+      <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewSleep">
+        <li class="list-group-item rounded">
+          <LoadingComponent />
+        </li>
+      </ul>
+
+      <LoadingComponent class="mt-3" v-if="isLoadingParent || isLoading" />
+      <div v-else-if="userHealthSleepPagination && userHealthSleepPagination.length" class="mt-3">
+        <!-- list zone -->
+        <ul
+          class="my-3 list-group list-group-flush"
+          v-for="userHealthSleep in userHealthSleepPagination"
+          :key="userHealthSleep.id"
+          :data="userHealthSleep"
+        >
+          <!--<HealthSleepTimelineChartComponent
               :data="userHealthSleep.sleep_stages"
             />-->
-            <HealthSleepListComponent
-              :userHealthSleep="userHealthSleep"
-              @deletedSleep="updateSleepListDeleted"
-              @editedSleep="updateSleepListEdited"
-            />
-          </ul>
-
-          <!-- pagination area -->
-          <PaginationComponent
-            :totalPages="totalPages"
-            :pageNumber="pageNumber"
-            @pageNumberChanged="setPageNumber"
+          <HealthSleepListComponent
+            :userHealthSleep="userHealthSleep"
+            @deletedSleep="updateSleepListDeleted"
+            @editedSleep="updateSleepListEdited"
           />
-        </div>
-        <!-- Displaying a message or component when there are no weight measurements -->
-        <NoItemsFoundComponent class="mt-3" :show-shadow="false" v-else />
+        </ul>
+
+        <!-- pagination area -->
+        <PaginationComponent
+          :totalPages="totalPages"
+          :pageNumber="pageNumber"
+          @pageNumberChanged="setPageNumber"
+          v-if="paginationFilter !== 'disabled'"
+        />
       </div>
+      <!-- Displaying a message or component when there are no weight measurements -->
+      <NoItemsFoundComponent class="mt-3" :show-shadow="false" v-else />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import HealthSleepAddEditModalComponent from './HealthSleepZone/HealthSleepAddEditModalComponent.vue'
@@ -106,66 +132,111 @@ import HealthSleepListComponent from './HealthSleepZone/HealthSleepListComponent
 import LoadingComponent from '../GeneralComponents/LoadingComponent.vue'
 import NoItemsFoundComponent from '../GeneralComponents/NoItemsFoundComponents.vue'
 import PaginationComponent from '../GeneralComponents/PaginationComponent.vue'
+// import stores
+import { health_sleep } from '@/services/health_sleepService'
+import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 
 const props = defineProps({
-  userHealthSleep: {
-    type: [Object, null],
-    required: true
-  },
-  userHealthSleepPagination: {
-    type: [Object, null],
-    required: true
-  },
   userHealthTargets: {
     type: [Object, null],
     required: true
   },
-  isLoading: {
+  isLoadingParent: {
     type: Boolean,
-    required: true
-  },
-  totalPages: {
-    type: Number,
-    required: true
-  },
-  pageNumber: {
-    type: Number,
     required: true
   }
 })
 
-const emit = defineEmits([
-  'createdSleep',
-  'deletedSleep',
-  'editedSleep',
-  'pageNumberChanged',
-  'setSleepTarget'
-])
+const emit = defineEmits(['setSleepTarget'])
 
 const { t } = useI18n()
+const serverSettingsStore = useServerSettingsStore()
 const isLoadingNewSleep = ref(false)
+const isLoading = ref(false)
+const userHealthSleepNumber = ref(0)
+const userHealthSleepPagination = ref([])
+const pageNumber = ref(1)
+const totalPages = ref(1)
+const numRecords = computed(() => {
+  if (paginationFilter.value === 'disabled') {
+    return serverSettingsStore.serverSettings.num_records_per_page || 25
+  }
+  return parseInt(paginationFilter.value)
+})
+const paginationFilter = ref('disabled')
+const intervalFilter = ref('last_7_days')
+
+async function updateHealthSleepPagination() {
+  try {
+    isLoading.value = true
+    const sleepDataPagination = await health_sleep.getUserHealthSleepWithPagination(
+      pageNumber.value,
+      numRecords.value,
+      paginationFilter.value,
+      intervalFilter.value
+    )
+    userHealthSleepPagination.value = sleepDataPagination.records
+    userHealthSleepNumber.value = sleepDataPagination.total
+    totalPages.value = Math.ceil(userHealthSleepNumber.value / numRecords.value)
+  } catch (error) {
+    push.error(`${t('healthSleepZoneComponent.errorFetchingHealthSleep')} - ${error}`)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 function updateIsLoadingNewSleep(isLoadingNewSleepNewValue) {
   isLoadingNewSleep.value = isLoadingNewSleepNewValue
 }
 
 function updateSleepListAdded(createdSleep) {
-  emit('createdSleep', createdSleep)
-}
-
-function updateSleepListDeleted(deletedSleep) {
-  emit('deletedSleep', deletedSleep)
+  const updateOrAdd = (array, newEntry) => {
+    const index = array.findIndex((item) => item.id === newEntry.id)
+    if (index !== -1) {
+      array[index] = newEntry
+    } else {
+      array.unshift(newEntry)
+      userHealthSleepNumber.value++
+    }
+  }
+  isLoadingNewSleep.value = true
+  if (userHealthSleepPagination.value) {
+    updateOrAdd(userHealthSleepPagination.value, createdSleep)
+  } else {
+    userHealthSleepPagination.value = [createdSleep]
+  }
+  isLoadingNewSleep.value = false
 }
 
 function updateSleepListEdited(editedSleep) {
-  emit('editedSleep', editedSleep)
+  const index = userHealthSleepPagination.value.findIndex((sleep) => sleep.id === editedSleep.id)
+  userHealthSleepPagination.value[index] = editedSleep
+}
+
+function updateSleepListDeleted(deletedSleep) {
+  userHealthSleepPagination.value = userHealthSleepPagination.value.filter(
+    (sleep) => sleep.id !== deletedSleep
+  )
+  userHealthSleepNumber.value--
 }
 
 function setPageNumber(page) {
-  emit('pageNumberChanged', page)
+  pageNumber.value = page
 }
 
 function submitSetSleepTarget(sleepTarget) {
   emit('setSleepTarget', sleepTarget)
 }
+
+function handleFilterChange() {
+  pageNumber.value = 1
+  updateHealthSleepPagination()
+}
+
+watch(pageNumber, updateHealthSleepPagination, { immediate: false })
+watch([intervalFilter, paginationFilter], handleFilterChange, { immediate: false })
+
+onMounted(async () => {
+  await updateHealthSleepPagination()
+})
 </script>

@@ -10,6 +10,8 @@ from pydantic import (
 )
 from datetime import datetime, date as datetime_date
 
+import health.schema as health_schema
+
 
 class Source(Enum):
     """
@@ -369,35 +371,19 @@ class HealthSleepUpdate(HealthSleepRead):
     """
 
 
-class HealthSleepListResponse(BaseModel):
+class HealthSleepListResponse(health_schema.HealthListResponse):
     """
-    Response model for paginated health sleep records.
+    Response model for listing health sleep records.
 
-    This model represents the paginated response structure for retrieving a user's sleep records.
-    It includes pagination metadata and a list of individual sleep record details.
+    Extends the base HealthListResponse to provide a typed response containing
+    a list of sleep records. This model is used when returning multiple sleep
+    entries from API endpoints.
 
     Attributes:
-        total (StrictInt): Total number of sleep records available for the user.
-        num_records (StrictInt | None): Number of records included in this response page.
-        page_number (StrictInt | None): Current page number of the paginated results.
-        records (list[HealthSleepRead]): List of health sleep record objects for the current page.
+        records: A list of HealthSleepRead objects representing individual
+        sleep records.
     """
 
-    total: StrictInt = Field(
-        ..., description="Total number of sleep records for the user"
-    )
-    num_records: StrictInt | None = Field(
-        default=None, description="Number of records in this response"
-    )
-    page_number: StrictInt | None = Field(
-        default=None, description="Current page number"
-    )
     records: list[HealthSleepRead] = Field(
         ..., description="List of health sleep records"
-    )
-
-    model_config = ConfigDict(
-        from_attributes=True,
-        extra="forbid",
-        validate_assignment=True,
     )

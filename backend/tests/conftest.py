@@ -149,7 +149,7 @@ def _include_router_if_exists(app: FastAPI, dotted: str):
             elif dotted == "health.health_steps.router":
                 app.include_router(router, prefix="/health_steps")
             elif dotted == "health.health_targets.router":
-                app.include_router(router, prefix="/health_targets")
+                app.include_router(router, prefix="/health/targets")
             elif dotted == "health.health_weight.router":
                 app.include_router(router, prefix="/health_weight")
             elif dotted == "users.users_goals.router":

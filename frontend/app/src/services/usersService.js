@@ -9,8 +9,26 @@ import { fetchPublicGetRequest } from '@/utils/servicePublicUtils'
 
 export const users = {
   // Users authenticated
-  getUsersWithPagination(pageNumber, numRecords) {
-    return fetchGetRequest(`users/page_number/${pageNumber}/num_records/${numRecords}`)
+  getUsersWithPagination(pageNumber, numRecords, filters = {}) {
+    let queryString = `users?`
+
+    Object.keys(filters).forEach((key) => {
+      if (filters[key] !== null && filters[key] !== undefined) {
+        // Convert camelCase to snake_case
+        const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+        queryString += `${snakeKey}=${encodeURIComponent(filters[key])}&`
+      }
+    })
+
+    // Add pagination parameters only if they are provided
+    if (pageNumber !== null && numRecords !== null) {
+      queryString += `page_number=${pageNumber}&num_records=${numRecords}&`
+    }
+
+    // Remove trailing '&' or '?' if no filters were added
+    queryString = queryString.slice(0, -1)
+
+    return fetchGetRequest(queryString)
   },
   getUserContainsUsername(username) {
     return fetchGetRequest(`users/username/contains/${username}`)

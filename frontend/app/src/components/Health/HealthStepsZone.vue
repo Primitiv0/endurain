@@ -37,62 +37,89 @@
         @numberToEmitAction="submitSetStepsTarget"
       />
 
-      <LoadingComponent v-if="isLoading" />
-      <div v-else>
-        <!-- Checking if userHealthSteps is loaded and has length -->
-        <div v-if="userHealthSteps && userHealthSteps.length" class="mt-3">
-          <!-- show graph -->
-          <HealthStepsBarChartComponent
-            :userHealthTargets="userHealthTargets"
-            :userHealthSteps="userHealthSteps"
-            :isLoading="isLoading"
-          />
+      <LoadingComponent class="mt-3" v-if="isLoadingParent || isLoading" />
+      <!-- Checking if userHealthStepsPagination is loaded and has length -->
+      <!-- show graph -->
+      <HealthStepsBarChartComponent
+        class="mt-3"
+        :userHealthTargets="userHealthTargets"
+        :userHealthSteps="userHealthStepsPagination"
+        :isLoading="isLoading"
+        v-else-if="userHealthStepsPagination && userHealthStepsPagination.length"
+      />
 
-          <br />
-          <p>
-            {{ $t('healthStepsZoneComponent.labelNumberOfHealthSteps1') }}{{ userHealthSteps.length
+      <div class="row row-gap-3 mt-3 align-items-center">
+        <div class="col-sm-7">
+          <span>
+            {{ $t('healthStepsZoneComponent.labelNumberOfHealthSteps1') }}{{ userHealthStepsNumber
             }}{{ $t('healthStepsZoneComponent.labelNumberOfHealthSteps2')
             }}{{ userHealthStepsPagination.length
             }}{{ $t('healthStepsZoneComponent.labelNumberOfHealthSteps3') }}
-          </p>
-
-          <!-- Displaying loading new steps if applicable -->
-          <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewSteps">
-            <li class="list-group-item rounded">
-              <LoadingComponent />
-            </li>
-          </ul>
-
-          <!-- list zone -->
-          <ul
-            class="my-3 list-group list-group-flush"
-            v-for="userHealthStep in userHealthStepsPagination"
-            :key="userHealthStep.id"
-            :userHealthStep="userHealthStep"
-          >
-            <HealthStepsListComponent
-              :userHealthStep="userHealthStep"
-              @deletedSteps="updateStepsListDeleted"
-              @editedSteps="updateStepsListEdited"
-            />
-          </ul>
-
-          <!-- pagination area -->
-          <PaginationComponent
-            :totalPages="totalPages"
-            :pageNumber="pageNumber"
-            @pageNumberChanged="setPageNumber"
-          />
+          </span>
         </div>
-        <!-- Displaying a message or component when there are no weight measurements -->
-        <NoItemsFoundComponent class="mt-3" :show-shadow="false" v-else />
+
+        <div class="col">
+          <form class="d-flex">
+            <select class="form-select" v-model="intervalFilter">
+              <option value="last_7_days">{{ $t('healthView.filter_last_7_days') }}</option>
+              <option value="last_30_days">{{ $t('healthView.filter_last_30_days') }}</option>
+              <option value="last_90_days">{{ $t('healthView.filter_last_90_days') }}</option>
+              <option value="last_year">{{ $t('healthView.filter_last_year') }}</option>
+              <option value="all_time">{{ $t('healthView.filter_all_time') }}</option>
+            </select>
+
+            <select class="form-select ms-2" v-model="paginationFilter">
+              <option value="disabled">{{ $t('healthView.paginationDisabled') }}</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </form>
+        </div>
       </div>
+
+      <!-- Displaying loading new steps if applicable -->
+      <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewSteps">
+        <li class="list-group-item rounded">
+          <LoadingComponent />
+        </li>
+      </ul>
+
+      <LoadingComponent v-if="isLoadingParent || isLoading" />
+      <!-- Checking if userHealthStepsPagination is loaded and has length -->
+      <div v-else-if="userHealthStepsPagination && userHealthStepsPagination.length" class="mt-3">
+        <!-- list zone -->
+        <ul
+          class="my-3 list-group list-group-flush"
+          v-for="userHealthStep in userHealthStepsPagination"
+          :key="userHealthStep.id"
+          :userHealthStep="userHealthStep"
+        >
+          <HealthStepsListComponent
+            :userHealthStep="userHealthStep"
+            @deletedSteps="updateStepsListDeleted"
+            @editedSteps="updateStepsListEdited"
+          />
+        </ul>
+
+        <!-- pagination area -->
+        <PaginationComponent
+          :totalPages="totalPages"
+          :pageNumber="pageNumber"
+          @pageNumberChanged="setPageNumber"
+          v-if="paginationFilter !== 'disabled'"
+        />
+      </div>
+      <!-- Displaying a message or component when there are no weight measurements -->
+      <NoItemsFoundComponent class="mt-3" :show-shadow="false" v-else />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import HealthStepsAddEditModalComponent from './HealthStepsZone/HealthStepsAddEditModalComponent.vue'
 import HealthStepsBarChartComponent from './HealthStepsZone/HealthStepsBarChartComponent.vue'
@@ -101,66 +128,111 @@ import LoadingComponent from '../GeneralComponents/LoadingComponent.vue'
 import NoItemsFoundComponent from '../GeneralComponents/NoItemsFoundComponents.vue'
 import PaginationComponent from '../GeneralComponents/PaginationComponent.vue'
 import ModalComponentNumberInput from '../Modals/ModalComponentNumberInput.vue'
+// import stores
+import { health_steps } from '@/services/health_stepsService'
+import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 
 const props = defineProps({
-  userHealthSteps: {
-    type: [Object, null],
-    required: true
-  },
-  userHealthStepsPagination: {
-    type: [Object, null],
-    required: true
-  },
   userHealthTargets: {
     type: [Object, null],
     required: true
   },
-  isLoading: {
+  isLoadingParent: {
     type: Boolean,
-    required: true
-  },
-  totalPages: {
-    type: Number,
-    required: true
-  },
-  pageNumber: {
-    type: Number,
     required: true
   }
 })
 
-const emit = defineEmits([
-  'createdSteps',
-  'deletedSteps',
-  'editedSteps',
-  'pageNumberChanged',
-  'setStepsTarget'
-])
+const emit = defineEmits(['setStepsTarget'])
 
 const { t } = useI18n()
+const serverSettingsStore = useServerSettingsStore()
 const isLoadingNewSteps = ref(false)
+const isLoading = ref(false)
+const userHealthStepsNumber = ref(0)
+const userHealthStepsPagination = ref([])
+const pageNumber = ref(1)
+const totalPages = ref(1)
+const numRecords = computed(() => {
+  if (paginationFilter.value === 'disabled') {
+    return serverSettingsStore.serverSettings.num_records_per_page || 25
+  }
+  return parseInt(paginationFilter.value)
+})
+const paginationFilter = ref('disabled')
+const intervalFilter = ref('last_7_days')
+
+async function updateHealthStepsPagination() {
+  try {
+    isLoading.value = true
+    const stepsDataPagination = await health_steps.getUserHealthStepsWithPagination(
+      pageNumber.value,
+      numRecords.value,
+      paginationFilter.value,
+      intervalFilter.value
+    )
+    userHealthStepsPagination.value = stepsDataPagination.records
+    userHealthStepsNumber.value = stepsDataPagination.total
+    totalPages.value = Math.ceil(userHealthStepsNumber.value / numRecords.value)
+  } catch (error) {
+    push.error(`${t('healthStepsZoneComponent.errorFetchingHealthSteps')} - ${error}`)
+  } finally {
+    isLoading.value = false
+  }
+}
 
 function updateIsLoadingNewSteps(isLoadingNewStepsNewValue) {
   isLoadingNewSteps.value = isLoadingNewStepsNewValue
 }
 
-function updateStepsListAdded(createdSteps) {
-  emit('createdSteps', createdSteps)
+function updateStepsListAdded(createdStep) {
+  const updateOrAdd = (array, newEntry) => {
+    const index = array.findIndex((item) => item.id === newEntry.id)
+    if (index !== -1) {
+      array[index] = newEntry
+    } else {
+      array.unshift(newEntry)
+      userHealthStepsNumber.value++
+    }
+  }
+  isLoadingNewSteps.value = true
+  if (userHealthStepsPagination.value) {
+    updateOrAdd(userHealthStepsPagination.value, createdStep)
+  } else {
+    userHealthStepsPagination.value = [createdStep]
+  }
+  isLoadingNewSteps.value = false
 }
 
-function updateStepsListDeleted(deletedSteps) {
-  emit('deletedSteps', deletedSteps)
+function updateStepsListEdited(editedStep) {
+  const index = userHealthStepsPagination.value.findIndex((step) => step.id === editedStep.id)
+  userHealthStepsPagination.value[index] = editedStep
 }
 
-function updateStepsListEdited(editedSteps) {
-  emit('editedSteps', editedSteps)
+function updateStepsListDeleted(deletedStep) {
+  userHealthStepsPagination.value = userHealthStepsPagination.value.filter(
+    (step) => step.id !== deletedStep
+  )
+  userHealthStepsNumber.value--
 }
 
 function setPageNumber(page) {
-  emit('pageNumberChanged', page)
+  pageNumber.value = page
 }
 
 function submitSetStepsTarget(stepsTarget) {
   emit('setStepsTarget', stepsTarget)
 }
+
+function handleFilterChange() {
+  pageNumber.value = 1
+  updateHealthStepsPagination()
+}
+
+watch(pageNumber, updateHealthStepsPagination, { immediate: false })
+watch([intervalFilter, paginationFilter], handleFilterChange, { immediate: false })
+
+onMounted(async () => {
+  await updateHealthStepsPagination()
+})
 </script>

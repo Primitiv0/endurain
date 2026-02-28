@@ -4,6 +4,11 @@
   "labelNumberOfUsers1": "There is a total of ",
   "labelNumberOfUsers2": " user(s) (",
   "labelNumberOfUsers3": " loaded):",
+  "showInactiveUsers": "Show inactive users",
+  "showEmailUnverifiedUsers": "Show email unverified users",
+  "showPendingApprovalUsers": "Show pending approval users",
+  "showExternalAuthUsers": "Show external auth users",
+  "showLocalAuthUsers": "Show local auth users",
   "successUserAdded": "User added successfully",
   "successUserDeleted": "User deleted successfully",
   "errorFetchingUsers": "Error fetching users"

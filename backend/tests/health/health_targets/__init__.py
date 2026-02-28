@@ -1,1 +1,1 @@
-# tests/health_targets/__init__.py
+# tests/health/targets/__init__.py

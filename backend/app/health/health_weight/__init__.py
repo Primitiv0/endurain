@@ -6,10 +6,10 @@ weight tracking including BMI, body composition metrics, and
 various health indicators.
 
 Exports:
-    - CRUD: get_all_health_weight, get_health_weight_number,
+    - CRUD: get_all_health_weight, get_health_weight_number_by_user_id,
       get_all_health_weight_by_user_id,
       get_health_weight_by_id_and_user_id,
-      get_health_weight_with_pagination, get_health_weight_by_date,
+      get_health_weight_by_user_id, get_health_weight_by_date_and_user_id,
       create_health_weight, edit_health_weight, delete_health_weight
     - Schemas: HealthWeightBase, HealthWeightCreate,
       HealthWeightUpdate, HealthWeightRead,
@@ -21,11 +21,11 @@ Exports:
 
 from .crud import (
     get_all_health_weight,
-    get_health_weight_number,
+    get_health_weight_number_by_user_id,
     get_all_health_weight_by_user_id,
     get_health_weight_by_id_and_user_id,
-    get_health_weight_with_pagination,
-    get_health_weight_by_date,
+    get_health_weight_by_user_id,
+    get_health_weight_by_date_and_user_id,
     create_health_weight,
     edit_health_weight,
     delete_health_weight,
@@ -44,11 +44,11 @@ from .utils import calculate_bmi, calculate_bmi_all_user_entries
 __all__ = [
     # CRUD operations
     "get_all_health_weight",
-    "get_health_weight_number",
+    "get_health_weight_number_by_user_id",
     "get_all_health_weight_by_user_id",
     "get_health_weight_by_id_and_user_id",
-    "get_health_weight_with_pagination",
-    "get_health_weight_by_date",
+    "get_health_weight_by_user_id",
+    "get_health_weight_by_date_and_user_id",
     "create_health_weight",
     "edit_health_weight",
     "delete_health_weight",
