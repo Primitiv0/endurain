@@ -154,6 +154,39 @@
           </div>
         </div>
       </div>
+      <!-- Fasting -->
+      <div class="col-lg-4 col-md-12">
+        <div class="card mb-3 text-center shadow-sm">
+          <div class="card-header">
+            <h4>{{ $t('healthDashboardZoneComponent.fasting') }}</h4>
+          </div>
+          <div class="card-body">
+            <h1 v-if="activeFasting">
+              {{ formatSecondsToHoursMinutes(activeFastingElapsed) }}
+            </h1>
+            <h1 v-else>{{ $t('generalItems.labelNoData') }}</h1>
+            <span v-if="activeFasting" class="text-muted">
+              {{ activeFasting.fasting_type }}
+            </span>
+          </div>
+          <div class="card-footer text-body-secondary">
+            <span v-if="userHealthTargets && userHealthTargets['fasting']">
+              <font-awesome-icon
+                :icon="['fas', 'angle-down']"
+                class="me-1"
+                v-if="activeFasting && activeFastingElapsed < userHealthTargets.fasting"
+              />
+              <font-awesome-icon
+                :icon="['fas', 'angle-up']"
+                class="me-1"
+                v-else-if="activeFasting && activeFastingElapsed >= userHealthTargets.fasting"
+              />
+              {{ formatSecondsToHoursMinutes(userHealthTargets.fasting) }}
+            </span>
+            <span v-else>{{ $t('healthDashboardZoneComponent.noFastingTarget') }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -193,6 +226,8 @@ const todaySleep = ref(null)
 const restingHeartRate = ref(null)
 const hrvStatus = ref(null)
 const avgSkinTempDeviation = ref(null)
+const activeFasting = ref(null)
+const activeFastingElapsed = ref(0)
 
 onMounted(async () => {
   try {
@@ -240,7 +275,17 @@ onMounted(async () => {
         }
       }
     }
-    // Process fasting data (if needed)
+    // Process fasting data
+    if (healthDashboardData.value.fasting) {
+      activeFasting.value = healthDashboardData.value.fasting
+      if (activeFasting.value.status === 'in_progress' && activeFasting.value.fast_start_time) {
+        const startTime = new Date(activeFasting.value.fast_start_time).getTime()
+        const now = Date.now()
+        activeFastingElapsed.value = Math.floor((now - startTime) / 1000)
+      } else if (activeFasting.value.actual_duration_seconds) {
+        activeFastingElapsed.value = activeFasting.value.actual_duration_seconds
+      }
+    }
   } catch (error) {
     push.error(`${t('healthDashboardZoneComponent.errorFetchingHealthDailyStats')} - ${error}`)
   } finally {

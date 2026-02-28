@@ -17,5 +17,7 @@
   "steps": "Steps",
   "stepsTargetLabel": "steps",
   "noStepsTarget": "No steps target",
+  "fasting": "Fasting",
+  "noFastingTarget": "No fasting target",
   "errorFetchingHealthDailyStats": "Error fetching health daily stats"
 }

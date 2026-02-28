@@ -57,7 +57,7 @@
           @click.prevent="changeActive('weight')"
         >
           <font-awesome-icon :icon="['fas', 'weight']" />
-          <span class="ms-2">{{ $t('healthSideBarComponent.weightSection') }}</span>
+          <span class="ms-1">{{ $t('healthSideBarComponent.weightSection') }}</span>
         </a>
       </li>
       <li class="nav-item">
@@ -68,7 +68,9 @@
           @click.prevent="changeActive('fasting')"
         >
           <font-awesome-icon :icon="['fas', 'utensils']" />
-          <span class="ms-2">{{ $t('healthSideBarComponent.fastingSection') }}</span>
+          <span class="ms-1"
+            >{{ $t('healthSideBarComponent.fastingSection') }}{{ $t('generalItems.betaTag') }}</span
+          >
         </a>
       </li>
     </ul>
