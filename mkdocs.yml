@@ -59,6 +59,7 @@ nav:
       - Health targets: reference/health/health_targets.md
       - Health weight: reference/health/health_weight.md
     - Profile: reference/profile.md
+    - TCX: reference/tcx/tcx.md
     - Users:
       - Users: reference/users/users.md
       - Users default gear: reference/users/users_default_gear.md
