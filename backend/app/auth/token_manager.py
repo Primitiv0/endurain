@@ -32,30 +32,26 @@ class TokenType(Enum):
 
 class TokenManager:
     """
-    TokenManager is a utility class for managing JSON Web Tokens (JWT) in user sessions.
+    TokenManager is a utility class for managing JSON Web Tokens (JWT) in user
+    sessions.
 
-    This class provides methods for creating, decoding, validating, and extracting claims from JWTs,
-    as well as generating secure CSRF tokens. It supports configurable encryption algorithms and
-    integrates with application logging and exception handling for robust security and error reporting.
+    This class provides methods for creating, decoding, validating, and
+    extracting claims from JWTs, as well as generating secure CSRF tokens. It
+    supports configurable encryption algorithms and integrates with application
+    logging and exception handling for robust security and error reporting.
 
     Attributes:
         algorithm (str): The algorithm used for token operations (default: "HS256").
-        _key: The imported key object used for cryptographic operations.
+            _key: The imported key object used for cryptographic operations.
 
     Methods:
         __init__(secret_key: str, algorithm: str = "HS256"):
-
         get_token_claim(token: str, claim: str) -> str | list[str] | int:
-
         decode_token(token: str) -> dict:
-
-        validate_token_expiration(token: str) -> None:
-
+        validate_token_expiration(token: str, expected_type: TokenType) -> None:
         create_token(session_id: str, user: users_schema.UsersRead, token_type: TokenType) -> tuple[datetime, str]:
-
         create_csrf_token() -> str:
             Generates a secure random CSRF (Cross-Site Request Forgery) token.
-
         HTTPException: Raised for invalid, expired, or missing claims in JWT tokens.
         ValueError: Raised for missing or invalid parameters during token creation.
     """
@@ -65,8 +61,10 @@ class TokenManager:
         Initializes the TokenManager with the provided secret key and algorithm.
 
         Args:
-            secret_key (str): The secret key used for token encryption and decryption.
-            algorithm (str, optional): The algorithm to use for token operations. Defaults to "HS256".
+            secret_key (str): The secret key used for token encryption and
+                decryption.
+            algorithm (str, optional): The algorithm to use for token
+                operations. Defaults to "HS256".
 
         """
         self.secret_key = secret_key
@@ -82,10 +80,12 @@ class TokenManager:
             claim (str): The name of the claim to retrieve from the token.
 
         Returns:
-            str | list[str] | int: The value of the requested claim, which can be a string, list of strings, or integer.
+            str | list[str] | int: The value of the requested claim, which can
+                be a string, list of strings, or integer.
 
         Raises:
-            HTTPException: If the claim is not found in the token or if there is an error retrieving the claim.
+            HTTPException: If the claim is not found in the token or if there
+                is an error retrieving the claim.
         """
         try:
             # Decode the token
@@ -129,7 +129,8 @@ class TokenManager:
             dict: The decoded payload from the token.
 
         Raises:
-            HTTPException: If the token cannot be decoded, raises an HTTP 401 Unauthorized exception.
+            HTTPException: If the token cannot be decoded, raises an HTTP 401
+                Unauthorized exception.
         """
         try:
             # Decode the token and return the payload
@@ -159,40 +160,57 @@ class TokenManager:
                 headers={"WWW-Authenticate": "Bearer"},
             ) from err
 
-    def validate_token_expiration(self, token: str) -> None:
+    def validate_token_expiration(
+        self,
+        token: str,
+        expected_type: TokenType,
+    ) -> None:
         """
-        Validates the expiration and required claims of a JWT token.
+        Validates expiration, required claims, and type of a JWT.
 
-        This method checks if the provided JWT token contains all essential claims,
-        verifies its expiration, and ensures it is not used before its valid time.
-        If any required claim is missing, the token is expired, not yet valid, or contains
-        insecure/invalid claims, appropriate HTTP exceptions are raised and errors are logged.
+        Checks that the token contains all essential claims, is not expired or
+        used before its valid time, and that the ``typ`` claim matches the
+        expected token type. This prevents refresh tokens from being used as
+        access tokens and vice versa.
 
         Args:
-            token (str): The JWT token to validate.
+            token: The JWT token to validate.
+            expected_type: The expected token type
+                (``TokenType.ACCESS`` or
+                ``TokenType.REFRESH``).
 
         Raises:
-            HTTPException: If the token is missing required claims, expired, not yet valid,
-                           or contains invalid claims.
+            HTTPException: If the token is missing required claims, expired,
+                not yet valid, contains invalid claims, or has the wrong type.
         """
         try:
             # Define required claims
             claims_requests = jwt.JWTClaimsRegistry(
                 sid={"essential": True},
-                iss={"essential": True, "value": f"{core_config.ENDURAIN_HOST}"},
-                aud={"essential": True, "value": f"{core_config.ENDURAIN_HOST}"},
+                iss={
+                    "essential": True,
+                    "value": f"{core_config.ENDURAIN_HOST}",
+                },
+                aud={
+                    "essential": True,
+                    "value": f"{core_config.ENDURAIN_HOST}",
+                },
                 sub={"essential": True},
                 scope={"essential": True},
                 iat={"essential": True},
                 nbf={"essential": True},
                 exp={"essential": True},
                 jti={"essential": True},
+                typ={
+                    "essential": True,
+                    "value": expected_type.value,
+                },
             )
 
             # Decode the token to get the payload
             payload = self.decode_token(token)
 
-            # Validate token expiration
+            # Validate token claims (incl. expiration and typ)
             claims_requests.validate(payload.claims)
         except MissingClaimError as missing_err:
             core_logger.print_to_log(
@@ -268,15 +286,19 @@ class TokenManager:
         token_type: TokenType,
     ) -> tuple[datetime, str]:
         """
-        Creates a JWT token for a user session with appropriate access scope and expiration.
+        Creates a JWT token for a user session with appropriate access scope
+        and expiration.
 
         Args:
             session_id (str): The unique identifier for the session.
-            user (users_schema.UsersRead): The user object containing user details.
-            token_type (TokenType): The type of token to create (access or refresh).
+            user (users_schema.UsersRead): The user object containing user
+                details.
+            token_type (TokenType): The type of token to create (access or
+                refresh).
 
         Returns:
-            tuple[datetime, str]: A tuple containing the token's expiration datetime and the encoded JWT token string.
+            tuple[datetime, str]: A tuple containing the token's expiration
+                datetime and the encoded JWT token string.
 
         Raises:
             ValueError: If required parameters are missing or invalid.
@@ -308,6 +330,7 @@ class TokenManager:
             "nbf": now,
             "exp": exp,
             "jti": str(uuid.uuid4()),
+            "typ": token_type.value,
         }
 
         encoded_token = jwt.encode(
@@ -325,7 +348,8 @@ class TokenManager:
         Generate a secure random CSRF (Cross-Site Request Forgery) token.
 
         Returns:
-            str: A URL-safe, securely generated random string suitable for use as a CSRF token.
+            str: A URL-safe, securely generated random string suitable for use
+                as a CSRF token.
         """
         return secrets.token_urlsafe(32)
 
@@ -335,7 +359,8 @@ def get_token_manager() -> TokenManager:
     Returns the singleton instance of TokenManager.
 
     This function provides access to the global token_manager instance,
-    which is responsible for managing authentication tokens within the application.
+    which is responsible for managing authentication tokens within the
+    application.
 
     Returns:
         TokenManager: The singleton token manager instance.
