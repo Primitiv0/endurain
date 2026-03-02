@@ -31,6 +31,7 @@ DEFAULT_ROUTER_MODULES = [
     "health.health_targets.router",
     "health.health_weight.router",
     "users.users_goals.router",
+    "users.users_api_keys.router",
 ]
 
 PUBLIC_ROUTER_MODULES = [
@@ -154,6 +155,8 @@ def _include_router_if_exists(app: FastAPI, dotted: str):
                 app.include_router(router, prefix="/health_weight")
             elif dotted == "users.users_goals.router":
                 app.include_router(router, prefix="/user_goals")
+            elif dotted == "users.users_api_keys.router":
+                app.include_router(router, prefix="/api_keys")
             elif dotted == "server_settings.public_router":
                 app.include_router(router, prefix="/server_settings/public")
             else:

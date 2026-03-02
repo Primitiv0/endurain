@@ -52,7 +52,7 @@ nav:
     - Authentication: developer-guide/authentication.md
     - Supported types: developer-guide/supported-types.md
   - Gallery: gallery.md
-  - Reference:
+  - Backend reference:
     - Health:
       - Health sleep: reference/health/health_sleep.md
       - Health steps: reference/health/health_steps.md
