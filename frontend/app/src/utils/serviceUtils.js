@@ -239,6 +239,19 @@ export async function fetchPutRequest(url, data) {
   return fetchWithRetry(url, options)
 }
 
+export async function fetchPatchRequest(url, data) {
+  const options = {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Client-Type': 'web'
+    }
+  }
+  return fetchWithRetry(url, options)
+}
+
 export async function fetchDeleteRequest(url) {
   const options = {
     method: 'DELETE',

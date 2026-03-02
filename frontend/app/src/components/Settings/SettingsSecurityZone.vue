@@ -286,6 +286,62 @@
       <div v-else>
         <NoItemsFoundComponents :show-shadow="false" />
       </div>
+
+      <hr />
+      <!-- API Keys -->
+      <h4>{{ $t('settingsSecurityZone.subtitleApiKeys') }}</h4>
+      <p>{{ $t('settingsSecurityZone.apiKeysDescription') }}</p>
+      <button type="button" class="btn btn-success mb-3" @click="openCreateApiKeyModal">
+        <font-awesome-icon :icon="['fas', 'plus']" class="me-1" />
+        {{ $t('settingsSecurityZone.apiKeyCreateButton') }}
+      </button>
+      <div v-if="isLoadingApiKeys">
+        <LoadingComponent />
+      </div>
+      <div v-else-if="apiKeys && apiKeys.length > 0">
+        <ApiKeyListItemComponent
+          v-for="key in apiKeys"
+          :key="key.id"
+          :apiKey="key"
+          @keyRevoked="onKeyRevoked"
+          @keyDeleted="onKeyDeleted"
+        />
+      </div>
+      <div v-else>
+        <NoItemsFoundComponents :show-shadow="false" />
+      </div>
+
+      <!-- API Key Create Modal -->
+      <ModalComponentApiKeyCreate
+        ref="apiKeyCreateModalRef"
+        modalId="apiKeyCreateModal"
+        :title="t('settingsSecurityZone.apiKeyCreateModalTitle')"
+        :nameLabel="t('settingsSecurityZone.apiKeyNameLabel')"
+        :namePlaceholder="t('settingsSecurityZone.apiKeyNamePlaceholder')"
+        :scopesLabel="t('settingsSecurityZone.apiKeyScopesSelectLabel')"
+        :expiryLabel="t('settingsSecurityZone.apiKeyExpiryOptionalLabel')"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        :actionButtonText="t('settingsSecurityZone.apiKeyCreateButton')"
+        :isLoading="apiKeyCreateLoading"
+        @submitAction="onCreateApiKey"
+      />
+
+      <!-- API Key Reveal Modal -->
+      <ModalComponentApiKeyReveal
+        ref="apiKeyRevealModalRef"
+        modalId="apiKeyRevealModal"
+        :title="t('settingsSecurityZone.apiKeyRevealModalTitle')"
+        :description="t('settingsSecurityZone.apiKeyRevealDescription')"
+        :warningTitle="t('settingsSecurityZone.backupCodesWarningTitle')"
+        :warningMessage="t('settingsSecurityZone.apiKeyRevealWarning')"
+        :apiKey="newApiKeyRaw"
+        :copyButtonText="t('settingsSecurityZone.apiKeyRevealCopyButton')"
+        :copySuccessMessage="t('settingsSecurityZone.apiKeyRevealCopied')"
+        :confirmationText="t('settingsSecurityZone.apiKeyRevealConfirmation')"
+        :closeButtonText="t('settingsSecurityZone.apiKeyRevealClose')"
+        @closed="newApiKeyRaw = ''"
+      />
     </div>
   </div>
 </template>
@@ -310,6 +366,9 @@ import { isValidPassword, passwordsMatch, buildPasswordRequirements } from '@/ut
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 import NoItemsFoundComponents from '@/components/GeneralComponents/NoItemsFoundComponents.vue'
 import UserSessionsListComponent from '@/components/Settings/SettingsUserSessionsZone/UserSessionsListComponent.vue'
+import ApiKeyListItemComponent from '@/components/Settings/SettingsApiKeysZone/ApiKeyListItemComponent.vue'
+import ModalComponentApiKeyCreate from '@/components/Modals/ModalComponentApiKeyCreate.vue'
+import ModalComponentApiKeyReveal from '@/components/Modals/ModalComponentApiKeyReveal.vue'
 // Importing stores
 import { useAuthStore } from '@/stores/authStore'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
@@ -363,6 +422,14 @@ const availableProviders = ref([])
 const allProviders = ref([])
 const isLoadingLinkedAccounts = ref(false)
 const linkingProviderId = ref(null)
+
+// API keys variables
+const apiKeys = ref([])
+const isLoadingApiKeys = ref(false)
+const newApiKeyRaw = ref('')
+const apiKeyCreateLoading = ref(false)
+const apiKeyCreateModalRef = ref(null)
+const apiKeyRevealModalRef = ref(null)
 
 // Toggle visibility for new password
 const toggleNewPasswordVisibility = () => {
@@ -590,6 +657,62 @@ async function linkAccount(providerId) {
   }
 }
 
+// API Keys Functions
+async function loadApiKeys() {
+  try {
+    isLoadingApiKeys.value = true
+    apiKeys.value = await profile.getApiKeys()
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyLoadError')} - ${error}`)
+  } finally {
+    isLoadingApiKeys.value = false
+  }
+}
+
+function openCreateApiKeyModal() {
+  apiKeyCreateModalRef.value?.show()
+}
+
+async function onCreateApiKey(formData) {
+  try {
+    apiKeyCreateLoading.value = true
+    const response = await profile.createApiKey(formData)
+    // Hide create modal and show reveal modal with the raw key
+    apiKeyCreateModalRef.value?.hide()
+    newApiKeyRaw.value = response.key
+    apiKeyRevealModalRef.value?.show()
+    push.success(t('settingsSecurityZone.apiKeyCreateSuccess'))
+    // Reload list to include the new key (without the raw key)
+    await loadApiKeys()
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyCreateError')} - ${error}`)
+  } finally {
+    apiKeyCreateLoading.value = false
+  }
+}
+
+async function onKeyRevoked(keyId) {
+  try {
+    await profile.revokeApiKey(keyId)
+    // Update local state without a full reload
+    const key = apiKeys.value.find((k) => k.id === keyId)
+    if (key) key.is_active = false
+    push.success(t('settingsSecurityZone.apiKeyRevokeSuccess'))
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyRevokeError')} - ${error}`)
+  }
+}
+
+async function onKeyDeleted(keyId) {
+  try {
+    await profile.deleteApiKey(keyId)
+    apiKeys.value = apiKeys.value.filter((k) => k.id !== keyId)
+    push.success(t('settingsSecurityZone.apiKeyDeleteSuccess'))
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyDeleteError')} - ${error}`)
+  }
+}
+
 // Check for OAuth link success/error in URL params
 function checkOAuthLinkStatus() {
   const idpLink = route.query.idp_link
@@ -619,6 +742,9 @@ onMounted(async () => {
 
   // Load linked accounts
   await loadLinkedAccounts()
+
+  // Load API keys
+  await loadApiKeys()
 
   // Set the isLoading to false
   isLoading.value = false

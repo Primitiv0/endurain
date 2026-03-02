@@ -2,6 +2,7 @@ import {
   fetchGetRequest,
   fetchPostRequest,
   fetchPutRequest,
+  fetchPatchRequest,
   fetchDeleteRequest,
   fetchPostFileRequest,
   fetchGetRequestWithRedirect
@@ -81,5 +82,18 @@ export const profile = {
     const linkToken = response.token
 
     fetchGetRequestWithRedirect(`profile/idp/${idpId}/link?link_token=${linkToken}`)
+  },
+  // API keys endpoints
+  getApiKeys() {
+    return fetchGetRequest('profile/api_keys')
+  },
+  createApiKey(data) {
+    return fetchPostRequest('profile/api_keys', data)
+  },
+  revokeApiKey(id) {
+    return fetchPatchRequest(`profile/api_keys/${id}/revoke`, {})
+  },
+  deleteApiKey(id) {
+    return fetchDeleteRequest(`profile/api_keys/${id}`)
   }
 }
