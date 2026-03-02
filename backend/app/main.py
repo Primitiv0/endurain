@@ -118,6 +118,9 @@ async def startup_event():
             app.state.allowed_tile_domains = (
                 server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
             )
+    core_logger.print_to_log_and_console(
+        f"Allowed trusted proxies: {core_config.TRUSTED_PROXIES}"
+    )
 
 
 def shutdown_event():
