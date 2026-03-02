@@ -35,6 +35,10 @@ from sqlalchemy.orm import Session
 # Define the API router
 router = APIRouter()
 
+# Separate router for upload endpoint that supports
+# both JWT and API key authentication
+api_upload_router = APIRouter()
+
 # Define the thread pool executor with 2 workers
 executor = ThreadPoolExecutor(max_workers=2)
 
@@ -603,7 +607,7 @@ async def read_activities_contain_name(
     return activities_crud.get_activities_if_contains_name(name, token_user_id, db)
 
 
-@router.post(
+@api_upload_router.post(
     "/create/upload",
     status_code=201,
     response_model=list[activities_schema.Activity],
@@ -611,11 +615,15 @@ async def read_activities_contain_name(
 async def create_activity_with_uploaded_file(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_security.get_user_id_from_auth),
     ],
     file: UploadFile,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:write"])
+        Callable,
+        Security(
+            auth_security.check_auth_scopes,
+            scopes=["activities:upload"],
+        ),
     ],
     ws_manager: Annotated[
         websocket_manager.WebSocketManager,
@@ -626,6 +634,25 @@ async def create_activity_with_uploaded_file(
         Depends(core_database.get_db),
     ],
 ):
+    """
+    Upload an activity file (GPX, FIT, TCX, GZ).
+
+    Accepts both JWT bearer token and API key
+    authentication (X-API-Key header or ?api_key=
+    query parameter). Requires the
+    ``activities:upload`` scope.
+
+    Args:
+        token_user_id: Authenticated user ID.
+        file: The activity file to upload.
+        _check_scopes: Scope validation dependency.
+        ws_manager: WebSocket manager for real-time
+            notifications.
+        db: Database session dependency.
+
+    Returns:
+        List of created activity objects.
+    """
     try:
         # Return activity/activities
         return await activities_utils.parse_and_store_activity_from_uploaded_file(
@@ -634,10 +661,10 @@ async def create_activity_with_uploaded_file(
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
-            f"Error in create_activity_with_uploaded_file: {err}", "error", exc=err
+            f"Error in create_activity_with_uploaded_file: {err}",
+            "error",
+            exc=err,
         )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
         raise err
 
 

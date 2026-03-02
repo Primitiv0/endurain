@@ -63,6 +63,7 @@ nav:
     - TCX: reference/tcx/tcx.md
     - Users:
       - Users: reference/users/users.md
+      - Users API keys: reference/users/users_api_keys.md
       - Users default gear: reference/users/users_default_gear.md
       - Users goals: reference/users/users_goals.md
       - Users identity providers: reference/users/users_identity_providers.md

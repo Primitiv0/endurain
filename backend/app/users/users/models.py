@@ -292,3 +292,8 @@ class Users(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
+    users_api_keys = relationship(
+        "UsersApiKeys",
+        back_populates="users",
+        cascade="all, delete-orphan",
+    )

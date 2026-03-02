@@ -1,15 +1,32 @@
+import hmac
+from dataclasses import dataclass
 from typing import Annotated, Union
-from fastapi import Depends, HTTPException, Query, status, WebSocket, WebSocketException
+from datetime import datetime, timezone
+from fastapi import (
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Security,
+    status,
+    WebSocket,
+    WebSocketException,
+)
 from fastapi.security import (
     OAuth2PasswordBearer,
     SecurityScopes,
     APIKeyHeader,
     APIKeyCookie,
 )
+from sqlalchemy.orm import Session
 
 import auth.constants as auth_constants
 import auth.token_manager as auth_token_manager
 
+import users.users_api_keys.crud as users_api_keys_crud
+import users.users_api_keys.utils as users_api_keys_utils
+
+import core.database as core_database
 import core.logger as core_logger
 
 # Define the OAuth2 scheme for handling bearer tokens
@@ -21,6 +38,31 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 # Define the API key header for the client type
 header_client_type_scheme = APIKeyHeader(name="X-Client-Type")
+
+# Define the API key header for third-party API key auth
+header_api_key_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+@dataclass
+class AuthContext:
+    """
+    Unified authentication context.
+
+    Carries the resolved user identity and scopes
+    regardless of whether authentication was via JWT
+    or API key.
+
+    Attributes:
+        user_id: Authenticated user's ID.
+        scopes: List of granted scope strings.
+        auth_type: Source of authentication
+            (``"jwt"`` or ``"api_key"``).
+    """
+
+    user_id: int
+    scopes: list[str]
+    auth_type: str
+
 
 # Define the API key header for the client type for OAuth redirects
 header_client_type_scheme_optional = APIKeyHeader(
@@ -621,6 +663,239 @@ def check_scopes_for_browser_redirect(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred during scope validation.",
         ) from err
+
+
+## API KEY + UNIFIED AUTH
+async def validate_api_key(
+    raw_key: str,
+    request: Request,
+    db,
+) -> "AuthContext":
+    """
+    Validate a raw API key and return an AuthContext.
+
+    Hashes the incoming key with SHA-256, looks it up
+    in the database, checks revocation and expiry, and
+    updates ``last_used_at``. Uses constant-time
+    comparison (``hmac.compare_digest``) to prevent
+    timing attacks.
+
+    Args:
+        raw_key: The plain-text API key from the
+            request header or query parameter.
+        request: The current HTTP request (for audit
+            logging).
+        db: SQLAlchemy database session.
+
+    Returns:
+        AuthContext with user_id, scopes, and
+        auth_type set to ``"api_key"``.
+
+    Raises:
+        HTTPException: 401 if the key is not found,
+            revoked, or expired.
+    """
+    computed_hash = users_api_keys_utils.hash_api_key(raw_key)
+    db_key = users_api_keys_crud.get_api_key_by_hash(computed_hash, db)
+
+    # Constant-time comparison to prevent timing attacks
+    # (protects even when key is not found)
+    stored_hash = db_key.key_hash if db_key else ("0" * 64)
+    if not hmac.compare_digest(stored_hash, computed_hash):
+        db_key = None
+
+    if db_key is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    if not db_key.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key has been revoked",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+    if db_key.expires_at is not None:
+        expires = db_key.expires_at
+        # Ensure timezone-aware comparison
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key has expired",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+
+    # Update last_used_at (best-effort; don't fail the
+    # request if this errors)
+    try:
+        users_api_keys_crud.update_last_used(db_key.id, db)
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Failed to update last_used_at for API key " f"{db_key.id}: {err}",
+            "warning",
+            exc=err,
+        )
+
+    # Structured audit log
+    core_logger.print_to_log(
+        "API key authenticated",
+        "info",
+        context={
+            "key_prefix": db_key.key_prefix,
+            "user_id": db_key.user_id,
+            "endpoint": request.url.path,
+            "ip": (request.client.host if request.client else "unknown"),
+        },
+    )
+
+    scopes = users_api_keys_utils.json_to_scopes(db_key.scopes)
+    return AuthContext(
+        user_id=db_key.user_id,
+        scopes=scopes,
+        auth_type="api_key",
+    )
+
+
+async def validate_access_token_or_api_key(
+    request: Request,
+    token_manager: Annotated[
+        auth_token_manager.TokenManager,
+        Depends(auth_token_manager.get_token_manager),
+    ],
+    db: Annotated[
+        Session,
+        Depends(core_database.get_db),
+    ],
+    bearer_token: Union[str, None] = Depends(oauth2_scheme),
+    api_key_header: Union[str, None] = Depends(header_api_key_scheme),
+    api_key_query: Union[str, None] = Query(None, alias="api_key"),
+) -> "AuthContext":
+    """
+    Accept either a JWT bearer token or an API key.
+
+    Tries JWT first (Authorization: Bearer header). If
+    none is present, falls back to the ``X-API-Key``
+    header, then the ``?api_key=`` query parameter.
+    Raises 401 if neither is supplied.
+
+    Args:
+        request: The current HTTP request.
+        token_manager: JWT token manager dependency.
+        db: Database session dependency.
+        bearer_token: Optional Bearer token from the
+            Authorization header.
+        api_key_header: Optional API key from the
+            ``X-API-Key`` header.
+        api_key_query: Optional API key from the
+            ``?api_key=`` query parameter.
+
+    Returns:
+        AuthContext with resolved user_id, scopes, and
+        auth_type (``"jwt"`` or ``"api_key"``).
+
+    Raises:
+        HTTPException: 401 if no valid credential is
+            provided.
+    """
+    # --- JWT path ---
+    if bearer_token is not None:
+        try:
+            token_manager.validate_token_expiration(bearer_token)
+        except HTTPException as http_err:
+            log_level = "debug" if "expired" in http_err.detail.lower() else "error"
+            core_logger.print_to_log(
+                f"Access token validation failed: " f"{http_err.detail}",
+                log_level,
+                exc=http_err,
+                context={"access_token": "[REDACTED]"},
+            )
+            raise
+
+        sub = token_manager.get_token_claim(bearer_token, "sub")
+        if not isinstance(sub, int):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=("Invalid token: 'sub' claim must " "be an integer"),
+            )
+        scope = token_manager.get_token_claim(bearer_token, "scope")
+        if not isinstance(scope, list):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=("Invalid token: 'scope' claim must " "be a list"),
+            )
+        return AuthContext(user_id=sub, scopes=scope, auth_type="jwt")
+
+    # --- API key path ---
+    raw_key = api_key_header or api_key_query
+    if raw_key is not None:
+        return await validate_api_key(raw_key, request, db)
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=("Not authenticated. Provide a Bearer token " "or an API key."),
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def get_user_id_from_auth(
+    auth: Annotated[
+        "AuthContext",
+        Depends(validate_access_token_or_api_key),
+    ],
+) -> int:
+    """
+    Extract the user ID from a unified AuthContext.
+
+    Use this in place of ``get_sub_from_access_token``
+    on endpoints that accept both JWT and API key auth.
+
+    Args:
+        auth: Resolved AuthContext from
+            validate_access_token_or_api_key.
+
+    Returns:
+        The authenticated user's ID.
+    """
+    return auth.user_id
+
+
+def check_auth_scopes(
+    auth: Annotated[
+        "AuthContext",
+        Depends(validate_access_token_or_api_key),
+    ],
+    security_scopes: SecurityScopes,
+) -> None:
+    """
+    Validate scopes from a unified AuthContext.
+
+    Use this in place of ``check_scopes`` on endpoints
+    that accept both JWT and API key auth.
+
+    Args:
+        auth: Resolved AuthContext from
+            validate_access_token_or_api_key.
+        security_scopes: Required scopes for the
+            endpoint.
+
+    Raises:
+        HTTPException: 403 if any required scope is
+            missing from the AuthContext.
+    """
+    missing = set(security_scopes.scopes) - set(auth.scopes)
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(f"Unauthorized Access - Missing " f"permissions: {missing}"),
+            headers={
+                "WWW-Authenticate": (f'Bearer scope="' f'{security_scopes.scopes}"')
+            },
+        )
 
 
 ## WEBSOCKET TOKEN VALIDATION

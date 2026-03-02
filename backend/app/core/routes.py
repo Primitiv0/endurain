@@ -41,6 +41,7 @@ import users.users_sessions.router as users_session_router
 import sign_up_tokens.router as sign_up_tokens_router
 import strava.router as strava_router
 import users.users.router as users_router
+import users.users_api_keys.router as users_api_keys_router
 import users.users_goals.router as user_goals_router
 import users.users_identity_providers.router as user_identity_providers_router
 import users.users.public_router as users_public_router
@@ -56,6 +57,12 @@ router.include_router(
     prefix=core_config.ROOT_PATH + "/activities",
     tags=["activities"],
     dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
+    activities_router.api_upload_router,
+    prefix=core_config.ROOT_PATH + "/activities",
+    tags=["activities"],
+    dependencies=[Depends(auth_security.validate_access_token_or_api_key)],
 )
 router.include_router(
     activity_exercise_titles_router.router,
@@ -237,6 +244,15 @@ router.include_router(
     user_goals_router.router,
     prefix=core_config.ROOT_PATH + "/profile/goals",
     tags=["profile"],
+    dependencies=[
+        Depends(auth_security.validate_access_token),
+        Security(auth_security.check_scopes, scopes=["profile"]),
+    ],
+)
+router.include_router(
+    users_api_keys_router.router,
+    prefix=core_config.ROOT_PATH + "/profile/api_keys",
+    tags=["api_keys"],
     dependencies=[
         Depends(auth_security.validate_access_token),
         Security(auth_security.check_scopes, scopes=["profile"]),

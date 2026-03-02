@@ -33,6 +33,7 @@ import server_settings.models
 import users.users_sessions.models
 import users.users_sessions.rotated_refresh_tokens.models
 import users.users.models
+import users.users_api_keys.models
 import users.users_goals.models
 import users.users_default_gear.models
 import users.users_identity_providers.models

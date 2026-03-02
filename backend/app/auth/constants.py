@@ -37,7 +37,11 @@ USERS_ADMIN_SCOPE: Final[tuple[str, ...]] = (
     "sessions:write",
 )
 GEARS_SCOPE: Final[tuple[str, ...]] = ("gears:read", "gears:write")
-ACTIVITIES_SCOPE: Final[tuple[str, ...]] = ("activities:read", "activities:write")
+ACTIVITIES_SCOPE: Final[tuple[str, ...]] = (
+    "activities:read",
+    "activities:write",
+    "activities:upload",
+)
 IDENTITY_PROVIDERS_REGULAR_SCOPE: Final[tuple[str, ...]] = ("identity_providers:read",)
 IDENTITY_PROVIDERS_ADMIN_SCOPE: Final[tuple[str, ...]] = ("identity_providers:write",)
 HEALTH_SCOPE: Final[tuple[str, ...]] = (
@@ -62,6 +66,7 @@ SCOPE_DICT: Final[dict[str, str]] = {
     "gears:write": "Write privileges over gears",
     "activities:read": "Read privileges over activities",
     "activities:write": "Write privileges over activities",
+    "activities:upload": "Upload privileges over activities",
     "health:read": "Read privileges over health data",
     "health:write": "Write privileges over health data",
     "health_targets:read": "Read privileges over health targets data",
