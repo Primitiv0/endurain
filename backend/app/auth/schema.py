@@ -74,29 +74,36 @@ class PendingMFALogin:
     """
     A class to manage pending Multi-Factor Authentication (MFA) login sessions.
 
-    This class provides methods to add, retrieve, delete, and check pending login entries
-    for users who are in the process of MFA authentication. It uses an internal dictionary
-    to store the mapping between usernames and their associated user IDs.
+    This class provides methods to add, retrieve, delete, and check pending login
+    entries for users who are in the process of MFA authentication. Each entry
+    carries a creation timestamp and automatically expires after
+    ``PENDING_MFA_TTL_SECONDS`` (5 minutes). Expired entries are evicted lazily
+    on access and eagerly via ``cleanup_expired``.
 
-    Also implements progressive lockout mechanism to prevent TOTP brute-force attacks
-    (AuthQuake-style vulnerabilities).
+    Also implements progressive lockout mechanism to prevent TOTP brute-force
+    attacks (AuthQuake-style vulnerabilities).
 
     Attributes:
-        _store (dict): Internal storage mapping usernames to user IDs for pending logins.
-        _failed_attempts (dict): Tracks failed MFA attempts and lockout times per username.
+        PENDING_MFA_TTL_SECONDS: TTL for pending MFA entries (300 s).
+        _store: Maps username to ``(user_id, created_at)`` tuples.
+        _failed_attempts: Tracks failed MFA attempts and lockout times
+            per username.
 
     Methods:
         add_pending_login(username: str, user_id: int):
             Adds a pending login entry for the specified username and user ID.
 
         get_pending_login(username: str):
-            Retrieves the user ID associated with the given username's pending login entry.
+            Retrieves the user ID if the entry exists and has not expired.
 
         delete_pending_login(username: str):
             Removes the pending login entry for the specified username.
 
         has_pending_login(username: str):
-            Checks if the specified username has a pending login entry.
+            Checks if the specified username has a valid, non-expired entry.
+
+        cleanup_expired():
+            Evicts all entries whose TTL has elapsed.
 
         is_locked_out(username: str):
             Checks if user is currently locked out from MFA attempts.
@@ -114,61 +121,110 @@ class PendingMFALogin:
             Clears all pending login entries from the internal store.
     """
 
+    # Abandoned MFA flows expire after 5 minutes, preventing
+    # indefinite brute-force windows on the second factor.
+    PENDING_MFA_TTL_SECONDS: int = 300
+
     def __init__(self):
-        self._store = {}
+        # {username: (user_id, created_at)}
+        self._store: dict[str, tuple[int, datetime]] = {}
         # Failed attempts tracking: {username: (failed_count, lockout_until)}
         self._failed_attempts: dict[str, tuple[int, datetime | None]] = {}
 
-    def add_pending_login(self, username: str, user_id: int):
+    def add_pending_login(self, username: str, user_id: int) -> None:
         """
-        Adds a pending login entry for a user.
+        Add a pending MFA login entry for a user.
 
-        Stores the provided username and associated user ID in the internal store,
-        marking the user as pending login.
+        Stores the username, associated user ID, and creation
+        timestamp in the internal store. Any previous entry for
+        this username is overwritten (re-initiating the flow
+        resets the TTL).
 
         Args:
-            username (str): The username of the user to add.
-            user_id (int): The unique identifier of the user.
-
+            username: The username of the user to add.
+            user_id: The unique identifier of the user.
         """
-        self._store[username] = user_id
+        self._store[username] = (user_id, datetime.now(timezone.utc))
 
-    def get_pending_login(self, username: str):
+    def get_pending_login(self, username: str) -> int | None:
         """
-        Retrieve the pending login information for a given username.
+        Retrieve the user ID for a pending MFA login.
+
+        Returns ``None`` and evicts the entry if it exists but
+        has exceeded ``PENDING_MFA_TTL_SECONDS``.
 
         Args:
-            username (str): The username to look up.
+            username: The username to look up.
 
         Returns:
-            Any: The pending login information associated with the username, or None if not found.
+            The user ID if a valid, non-expired entry exists,
+            otherwise None.
         """
-        return self._store.get(username)
+        entry = self._store.get(username)
+        if entry is None:
+            return None
 
-    def delete_pending_login(self, username: str):
+        user_id, created_at = entry
+        age = (datetime.now(timezone.utc) - created_at).total_seconds()
+        if age > self.PENDING_MFA_TTL_SECONDS:
+            # Entry has expired — evict it
+            del self._store[username]
+            core_logger.print_to_log(
+                f"Pending MFA entry for '{username}' expired "
+                f"after {int(age)}s and was evicted.",
+                "info",
+            )
+            return None
+
+        return user_id
+
+    def delete_pending_login(self, username: str) -> None:
         """
-        Removes the pending login entry for the specified username from the internal store.
+        Remove the pending MFA login entry for the given username.
 
         Args:
-            username (str): The username whose pending login entry should be deleted.
-
-        Returns:
-            None
+            username: The username whose entry should be deleted.
         """
         if username in self._store:
             del self._store[username]
 
-    def has_pending_login(self, username: str):
+    def has_pending_login(self, username: str) -> bool:
         """
-        Checks if the given username has a pending login session.
+        Check if the given username has a valid, non-expired pending
+        MFA login session.
 
         Args:
-            username (str): The username to check for a pending login.
+            username: The username to check.
 
         Returns:
-            bool: True if the username has a pending login session, False otherwise.
+            True if a non-expired entry exists, False otherwise.
         """
-        return username in self._store
+        return self.get_pending_login(username) is not None
+
+    def cleanup_expired(self) -> int:
+        """
+        Evict all pending MFA entries whose TTL has elapsed.
+
+        Intended to be called by a periodic background task to
+        prevent unbounded memory growth.
+
+        Returns:
+            Number of entries removed.
+        """
+        now = datetime.now(timezone.utc)
+        expired = [
+            username
+            for username, (_, created_at) in self._store.items()
+            if (now - created_at).total_seconds() > self.PENDING_MFA_TTL_SECONDS
+        ]
+        for username in expired:
+            del self._store[username]
+        if expired:
+            core_logger.print_to_log(
+                f"Cleaned up {len(expired)} expired pending MFA " "entries.",
+                "info",
+            )
+        return len(expired)
 
     def is_locked_out(self, username: str) -> bool:
         """
@@ -296,6 +352,18 @@ def get_pending_mfa_store():
 
 
 pending_mfa_store = PendingMFALogin()
+
+
+def cleanup_expired_pending_mfa_logins() -> None:
+    """Evict all expired pending MFA login entries.
+
+    Delegates to the singleton's cleanup_expired() method.
+    Intended to be called by the background scheduler.
+
+    Returns:
+        None
+    """
+    pending_mfa_store.cleanup_expired()
 
 
 class FailedLoginAttempts:

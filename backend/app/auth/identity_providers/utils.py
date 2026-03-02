@@ -1,5 +1,6 @@
 """Identity Provider utility functions and templates"""
 
+import hmac
 import re
 import hashlib
 import base64
@@ -179,19 +180,17 @@ def _secure_compare(a: str, b: str) -> bool:
     """
     Constant-time string comparison to prevent timing attacks.
 
+    Uses ``hmac.compare_digest`` to avoid both character-by-
+    character and length timing leaks.
+
     Args:
-        a (str): First string.
-        b (str): Second string.
+        a: First string.
+        b: Second string.
 
     Returns:
-        bool: True if strings are equal, False otherwise.
+        True if strings are equal, False otherwise.
     """
-    if len(a) != len(b):
-        return False
-    result = 0
-    for x, y in zip(a, b):
-        result |= ord(x) ^ ord(y)
-    return result == 0
+    return hmac.compare_digest(a.encode(), b.encode())
 
 
 # Pre-configured templates for common IdPs

@@ -16,6 +16,7 @@ import users.users_sessions.utils as users_session_utils
 import users.users_sessions.rotated_refresh_tokens.utils as users_session_rotated_tokens_utils
 
 import auth.oauth_state.utils as oauth_state_utils
+import auth.schema as auth_schema
 
 import core.logger as core_logger
 
@@ -98,6 +99,14 @@ def start_scheduler():
         1,
         [],
         "delete expired rotated tokens from the database",
+    )
+
+    add_scheduler_job(
+        auth_schema.cleanup_expired_pending_mfa_logins,
+        "interval",
+        5,
+        [],
+        "evict expired pending MFA login entries",
     )
 
 

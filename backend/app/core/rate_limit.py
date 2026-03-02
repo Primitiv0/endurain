@@ -52,6 +52,11 @@ SESSION_REFRESH_LIMIT = "20/minute"  # Token refresh (more frequent but still li
 SESSION_LOGOUT_LIMIT = "10/minute"  # Logout requests
 
 SIGNUP_LIMIT = "5/minute"  # Signup attempts (prevent account creation abuse)
+SIGNUP_CONFIRM_LIMIT = "5/minute"  # Email token brute-force prevention
+
+# Password reset endpoints - strict protection
+PASSWORD_RESET_REQUEST_LIMIT = "3/minute"  # Prevent email spam
+PASSWORD_RESET_CONFIRM_LIMIT = "5/minute"  # Token brute-force prevention
 
 # MFA endpoints - very strict protection (high-value target for brute-force)
 MFA_VERIFY_LIMIT = (

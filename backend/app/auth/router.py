@@ -327,6 +327,7 @@ async def verify_mfa_and_login(
 
 
 @router.post("/refresh")
+@core_rate_limit.limiter.limit(core_rate_limit.SESSION_REFRESH_LIMIT)
 async def refresh_token(
     response: Response,
     request: Request,
@@ -559,8 +560,10 @@ async def refresh_token(
 
 
 @router.post("/logout")
+@core_rate_limit.limiter.limit(core_rate_limit.SESSION_LOGOUT_LIMIT)
 async def logout(
     response: Response,
+    request: Request,
     _validate_refresh_token: Annotated[
         Callable, Depends(auth_security.validate_refresh_token)
     ],
@@ -591,6 +594,7 @@ async def logout(
 
     Args:
         response: The HTTP response object to modify cookies.
+        request: The HTTP request object.
         _validate_refresh_token: Dependency to validate the refresh token.
         token_session_id: The session ID extracted from the refresh token.
         refresh_token_value: The refresh token value from the request.

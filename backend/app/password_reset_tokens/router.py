@@ -4,6 +4,7 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Request,
     status,
 )
 from sqlalchemy.orm import Session
@@ -15,13 +16,16 @@ import auth.password_hasher as auth_password_hasher
 
 import core.database as core_database
 import core.apprise as core_apprise
+import core.rate_limit as core_rate_limit
 
 # Define the API router
 router = APIRouter()
 
 
 @router.post("/password-reset/request")
+@core_rate_limit.limiter.limit(core_rate_limit.PASSWORD_RESET_REQUEST_LIMIT)
 async def request_password_reset(
+    request: Request,
     request_data: password_reset_tokens_schema.PasswordResetRequest,
     email_service: Annotated[
         core_apprise.AppriseService,
@@ -42,6 +46,7 @@ async def request_password_reset(
 
     Parameters
     ----------
+    request : The HTTP request object.
     request_data : password_reset_tokens_schema.PasswordResetRequest
         Pydantic model containing the email address to send the reset link to.
     email_service : core_apprise.AppriseService
@@ -89,7 +94,9 @@ async def request_password_reset(
 
 
 @router.post("/password-reset/confirm")
+@core_rate_limit.limiter.limit(core_rate_limit.PASSWORD_RESET_CONFIRM_LIMIT)
 async def confirm_password_reset(
+    request: Request,
     confirm_data: password_reset_tokens_schema.PasswordResetConfirm,
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -104,6 +111,7 @@ async def confirm_password_reset(
     Confirms a password reset using the provided token and new password.
 
     Args:
+        request (Request): The incoming HTTP request object.
         confirm_data (password_reset_tokens_schema.PasswordResetConfirm):
             Data containing the password reset token and the new password.
         password_hasher (auth_password_hasher.PasswordHasher):

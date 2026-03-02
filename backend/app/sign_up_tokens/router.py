@@ -153,7 +153,9 @@ async def signup(
 
 
 @router.post("/sign-up/confirm")
+@core_rate_limit.limiter.limit(core_rate_limit.SIGNUP_CONFIRM_LIMIT)
 async def verify_email(
+    request: Request,
     confirm_data: sign_up_tokens_schema.SignUpConfirm,
     email_service: Annotated[
         core_apprise.AppriseService,
