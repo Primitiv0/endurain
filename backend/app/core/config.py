@@ -20,6 +20,7 @@ ALLOWED_REDIRECT_SCHEMES: set[str] = (
     if _allowed_schemes_raw.strip()
     else set()
 )
+TRUSTED_PROXIES = os.getenv("TRUSTED_PROXIES", "*").split(",")
 FRONTEND_DIR = os.getenv("FRONTEND_DIR", "/app/frontend/dist")
 BACKEND_DIR = os.getenv("BACKEND_DIR", "/app/backend")
 DATA_DIR = os.getenv("DATA_DIR", f"{BACKEND_DIR}/data")

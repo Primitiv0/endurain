@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import ipaddress
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ import users.users_sessions.crud as users_session_crud
 
 import users.users.schema as users_schema
 
+import core.config as core_config
 import core.logger as core_logger
 from core.database import SessionLocal
 
@@ -350,12 +352,51 @@ def get_user_agent(request: Request) -> str:
     return request.headers.get("user-agent", "")
 
 
+def _is_trusted_peer(peer_ip: str) -> bool:
+    """Check whether peer_ip is in the TRUSTED_PROXIES allow-list.
+
+    Supports exact IPs and CIDR notation.  The special value ``"*"``
+    (the default) trusts every peer.
+
+    Args:
+        peer_ip: The direct TCP-connection IP of the caller.
+
+    Returns:
+        True if the peer is trusted, False otherwise.
+    """
+    trusted = core_config.TRUSTED_PROXIES
+    if trusted == ["*"]:
+        return True
+    try:
+        addr = ipaddress.ip_address(peer_ip)
+        for entry in trusted:
+            entry = entry.strip()
+            if not entry:
+                continue
+            try:
+                network = ipaddress.ip_network(entry, strict=False)
+                if addr in network:
+                    return True
+            except ValueError:
+                # Entry is not a valid network — compare as plain string
+                if peer_ip == entry:
+                    return True
+    except ValueError:
+        pass
+    return False
+
+
 def get_ip_address(request: Request) -> str:
     """
-    Extract client IP address from request.
+    Extract client IP address from request, respecting TRUSTED_PROXIES.
 
-    Checks proxy headers (X-Forwarded-For, X-Real-IP) first,
-    then falls back to direct client host.
+    Proxy headers (``X-Forwarded-For``, ``X-Real-IP``) are only trusted
+    when the direct TCP peer matches an entry in ``TRUSTED_PROXIES``.
+    This prevents attackers from spoofing their IP by injecting those
+    headers on direct connections.
+
+    When ``TRUSTED_PROXIES`` is ``["*"]`` (the default) all peers are
+    trusted.
 
     Args:
         request: Request object with headers and client info.
@@ -363,17 +404,21 @@ def get_ip_address(request: Request) -> str:
     Returns:
         Client IP address or "unknown" if indeterminate.
     """
-    # Check for proxy headers first
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # Take the first IP in the chain
-        return forwarded_for.split(",")[0].strip()
+    peer_ip = request.client.host if request.client else None
 
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip
+    if peer_ip and _is_trusted_peer(peer_ip):
+        # Peer is a trusted proxy — honour the forwarded headers
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            # Take the leftmost IP: the original client
+            return forwarded_for.split(",")[0].strip()
 
-    return request.client.host if request.client else "unknown"
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            return real_ip
+
+    # Untrusted peer or no peer info — use the raw socket IP
+    return peer_ip or "unknown"
 
 
 def parse_user_agent(user_agent: str) -> DeviceInfo:
