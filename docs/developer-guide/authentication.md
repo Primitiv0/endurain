@@ -8,6 +8,9 @@ Endurain supports integration with other apps through a comprehensive OAuth 2.1 
 - **Authorization:** Every request must include an `Authorization: Bearer <access token>` header with a valid access token.
 - **CSRF Protection (Web Only):** State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) from web clients must include an `X-CSRF-Token` header.
 
+!!! note "API Key Authentication"
+    Certain endpoints support API key authentication as an alternative to Bearer + `X-Client-Type` headers. API key requests do not require the `X-Client-Type` header or a CSRF token. See [API Key Authentication](#api-key-authentication) for details.
+
 ## Token Handling
 
 ### Token Lifecycle
@@ -130,6 +133,18 @@ Endurain implements automatic refresh token rotation with reuse detection to pre
 | **Family Invalidation** | If reuse detected, ALL tokens in family are invalidated |
 | **Rotation Count** | Tracks number of rotations for audit purposes |
 
+### API Key Authentication Flow
+
+For integrations that do not maintain a JWT session, API keys provide a stateless alternative:
+
+1. Generate an API key via the web UI (Settings → Security → API Keys) or the management API (requires JWT)
+2. Store the raw key securely — it is shown only once at creation time
+3. Include the key in requests to supported endpoints via the `X-API-Key` header or the `?api_key=` query parameter
+4. The backend validates the key hash, checks revocation and expiry, and resolves the user identity and scopes
+5. The endpoint processes the request if the required scope is present in the key's grant
+
+See [API Key Authentication](#api-key-authentication) for the complete reference.
+
 ## API Endpoints 
 
 The API is reachable under `/api/v1`. Below are the authentication-related endpoints. Complete API documentation is available on the backend docs (`http://localhost:98/api/v1/docs` or `http://ip_address:98/api/v1/docs` or `https://domain/api/v1/docs`):
@@ -169,11 +184,22 @@ The API is reachable under `/api/v1`. Below are the authentication-related endpo
 | **Get User Sessions** | `/sessions/user/{user_id}` | Header: `Authorization: Bearer <Access Token>` |
 | **Delete Session** | `/sessions/{session_id}/user/{user_id}` | Header: `Authorization: Bearer <Access Token>` |
 
+### API Key Management Endpoints
+
+Require JWT authentication. API keys cannot manage other API keys.
+
+| Method | Url | Description |
+| ------ | --- | ----------- |
+| `GET` | `/profile/api_keys` | List all API keys for the authenticated user |
+| `POST` | `/profile/api_keys` | Create a new API key |
+| `PATCH` | `/profile/api_keys/{id}/revoke` | Revoke (deactivate) a key |
+| `DELETE` | `/profile/api_keys/{id}` | Permanently delete a key |
+
 ### Example Resource Endpoints
 
 | What | Url | Expected Information |
 | ---- | --- | -------------------- |
-| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file |
+| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file. Accepts JWT **or** API key (`X-API-Key` header / `?api_key=` query param) with `activities:upload` scope |
 | **Set Weight** | `/health/weight` | JSON `{'weight': <number>, 'created_at': 'yyyy-MM-dd'}` |
 
 ## Progressive Account Lockout
@@ -376,6 +402,152 @@ X-Client-Type: web|mobile
     - Each backup code can only be used once
     - Regenerating codes invalidates ALL previous backup codes
     - Store backup codes in a secure location separate from your authenticator device
+
+## API Key Authentication
+
+API keys provide a stateless, long-lived authentication mechanism for programmatic access and third-party integrations. Unlike JWT sessions, API keys do not require a login flow or token refresh, and are scoped to specific operations.
+
+!!! warning "Security Notice"
+    API keys are powerful credentials. Treat them like passwords: store them securely and never expose them in client-side code, public repositories, or logs.
+
+### Key Format
+
+API keys use the following format:
+
+```
+endurain_<32-character-random-string>
+```
+
+- **Prefix**: `endurain_` — identifies Endurain API keys in secret scanning tools (e.g., GitHub secret scanning)
+- **Random part**: 256 bits of cryptographically secure random data (`secrets.token_urlsafe(32)`)
+- **Total length**: ~52 characters
+
+The raw key is shown **once** at creation time and is never stored by the server (only the SHA-256 hash is stored). If lost, the key must be deleted and a new one created.
+
+### Scopes
+
+API keys are granted one or more scopes at creation time. A key can only access operations covered by its granted scopes:
+
+| Scope | Description |
+| ----- | ----------- |
+| `activities:upload` | Upload activity files (.gpx, .tcx, .fit, .gz) |
+
+### How to Authenticate with an API Key
+
+API keys bypass the standard JWT and `X-Client-Type` requirements. Send the raw key using either option:
+
+**Option 1: `X-API-Key` header (recommended):**
+
+```http
+POST /api/v1/activities/create/upload
+X-API-Key: endurain_abc12345...
+Content-Type: multipart/form-data
+
+(file body)
+```
+
+**Option 2: `api_key` query parameter (for tools that cannot set custom headers):**
+
+```http
+POST /api/v1/activities/create/upload?api_key=endurain_abc12345...
+Content-Type: multipart/form-data
+
+(file body)
+```
+
+!!! tip "Header vs Query Parameter"
+    The `X-API-Key` header is strongly preferred. Query parameters may appear in server access logs, reverse-proxy logs, and browser history, increasing the risk of key exposure. Use the query parameter only when setting custom headers is not possible.
+
+If both the `X-API-Key` header and the `?api_key=` query parameter are present, the **header takes precedence**.
+
+### Endpoints That Accept API Keys
+
+| Method | Endpoint | Required Scope | Description |
+| ------ | -------- | -------------- | ----------- |
+| `POST` | `/activities/create/upload` | `activities:upload` | Upload a .gpx, .tcx, .fit, or .gz activity file |
+
+### Managing API Keys
+
+API keys are managed through the Endurain web UI (Settings → Security → API Keys) or via the REST API. All management endpoints require a valid JWT access token.
+
+**Create API Key Request:**
+
+```http
+POST /api/v1/profile/api_keys
+Authorization: Bearer {access_token}
+X-Client-Type: web
+Content-Type: application/json
+
+{
+  "name": "Home Server Integration",
+  "scopes": ["activities:upload"],
+  "expires_at": "2027-01-01T00:00:00Z"
+}
+```
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `name` | Yes | Human-readable label (max 100 characters) |
+| `scopes` | Yes | Array of scope strings to grant |
+| `expires_at` | No | ISO 8601 expiry datetime. Omit or `null` for no expiry |
+
+**Create API Key Response (HTTP 201):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Home Server Integration",
+  "key_prefix": "abc12345",
+  "scopes": "[\"activities:upload\"]",
+  "expires_at": "2027-01-01T00:00:00Z",
+  "last_used_at": null,
+  "created_at": "2026-03-02T10:00:00Z",
+  "is_active": true,
+  "key": "endurain_abc12345..."
+}
+```
+
+!!! warning "Save the key immediately"
+    The `key` field is returned **only in this response**. It is not stored by the server and cannot be retrieved later. Store it in a secure location (e.g., a password manager or secrets vault) before dismissing the response.
+
+**List API Keys Response (`GET /profile/api_keys`):**
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "Home Server Integration",
+    "key_prefix": "abc12345",
+    "scopes": "[\"activities:upload\"]",
+    "expires_at": "2027-01-01T00:00:00Z",
+    "last_used_at": "2026-03-01T08:30:00Z",
+    "created_at": "2026-03-02T10:00:00Z",
+    "is_active": true
+  }
+]
+```
+
+The `key` field is **never** returned in list or subsequent get responses — only `key_prefix` is shown for identification.
+
+**Revoke API Key (`PATCH /profile/api_keys/{id}/revoke`):**
+
+Revocation soft-deletes the key by setting `is_active = false`. Revoked keys are rejected immediately but remain visible in the list (useful for audit purposes). Returns HTTP 204 on success.
+
+**Delete API Key (`DELETE /profile/api_keys/{id}`):**
+
+Permanently removes the key from the database. Returns HTTP 204 on success.
+
+### Security Properties
+
+| Property | Detail |
+| -------- | ------ |
+| **Storage** | SHA-256 hex digest stored server-side; raw key never persisted |
+| **Comparison** | Constant-time (`hmac.compare_digest`) prevents timing attacks |
+| **Revocation** | Immediate — revoked keys are rejected at validation time |
+| **Expiry** | Optional; expired keys are rejected at validation time with timezone-aware comparison |
+| **Audit logging** | Every successful authentication is logged with key prefix, user ID, endpoint, and client IP |
+| **No self-escalation** | An API key cannot create, list, or revoke other API keys (JWT required) |
+| **Minimum privilege** | Keys carry only the scopes explicitly granted at creation time |
 
 ## OAuth/SSO Integration
 
@@ -930,6 +1102,7 @@ Endurain uses OAuth-style scopes to control API access. Each scope controls acce
 | `gears:write` | Modify gear/equipment data | Write |
 | `activities:read` | Read activity data | Read-only |
 | `activities:write` | Create/modify activities | Write |
+| `activities:upload` | Upload activity files (.gpx, .tcx, .fit, .gz) | Write (API key) |
 | `health:read` | Read health metrics (weight, sleep, steps) | Read-only |
 | `health:write` | Record health metrics | Write |
 | `health_targets:read` | Read health targets | Read-only |
@@ -1044,3 +1217,13 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 4. **Handle provider errors gracefully** with user-friendly messages
 5. **Support account linking** - Allow users to connect multiple providers
 6. **Respect token expiry** - OAuth state expires after 10 minutes
+
+### For API Key Integrations
+
+1. **Store the key securely** — use a secrets manager, environment variable, or encrypted config file. Never hardcode it in source code
+2. **Use the `X-API-Key` header** rather than the `?api_key=` query parameter to avoid key exposure in logs
+3. **Grant minimum scopes** — request only the scopes your integration needs (e.g., `activities:upload` for file upload scripts)
+4. **Set an expiry date** when creating keys for temporary or one-off integrations
+5. **Rotate keys periodically** — delete the old key and create a new one; update any dependent services before deleting
+6. **Revoke immediately** if a key is suspected to be compromised — revocation takes effect instantly
+7. **Monitor `last_used_at`** via the list endpoint to detect unused keys that can be cleaned up
