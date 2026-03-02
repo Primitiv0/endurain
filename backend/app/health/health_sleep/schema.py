@@ -381,7 +381,7 @@ class HealthSleepListResponse(health_schema.HealthListResponse):
 
     Attributes:
         records: A list of HealthSleepRead objects representing individual
-        sleep records.
+            sleep records.
     """
 
     records: list[HealthSleepRead] = Field(

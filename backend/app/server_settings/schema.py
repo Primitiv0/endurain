@@ -245,7 +245,6 @@ class ServerSettings(ServerSettingsBase):
     Attributes:
         id: Unique identifier (always 1, singleton pattern).
         tileserver_api_key: API key encrypted for the tile server.
-        (plus all fields inherited from ServerSettingsBase)
     """
 
     id: StrictInt = Field(
@@ -269,7 +268,6 @@ class ServerSettingsEdit(ServerSettings):
             (true - yes, false - no).
         signup_require_email_verification: Require email verification for new
             sign-ups (true - yes, false - no).
-        (plus all fields inherited from ServerSettings)
     """
 
     signup_require_admin_approval: StrictBool = Field(

@@ -110,7 +110,7 @@ class HealthStepsListResponse(health_schema.HealthListResponse):
 
     Attributes:
         records: A list of HealthStepsRead objects representing individual
-        steps records.
+            steps records.
     """
 
     records: list[HealthStepsRead] = Field(

@@ -149,7 +149,7 @@ class HealthWeightListResponse(health_schema.HealthListResponse):
 
     Attributes:
         records: A list of HealthWeightRead objects representing individual
-        weight records.
+            weight records.
     """
 
     records: list[HealthWeightRead] = Field(
