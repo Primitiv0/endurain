@@ -204,7 +204,7 @@ def complete_login(
             expires=datetime.now(timezone.utc)
             + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
             httponly=True,
-            path="/",
+            path="/api/v1/auth",
             secure=secure,
             samesite="strict",  # OAuth 2.1: Strict for defense-in-depth
         )
