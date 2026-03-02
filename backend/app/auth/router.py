@@ -420,7 +420,9 @@ async def refresh_token(
     # - CSRF token is defense-in-depth; SameSite=Strict is primary protection
     if client_type == "web" and x_csrf_token and session.csrf_token_hash is not None:
         # CSRF token was provided: validate it
-        if not password_hasher.verify(x_csrf_token, session.csrf_token_hash):
+        if not users_session_utils.verify_csrf_token(
+            x_csrf_token, session.csrf_token_hash
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid CSRF token",
