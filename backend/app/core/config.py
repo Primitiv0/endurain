@@ -314,6 +314,9 @@ def check_required_env_vars():
                 "FERNET_KEY validation failed. Please check the key format and regenerate if necessary.",
                 "warning",
             )
+            raise ValueError(
+                "FERNET_KEY validation failed. Please check the key format and regenerate if necessary."
+            )
 
     validate_log_level(LOG_LEVEL)
 
