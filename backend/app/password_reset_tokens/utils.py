@@ -74,8 +74,7 @@ async def send_password_reset_email(
         False if the email service failed to send.
 
     Raises:
-        HTTPException: 503 if the email service is not
-            configured.
+        HTTPException: 503 if the email service is not configured.
     """
     # Check if email service is configured
     if not email_service.is_configured():
@@ -137,8 +136,7 @@ def use_password_reset_token(
 
     Raises:
         HTTPException: 400 if the token is invalid or expired.
-        HTTPException: 500 if password update or token
-            marking fails.
+        HTTPException: 500 if password update or token marking fails.
     """
     # Hash the provided token to find the database record
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -165,8 +163,8 @@ def delete_invalid_tokens_from_db() -> None:
     """
     Remove expired password reset tokens from the database.
 
-    Opens a new session, deletes expired tokens, and logs
-    the count if any were removed.
+    Opens a new session, deletes expired tokens, and logs the count if any were
+        removed.
 
     Returns:
         None

@@ -1,8 +1,8 @@
 """
 Password reset tokens module for user password recovery.
 
-This module provides CRUD operations, email messaging,
-and utilities for password reset token management.
+This module provides CRUD operations, email messaging, and utilities for
+password reset token management.
 
 Exports:
     - CRUD: create_password_reset_token,

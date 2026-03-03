@@ -1,3 +1,5 @@
+"""Utility functions for sign-up token operations."""
+
 from datetime import datetime, timedelta, timezone
 from fastapi import (
     HTTPException,
@@ -23,6 +25,17 @@ from core.database import SessionLocal
 
 
 def create_sign_up_token(user_id: int, db: Session) -> str:
+    """
+    Create and persist a sign-up token for a user.
+
+    Args:
+        user_id: ID of the user signing up.
+        db: Active SQLAlchemy session.
+
+    Returns:
+        The plaintext token to deliver to the user.
+        Only the hash is stored in the database.
+    """
     # Generate token and hash
     token, token_hash = core_apprise.generate_token_and_hash()
 
@@ -34,7 +47,7 @@ def create_sign_up_token(user_id: int, db: Session) -> str:
         created_at=datetime.now(timezone.utc),
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=24),  # 24 hour expiration
-        used=0,
+        used=False,
     )
 
     # Save to database
@@ -45,8 +58,24 @@ def create_sign_up_token(user_id: int, db: Session) -> str:
 
 
 async def send_sign_up_email(
-    user: users_models.Users, email_service: core_apprise.AppriseService, db: Session
+    user: users_models.Users,
+    email_service: core_apprise.AppriseService,
+    db: Session,
 ) -> bool:
+    """
+    Send a sign-up confirmation email to a user.
+
+    Args:
+        user: User model instance to email.
+        email_service: Configured AppriseService.
+        db: Active SQLAlchemy session.
+
+    Returns:
+        True if the email was sent successfully.
+
+    Raises:
+        HTTPException: 503 if the email service is not configured.
+    """
     # Check if email service is configured
     if not email_service.is_configured():
         raise HTTPException(
@@ -77,8 +106,24 @@ async def send_sign_up_email(
 
 
 async def send_sign_up_admin_approval_email(
-    user: users_models.Users, email_service: core_apprise.AppriseService, db: Session
+    user: users_models.Users,
+    email_service: core_apprise.AppriseService,
+    db: Session,
 ) -> None:
+    """
+    Notify admins about a new sign-up for approval.
+
+    Args:
+        user: User model instance who signed up.
+        email_service: Configured AppriseService.
+        db: Active SQLAlchemy session.
+
+    Returns:
+        None
+
+    Raises:
+        HTTPException: 503 if the email service is not configured.
+    """
     # Check if email service is configured
     if not email_service.is_configured():
         raise HTTPException(
@@ -93,7 +138,10 @@ async def send_sign_up_admin_approval_email(
         # use default email message in English
         subject, html_content, text_content = (
             sign_up_tokens_email_messages.get_admin_signup_notification_email_en(
-                admin.name, user.name, user.username, email_service
+                admin.name,
+                user.name,
+                user.username,
+                email_service,
             )
         )
 
@@ -107,8 +155,25 @@ async def send_sign_up_admin_approval_email(
 
 
 async def send_sign_up_approval_email(
-    user_id: int, email_service: core_apprise.AppriseService, db: Session
+    user_id: int,
+    email_service: core_apprise.AppriseService,
+    db: Session,
 ) -> bool:
+    """
+    Send an approval notification email to a user.
+
+    Args:
+        user_id: ID of the approved user.
+        email_service: Configured AppriseService.
+        db: Active SQLAlchemy session.
+
+    Returns:
+        True if the email was sent successfully.
+
+    Raises:
+        HTTPException: 503 if the email service is not configured.
+        HTTPException: 404 if user is not found.
+    """
     # Check if email service is configured
     if not email_service.is_configured():
         raise HTTPException(
@@ -142,6 +207,20 @@ async def send_sign_up_approval_email(
 
 
 def use_sign_up_token(token: str, db: Session) -> int:
+    """
+    Validate and consume a sign-up token.
+
+    Args:
+        token: Plaintext sign-up token to validate.
+        db: Active SQLAlchemy session.
+
+    Returns:
+        The user ID associated with the token.
+
+    Raises:
+        HTTPException: 400 if the token is invalid or expired.
+        HTTPException: 500 if an unexpected error occurs.
+    """
     # Hash the provided token to find the database record
     token_hash = hashlib.sha256(token.encode()).hexdigest()
 
@@ -163,14 +242,27 @@ def use_sign_up_token(token: str, db: Session) -> int:
     except HTTPException as http_err:
         raise http_err
     except Exception as err:
-        core_logger.print_to_log(f"Error in use_sign_up_token: {err}", "error", exc=err)
+        core_logger.print_to_log(
+            f"Error in use_sign_up_token: {err}",
+            "error",
+            exc=err,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from err
 
 
-def delete_invalid_tokens_from_db():
+def delete_invalid_tokens_from_db() -> None:
+    """
+    Remove expired sign-up tokens from the database.
+
+    Opens a new session, deletes expired tokens, and logs the count if any were
+        removed.
+
+    Returns:
+        None
+    """
     # Create a new database session using context manager
     with SessionLocal() as db:
         # Get num tokens deleted

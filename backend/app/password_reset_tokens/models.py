@@ -29,7 +29,7 @@ class PasswordResetToken(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment=("User ID that the password reset" " token belongs to"),
+        comment=("User ID that the password reset token belongs to"),
     )
     token_hash: Mapped[str] = mapped_column(
         String(128),

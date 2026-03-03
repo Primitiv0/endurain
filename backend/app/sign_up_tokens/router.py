@@ -1,3 +1,5 @@
+"""Sign-up tokens router for user registration."""
+
 from typing import Annotated
 
 from fastapi import (
@@ -32,7 +34,11 @@ import websocket.manager as websocket_manager
 router = APIRouter()
 
 
-@router.post("/sign-up/request", status_code=201)
+@router.post(
+    "/sign-up/request",
+    status_code=201,
+    response_model=sign_up_tokens_schema.SignUpResponse,
+)
 @core_rate_limit.limiter.limit(core_rate_limit.SIGNUP_LIMIT)
 async def signup(
     request: Request,
@@ -51,56 +57,20 @@ async def signup(
     ],
 ):
     """
-    Handle user sign-up: create the user and related default data, enforce server sign-up policies,
-    and trigger ancillary actions such as sending verification/approval emails and notifying admins.
+    Handle user sign-up request.
 
-    Parameters
-    - user (users_schema.UsersSignup): The payload containing the user's sign-up information.
-    - email_service (core_apprise.AppriseService): Injected email service used to send
-        verification and admin approval emails.
-    - websocket_manager (websocket_manager.WebSocketManager): Injected manager used to send
-        real-time notifications (e.g., admin approval requests).
-    - password_hasher (auth_password_hasher.PasswordHasher): Injected password hasher used to hash user passwords.
-    - db (Session): Database session/connection used to create the user and related records.
+    Args:
+        request: Incoming HTTP request.
+        user: Sign-up payload with user info.
+        email_service: Injected email service.
+        password_hasher: Injected password hasher.
+        db: Database session.
 
-    Behavior and side effects
-    - Reads server settings to determine whether sign-up is enabled and whether email verification
-        and/or admin approval are required.
-    - If sign-up is disabled, raises an HTTPException(403).
-    - Creates the user record and several related default records in the database, including:
-        - user integrations
-        - user privacy settings
-        - user health targets
-        - user default gear
-    - Depending on server settings:
-        - If email verification is required (and admin approval is not required):
-            - Attempts to send an email with verification instructions to the created user.
-            - Adds the "email_verification_required" flag to the returned response and updates
-                the human-readable message to reflect email sending success or failure.
-            - Note: account creation still occurs even if sending the verification email fails.
-        - If admin approval is required:
-            - Adds the "admin_approval_required" flag to the returned response and updates
-                the human-readable message to indicate the account is pending approval.
-            - Sends an admin-approval email and creates a real-time admin notification via
-                the websocket manager.
-        - If neither email verification nor admin approval is required:
-            - Updates the human-readable message to inform the user they can now log in.
+    Returns:
+        Sign-up result with message and flags.
 
-    Return
-    - dict: A dictionary containing at least a "message" key describing the result.
-        Additional keys may be present:
-        - "email_verification_required" (bool): Present when email verification must be completed.
-        - "admin_approval_required" (bool): Present when admin approval is required.
-
-    Raises
-    - HTTPException: Raised with status code 403 when server sign-up is disabled.
-    - Any exceptions raised by the underlying CRUD utilities, email service, notification utilities,
-        or database session may propagate (e.g., for transaction rollback or upstream error handling).
-
-    Notes
-    - This is an async FastAPI route handler intended to be used with dependency injection.
-    - The function performs persistent writes and external I/O (sending emails, pushing notifications);
-        callers and tests should account for these side effects (e.g., by using transactions, fakes, or mocks).
+    Raises:
+        HTTPException: 403 if sign-up is disabled.
     """
     # Get server settings to check if signup is enabled
     server_settings = server_settings_utils.get_server_settings_or_404(db)
@@ -121,38 +91,39 @@ async def signup(
     users_utils.create_user_default_data(created_user.id, db)
 
     # Return appropriate response based on server configuration
-    response_data = {"message": "User created successfully."}
+    message = "User created successfully."
+    email_verification_required: bool | None = None
+    admin_approval_required: bool | None = None
 
     if server_settings.signup_require_email_verification:
         # Send the sign-up email
         success = await sign_up_tokens_utils.send_sign_up_email(
             created_user, email_service, db
         )
-
         if success:
-            response_data["message"] = (
-                response_data["message"] + " Email sent with verification instructions."
-            )
+            message += " Email sent with verification instructions."
         else:
-            response_data["message"] = (
-                response_data["message"]
-                + " Failed to send verification email. Please contact support."
-            )
-        response_data["email_verification_required"] = True
+            message += " Failed to send verification email. Please contact support."
+        email_verification_required = True
     if server_settings.signup_require_admin_approval:
-        response_data["message"] = (
-            response_data["message"] + " Account is pending admin approval."
-        )
-        response_data["admin_approval_required"] = True
+        message += " Account is pending admin approval."
+        admin_approval_required = True
     if (
         not server_settings.signup_require_email_verification
         and not server_settings.signup_require_admin_approval
     ):
-        response_data["message"] = response_data["message"] + " You can now log in."
-    return response_data
+        message += " You can now log in."
+    return sign_up_tokens_schema.SignUpResponse(
+        message=message,
+        email_verification_required=email_verification_required,
+        admin_approval_required=admin_approval_required,
+    )
 
 
-@router.post("/sign-up/confirm")
+@router.post(
+    "/sign-up/confirm",
+    response_model=sign_up_tokens_schema.SignUpResponse,
+)
 @core_rate_limit.limiter.limit(core_rate_limit.SIGNUP_CONFIRM_LIMIT)
 async def verify_email(
     request: Request,
@@ -170,6 +141,22 @@ async def verify_email(
         Depends(core_database.get_db),
     ],
 ):
+    """
+    Verify user email via sign-up token.
+
+    Args:
+        request: Incoming HTTP request.
+        confirm_data: Token confirmation payload.
+        email_service: Injected email service.
+        websocket_manager: WebSocket notification manager.
+        db: Database session.
+
+    Returns:
+        Verification result with message and optional flags.
+
+    Raises:
+        HTTPException: 412 if email verification is not enabled.
+    """
     # Get server settings
     server_settings = server_settings_utils.get_server_settings_or_404(db)
     if not server_settings.signup_require_email_verification:
@@ -187,16 +174,22 @@ async def verify_email(
         await sign_up_tokens_utils.send_sign_up_admin_approval_email(
             user, email_service, db
         )
-        await notifications_utils.create_admin_new_sign_up_approval_request_notification(
-            user, websocket_manager, db
+        notif_coro = (
+            notifications_utils.create_admin_new_sign_up_approval_request_notification(
+                user, websocket_manager, db
+            )
         )
+        await notif_coro
 
     # Return appropriate response based on server configuration
-    response_data = {"message": "Email verified successfully."}
+    message = "Email verified successfully."
+    admin_approval_required: bool | None = None
     if server_settings.signup_require_admin_approval:
-        response_data["message"] += " Your account is now pending admin approval."
-        response_data["admin_approval_required"] = True
+        message += " Your account is now pending admin approval."
+        admin_approval_required = True
     else:
-        response_data["message"] += " You can now log in."
-
-    return response_data
+        message += " You can now log in."
+    return sign_up_tokens_schema.SignUpResponse(
+        message=message,
+        admin_approval_required=admin_approval_required,
+    )

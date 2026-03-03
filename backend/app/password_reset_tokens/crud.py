@@ -58,15 +58,14 @@ def get_password_reset_token_by_hash(
         db: SQLAlchemy database session.
 
     Returns:
-        The matching PasswordResetToken if found and valid,
-        None otherwise.
+        The matching PasswordResetToken if found and valid, None otherwise.
 
     Raises:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(password_reset_tokens_models.PasswordResetToken).where(
         password_reset_tokens_models.PasswordResetToken.token_hash == token_hash,
-        password_reset_tokens_models.PasswordResetToken.used == False,  # noqa: E712
+        password_reset_tokens_models.PasswordResetToken.used.is_(False),
         password_reset_tokens_models.PasswordResetToken.expires_at
         > datetime.now(timezone.utc),
     )
@@ -84,8 +83,7 @@ def mark_password_reset_token_used(
         db: SQLAlchemy database session.
 
     Returns:
-        Updated PasswordResetToken instance if found,
-        None otherwise.
+        Updated PasswordResetToken instance if found, None otherwise.
 
     Raises:
         HTTPException: 500 error if database operation fails.

@@ -10,28 +10,38 @@ def get_signup_confirmation_email_en(
     user_name: str, signup_link: str, email_service: core_apprise.AppriseService
 ) -> tuple[str, str, str]:
     """
-    Return the subject, HTML body, and plain-text body for an English sign-up confirmation email.
+    Return the subject, HTML body, and plain-text body for an English sign-up
+    confirmation email.
 
     Args:
-        user_name (str): The recipient's display name inserted into the greeting.
-        signup_link (str): The URL the user will follow to confirm their sign-up; inserted into the CTA button
-            and included as a plain link for clients that do not render the button.
-        email_service (core_apprise.AppriseService): Notification service instance used to obtain service
-            metadata (e.g., `frontend_host`) for the email footer.
+        user_name (str): The recipient's display name inserted into the
+            greeting.
+        signup_link (str): The URL the user will follow to confirm their
+            sign-up; inserted into the CTA button and included as a plain link
+            for clients that do not render the button.
+        email_service (core_apprise.AppriseService): Notification service
+            instance used to obtain service metadata (e.g., `frontend_host`)
+            for the email footer.
 
     Returns:
         tuple[str, str, str]: A 3-tuple containing:
             - subject: The email subject line.
-            - html_content: The full HTML email content (string) including inline styles, logo, a prominent
-              "Confirm Account" button linking to `signup_link`, a security notice about a 24-hour expiry, and
-              a footer referencing `email_service.frontend_host`.
-            - text_content: A plain-text alternative suitable for clients that do not render HTML, containing
-              the greeting, confirmation instructions, the raw `signup_link`, expiry notice, and sign-off.
+            - html_content: The full HTML email content (string) including
+                inline styles, logo, a prominent "Confirm Account" button
+                linking to `signup_link`, a security notice about a 24-hour
+                expiry, and a footer referencing `email_service.frontend_host`.
+            - text_content: A plain-text alternative suitable for clients that
+                do not render HTML, containing the greeting, confirmation
+                instructions, the raw `signup_link`, expiry notice, and
+                sign-off.
 
     Notes:
-        - The function only constructs and returns strings; it does not send emails or perform network I/O.
-        - Calling code should ensure `signup_link` and `user_name` are properly validated/sanitized as needed.
-        - The HTML is crafted with inline styles for broad email-client compatibility.
+        - The function only constructs and returns strings; it does not send
+            emails or perform network I/O.
+        - Calling code should ensure `signup_link` and `user_name` are properly
+            validated/sanitized as needed.
+        - The HTML is crafted with inline styles for broad email-client
+            compatibility.
     """
     safe_name = html.escape(user_name)
     subject = "Endurain - Confirm your account"
@@ -91,8 +101,8 @@ def get_admin_signup_notification_email_en(
     Args:
         user_name: Display name of the admin receiving the notification.
         sign_up_user_name: Display name of the user who signed up.
-        sign_up_user_username: Username of the user who signed up,
-            used to build the direct link to the admin approval page.
+        sign_up_user_username: Username of the user who signed up, used to
+            build the direct link to the admin approval page.
         email_service: AppriseService for footer metadata.
 
     Returns:
@@ -151,12 +161,13 @@ def get_user_signup_approved_email_en(
     email_service: core_apprise.AppriseService,
 ) -> tuple[str, str, str]:
     """
-    Build an English account-approved notification email for a newly approved user.
+    Build an English account-approved notification email for a newly approved
+    user.
 
     Args:
         sign_up_user_name: Display name of the approved user.
-        sign_up_user_username: Username of the approved user, shown in
-            the email body.
+        sign_up_user_username: Username of the approved user, shown in the
+            email body.
         email_service: AppriseService for footer metadata.
 
     Returns:
