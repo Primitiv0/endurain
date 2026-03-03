@@ -88,7 +88,7 @@ async def list_tile_maps_templates(
 @router.put(
     "",
     response_model=server_settings_schema.ServerSettingsRead,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
 )
 async def edit_server_settings(
     request: Request,
