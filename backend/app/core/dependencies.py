@@ -4,7 +4,7 @@ from fastapi import HTTPException, status, Query
 
 
 def validate_id(id: int, min: int, message: str):
-    # Check if id higher than 0
+    # Check if id higher than min
     if not (int(id) > min):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

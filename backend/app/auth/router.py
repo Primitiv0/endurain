@@ -643,7 +643,7 @@ async def logout(
         await idp_utils.clear_all_idp_tokens(token_user_id, db)
 
     if client_type == "web":
-        response.delete_cookie(key="endurain_refresh_token", path="/")
+        response.delete_cookie(key="endurain_refresh_token", path="/api/v1/auth")
         return {"message": "Logout successful"}
     if client_type == "mobile":
         return {"message": "Logout successful"}

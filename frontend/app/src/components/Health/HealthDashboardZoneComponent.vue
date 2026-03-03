@@ -233,7 +233,6 @@ onMounted(async () => {
   try {
     isLoading.value = true
     healthDashboardData.value = await health.getUserDailyHealthStats()
-    console.log('Health Dashboard Data:', healthDashboardData.value)
 
     // Process steps data
     todaySteps.value = healthDashboardData.value.steps?.steps
