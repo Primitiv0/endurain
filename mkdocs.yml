@@ -58,6 +58,7 @@ nav:
       - Health steps: reference/health/health_steps.md
       - Health targets: reference/health/health_targets.md
       - Health weight: reference/health/health_weight.md
+    - Migrations: reference/migrations.md
     - Notifications: reference/notifications.md
     - Password reset tokens: reference/password_reset_tokens.md
     - Profile: reference/profile.md

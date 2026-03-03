@@ -1,5 +1,6 @@
-from timezonefinder import TimezoneFinder
+"""Migration 2: populate activity timezones and health BMI."""
 
+from timezonefinder import TimezoneFinder
 from sqlalchemy.orm import Session
 
 import activities.activity.crud as activities_crud
@@ -14,13 +15,25 @@ import core.logger as core_logger
 import core.config as core_config
 
 
-def process_migration_2(db: Session):
+def process_migration_2(db: Session) -> None:
+    """
+    Run migration 2: backfill timezone and BMI fields.
+
+    Args:
+        db: The SQLAlchemy database session.
+
+    Returns:
+        None
+
+    Raises:
+        Exception: Logs errors per-record; does not re-raise.
+    """
     core_logger.print_to_log_and_console("Started migration 2")
 
     # Create an instance of TimezoneFinder
     tf = TimezoneFinder()
 
-    # Initialize flag to track if all activities and health_weight were processed without errors
+    # Track if all records were processed without errors
     activities_processed_with_no_errors = True
     health_weight_processed_with_no_errors = True
 
@@ -54,7 +67,7 @@ def process_migration_2(db: Session):
                 try:
                     activity_stream_coord = (
                         activity_streams_crud.get_activity_stream_by_type(
-                            activity.id, 7, db
+                            activity.id, 7, activity.user_id, db
                         )
                     )
                 except Exception as err:

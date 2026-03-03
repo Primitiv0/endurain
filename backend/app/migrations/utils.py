@@ -1,3 +1,8 @@
+"""Migration execution orchestration utilities."""
+
+from collections.abc import Callable, Coroutine
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 import migrations.crud as migrations_crud
@@ -10,37 +15,47 @@ import migrations.migration_6 as migrations_migration_6
 
 import core.logger as core_logger
 
+# Synchronous migration handlers keyed by migration ID.
+_SYNC_MIGRATIONS: dict[int, Callable[[Session], None]] = {
+    1: migrations_migration_1.process_migration_1,
+    2: migrations_migration_2.process_migration_2,
+    3: migrations_migration_3.process_migration_3,
+}
 
-async def check_migrations_not_executed(db: Session):
+# Asynchronous migration handlers keyed by migration ID.
+_ASYNC_MIGRATIONS: dict[int, Callable[[Session], Coroutine[Any, Any, None]]] = {
+    4: migrations_migration_4.process_migration_4,
+    5: migrations_migration_5.process_migration_5,
+    6: migrations_migration_6.process_migration_6,
+}
+
+
+async def check_migrations_not_executed(
+    db: Session,
+) -> None:
+    """
+    Check and execute any pending migrations.
+
+    Iterates over unexecuted migrations and runs each migration handler in
+    order. Sync handlers are called directly; async handlers are awaited.
+
+    Args:
+        db: Database session.
+
+    Returns:
+        None.
+    """
     migrations_not_executed = migrations_crud.get_migrations_not_executed(db)
 
-    if migrations_not_executed:
-        for migration in migrations_not_executed:
-            # Log the migration not executed
-            core_logger.print_to_log(
-                f"Migration not executed: {migration.name} - Migration will be executed"
-            )
+    if not migrations_not_executed:
+        return
 
-            if migration.id == 1:
-                # Execute the migration
-                migrations_migration_1.process_migration_1(db)
+    for migration in migrations_not_executed:
+        core_logger.print_to_log(
+            f"Migration not executed: {migration.name}" " - Migration will be executed"
+        )
 
-            if migration.id == 2:
-                # Execute the migration
-                migrations_migration_2.process_migration_2(db)
-
-            if migration.id == 3:
-                # Execute the migration
-                migrations_migration_3.process_migration_3(db)
-
-            if migration.id == 4:
-                # Execute the migration
-                await migrations_migration_4.process_migration_4(db)
-
-            if migration.id == 5:
-                # Execute the migration
-                await migrations_migration_5.process_migration_5(db)
-
-            if migration.id == 6:
-                # Execute the migration
-                await migrations_migration_6.process_migration_6(db)
+        if migration.id in _SYNC_MIGRATIONS:
+            _SYNC_MIGRATIONS[migration.id](db)
+        elif migration.id in _ASYNC_MIGRATIONS:
+            await _ASYNC_MIGRATIONS[migration.id](db)
