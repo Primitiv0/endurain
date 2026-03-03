@@ -1,256 +1,126 @@
-from fastapi import HTTPException, status
-from sqlalchemy import and_
-from sqlalchemy.orm import Session
+"""CRUD operations for password reset tokens."""
+
 from datetime import datetime, timezone
+
+from fastapi import HTTPException, status
+from sqlalchemy import delete as sa_delete, select
+from sqlalchemy.orm import Session
 
 import password_reset_tokens.schema as password_reset_tokens_schema
 import password_reset_tokens.models as password_reset_tokens_models
 
-import core.logger as core_logger
+import core.decorators as core_decorators
 
 
+@core_decorators.handle_db_errors
 def create_password_reset_token(
-    token: password_reset_tokens_schema.PasswordResetToken, db: Session
+    token: password_reset_tokens_schema.PasswordResetToken,
+    db: Session,
 ) -> password_reset_tokens_models.PasswordResetToken:
-    """
-    Create and persist a new password reset token record in the database.
+    """Create and persist a new password reset token.
 
-    This function constructs a PasswordResetToken ORM model from the provided
-    schema object, adds it to the given SQLAlchemy session, commits the
-    transaction, refreshes the instance from the database, and returns the
-    persisted model instance.
-
-    Parameters:
-        token (password_reset_tokens_schema.PasswordResetToken): A schema object
-            containing the token data to be stored. Expected attributes include
-            id, user_id, token_hash, created_at, expires_at, and used.
-        db (Session): An active SQLAlchemy Session used to persist the model.
+    Args:
+        token: Schema object with token data to persist.
+        db: SQLAlchemy database session.
 
     Returns:
-        password_reset_tokens_models.PasswordResetToken: The persisted ORM model
-        instance representing the created password reset token, refreshed from
-        the database to include any defaults or database-side generated values.
+        The persisted PasswordResetToken ORM instance.
 
-    Side effects:
-        - Adds a new PasswordResetToken instance to the provided DB session.
-        - Commits the session, causing the INSERT to be executed.
-        - Refreshes the instance from the database.
-
-    Errors:
-        On any exception during add/commit/refresh the session is rolled back,
-        the error is logged, and an HTTPException with status_code
-        500 (Internal Server Error) is raised (the original exception is chained).
+    Raises:
+        HTTPException: 500 error if database operation fails.
     """
-    try:
-        # Create a new password reset token
-        db_token = password_reset_tokens_models.PasswordResetToken(
-            id=token.id,
-            user_id=token.user_id,
-            token_hash=token.token_hash,
-            created_at=token.created_at,
-            expires_at=token.expires_at,
-            used=token.used,
-        )
+    # Create a new password reset token
+    db_token = password_reset_tokens_models.PasswordResetToken(
+        id=token.id,
+        user_id=token.user_id,
+        token_hash=token.token_hash,
+        created_at=token.created_at,
+        expires_at=token.expires_at,
+        used=token.used,
+    )
 
-        # Add the token to the database
-        db.add(db_token)
-        db.commit()
-        db.refresh(db_token)
+    # Add the token to the database
+    db.add(db_token)
+    db.commit()
+    db.refresh(db_token)
 
-        # Return the token
-        return db_token
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in create_password_reset_token: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    return db_token
 
 
+@core_decorators.handle_db_errors
 def get_password_reset_token_by_hash(
     token_hash: str, db: Session
 ) -> password_reset_tokens_models.PasswordResetToken | None:
-    """
-    Retrieve an unused, unexpired PasswordResetToken that matches the provided token hash.
+    """Retrieve an unused, unexpired token matching the given hash.
 
-    Parameters:
-        token_hash (str): The hashed token value to look up.
-        db (Session): SQLAlchemy Session used to query the password_reset_tokens table.
+    Args:
+        token_hash: The hashed token value to look up.
+        db: SQLAlchemy database session.
 
     Returns:
-        password_reset_tokens_models.PasswordResetToken | None:
-            The matching PasswordResetToken instance if an unused token exists and its
-            expires_at is strictly in the future (compared to datetime.now(timezone.utc));
-            otherwise None when no valid token is found.
+        The matching PasswordResetToken if found and valid,
+        None otherwise.
 
     Raises:
-        HTTPException:
-            Raises an HTTPException with status_code 500 if an unexpected error occurs
-            while querying the database. The underlying exception is logged before
-            the HTTPException is raised.
-
-    Notes:
-        - The function filters tokens by token_hash, used == False, and expires_at > now (UTC).
-        - Side effects: unexpected errors are logged via core_logger.print_to_log.
+        HTTPException: 500 error if database query fails.
     """
-    try:
-        # Get the token from the database
-        db_token = (
-            db.query(password_reset_tokens_models.PasswordResetToken)
-            .filter(
-                and_(
-                    password_reset_tokens_models.PasswordResetToken.token_hash
-                    == token_hash,
-                    password_reset_tokens_models.PasswordResetToken.used == False,
-                    password_reset_tokens_models.PasswordResetToken.expires_at
-                    > datetime.now(timezone.utc),
-                )
-            )
-            .first()
-        )
-
-        # Return the token (can be None if not found)
-        return db_token
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_password_reset_token_by_hash: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = select(password_reset_tokens_models.PasswordResetToken).where(
+        password_reset_tokens_models.PasswordResetToken.token_hash == token_hash,
+        password_reset_tokens_models.PasswordResetToken.used == False,  # noqa: E712
+        password_reset_tokens_models.PasswordResetToken.expires_at
+        > datetime.now(timezone.utc),
+    )
+    return db.execute(stmt).scalar_one_or_none()
 
 
+@core_decorators.handle_db_errors
 def mark_password_reset_token_used(
     token_id: str, db: Session
 ) -> password_reset_tokens_models.PasswordResetToken | None:
+    """Mark a password reset token as used.
+
+    Args:
+        token_id: The unique identifier of the token to mark.
+        db: SQLAlchemy database session.
+
+    Returns:
+        Updated PasswordResetToken instance if found,
+        None otherwise.
+
+    Raises:
+        HTTPException: 500 error if database operation fails.
     """
-    Mark a password reset token as used.
+    stmt = select(password_reset_tokens_models.PasswordResetToken).where(
+        password_reset_tokens_models.PasswordResetToken.id == token_id,
+    )
+    db_token = db.execute(stmt).scalar_one_or_none()
 
-    This function looks up a PasswordResetToken by its identifier, sets its `used`
-    attribute to True, and commits the change to the database.
-
-    Parameters
-    ----------
-    token_id : str
-        The unique identifier of the password reset token to mark as used.
-    db : Session
-        An active SQLAlchemy Session used to query and persist changes.
-
-    Returns
-    -------
-    password_reset_tokens_models.PasswordResetToken | None
-        The updated PasswordResetToken instance if found and updated; otherwise
-        None if no token with the given id exists.
-
-    Side effects
-    ------------
-    - If the token is found, its `used` field is set to True and the change is
-      committed to the database.
-    - On unexpected errors, the transaction is rolled back, the error is logged
-      (via core_logger), and an HTTPException with status 500 is raised.
-
-    Exceptions
-    ----------
-    HTTPException
-        Raised with status code 500 (Internal Server Error) when an unexpected
-        error occurs during the database operation.
-    """
-    try:
-        # Get the token from the database
-        db_token = (
-            db.query(password_reset_tokens_models.PasswordResetToken)
-            .filter(password_reset_tokens_models.PasswordResetToken.id == token_id)
-            .first()
-        )
-
-        if db_token:
-            # Mark the token as used
-            db_token.used = True
-            db.commit()
-
-        return db_token
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in mark_password_reset_token_used: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
-
-
-def delete_expired_password_reset_tokens(db: Session):
-    """
-    Delete expired password reset tokens from the database.
-
-    This function removes all PasswordResetToken records whose `expires_at`
-    timestamp is strictly earlier than the current UTC time (datetime.now(timezone.utc)).
-    On success the transaction is committed and the number of deleted rows is returned.
-    If any exception occurs during the operation, the session is rolled back,
-    the error is logged via core_logger.print_to_log, and an HTTPException with
-    status 500 (Internal Server Error) is raised.
-
-    Parameters
-    ----------
-    db : Session
-        An active SQLAlchemy session used to query, delete, and commit changes.
-
-    Returns
-    -------
-    int
-        The number of password reset token rows deleted.
-
-    Raises
-    ------
-    fastapi.HTTPException
-        Raised with status_code=500 if an unexpected error occurs while deleting
-        tokens or committing the transaction. The original exception is logged
-        and the transaction is rolled back before raising.
-    """
-    try:
-        # Delete expired tokens
-        num_deleted = (
-            db.query(password_reset_tokens_models.PasswordResetToken)
-            .filter(
-                password_reset_tokens_models.PasswordResetToken.expires_at
-                < datetime.now(timezone.utc)
-            )
-            .delete()
-        )
-
-        # Commit the transaction
+    if db_token:
+        # Mark the token as used
+        db_token.used = True
         db.commit()
+        db.refresh(db_token)
 
-        return num_deleted
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
+    return db_token
 
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in delete_expired_password_reset_tokens: {err}", "error", exc=err
-        )
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+@core_decorators.handle_db_errors
+def delete_expired_password_reset_tokens(db: Session) -> int:
+    """Delete all expired password reset tokens.
+
+    Args:
+        db: SQLAlchemy database session.
+
+    Returns:
+        Number of deleted rows.
+
+    Raises:
+        HTTPException: 500 error if database operation fails.
+    """
+    stmt = sa_delete(password_reset_tokens_models.PasswordResetToken).where(
+        password_reset_tokens_models.PasswordResetToken.expires_at
+        < datetime.now(timezone.utc)
+    )
+    result = db.execute(stmt)
+    db.commit()
+    return result.rowcount

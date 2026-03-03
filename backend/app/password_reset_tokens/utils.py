@@ -1,3 +1,5 @@
+"""Utility functions for password reset token operations."""
+
 from datetime import datetime, timedelta, timezone
 from fastapi import (
     HTTPException,
@@ -8,7 +10,9 @@ import hashlib
 
 from sqlalchemy.orm import Session
 
-import password_reset_tokens.email_messages as password_reset_tokens_email_messages
+from password_reset_tokens import (
+    email_messages as password_reset_tokens_email_messages,
+)
 import password_reset_tokens.schema as password_reset_tokens_schema
 import password_reset_tokens.crud as password_reset_tokens_crud
 
@@ -24,45 +28,15 @@ from core.database import SessionLocal
 
 def create_password_reset_token(user_id: int, db: Session) -> str:
     """
-    Create and persist a password reset token for a user and return the plain token.
+    Create and persist a password reset token for a user.
 
-    Parameters
-    ----------
-    user_id : int
-        The ID of the user for whom the password reset token will be created.
-    db : Session
-        Database session used to persist the token (e.g., an SQLAlchemy Session).
+    Args:
+        user_id: ID of the user requesting the reset.
+        db: Active SQLAlchemy session.
 
-    Returns
-    -------
-    str
-        The plaintext password reset token that should be delivered to the user (for example via email).
-        The function stores only a hash of this token in the database.
-
-    Behavior / Side effects
-    -----------------------
-    - Generates a secure token and a corresponding hash.
-    - Creates a PasswordResetToken record with a unique id, user_id, token_hash, created_at,
-      expires_at (1 hour after creation), and used flag set to 0.
-    - Persists the PasswordResetToken record to the provided database session.
-
-    Security notes
-    --------------
-    - Treat the returned plaintext token as sensitive; transmit it over secure channels only.
-    - Only the token hash is stored in the database to avoid storing secrets in plaintext.
-    - When validating a token later, compare the provided token against the stored hash,
-      ensure it has not expired, and verify it has not already been used.
-    - Consider adding rate limiting, logging, and additional checks to reduce abuse.
-
-    Exceptions
-    ----------
-    May raise exceptions originating from token generation/hashing utilities or from the database layer
-    (e.g., integrity or operational errors). Callers should handle or propagate these exceptions as appropriate.
-
-    Example
-    -------
-    token = create_password_reset_token(user_id=42, db=session)
-    # Send `token` to the user's email. Do not store the plaintext token in persistent storage.
+    Returns:
+        The plaintext token to deliver to the user.
+        Only the token hash is stored in the database.
     """
     # Generate token and hash
     token, token_hash = core_apprise.generate_token_and_hash()
@@ -73,8 +47,8 @@ def create_password_reset_token(user_id: int, db: Session) -> str:
         user_id=user_id,
         token_hash=token_hash,
         created_at=datetime.now(timezone.utc),
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),  # 1 hour expiration
-        used=0,
+        expires_at=(datetime.now(timezone.utc) + timedelta(hours=1)),
+        used=False,
     )
 
     # Save to database
@@ -88,50 +62,20 @@ async def send_password_reset_email(
     email: str, email_service: core_apprise.AppriseService, db: Session
 ) -> bool:
     """
-    Asynchronously send a password reset email for the given address.
+    Send a password reset email to the given address.
 
-    This function performs the following steps:
-    1. Verifies that the provided email service is configured; if not, raises an HTTP 503.
-    2. Attempts to locate the user record for the given email in the provided DB session.
-        - For security (to avoid user enumeration), if the user does not exist the function
-          returns True and does not indicate existence to the caller.
-    3. Verifies the located user is active.
-        - If the user is inactive the function returns True for the same security reason.
-    4. Creates a password reset token and persists it via create_password_reset_token.
-    5. Constructs a frontend reset URL using the email_service.frontend_host and the token.
-    6. Builds a default English email subject/body via password_reset_tokens_email_messages
-        and delegates actual sending to email_service.send_email.
-    7. Returns the boolean result from the email service send operation.
+    Args:
+        email: Recipient email address.
+        email_service: Configured AppriseService instance.
+        db: Active SQLAlchemy session.
 
-    Parameters
-    - email (str): Recipient email address for the password reset message.
-    - email_service (core_apprise.AppriseService): An email service instance used to
-      construct the frontend host and send the message. Must implement is_configured()
-      and an async send_email(...) method that returns a bool.
-    - db (Session): SQLAlchemy Session (or equivalent) used to look up the user and
-      persist the reset token.
+    Returns:
+        True if the operation is considered successful,
+        False if the email service failed to send.
 
-    Returns
-    - bool: True when the operation is considered successful. This includes the cases
-      where the user does not exist or is inactive (to avoid revealing account existence).
-      Otherwise returns the boolean result produced by the email_service.send_email call
-      (False typically indicates the email failed to send).
-
-    Raises
-    - HTTPException (status 503): If the email service is not configured.
-    - Any other exceptions raised by the DB access, token creation, or email service
-      may propagate to the caller.
-
-    Side effects and security notes
-    - A password reset token is generated and stored when a matching active user is found.
-    - The function deliberately avoids disclosing whether an email address maps to a user
-      or whether that user is active, to mitigate user enumeration attacks.
-    - The reset link contains the raw token; callers should ensure the frontend and token
-      handling enforce appropriate expiry and single-use semantics.
-    - As an async function, it must be awaited.
-
-    Example
-    - await send_password_reset_email("user@example.com", email_service, db)
+    Raises:
+        HTTPException: 503 if the email service is not
+            configured.
     """
     # Check if email service is configured
     if not email_service.is_configured():
@@ -178,46 +122,23 @@ def use_password_reset_token(
     new_password: str,
     password_hasher: auth_password_hasher.PasswordHasher,
     db: Session,
-):
+) -> None:
     """
-    Use a password reset token to update a user's password and mark the token as used.
+    Reset a user's password using a valid reset token.
 
-    The function:
-    - Hashes the provided plain-text token (SHA-256) and looks up the corresponding
-        password reset record in the database.
-    - If no matching record is found, raises an HTTPException with status 400.
-    - Delegates password update to users_crud.edit_user_password.
-    - Marks the token as used via password_reset_tokens_crud.mark_password_reset_token_used.
-    - Logs unexpected errors and raises an HTTPException with status 500 on failure.
-
-    Parameters:
-    - token (str): The plain-text password reset token supplied by the user. This
-        function will hash it before database lookup.
-    - new_password (str): The new plain-text password to set for the user. Password
-        validation/hashing is expected to be handled by the underlying users_crud.
-    - password_hasher (auth_password_hasher.PasswordHasher): An instance of the
-        password hasher to use when updating the user's password.
-    - db (Session): An active SQLAlchemy Session (or equivalent) used for DB operations.
-        Transaction management (commit/rollback) is expected to be handled by the caller
-        or the CRUD functions.
+    Args:
+        token: Plaintext reset token from the email link.
+        new_password: New plaintext password to set.
+        password_hasher: PasswordHasher instance for hashing.
+        db: Active SQLAlchemy session.
 
     Returns:
-    - None
+        None
 
-    Side effects:
-    - Updates the user's password in the database.
-    - Marks the password reset token record as used/consumed.
-    - Writes error information to the application log on unexpected failures.
-
-    Exceptions:
-    - Raises HTTPException(status_code=400) when the token is invalid or expired.
-    - Re-raises any HTTPException raised by underlying CRUD functions.
-    - Raises HTTPException(status_code=500) for unexpected internal errors.
-
-    Security notes:
-    - The token is hashed (SHA-256) before lookup to avoid storing/using the plain token.
-    - Ensure new_password meets application password policy and that users_crud
-        securely hashes and salts passwords before persisting.
+    Raises:
+        HTTPException: 400 if the token is invalid or expired.
+        HTTPException: 500 if password update or token
+            marking fails.
     """
     # Hash the provided token to find the database record
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -234,53 +155,21 @@ def use_password_reset_token(
         )
 
     # Update user password
-    try:
-        users_crud.edit_user_password(
-            db_token.user_id, new_password, password_hasher, db
-        )
+    users_crud.edit_user_password(db_token.user_id, new_password, password_hasher, db)
 
-        # Mark token as used
-        password_reset_tokens_crud.mark_password_reset_token_used(db_token.id, db)
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Error in use_password_reset_token: {err}", "error", exc=err
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    # Mark token as used
+    password_reset_tokens_crud.mark_password_reset_token_used(db_token.id, db)
 
 
-def delete_invalid_tokens_from_db():
+def delete_invalid_tokens_from_db() -> None:
     """
     Remove expired password reset tokens from the database.
 
-    Opens a new database session, calls the password_reset_tokens_crud layer to
-    delete any expired password reset tokens, and logs the number of deleted
-    tokens if one or more were removed. The database session is guaranteed to be
-    closed whether the operation succeeds or an exception is raised.
-
-    Behavior:
-    - Invokes password_reset_tokens_crud.delete_expired_password_reset_tokens(db),
-        which should return the number of deleted tokens (int).
-    - If the returned count is greater than zero, logs an informational message
-        via core_logger.print_to_log_and_console.
-    - Always closes the database session in a finally block.
+    Opens a new session, deletes expired tokens, and logs
+    the count if any were removed.
 
     Returns:
-    - None
-
-    Exceptions:
-    - Exceptions raised by the CRUD layer or the logger will propagate to the
-        caller, but the database session will still be closed before propagation.
-
-    Notes:
-    - This function performs destructive, persistent changes (deletions) and is
-        intended to be run as part of maintenance (for example, a scheduled task).
-    - The operation is effectively idempotent: running it repeatedly when there
-        are no expired tokens will have no further effect.
+        None
     """
     # Create a new database session using context manager
     with SessionLocal() as db:

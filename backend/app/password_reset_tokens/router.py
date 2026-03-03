@@ -1,3 +1,5 @@
+"""API router for password reset token endpoints."""
+
 from typing import Annotated
 
 from fastapi import (
@@ -22,7 +24,11 @@ import core.rate_limit as core_rate_limit
 router = APIRouter()
 
 
-@router.post("/password-reset/request")
+@router.post(
+    "/password-reset/request",
+    response_model=password_reset_tokens_schema.PasswordResetResponse,
+    status_code=status.HTTP_200_OK,
+)
 @core_rate_limit.limiter.limit(core_rate_limit.PASSWORD_RESET_REQUEST_LIMIT)
 async def request_password_reset(
     request: Request,
@@ -35,46 +41,22 @@ async def request_password_reset(
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> password_reset_tokens_schema.PasswordResetResponse:
     """
-    Asynchronously handle a password reset request.
+    Handle a password reset request.
 
-    Attempts to send a password reset email for the provided email address using an
-    injected email service and a database session. The endpoint intentionally returns
-    a generic success message to avoid revealing whether the provided email exists
-    in the system.
+    Args:
+        request: The HTTP request object.
+        request_data: Pydantic model with the email address.
+        email_service: Dependency-injected email service.
+        db: Dependency-injected database session.
 
-    Parameters
-    ----------
-    request : The HTTP request object.
-    request_data : password_reset_tokens_schema.PasswordResetRequest
-        Pydantic model containing the email address to send the reset link to.
-    email_service : core_apprise.AppriseService
-        Dependency-injected service responsible for sending emails.
-    db : Session
-        Dependency-injected database session.
+    Returns:
+        Generic success message to avoid user enumeration.
 
-    Returns
-    -------
-    dict
-        A generic success message:
-        {"message": "If the email exists in the system, a password reset link has been sent."}
-
-    Raises
-    ------
-    HTTPException
-        Raised with status_code=status.HTTP_500_INTERNAL_SERVER_ERROR if sending
-        the password reset email fails.
-    Other Errors
-        Validation errors from FastAPI/Pydantic or dependency resolution errors may
-        be propagated by the framework.
-
-    Notes
-    -----
-    - This function is asynchronous.
-    - Side effects include attempting to send an email and potentially interacting
-      with the database (e.g., creating or updating a password reset token).
-    - The generic response is used to mitigate user enumeration attacks.
+    Raises:
+        HTTPException: 500 if sending the reset email fails.
+        HTTPException: 503 if email service is not configured.
     """
     success = await password_reset_tokens_utils.send_password_reset_email(
         request_data.email, email_service, db
@@ -82,9 +64,12 @@ async def request_password_reset(
 
     # if the email was sent successfully send a generic success message
     if success:
-        return {
-            "message": "If the email exists in the system, a password reset link has been sent."
-        }
+        return password_reset_tokens_schema.PasswordResetResponse(
+            message=(
+                "If the email exists in the system, "
+                "a password reset link has been sent."
+            )
+        )
 
     # If the email sending failed, raise an error
     raise HTTPException(
@@ -93,7 +78,11 @@ async def request_password_reset(
     )
 
 
-@router.post("/password-reset/confirm")
+@router.post(
+    "/password-reset/confirm",
+    response_model=password_reset_tokens_schema.PasswordResetResponse,
+    status_code=status.HTTP_200_OK,
+)
 @core_rate_limit.limiter.limit(core_rate_limit.PASSWORD_RESET_CONFIRM_LIMIT)
 async def confirm_password_reset(
     request: Request,
@@ -106,28 +95,28 @@ async def confirm_password_reset(
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> password_reset_tokens_schema.PasswordResetResponse:
     """
-    Confirms a password reset using the provided token and new password.
+    Confirm a password reset using a token and new password.
 
     Args:
-        request (Request): The incoming HTTP request object.
-        confirm_data (password_reset_tokens_schema.PasswordResetConfirm):
-            Data containing the password reset token and the new password.
-        password_hasher (auth_password_hasher.PasswordHasher):
-            An instance of the password hasher to use for hashing the new password.
-        db (Session):
-            Database session dependency.
+        request: The HTTP request object.
+        confirm_data: Token and new password data.
+        password_hasher: Dependency-injected password hasher.
+        db: Dependency-injected database session.
 
     Returns:
-        dict: A message indicating the password reset was successful.
+        Success message on successful password reset.
 
     Raises:
-        HTTPException: If the token is invalid, expired, or the password reset fails.
+        HTTPException: 400 if token is invalid or expired.
+        HTTPException: 500 if password reset fails.
     """
     # Use the token to reset password
     password_reset_tokens_utils.use_password_reset_token(
         confirm_data.token, confirm_data.new_password, password_hasher, db
     )
 
-    return {"message": "Password reset successful"}
+    return password_reset_tokens_schema.PasswordResetResponse(
+        message="Password reset successful"
+    )
