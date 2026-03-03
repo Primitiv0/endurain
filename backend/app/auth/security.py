@@ -7,7 +7,6 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
-    Security,
     status,
     WebSocket,
     WebSocketException,

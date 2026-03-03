@@ -50,6 +50,10 @@ HEALTH_SCOPE: Final[tuple[str, ...]] = (
     "health_targets:read",
     "health_targets:write",
 )
+NOTIFICATIONS_REGULAR_SCOPE: Final[tuple[str, ...]] = (
+    "notifications:read",
+    "notifications:write",
+)
 SERVER_SETTINGS_REGULAR_SCOPE: Final[tuple[str, ...]] = ()
 SERVER_SETTINGS_ADMIN_SCOPE: Final[tuple[str, ...]] = (
     "server_settings:read",
@@ -71,6 +75,8 @@ SCOPE_DICT: Final[dict[str, str]] = {
     "health:write": "Write privileges over health data",
     "health_targets:read": "Read privileges over health targets data",
     "health_targets:write": "Write privileges over health targets data",
+    "notifications:read": "Read privileges over notifications",
+    "notifications:write": "Write privileges over notifications",
     "server_settings:read": "Read privileges over server settings",
     "server_settings:write": "Write privileges over server settings",
     "idp:read": "Read privileges over identity providers",
@@ -79,11 +85,12 @@ SCOPE_DICT: Final[dict[str, str]] = {
 
 REGULAR_ACCESS_SCOPE: Final[tuple[str, ...]] = (
     USERS_REGULAR_SCOPE
-    + GEARS_SCOPE
     + ACTIVITIES_SCOPE
-    + HEALTH_SCOPE
-    + SERVER_SETTINGS_REGULAR_SCOPE
+    + GEARS_SCOPE
     + IDENTITY_PROVIDERS_REGULAR_SCOPE
+    + HEALTH_SCOPE
+    + NOTIFICATIONS_REGULAR_SCOPE
+    + SERVER_SETTINGS_REGULAR_SCOPE
 )
 ADMIN_ACCESS_SCOPE: Final[tuple[str, ...]] = (
     REGULAR_ACCESS_SCOPE

@@ -2,7 +2,7 @@
 
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Security
 from sqlalchemy.orm import Session
 
 import auth.security as auth_security
@@ -23,6 +23,9 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def read_notifications_number(
+    _check_scopes: Annotated[
+        Callable, Security(auth_security.check_scopes, scopes=["notifications:read"])
+    ],
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
@@ -36,6 +39,8 @@ async def read_notifications_number(
     Retrieve notification count for the user.
 
     Args:
+        _check_scopes: Dependency that checks if the user has the required
+            scopes.
         token_user_id: ID of the user from the access token.
         db: Database session dependency.
 
@@ -56,6 +61,9 @@ async def read_notifications_by_id(
         Callable,
         Depends(notifications_dependencies.validate_notification_id),
     ],
+    _check_scopes: Annotated[
+        Callable, Security(auth_security.check_scopes, scopes=["notifications:read"])
+    ],
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
@@ -71,6 +79,8 @@ async def read_notifications_by_id(
     Args:
         notification_id: Unique ID of the notification.
         validate_notification_id: Dependency that validates the notification ID.
+        _check_scopes: Dependency that checks if the user has the required
+            scopes.
         token_user_id: ID of the user from the access token.
         db: Database session dependency.
 
@@ -94,6 +104,9 @@ async def read_notifications_user_pagination(
         Callable,
         Depends(core_dependencies.validate_pagination_values),
     ],
+    _check_scopes: Annotated[
+        Callable, Security(auth_security.check_scopes, scopes=["notifications:read"])
+    ],
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
@@ -110,6 +123,8 @@ async def read_notifications_user_pagination(
         page_number: Page number to retrieve.
         num_records: Number of records per page.
         validate_pagination_values: Dependency that validates pagination values.
+        _check_scopes: Dependency that checks if the user has the required
+            scopes.
         token_user_id: ID of the user from the access token.
         db: Database session dependency.
 
@@ -135,6 +150,9 @@ async def mark_notification_as_read(
         Callable,
         Depends(notifications_dependencies.validate_notification_id),
     ],
+    _check_scopes: Annotated[
+        Callable, Security(auth_security.check_scopes, scopes=["notifications:write"])
+    ],
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
@@ -150,6 +168,8 @@ async def mark_notification_as_read(
     Args:
         notification_id: ID of the notification to mark as read.
         validate_notification_id: Dependency that validates the notification ID.
+        _check_scopes: Dependency that checks if the user has the required
+            scopes.
         token_user_id: ID of the user from the access token.
         db: Database session dependency.
 
