@@ -1,29 +1,94 @@
-from pydantic import BaseModel
+"""Pydantic schemas for notification entities."""
+
+from datetime import datetime
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    field_serializer,
+)
 
 
-class Notification(BaseModel):
+class NotificationBase(BaseModel):
     """
-    Represents a notification entity.
+    Base schema for notification data.
 
     Attributes:
-        id (int | None): Unique identifier of the notification.
-        user_id (int | None): Identifier of the user associated with the notification.
-        type (int | None): Type of the notification.
-        options (dict | None): Additional options or metadata for the notification.
-        read (bool): Indicates whether the notification has been read. Defaults to False.
-        created_at (str | None): Timestamp of when the notification was created.
-
-    Config:
-        orm_mode (bool): Enables ORM mode for compatibility with ORMs like SQLAlchemy.
+        type: Type of the notification.
+        options: Additional metadata for the notification.
     """
 
-    id: int | None = None
-    user_id: int | None = None
-    type: int | None = None
-    options: dict | None = None
-    read: bool = False
-    created_at: str | None = None
+    type: StrictInt | None = Field(
+        default=None,
+        description="Type of the notification",
+    )
+    options: dict | None = Field(
+        default=None,
+        description="Additional notification metadata",
+    )
 
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class NotificationCreate(NotificationBase):
+    """
+    Schema for creating a notification record.
+
+    Attributes:
+        user_id: FK to user.
+    """
+
+    user_id: StrictInt = Field(
+        ...,
+        ge=1,
+        description="FK to user",
+    )
+
+
+class NotificationRead(NotificationBase):
+    """
+    Schema for reading a notification record.
+
+    Attributes:
+        id: Unique notification identifier.
+        user_id: FK to user.
+        read: Whether the notification has been read.
+        created_at: Timestamp of creation.
+    """
+
+    id: StrictInt = Field(..., description="Unique notification ID")
+    user_id: StrictInt = Field(
+        ...,
+        ge=1,
+        description="FK to user",
+    )
+    read: StrictBool = Field(
+        default=False,
+        description="Whether notification is read",
+    )
+    created_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of creation",
+    )
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        """
+        Serialize created_at as date string.
+
+        Args:
+            value: The datetime value to serialize.
+
+        Returns:
+            Date string in YYYY-MM-DD format or None.
+        """
+        if value is None:
+            return None
+        return value.strftime("%Y-%m-%d")
