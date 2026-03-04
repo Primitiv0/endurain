@@ -177,6 +177,36 @@ def upgrade() -> None:
             comment="Relative path to the pre-generated static map thumbnail image",
         ),
     )
+    # Add tileserver_regenerate_thumbnails_on_change column to server_settings
+    op.add_column(
+        "server_settings",
+        sa.Column(
+            "tileserver_regenerate_thumbnails_on_change",
+            sa.Boolean(),
+            nullable=True,
+            comment=(
+                "Delete and regenerate all activity thumbnails when "
+                "tile server settings change"
+            ),
+        ),
+    )
+    op.execute(
+        """
+        UPDATE server_settings
+        SET tileserver_regenerate_thumbnails_on_change = false
+        WHERE tileserver_regenerate_thumbnails_on_change IS NULL;
+    """
+    )
+    op.alter_column(
+        "server_settings",
+        "tileserver_regenerate_thumbnails_on_change",
+        nullable=False,
+        comment=(
+            "Delete and regenerate all activity thumbnails when "
+            "tile server settings change"
+        ),
+        existing_type=sa.Boolean(),
+    )
     # Update comments for notifications table columns
     op.alter_column(
         "migrations",
@@ -254,6 +284,8 @@ def downgrade() -> None:
     )
     # Drop map_thumbnail_path column from activities table
     op.drop_column("activities", "map_thumbnail_path")
+    # Drop tileserver_regenerate_thumbnails_on_change column from server_settings
+    op.drop_column("server_settings", "tileserver_regenerate_thumbnails_on_change")
     # Drop users_api_keys table
     op.drop_index(op.f("ix_users_api_keys_user_id"), table_name="users_api_keys")
     op.drop_index(op.f("ix_users_api_keys_key_hash"), table_name="users_api_keys")

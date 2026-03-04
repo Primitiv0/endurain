@@ -1292,6 +1292,37 @@ def set_activity_thumbnail_path(
         ) from err
 
 
+def clear_all_activity_thumbnail_paths(db: Session) -> None:
+    """Set map_thumbnail_path to NULL for all activities.
+
+    Called before a full thumbnail regeneration so that
+    generate_missing_activity_thumbnails() will pick up
+    every activity regardless of prior state.
+
+    Args:
+        db: Active database session.
+
+    Returns:
+        None
+
+    Raises:
+        None — errors are logged.
+    """
+    try:
+        db.query(activities_models.Activity).update(
+            {activities_models.Activity.map_thumbnail_path: None},
+            synchronize_session=False,
+        )
+        db.commit()
+    except Exception as err:
+        db.rollback()
+        core_logger.print_to_log(
+            f"Error in clear_all_activity_thumbnail_paths: {err}",
+            "error",
+            exc=err,
+        )
+
+
 def get_activities_without_thumbnail(
     db: Session,
 ) -> list[activities_models.Activity]:

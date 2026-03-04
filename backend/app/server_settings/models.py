@@ -26,6 +26,9 @@ class ServerSettings(Base):
         sso_auto_redirect: Auto-redirect to SSO.
         tileserver_url: Map tile server URL template.
         tileserver_attribution: Map tile attribution.
+        tileserver_api_key: API key for tile server (encrypted).
+        tileserver_regenerate_thumbnails_on_change: Regenerate
+            thumbnails when tile server settings change.
         map_background_color: Map background hex color.
         password_type: Password policy type.
         password_length_regular_users: Min password length
@@ -121,6 +124,14 @@ class ServerSettings(Base):
         default=None,
         nullable=True,
         comment=("API key encrypted for the tile server"),
+    )
+    tileserver_regenerate_thumbnails_on_change: Mapped[bool] = mapped_column(
+        default=False,
+        nullable=False,
+        comment=(
+            "Delete and regenerate all activity thumbnails when "
+            "tile server settings change (true - yes, false - no)"
+        ),
     )
     map_background_color: Mapped[str] = mapped_column(
         default="#dddddd",

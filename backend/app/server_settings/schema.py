@@ -142,6 +142,13 @@ class ServerSettingsBase(BaseModel):
         pattern=r"^#[0-9A-Fa-f]{6}$",
         description=("Background color for the map (hex format)"),
     )
+    tileserver_regenerate_thumbnails_on_change: StrictBool = Field(
+        False,
+        description=(
+            "Delete and regenerate all activity thumbnails when "
+            "tile server settings change"
+        ),
+    )
     password_type: PasswordType = Field(
         PasswordType.STRICT, description="Password type policy (strict, length_only)"
     )

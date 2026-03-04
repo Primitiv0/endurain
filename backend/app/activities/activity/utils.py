@@ -1269,6 +1269,54 @@ def process_all_files_sync(
         db.close()
 
 
+def delete_and_regenerate_all_activity_thumbnails() -> None:
+    """
+    Delete all existing thumbnails and regenerate from scratch.
+
+    Called when the tile server settings change and the admin has
+    enabled automatic thumbnail regeneration. Clears all thumbnail
+    file references in the database, deletes the files on disk,
+    then triggers a full regeneration pass.
+
+    Returns:
+        None
+
+    Raises:
+        None — errors are logged; execution continues.
+    """
+    core_logger.print_to_log(
+        "Thumbnail regeneration: deleting all existing thumbnails",
+        "info",
+    )
+
+    # Clear DB references so generate_missing picks them all up
+    with core_database.SessionLocal() as db:
+        activities_crud.clear_all_activity_thumbnail_paths(db)
+
+    # Delete files from disk
+    thumbnails_dir = Path(core_config.ACTIVITY_THUMBNAILS_DIR)
+    deleted = 0
+    if thumbnails_dir.is_dir():
+        for thumb_file in thumbnails_dir.glob("*.png"):
+            try:
+                thumb_file.unlink()
+                deleted += 1
+            except OSError as err:
+                core_logger.print_to_log(
+                    f"Thumbnail regeneration: could not delete "
+                    f"{thumb_file}: {err}",
+                    "warning",
+                )
+
+    core_logger.print_to_log(
+        f"Thumbnail regeneration: deleted {deleted} file(s) from disk",
+        "info",
+    )
+
+    # Regenerate all thumbnails
+    generate_missing_activity_thumbnails()
+
+
 def generate_missing_activity_thumbnails() -> None:
     """
     Generate thumbnails for activities that are missing one.
