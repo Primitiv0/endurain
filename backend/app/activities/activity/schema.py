@@ -62,22 +62,32 @@ class Activity(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ActivityDistances(BaseModel):
-    run: float
-    bike: float
-    swim: float
-    walk: float
-    hike: float
-    rowing: float
-    snow_ski: float
-    snowboard: float
-    windsurf: float
-    stand_up_paddleboarding: float
-    surfing: float
-    kayaking: float
-    sailing: float
-    snowshoeing: float
-    inline_skating: float
+class ActivitySportStats(BaseModel):
+    """Aggregated stats for a single sport type over a timeframe."""
+
+    distance: float = 0.0
+    time: float = 0.0
+    calories: float = 0.0
+
+
+class ActivityStats(BaseModel):
+    """Per-sport aggregated stats for a timeframe (week or month)."""
+
+    run: ActivitySportStats = ActivitySportStats()
+    bike: ActivitySportStats = ActivitySportStats()
+    swim: ActivitySportStats = ActivitySportStats()
+    walk: ActivitySportStats = ActivitySportStats()
+    hike: ActivitySportStats = ActivitySportStats()
+    rowing: ActivitySportStats = ActivitySportStats()
+    snow_ski: ActivitySportStats = ActivitySportStats()
+    snowboard: ActivitySportStats = ActivitySportStats()
+    windsurf: ActivitySportStats = ActivitySportStats()
+    stand_up_paddleboarding: ActivitySportStats = ActivitySportStats()
+    surfing: ActivitySportStats = ActivitySportStats()
+    kayaking: ActivitySportStats = ActivitySportStats()
+    sailing: ActivitySportStats = ActivitySportStats()
+    snowshoeing: ActivitySportStats = ActivitySportStats()
+    inline_skating: ActivitySportStats = ActivitySportStats()
 
 
 class ActivityEdit(BaseModel):

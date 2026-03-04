@@ -836,64 +836,56 @@ def parse_activity_streams_from_file(parsed_info: dict, activity_id: int):
     ]
 
 
-def calculate_activity_distances(activities: list[activities_schema.Activity]):
-    # Initialize the distances
-    run = bike = swim = walk = hike = rowing = snow_ski = snowboard = windsurf = (
-        stand_up_paddleboarding
-    ) = surfing = kayaking = sailing = snowshoeing = inline_skating = 0.0
+def calculate_activity_stats(
+    activities: list[activities_schema.Activity],
+) -> activities_schema.ActivityStats:
+    """Aggregate distance (m), time (s), and calories per sport type.
 
-    if activities is not None:
-        # Calculate the distances
+    Args:
+        activities: List of Activity schema objects for the timeframe.
+
+    Returns:
+        ActivityStats with per-sport distance, time, and calories totals.
+    """
+    stats = activities_schema.ActivityStats()
+
+    if activities is None:
+        return stats
+
+    # Sport-type buckets: activity_type IDs → attribute name on ActivityStats
+    _SPORT_BUCKETS: list[tuple[list[int], str]] = [
+        ([1, 2, 3, 34, 40], "run"),
+        ([4, 5, 6, 7, 27, 28, 29, 35, 36], "bike"),
+        ([8, 9], "swim"),
+        ([11, 31], "walk"),
+        ([12], "hike"),
+        ([13], "rowing"),
+        ([15, 16], "snow_ski"),
+        ([17], "snowboard"),
+        ([30], "windsurf"),
+        ([32], "stand_up_paddleboarding"),
+        ([33], "surfing"),
+        ([42], "kayaking"),
+        ([43], "sailing"),
+        ([44], "snowshoeing"),
+        ([45], "inline_skating"),
+    ]
+
+    try:
         for activity in activities:
-            if activity.activity_type in [1, 2, 3, 34, 40]:
-                run += activity.distance
-            elif activity.activity_type in [4, 5, 6, 7, 27, 28, 29, 35, 36]:
-                bike += activity.distance
-            elif activity.activity_type in [8, 9]:
-                swim += activity.distance
-            elif activity.activity_type in [11, 31]:
-                walk += activity.distance
-            elif activity.activity_type in [12]:
-                hike += activity.distance
-            elif activity.activity_type in [13]:
-                rowing += activity.distance
-            elif activity.activity_type in [15, 16]:
-                snow_ski += activity.distance
-            elif activity.activity_type in [17]:
-                snowboard += activity.distance
-            elif activity.activity_type in [30]:
-                windsurf += activity.distance
-            elif activity.activity_type in [32]:
-                stand_up_paddleboarding += activity.distance
-            elif activity.activity_type in [33]:
-                surfing += activity.distance
-            elif activity.activity_type in [42]:
-                kayaking += activity.distance
-            elif activity.activity_type in [43]:
-                sailing += activity.distance
-            elif activity.activity_type in [44]:
-                snowshoeing += activity.distance
-            elif activity.activity_type in [45]:
-                inline_skating += activity.distance
+            for type_ids, bucket_name in _SPORT_BUCKETS:
+                if activity.activity_type in type_ids:
+                    bucket = getattr(stats, bucket_name)
+                    bucket.distance += float(activity.distance or 0)
+                    bucket.time += float(activity.total_timer_time or 0)
+                    bucket.calories += float(activity.calories or 0)
+                    break
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Error in calculate_activity_stats - {str(err)}", "error", exc=err
+        )
 
-    # Return the distances
-    return activities_schema.ActivityDistances(
-        run=run,
-        bike=bike,
-        swim=swim,
-        walk=walk,
-        hike=hike,
-        rowing=rowing,
-        snow_ski=snow_ski,
-        snowboard=snowboard,
-        windsurf=windsurf,
-        stand_up_paddleboarding=stand_up_paddleboarding,
-        surfing=surfing,
-        kayaking=kayaking,
-        sailing=sailing,
-        snowshoeing=snowshoeing,
-        inline_skating=inline_skating,
-    )
+    return stats
 
 
 def location_based_on_coordinates(latitude, longitude) -> dict | None:

@@ -13,10 +13,10 @@ export const activities = {
     return fetchGetRequest(`activities/user/${user_id}/week/${week_number}`)
   },
   getUserThisWeekStats(user_id) {
-    return fetchGetRequest(`activities/user/${user_id}/thisweek/distances`)
+    return fetchGetRequest(`activities/user/${user_id}/thisweek/stats`)
   },
   getUserThisMonthStats(user_id) {
-    return fetchGetRequest(`activities/user/${user_id}/thismonth/distances`)
+    return fetchGetRequest(`activities/user/${user_id}/thismonth/stats`)
   },
   getUserThisMonthActivitiesNumber(user_id) {
     return fetchGetRequest(`activities/user/${user_id}/thismonth/number`)

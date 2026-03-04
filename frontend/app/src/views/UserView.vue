@@ -59,8 +59,8 @@
         </div>
         <UserDistanceStatsComponent
           v-else
-          :thisWeekDistances="thisWeekDistances"
-          :thisMonthDistances="thisMonthDistances"
+          :thisWeekStats="thisWeekStats"
+          :thisMonthStats="thisMonthStats"
         />
       </div>
       <!-- user goals zone -->
@@ -394,8 +394,8 @@ const authStore = useAuthStore()
 const route = useRoute()
 const userProfile = ref(null)
 const userGoals = ref(null)
-const thisWeekDistances = ref([])
-const thisMonthDistances = ref([])
+const thisWeekStats = ref({})
+const thisMonthStats = ref({})
 const thisMonthNumberOfActivities = ref(0)
 const followersCountAccepted = ref(0)
 const followingCountAccepted = ref(0)
@@ -416,8 +416,8 @@ const userFollowState = ref(null)
 
 async function fetchUserStars() {
   try {
-    thisWeekDistances.value = await activities.getUserThisWeekStats(authStore.user.id)
-    thisMonthDistances.value = await activities.getUserThisMonthStats(authStore.user.id)
+    thisWeekStats.value = await activities.getUserThisWeekStats(authStore.user.id)
+    thisMonthStats.value = await activities.getUserThisMonthStats(authStore.user.id)
   } catch (error) {
     // Set the error message
     push.error(`${t('userView.errorFetchingUserStats')} - ${error}`)

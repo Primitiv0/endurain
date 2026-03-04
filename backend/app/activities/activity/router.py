@@ -94,10 +94,10 @@ async def read_activities_user_activities_week(
 
 
 @router.get(
-    "/user/{user_id}/thisweek/distances",
-    response_model=activities_schema.ActivityDistances | None,
+    "/user/{user_id}/thisweek/stats",
+    response_model=activities_schema.ActivityStats,
 )
-async def read_activities_user_activities_this_week_distances(
+async def read_activities_user_activities_this_week_stats(
     user_id: int,
     _validate_user_id: Annotated[
         Callable, Depends(users_dependencies.validate_user_id)
@@ -113,11 +113,12 @@ async def read_activities_user_activities_this_week_distances(
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> activities_schema.ActivityStats:
     # Calculate the start of the current week
     today = datetime.now(timezone.utc)
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
+    activities = []
 
     if user_id == token_user_id:
         # Get all user activities for the requested week if the user is the owner of the token
@@ -130,15 +131,17 @@ async def read_activities_user_activities_this_week_distances(
             user_id, start_of_week, end_of_week, db
         )
 
-    # Return the activities distances for this week
-    return activities_utils.calculate_activity_distances(activities)
+    # Return the aggregated stats (distance, time, calories) per sport for this week
+    if activities:
+        return activities_utils.calculate_activity_stats(activities)
+    return activities_schema.ActivityStats()
 
 
 @router.get(
-    "/user/{user_id}/thismonth/distances",
-    response_model=activities_schema.ActivityDistances | None,
+    "/user/{user_id}/thismonth/stats",
+    response_model=activities_schema.ActivityStats,
 )
-async def read_activities_user_activities_this_month_distances(
+async def read_activities_user_activities_this_month_stats(
     user_id: int,
     _validate_user_id: Annotated[
         Callable, Depends(users_dependencies.validate_user_id)
@@ -154,13 +157,14 @@ async def read_activities_user_activities_this_month_distances(
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> activities_schema.ActivityStats:
     # Calculate the start of the current month
     today = datetime.now(timezone.utc)
     start_of_month = today.replace(day=1)
     end_of_month = start_of_month.replace(
         day=calendar.monthrange(today.year, today.month)[1]
     )
+    activities = []
 
     if user_id == token_user_id:
         # Get all user activities for the requested month if the user is the owner of the token
@@ -173,12 +177,10 @@ async def read_activities_user_activities_this_month_distances(
             user_id, start_of_month, end_of_month, db
         )
 
-    # if activities is None:
-    # Return None if activities is None
-    #    return None
-
-    # Return the activities distances for this month
-    return activities_utils.calculate_activity_distances(activities)
+    # Return the aggregated stats (distance, time, calories) per sport for this month
+    if activities:
+        return activities_utils.calculate_activity_stats(activities)
+    return activities_schema.ActivityStats()
 
 
 @router.get(
@@ -241,7 +243,7 @@ async def read_activities_gear_activities(
         Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
     ],
     token_user_id: Annotated[
-        Callable,
+        int,
         Depends(auth_security.get_sub_from_access_token),
     ],
     db: Annotated[
@@ -268,7 +270,7 @@ async def read_activities_gear_activities_number(
         Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
     ],
     token_user_id: Annotated[
-        Callable,
+        int,
         Depends(auth_security.get_sub_from_access_token),
     ],
     db: Annotated[
@@ -303,7 +305,7 @@ async def read_activities_gear_activities_with_pagination(
         Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
     ],
     token_user_id: Annotated[
-        Callable,
+        int,
         Depends(auth_security.get_sub_from_access_token),
     ],
     db: Annotated[
