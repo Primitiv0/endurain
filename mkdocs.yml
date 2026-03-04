@@ -58,13 +58,14 @@ nav:
       - Health steps: reference/health/health_steps.md
       - Health targets: reference/health/health_targets.md
       - Health weight: reference/health/health_weight.md
+    - GPX: reference/gpx.md
     - Migrations: reference/migrations.md
     - Notifications: reference/notifications.md
     - Password reset tokens: reference/password_reset_tokens.md
     - Profile: reference/profile.md
     - Server settings: reference/server_settings.md
     - Sign up tokens: reference/sign_up_tokens.md
-    - TCX: reference/tcx/tcx.md
+    - TCX: reference/tcx.md
     - Users:
       - Users: reference/users/users.md
       - Users API keys: reference/users/users_api_keys.md

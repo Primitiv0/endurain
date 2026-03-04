@@ -1,3 +1,4 @@
+import functools
 import gzip
 import os
 import shutil
@@ -12,6 +13,7 @@ from geopy.distance import geodesic
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from datetime import datetime
 from urllib.parse import urlencode
@@ -432,14 +434,19 @@ async def parse_and_store_activity_from_file(
                 )
             )
 
-            # Parse the file
-            parsed_info = parse_file(
-                token_user_id,
-                user_privacy_settings,
-                file_extension,
-                file_path,
-                db,
-                activity_name,
+            # Parse the file in a thread pool to avoid
+            # blocking the event loop with CPU-bound and
+            # sync I/O work (gpxpy, geopy, timezonefinder)
+            parsed_info = await run_in_threadpool(
+                functools.partial(
+                    parse_file,
+                    token_user_id,
+                    user_privacy_settings,
+                    file_extension,
+                    file_path,
+                    db,
+                    activity_name,
+                )
             )
 
             if parsed_info is not None:
@@ -588,13 +595,18 @@ async def parse_and_store_activity_from_uploaded_file(
             )
         )
 
-        # Parse the file
-        parsed_info = parse_file(
-            token_user_id,
-            user_privacy_settings,
-            file_extension,
-            file_path,
-            db,
+        # Parse the file in a thread pool to avoid
+        # blocking the event loop with CPU-bound and
+        # sync I/O work (gpxpy, geopy, timezonefinder)
+        parsed_info = await run_in_threadpool(
+            functools.partial(
+                parse_file,
+                token_user_id,
+                user_privacy_settings,
+                file_extension,
+                file_path,
+                db,
+            )
         )
 
         if parsed_info is not None:
