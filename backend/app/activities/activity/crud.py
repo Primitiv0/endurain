@@ -1292,6 +1292,41 @@ def set_activity_thumbnail_path(
         ) from err
 
 
+def get_activities_without_thumbnail(
+    db: Session,
+) -> list[activities_models.Activity]:
+    """Return activities that have no pre-generated map thumbnail.
+
+    Queries for activities where map_thumbnail_path is NULL.
+    The caller is responsible for checking whether GPS stream
+    data exists before attempting thumbnail generation.
+
+    Args:
+        db: Active database session.
+
+    Returns:
+        List of Activity ORM objects with map_thumbnail_path = None.
+
+    Raises:
+        None — errors are logged and an empty list is returned.
+    """
+    try:
+        return (
+            db.query(activities_models.Activity)
+            .filter(
+                activities_models.Activity.map_thumbnail_path.is_(None)
+            )
+            .all()
+        )
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Error in get_activities_without_thumbnail: {err}",
+            "error",
+            exc=err,
+        )
+        return []
+
+
 def edit_activity(
     user_id: int, activity_attributes: activities_schema.ActivityEdit, db: Session
 ):

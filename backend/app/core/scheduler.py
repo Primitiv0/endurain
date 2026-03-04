@@ -1,6 +1,8 @@
 # from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+import activities.activity.utils as activities_utils
+
 import strava.activity_utils as strava_activity_utils
 import strava.utils as strava_utils
 
@@ -107,6 +109,14 @@ def start_scheduler():
         5,
         [],
         "evict expired pending MFA login entries",
+    )
+
+    add_scheduler_job(
+        activities_utils.generate_missing_activity_thumbnails,
+        "interval",
+        60,
+        [],
+        "generate thumbnails for activities missing one",
     )
 
 

@@ -32,7 +32,9 @@ import activities.activity_laps.crud as activity_laps_crud
 
 import activities.activity_sets.crud as activity_sets_crud
 
+import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.crud as activity_streams_crud
+import activities.activity_streams.models as activity_streams_models
 import activities.activity_streams.schema as activity_streams_schema
 
 import activities.activity_workout_steps.crud as activity_workout_steps_crud
@@ -1265,3 +1267,97 @@ def process_all_files_sync(
         )
     finally:
         db.close()
+
+
+def generate_missing_activity_thumbnails() -> None:
+    """
+    Generate thumbnails for activities that are missing one.
+
+    Intended to be called periodically by the scheduler. Opens
+    its own database session, queries for activities whose
+    map_thumbnail_path is NULL, fetches the GPS stream for each,
+    and generates + persists the thumbnail.
+
+    Returns:
+        None
+
+    Raises:
+        None — errors are logged per-activity; execution continues.
+    """
+    with core_database.SessionLocal() as db:
+        activities_without_thumbnail = (
+            activities_crud.get_activities_without_thumbnail(db)
+        )
+
+        if not activities_without_thumbnail:
+            core_logger.print_to_log(
+                "Thumbnail scheduler: no activities without "
+                "thumbnail found",
+                "debug",
+            )
+            return
+
+        core_logger.print_to_log(
+            f"Thumbnail scheduler: generating thumbnails for "
+            f"{len(activities_without_thumbnail)} activities",
+            "info",
+        )
+
+        server_settings = (
+            server_settings_crud.get_server_settings(db)
+        )
+        tile_url = (
+            server_settings.tileserver_url
+            if server_settings
+            else activities_thumbnail._DEFAULT_TILE_URL
+        )
+        bg_color = (
+            server_settings.map_background_color
+            if server_settings
+            else activities_thumbnail._DEFAULT_BG_COLOR
+        )
+        api_key = None
+        if server_settings and server_settings.tileserver_api_key:
+            api_key = core_cryptography.decrypt_token_fernet(
+                server_settings.tileserver_api_key
+            )
+
+        generated = 0
+        for activity in activities_without_thumbnail:
+            gps_stream = (
+                db.query(activity_streams_models.ActivityStreams)
+                .filter_by(
+                    activity_id=activity.id,
+                    stream_type=(
+                        activity_streams_constants.STREAM_TYPE_MAP
+                    ),
+                )
+                .first()
+            )
+
+            if not gps_stream or not gps_stream.stream_waypoints:
+                continue
+
+            thumbnail_path = (
+                activities_thumbnail.generate_activity_thumbnail(
+                    activity.id,
+                    gps_stream.stream_waypoints,
+                    core_config.ACTIVITY_THUMBNAILS_DIR,
+                    tile_url=tile_url,
+                    background_color=bg_color,
+                    api_key=api_key,
+                )
+            )
+
+            if thumbnail_path is not None:
+                activities_crud.set_activity_thumbnail_path(
+                    activity.id, thumbnail_path, db
+                )
+                generated += 1
+
+        core_logger.print_to_log(
+            f"Thumbnail scheduler: generated {generated} "
+            f"thumbnail(s) out of "
+            f"{len(activities_without_thumbnail)} candidate(s)",
+            "info",
+        )

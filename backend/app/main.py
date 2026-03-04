@@ -29,6 +29,8 @@ import sign_up_tokens.utils as sign_up_tokens_utils
 import auth.oauth_state.utils as oauth_state_utils
 import auth.idp_link_tokens.utils as idp_link_token_utils
 
+import activities.activity.utils as activities_utils
+
 import server_settings.utils as server_settings_utils
 import server_settings.schema as server_settings_schema
 
@@ -95,6 +97,12 @@ async def startup_event():
         "Deleting expired IdP link tokens from the database"
     )
     idp_link_token_utils.delete_idp_link_expired_tokens_from_db()
+
+    # Generate thumbnails for activities that are missing one
+    core_logger.print_to_log_and_console(
+        "Generating missing activity map thumbnails"
+    )
+    activities_utils.generate_missing_activity_thumbnails()
 
     # Initialize allowed tile domains for CSP
     core_logger.print_to_log_and_console(
