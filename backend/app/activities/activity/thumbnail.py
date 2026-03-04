@@ -118,8 +118,11 @@ def generate_activity_thumbnail(
         # Build request headers; inject Authorization when an API
         # key is present (e.g. Stadia Maps requires backend auth).
         headers: dict[str, str] = {"User-Agent": f"Endurain {core_config.API_VERSION} - StaticMap backend thumbnail generator"}
-        if api_key:
+        if api_key and "stadiamaps.com" in normalised_url:
             headers["Authorization"] = f"Stadia-Auth {api_key}"
+        elif api_key:
+            separator = "&" if "?" in normalised_url else "?"
+            normalised_url += f"{separator}api_key={api_key}"
 
         static_map = StaticMap(
             width,
