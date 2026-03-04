@@ -1242,6 +1242,56 @@ async def create_activity(
         ) from err
 
 
+def set_activity_thumbnail_path(
+    activity_id: int,
+    thumbnail_path: str,
+    db: Session,
+) -> None:
+    """Set the map thumbnail path for an already-persisted activity.
+
+    Queries the ORM object by activity_id so the update is tracked
+    by SQLAlchemy and committed to the database correctly.
+
+    Args:
+        activity_id: The ID of the activity to update.
+        thumbnail_path: Absolute path to the generated thumbnail
+            file.
+        db: Active database session.
+
+    Returns:
+        None
+
+    Raises:
+        HTTPException: If the update cannot be committed.
+    """
+    try:
+        db_activity = (
+            db.query(activities_models.Activity)
+            .filter(activities_models.Activity.id == activity_id)
+            .first()
+        )
+        if db_activity is None:
+            core_logger.print_to_log(
+                f"Activity {activity_id} not found when setting "
+                "thumbnail path",
+                "warning",
+            )
+            return
+        db_activity.map_thumbnail_path = thumbnail_path
+        db.commit()
+    except Exception as err:
+        db.rollback()
+        core_logger.print_to_log(
+            f"Error in set_activity_thumbnail_path: {err}",
+            "error",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from err
+
+
 def edit_activity(
     user_id: int, activity_attributes: activities_schema.ActivityEdit, db: Session
 ):

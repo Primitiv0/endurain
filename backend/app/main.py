@@ -208,6 +208,11 @@ def create_app() -> FastAPI:
         StaticFiles(directory=core_config.ACTIVITY_MEDIA_DIR),
         name="activity_media",
     )
+    fastapi_app.mount(
+        f"/{core_config.ACTIVITY_THUMBNAILS_DIR}",
+        StaticFiles(directory=core_config.ACTIVITY_THUMBNAILS_DIR),
+        name="activity_thumbnails",
+    )
 
     return fastapi_app
 

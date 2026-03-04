@@ -216,6 +216,11 @@ class Activity(Base):
         nullable=True,
         comment="Tracker model (e.g., Forerunner 245, Ambit3 Peak, Vantage V2)",
     )
+    map_thumbnail_path = Column(
+        String(length=500),
+        nullable=True,
+        comment="Relative path to the pre-generated static map thumbnail image",
+    )
 
     # Define a relationship to the Users model
     users = relationship("Users", back_populates="activities")

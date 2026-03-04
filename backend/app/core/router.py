@@ -117,6 +117,36 @@ def activity_media_return(
     return path
 
 
+@router.get("/activity_thumbnails/{thumbnail}")
+def activity_thumbnail_return(
+    thumbnail: str,
+):
+    """
+    Retrieves the server path for a given activity thumbnail.
+
+    Args:
+        thumbnail (str): The name or identifier of the activity thumbnail.
+
+    Returns:
+        str: The server path to the activity thumbnail.
+
+    Raises:
+        HTTPException: If the thumbnail is not found, raises a 404 error.
+    """
+    # Get the server image path
+    path = core_utils.return_activity_thumbnail_path(thumbnail)
+
+    # If the path is None, raise a 404 error
+    if path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity thumbnail not found",
+        )
+
+    # Return the activity thumbnail path
+    return path
+
+
 @router.get("/{path:path}", include_in_schema=False)
 def frontend_not_found(
     path: str,

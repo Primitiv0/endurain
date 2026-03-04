@@ -836,6 +836,19 @@ async def delete_activity(
     # Delete the activity
     activities_crud.delete_activity(activity_id, db)
 
+    # Delete the map thumbnail if one was generated
+    if activity.map_thumbnail_path:
+        try:
+            os.remove(activity.map_thumbnail_path)
+        except FileNotFoundError:
+            pass
+        except Exception as err:
+            core_logger.print_to_log(
+                f"Error deleting thumbnail {activity.map_thumbnail_path}: {err}",
+                "error",
+                exc=err,
+            )
+
     # Define the search pattern using the file ID (e.g., '1.*')
     pattern = f"{core_config.FILES_PROCESSED_DIR}/{activity_id}.*"
 

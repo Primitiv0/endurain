@@ -43,6 +43,11 @@ import gpx.utils as gpx_utils
 import tcx.utils as tcx_utils
 import fit.utils as fit_utils
 
+import activities.activity.thumbnail as activities_thumbnail
+
+import server_settings.crud as server_settings_crud
+
+import core.cryptography as core_cryptography
 import core.logger as core_logger
 import core.config as core_config
 import core.database as core_database
@@ -790,6 +795,45 @@ async def store_activity(
         activity_sets_crud.create_activity_sets(
             parsed_info["sets"], created_activity.id, db
         )
+
+    # Generate a static map thumbnail if GPS data is present
+    if parsed_info.get("is_lat_lon_set") and parsed_info.get(
+        "lat_lon_waypoints"
+    ):
+        server_settings = server_settings_crud.get_server_settings(db)
+        tile_url = (
+            server_settings.tileserver_url
+            if server_settings
+            else activities_thumbnail._DEFAULT_TILE_URL
+        )
+        bg_color = (
+            server_settings.map_background_color
+            if server_settings
+            else activities_thumbnail._DEFAULT_BG_COLOR
+        )
+        # Decrypt tile API key if the provider requires backend auth
+        api_key = None
+        if (
+            server_settings
+            and server_settings.tileserver_api_key
+        ):
+            api_key = core_cryptography.decrypt_token_fernet(
+                server_settings.tileserver_api_key
+            )
+        thumbnail_path = activities_thumbnail.generate_activity_thumbnail(
+            created_activity.id,
+            parsed_info["lat_lon_waypoints"],
+            core_config.ACTIVITY_THUMBNAILS_DIR,
+            tile_url=tile_url,
+            background_color=bg_color,
+            api_key=api_key,
+        )
+        if thumbnail_path is not None:
+            activities_crud.set_activity_thumbnail_path(
+                created_activity.id,
+                thumbnail_path,
+                db,
+            )
 
     # Return the created activity
     return created_activity

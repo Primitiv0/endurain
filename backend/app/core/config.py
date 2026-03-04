@@ -30,7 +30,13 @@ USER_IMAGES_DIR = f"{DATA_DIR}/{USER_IMAGES_URL_PATH}"
 SERVER_IMAGES_URL_PATH = "server_images"
 SERVER_IMAGES_DIR = f"{DATA_DIR}/{SERVER_IMAGES_URL_PATH}"
 FILES_DIR = os.getenv("FILES_DIR", f"{DATA_DIR}/activity_files")
-ACTIVITY_MEDIA_DIR = os.getenv("ACTIVITY_MEDIA_DIR", f"{DATA_DIR}/activity_media")
+ACTIVITY_MEDIA_DIR = os.getenv(
+    "ACTIVITY_MEDIA_DIR", f"{DATA_DIR}/activity_media"
+)
+ACTIVITY_THUMBNAILS_DIR = os.getenv(
+    "ACTIVITY_THUMBNAILS_DIR",
+    f"{DATA_DIR}/activity_thumbnails",
+)
 FILES_PROCESSED_DIR = f"{FILES_DIR}/processed"
 FILES_BULK_IMPORT_DIR = f"{FILES_DIR}/bulk_import"
 FILES_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{FILES_BULK_IMPORT_DIR}/import_errors"
@@ -333,6 +339,7 @@ def check_required_dirs():
         USER_IMAGES_DIR,
         SERVER_IMAGES_DIR,
         ACTIVITY_MEDIA_DIR,
+        ACTIVITY_THUMBNAILS_DIR,
         FILES_DIR,
         FILES_PROCESSED_DIR,
         FILES_BULK_IMPORT_DIR,

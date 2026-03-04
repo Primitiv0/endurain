@@ -58,6 +58,7 @@ class Activity(BaseModel):
     hide_gear: bool | None = None
     tracker_manufacturer: str | None = None
     tracker_model: str | None = None
+    map_thumbnail_path: str | None = None
 
     model_config = {"from_attributes": True}
 

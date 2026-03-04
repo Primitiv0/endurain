@@ -31,3 +31,10 @@ def return_activity_media_path(media: str):
     if not os.path.isfile(file_path):
         return None
     return FileResponse(file_path)
+
+
+def return_activity_thumbnail_path(thumbnail: str):
+    file_path = f"{core_config.ACTIVITY_THUMBNAILS_DIR}/" + thumbnail
+    if not os.path.isfile(file_path):
+        return None
+    return FileResponse(file_path)
