@@ -48,49 +48,97 @@ async def fetch_and_process_activities(
     db: Session,
     is_startup: bool = False,
 ) -> int:
+    # Check if we're currently rate-limited before
+    # making any Strava API calls
+    if strava_utils.rate_limit_tracker.is_rate_limited():
+        core_logger.print_to_log_and_console(
+            f"User {user_id}: Strava rate limit active,"
+            " skipping activity fetch",
+            "warning",
+        )
+        return 0
+
     # set the strava activities to None
     strava_activities = None
 
-    # Fetch Strava activities after the specified start date
-    # Run in a thread pool to avoid blocking the asyncio event loop with
-    # the synchronous requests-based stravalib library.
+    # Fetch Strava activities after the specified start
+    # date. Run in a thread pool to avoid blocking the
+    # asyncio event loop with the synchronous
+    # requests-based stravalib library.
     try:
         strava_activities = await asyncio.to_thread(
             lambda: list(
-                strava_client.get_activities(after=start_date, before=end_date)
+                strava_client.get_activities(
+                    after=start_date, before=end_date
+                )
             )
         )
     except AccessUnauthorized as auth_err:
-        # Log a more specific error message for authentication issues
+        # Log a more specific error for auth issues
         core_logger.print_to_log(
-            f"User {user_id}: Authentication error with Strava: {str(auth_err)}",
+            f"User {user_id}: Authentication error "
+            f"with Strava: {str(auth_err)}",
             "error",
             exc=auth_err,
         )
-        # Attempt to refresh token or notify user about authentication issues
         if not is_startup:
             raise HTTPException(
-                status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                detail="Strava authentication failed. Please reconnect your Strava account.",
+                status_code=(
+                    status.HTTP_424_FAILED_DEPENDENCY
+                ),
+                detail=(
+                    "Strava authentication failed."
+                    " Please reconnect your Strava"
+                    " account."
+                ),
             ) from auth_err
-        # Return 0 to indicate no activities were processed
         return 0
     except HTTPException as http_err:
         raise http_err
     except Exception as err:
+        # Check if this is a rate limit error
+        if strava_utils.is_strava_rate_limit_error(err):
+            err_str = str(err).lower()
+            is_long = "long" in err_str or (
+                "daily" in err_str
+            )
+            strava_utils.rate_limit_tracker.mark_rate_limited(
+                is_long_term=is_long
+            )
+            core_logger.print_to_log(
+                f"User {user_id}: Strava rate limit"
+                " exceeded, skipping activity fetch",
+                "warning",
+            )
+            if not is_startup:
+                raise HTTPException(
+                    status_code=(
+                        status.HTTP_429_TOO_MANY_REQUESTS
+                    ),
+                    detail=(
+                        "Strava API rate limit exceeded"
+                        ". Please try again later."
+                    ),
+                ) from err
+            return 0
+
         # Log an error event if an exception occurred
         core_logger.print_to_log(
-            f"User {user_id}: Error fetching Strava activities: {str(err)}",
+            f"User {user_id}: Error fetching Strava"
+            f" activities: {str(err)}",
             "error",
             exc=err,
         )
-        # Raise an HTTPException with a 424 Failed Dependency status code
         if not is_startup:
             raise HTTPException(
-                status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                detail="Not able to fetch Strava activities",
+                status_code=(
+                    status.HTTP_424_FAILED_DEPENDENCY
+                ),
+                detail=(
+                    "Not able to fetch Strava"
+                    " activities"
+                ),
             ) from err
-        # Return 0 to indicate no activities were processed
         return 0
 
     if strava_activities is None:
@@ -146,21 +194,62 @@ def parse_activity(
     tf = TimezoneFinder()
     timezone = core_config.TZ
 
+    # Check rate limit before detailed activity fetch
+    if strava_utils.rate_limit_tracker.is_rate_limited():
+        core_logger.print_to_log(
+            f"User {user_id}: Strava rate limit"
+            " active, skipping activity parse",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=(
+                status.HTTP_429_TOO_MANY_REQUESTS
+            ),
+            detail=(
+                "Strava API rate limit exceeded."
+                " Please try again later."
+            ),
+        )
+
     # Get the detailed activity
     try:
-        detailedActivity = strava_client.get_activity(activity.id)
+        detailedActivity = strava_client.get_activity(
+            activity.id
+        )
     except Exception as err:
+        # Check if this is a rate limit error
+        if strava_utils.is_strava_rate_limit_error(err):
+            err_str = str(err).lower()
+            is_long = "long" in err_str or (
+                "daily" in err_str
+            )
+            strava_utils.rate_limit_tracker.mark_rate_limited(
+                is_long_term=is_long
+            )
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_429_TOO_MANY_REQUESTS
+                ),
+                detail=(
+                    "Strava API rate limit exceeded"
+                    ". Please try again later."
+                ),
+            ) from err
         # Log an error event if an exception occurred
         core_logger.print_to_log(
-            f"User {user_id}: Error fetching detailed Strava activity {activity.id}: {str(err)}",
+            f"User {user_id}: Error fetching "
+            f"detailed Strava activity "
+            f"{activity.id}: {str(err)}",
             "error",
             exc=err,
         )
-        # Return None to indicate the activity was not processed
-        # return None
         raise HTTPException(
-            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail="Not able to fetch Strava activity",
+            status_code=(
+                status.HTTP_424_FAILED_DEPENDENCY
+            ),
+            detail=(
+                "Not able to fetch Strava activity"
+            ),
         )
 
     # Parse start and end dates
@@ -457,6 +546,23 @@ def fetch_and_process_activity_streams(
     strava_activity_id: int,
     user_id: int,
 ):
+    # Check rate limit before fetching streams
+    if strava_utils.rate_limit_tracker.is_rate_limited():
+        core_logger.print_to_log(
+            f"User {user_id}: Strava rate limit"
+            " active, skipping streams fetch",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=(
+                status.HTTP_429_TOO_MANY_REQUESTS
+            ),
+            detail=(
+                "Strava API rate limit exceeded."
+                " Please try again later."
+            ),
+        )
+
     # Get streams for the activity
     try:
         streams = strava_client.get_activity_streams(
@@ -472,16 +578,39 @@ def fetch_and_process_activity_streams(
             ],
         )
     except Exception as err:
+        # Check if this is a rate limit error
+        if strava_utils.is_strava_rate_limit_error(err):
+            err_str = str(err).lower()
+            is_long = "long" in err_str or (
+                "daily" in err_str
+            )
+            strava_utils.rate_limit_tracker.mark_rate_limited(
+                is_long_term=is_long
+            )
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_429_TOO_MANY_REQUESTS
+                ),
+                detail=(
+                    "Strava API rate limit exceeded"
+                    ". Please try again later."
+                ),
+            ) from err
         # Log an error event if an exception occurred
         core_logger.print_to_log(
-            f"User {user_id}: Error fetching Strava activity streams {strava_activity_id}: {str(err)}",
+            f"User {user_id}: Error fetching "
+            f"Strava activity streams "
+            f"{strava_activity_id}: {str(err)}",
             "error",
             exc=err,
         )
-        # Raise exception
         raise HTTPException(
-            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail="Not able to fetch Strava activity streams",
+            status_code=(
+                status.HTTP_424_FAILED_DEPENDENCY
+            ),
+            detail=(
+                "Not able to fetch Strava activity streams"
+            ),
         )
 
     # Extract data from streams
@@ -701,6 +830,15 @@ def fetch_and_process_activity_laps(
 async def retrieve_strava_users_activities_for_days(
     days: int, is_startup: bool = False
 ):
+    # Skip entirely if Strava rate limit is active
+    if strava_utils.rate_limit_tracker.is_rate_limited():
+        core_logger.print_to_log(
+            "Strava rate limit active, skipping"
+            " scheduled activity retrieval",
+            "warning",
+        )
+        return
+
     # Create a new database session using context manager
     with SessionLocal() as db:
         try:

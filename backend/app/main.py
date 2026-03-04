@@ -55,18 +55,35 @@ async def startup_event():
     # Create a scheduler to run background jobs
     core_scheduler.start_scheduler()
 
-    # Retrieve last day activities from Garmin Connect and Strava
+    # Refresh Strava tokens on startup (non-blocking)
     core_logger.print_to_log_and_console(
-        "Refreshing Strava tokens on startup on startup"
+        "Refreshing Strava tokens on startup"
     )
-    strava_utils.refresh_strava_tokens(True)
+    try:
+        strava_utils.refresh_strava_tokens(True)
+    except Exception as err:
+        core_logger.print_to_log(
+            "Failed to refresh Strava tokens on"
+            f" startup: {err}",
+            "error",
+            exc=err,
+        )
 
     # Retrieve last day activities from Garmin Connect and Strava
     core_logger.print_to_log_and_console(
-        "Retrieving last day activities from Garmin Connect and Strava on startup"
+        "Retrieving last day activities from Garmin Connect and Strava on "
+        "startup"
     )
     await garmin_activity_utils.retrieve_garminconnect_users_activities_for_days(1)
-    await strava_activity_utils.retrieve_strava_users_activities_for_days(1, True)
+    try:
+        await strava_activity_utils.retrieve_strava_users_activities_for_days(1, True)
+    except Exception as err:
+        core_logger.print_to_log(
+            "Failed to retrieve Strava activities"
+            f" on startup: {err}",
+            "error",
+            exc=err,
+        )
 
     # Retrieve last day health stats from Garmin Connect
     core_logger.print_to_log_and_console(

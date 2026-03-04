@@ -92,7 +92,7 @@ RUN chmod +x /docker-entrypoint.d/start.sh
 EXPOSE 8080
 
 # Add a healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s CMD curl -f http://localhost:8080/api/v1/about || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 CMD curl -f http://localhost:8080/api/v1/about || exit 1
 
 # Run the FastAPI app
 ENTRYPOINT ["/docker-entrypoint.d/start.sh"]
