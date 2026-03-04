@@ -1,3 +1,5 @@
+"""Core logging setup for the application."""
+
 import logging
 
 import core.config as core_config
@@ -5,11 +7,15 @@ import core.config as core_config
 
 def setup_main_logger():
     """
-    Sets up the main application logger and attaches a file handler to it, as well as to the Alembic and APScheduler loggers.
+    Sets up the main application logger and attaches a file handler to it, as
+    well as to the Alembic and APScheduler loggers.
 
-    The logger writes log messages to 'logs/app.log' with a specific format and log level.
-    - The main logger ('main_logger') uses the LOG_LEVEL from configuration (default: WARNING).
-    - The Alembic logger ('alembic') and APScheduler logger ('apscheduler') are set to INFO level.
+    The logger writes log messages to 'logs/app.log' with a specific format and
+    log level.
+    - The main logger ('main_logger') uses the LOG_LEVEL from configuration
+        (default: WARNING).
+    - The Alembic logger ('alembic') and APScheduler logger ('apscheduler') are
+        set to INFO level.
     - All three loggers share the same file handler and formatter.
 
     Returns:
@@ -22,7 +28,7 @@ def setup_main_logger():
         "warning": logging.WARNING,
         "info": logging.INFO,
         "debug": logging.DEBUG,
-        "trace": logging.DEBUG,  # Map trace to debug (Python logging doesn't have trace)
+        "trace": logging.DEBUG,  # Trace to debug (Python doesn't have trace)
     }
 
     # Get log level from config, default to WARNING if invalid
@@ -58,8 +64,10 @@ def get_main_logger():
     """
     Returns the main logger instance for the application.
 
-    This function retrieves a logger named "main_logger" using Python's standard logging module.
-    It can be used throughout the application to log messages under a consistent logger name.
+    This function retrieves a logger named "main_logger" using Python's
+    standard logging module.
+    It can be used throughout the application to log messages under a
+    consistent logger name.
 
     Returns:
         logging.Logger: The logger instance named "main_logger".
@@ -68,18 +76,21 @@ def get_main_logger():
 
 
 def print_to_log(
-    message: str, log_level: str = "info", exc: Exception = None, context=None
+    message: str, log_level: str = "info", exc: Exception | None = None, context=None
 ):
     """
     Logs a message at the specified log level using the main logger.
 
     Args:
         message (str): The message to log.
-        log_level (str, optional): The log level to use ('info', 'error', 'warning', 'debug'). Defaults to "info".
-        exc (Exception, optional): An exception instance to include in the log if log_level is "error". Defaults to None.
+        log_level (str, optional): The log level to use ('info', 'error',
+            'warning', 'debug'). Defaults to "info".
+        exc (Exception, optional): An exception instance to include in the log
+            if log_level is "error". Defaults to None.
 
     Notes:
-        - If log_level is "error" and exc is provided, exception information will be included in the log.
+        - If log_level is "error" and exc is provided, exception information
+            will be included in the log.
     """
     main_logger = get_main_logger()
     if log_level == "info":
@@ -98,7 +109,8 @@ def print_to_console(message: str, log_level: str = "info"):
 
     Args:
         message (str): The message to print.
-        log_level (str, optional): The log level to display ('info', 'error', 'warning', 'debug'). Defaults to "info".
+        log_level (str, optional): The log level to display ('info', 'error',
+            'warning', 'debug'). Defaults to "info".
     """
     if log_level == "info":
         print(f"INFO:     {message}")
@@ -111,17 +123,22 @@ def print_to_console(message: str, log_level: str = "info"):
 
 
 def print_to_log_and_console(
-    message: str, log_level: str = "info", exc: Exception = None
+    message: str, log_level: str = "info", exc: Exception | None = None
 ):
     """
     Logs a message to both the main logger and the console.
 
-    This function temporarily adds a console handler to the main logger, logs the provided message at the specified log level (optionally including exception information), and then removes the console handler to ensure subsequent logs are not printed to the console.
+    This function temporarily adds a console handler to the main logger, logs
+    the provided message at the specified log level (optionally including
+    exception information), and then removes the console handler to ensure
+    subsequent logs are not printed to the console.
 
     Args:
         message (str): The message to log.
-        log_level (str, optional): The logging level to use (e.g., "info", "warning", "error"). Defaults to "info".
-        exc (Exception, optional): An exception to include in the log entry. Defaults to None.
+        log_level (str, optional): The logging level to use (e.g., "info",
+            "warning", "error"). Defaults to "info".
+        exc (Exception, optional): An exception to include in the log entry.
+            Defaults to None.
     """
     main_logger = get_main_logger()
 

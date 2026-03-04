@@ -3,6 +3,8 @@
   "editFastingModalTitle": "Edit fasting",
   "addFastingTypeLabel": "Fasting type",
   "addFastingStartTimeLabel": "Start time",
+  "addFastingEndTimeLabel": "End time (optional)",
+  "addFastingStatusLabel": "Status",
   "addFastingNotesLabel": "Notes (optional)",
   "customDurationLabel": "Custom duration",
   "hours": "hours",

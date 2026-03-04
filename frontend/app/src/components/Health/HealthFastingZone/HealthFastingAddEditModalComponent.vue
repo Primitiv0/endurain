@@ -96,6 +96,40 @@
               required
             />
 
+            <!-- end time field (edit only) -->
+            <div v-if="action === 'edit'" class="mb-3">
+              <label for="fastingEndTimeEdit">
+                <b>{{ $t('healthFastingAddEditModalComponent.addFastingEndTimeLabel') }}</b>
+              </label>
+              <input
+                class="form-control"
+                type="datetime-local"
+                name="fastingEndTimeEdit"
+                v-model="newEditFastingEndTime"
+              />
+            </div>
+
+            <!-- status field (edit only) -->
+            <div v-if="action === 'edit'" class="mb-3">
+              <label for="fastingStatusEdit">
+                <b>{{ $t('healthFastingAddEditModalComponent.addFastingStatusLabel') }}</b>
+              </label>
+              <select class="form-select" v-model="newEditFastingStatus" name="fastingStatusEdit">
+                <option value="in_progress">
+                  {{ $t('healthFastingListComponent.statusInProgress') }}
+                </option>
+                <option value="completed">
+                  {{ $t('healthFastingListComponent.statusCompleted') }}
+                </option>
+                <option value="broken">
+                  {{ $t('healthFastingListComponent.statusBroken') }}
+                </option>
+                <option value="cancelled">
+                  {{ $t('healthFastingListComponent.statusCancelled') }}
+                </option>
+              </select>
+            </div>
+
             <!-- notes field -->
             <label for="fastingNotesAdd">
               <b>{{ $t('healthFastingAddEditModalComponent.addFastingNotesLabel') }}</b>
@@ -155,6 +189,8 @@ const { t } = useI18n()
 const newEditFastingType = ref('16:8')
 const customDurationHours = ref(16)
 const newEditFastingStartTime = ref(new Date().toISOString().slice(0, 16))
+const newEditFastingEndTime = ref('')
+const newEditFastingStatus = ref('in_progress')
 const newEditFastingNotes = ref('')
 const editFastingId = ref('')
 
@@ -182,6 +218,10 @@ if (props.userHealthFasting) {
   newEditFastingStartTime.value = props.userHealthFasting.fast_start_time
     ? new Date(props.userHealthFasting.fast_start_time).toISOString().slice(0, 16)
     : new Date().toISOString().slice(0, 16)
+  newEditFastingEndTime.value = props.userHealthFasting.fast_end_time
+    ? new Date(props.userHealthFasting.fast_end_time).toISOString().slice(0, 16)
+    : ''
+  newEditFastingStatus.value = props.userHealthFasting.status || 'in_progress'
   newEditFastingNotes.value = props.userHealthFasting.notes || ''
   editFastingId.value = `editFastingId${props.userHealthFasting.id}`
 
@@ -221,13 +261,25 @@ async function submitAddFasting() {
 }
 
 function submitEditFasting() {
+  const startTime = new Date(newEditFastingStartTime.value)
+  const endTime = newEditFastingEndTime.value ? new Date(newEditFastingEndTime.value) : null
+
+  let actualDurationSeconds = props.userHealthFasting.actual_duration_seconds ?? null
+  if (endTime && startTime && endTime > startTime) {
+    actualDurationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000)
+  }
+
   emit('editedFasting', {
     id: props.userHealthFasting.id,
     user_id: props.userHealthFasting.user_id,
-    fast_start_time: new Date(newEditFastingStartTime.value).toISOString(),
+    fast_start_time: startTime.toISOString(),
+    fast_end_time: endTime ? endTime.toISOString() : null,
     fasting_type: newEditFastingType.value,
     target_duration_seconds: targetDurationSeconds.value,
-    notes: newEditFastingNotes.value || null
+    actual_duration_seconds: actualDurationSeconds,
+    status: newEditFastingStatus.value,
+    notes: newEditFastingNotes.value || null,
+    source: props.userHealthFasting.source
   })
 }
 
