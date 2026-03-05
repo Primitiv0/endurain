@@ -162,8 +162,7 @@ def _extract_extension_data(
     Extract HR, cadence, and power from extensions.
 
     Args:
-        point: A gpxpy trackpoint with optional
-            extension elements.
+        point: A gpxpy trackpoint with optional extension elements.
 
     Returns:
         Tuple of (heart_rate, cadence, power) as ints.
@@ -838,19 +837,17 @@ def parse_gpx_file(
     Args:
         file: Path to the GPX file on disk.
         user_id: ID of the user uploading the file.
-        user_privacy_settings: ORM privacy settings for
-            the user.
+        user_privacy_settings: ORM privacy settings for the user.
         db: SQLAlchemy database session.
-        activity_name_input: Optional override for the
-            activity name.
+        activity_name_input: Optional override for the activity name.
 
     Returns:
         ParsedGpxData with Activity schema, waypoint
         arrays, lap data, and boolean stream flags.
 
     Raises:
-        HTTPException: 400 if the GPX has no tracks,
-            no segments, or no valid timed trackpoints.
+        HTTPException: 400 if the GPX has no tracks, no segments, or no valid
+            timed trackpoints.
         HTTPException: 500 if the file cannot be read.
     """
     try:
@@ -871,8 +868,7 @@ def parse_gpx_file(
                         status.HTTP_400_BAD_REQUEST
                     ),
                     detail=(
-                        "Invalid GPX file - no tracks"
-                        " found in the GPX file"
+                        "Invalid GPX file - no tracks found in the GPX file"
                     ),
                 )
 
@@ -887,9 +883,8 @@ def parse_gpx_file(
                             status.HTTP_400_BAD_REQUEST
                         ),
                         detail=(
-                            "Invalid GPX file - "
-                            "no segments found in "
-                            "the GPX file"
+                            "Invalid GPX file -  no segments found in the GPX "
+                            "file"
                         ),
                     )
 
@@ -908,8 +903,8 @@ def parse_gpx_file(
                     status.HTTP_400_BAD_REQUEST
                 ),
                 detail=(
-                    "Invalid GPX file - no trackpoints"
-                    " with valid time data found"
+                    "Invalid GPX file - no trackpoints with valid time data "
+                    "found"
                 ),
             )
 
