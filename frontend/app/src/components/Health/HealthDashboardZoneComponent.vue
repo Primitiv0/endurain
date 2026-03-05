@@ -2,197 +2,82 @@
   <div class="col">
     <div class="row">
       <!-- Today's sleep -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.sleep') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="todaySleep">{{ formatSecondsToHoursMinutes(todaySleep) }}</h1>
-            <h1 v-else>{{ $t('generalItems.labelNoData') }}</h1>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <span v-if="userHealthTargets && userHealthTargets['sleep']">
-              <font-awesome-icon
-                :icon="['fas', 'angle-down']"
-                class="me-1"
-                v-if="todaySleep < userHealthTargets.sleep"
-              />
-              <font-awesome-icon :icon="['fas', 'angle-up']" class="me-1" v-else />
-              {{ formatSecondsToHoursMinutes(userHealthTargets.sleep) }}
-            </span>
-            <span v-else>{{ $t('healthDashboardZoneComponent.noSleepTarget') }}</span>
-          </div>
-        </div>
-      </div>
-      <!-- resting heart rate -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.restingHeartRate') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="restingHeartRate">
-              {{ restingHeartRate }} {{ $t('generalItems.unitsBpm') }}
-            </h1>
-            <h1 v-else>{{ $t('generalItems.labelNoData') }}</h1>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <span v-if="hrvStatus">{{ $t(getHrvStatusI18nKey(hrvStatus)) }}</span>
-            <span v-else>{{ $t('generalItems.labelNoData') }}</span>
-          </div>
-        </div>
-      </div>
-      <!-- avg skin temperature deviation -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.avgSkinTemperatureDeviation') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="avgSkinTempDeviation">
-              {{ avgSkinTempDeviation }} {{ $t('generalItems.unitsCelsius') }}
-            </h1>
-            <h1 v-else>{{ $t('generalItems.labelNoData') }}</h1>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <span>{{ $t('generalItems.labelNoData') }}</span>
-          </div>
-        </div>
-      </div>
-      <!-- weight -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.weight') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="currentWeight && authStore?.user?.units === 'metric'">
-              {{ currentWeight }} {{ $t('generalItems.unitsKg') }}
-            </h1>
-            <h1 v-else-if="currentWeight && authStore.user.units === 'imperial'">
-              {{ kgToLbs(currentWeight) }} {{ $t('generalItems.unitsLbs') }}
-            </h1>
-            <h1 v-else>{{ $t('generalItems.labelNotApplicable') }}</h1>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <font-awesome-icon
-              :icon="['fas', 'angle-down']"
-              class="me-1"
-              v-if="userHealthTargets && currentWeight && currentWeight > userHealthTargets.weight"
-            />
-            <font-awesome-icon
-              :icon="['fas', 'angle-up']"
-              class="me-1"
-              v-else-if="
-                userHealthTargets && currentWeight && currentWeight <= userHealthTargets.weight
-              "
-            />
-            <span
-              v-if="
-                userHealthTargets &&
-                userHealthTargets['weight'] &&
-                authStore?.user?.units === 'metric'
-              "
-            >
-              {{ userHealthTargets.weight }} {{ $t('generalItems.unitsKg') }}
-            </span>
-            <span
-              v-else-if="
-                userHealthTargets &&
-                userHealthTargets['weight'] &&
-                authStore?.user?.units === 'imperial'
-              "
-            >
-              {{ kgToLbs(userHealthTargets.weight) }} {{ $t('generalItems.unitsLbs') }}
-            </span>
-            <span v-else>{{ $t('healthDashboardZoneComponent.noWeightTarget') }}</span>
-          </div>
-        </div>
-      </div>
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.sleep')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="sleepDisplay"
+        :no-data-label="$t('generalItems.labelNoData')"
+        :target-display-value="sleepTargetDisplay"
+        :no-target-label="$t('healthDashboardZoneComponent.noSleepTarget')"
+        :arrow-direction="sleepArrowDirection"
+      />
+
+      <!-- Resting heart rate -->
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.restingHeartRate')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="restingHrDisplay"
+        :no-data-label="$t('generalItems.labelNoData')"
+        :footer-text="hrvFooterText"
+      />
+
+      <!-- Avg skin temperature deviation -->
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.avgSkinTemperatureDeviation')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="skinTempDisplay"
+        :no-data-label="$t('generalItems.labelNoData')"
+        :footer-text="$t('generalItems.labelNoData')"
+      />
+
+      <!-- Weight -->
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.weight')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="weightDisplay"
+        :no-data-label="$t('generalItems.labelNotApplicable')"
+        :target-display-value="weightTargetDisplay"
+        :no-target-label="$t('healthDashboardZoneComponent.noWeightTarget')"
+        :arrow-direction="weightArrowDirection"
+      />
+
       <!-- BMI -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.bmi') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="currentBMI">{{ currentBMI }}</h1>
-            <h1 v-else>{{ $t('generalItems.labelNotApplicable') }}</h1>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <span v-if="currentBMI">{{ bmiDescription }}</span>
-            <span v-else-if="!currentBMI && currentWeight">{{
-              $t('healthDashboardZoneComponent.noHeightDefined')
-            }}</span>
-            <span v-else>{{ $t('healthDashboardZoneComponent.noWeightData') }}</span>
-          </div>
-        </div>
-      </div>
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.bmi')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="bmiDisplay"
+        :no-data-label="$t('generalItems.labelNotApplicable')"
+        :footer-text="bmiFooterText"
+      />
+
       <!-- Today's steps -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.steps') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="todaySteps">{{ todaySteps }}</h1>
-            <h1 v-else>{{ $t('generalItems.labelNotApplicable') }}</h1>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <span v-if="userHealthTargets && userHealthTargets['steps']">
-              <font-awesome-icon
-                :icon="['fas', 'angle-down']"
-                class="me-1"
-                v-if="todaySteps < userHealthTargets.steps"
-              />
-              <font-awesome-icon :icon="['fas', 'angle-up']" class="me-1" v-else />
-              {{ userHealthTargets.steps }}
-              {{ $t('healthDashboardZoneComponent.stepsTargetLabel') }}
-            </span>
-            <span v-else>{{ $t('healthDashboardZoneComponent.noStepsTarget') }}</span>
-          </div>
-        </div>
-      </div>
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.steps')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="stepsDisplay"
+        :no-data-label="$t('generalItems.labelNotApplicable')"
+        :target-display-value="stepsTargetDisplay"
+        :no-target-label="$t('healthDashboardZoneComponent.noStepsTarget')"
+        :arrow-direction="stepsArrowDirection"
+      />
+
       <!-- Fasting -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card mb-3 text-center shadow-sm">
-          <div class="card-header">
-            <h4>{{ $t('healthDashboardZoneComponent.fasting') }}</h4>
-          </div>
-          <div class="card-body">
-            <h1 v-if="activeFasting">
-              {{ formatSecondsToHoursMinutes(activeFastingElapsed) }}
-            </h1>
-            <h1 v-else>{{ $t('generalItems.labelNoData') }}</h1>
-            <span v-if="activeFasting" class="text-muted">
-              {{ activeFasting.fasting_type }}
-            </span>
-          </div>
-          <div class="card-footer text-body-secondary">
-            <span v-if="userHealthTargets && userHealthTargets['fasting']">
-              <font-awesome-icon
-                :icon="['fas', 'angle-down']"
-                class="me-1"
-                v-if="activeFasting && activeFastingElapsed < userHealthTargets.fasting"
-              />
-              <font-awesome-icon
-                :icon="['fas', 'angle-up']"
-                class="me-1"
-                v-else-if="activeFasting && activeFastingElapsed >= userHealthTargets.fasting"
-              />
-              {{ formatSecondsToHoursMinutes(userHealthTargets.fasting) }}
-            </span>
-            <span v-else>{{ $t('healthDashboardZoneComponent.noFastingTarget') }}</span>
-          </div>
-        </div>
-      </div>
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.fasting')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="fastingDisplay"
+        :no-data-label="$t('generalItems.labelNoData')"
+        :subtitle="fastingSubtitle"
+        :target-display-value="fastingTargetDisplay"
+        :no-target-label="$t('healthDashboardZoneComponent.noFastingTarget')"
+        :arrow-direction="fastingArrowDirection"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 // Importing the stores
@@ -200,8 +85,10 @@ import { useAuthStore } from '@/stores/authStore'
 import { kgToLbs } from '@/utils/unitsUtils'
 import { formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey } from '@/utils/healthUtils'
-//
+// Import services
 import { health } from '@/services/healthService'
+// Import components
+import HealthDashboardCardComponent from './HealthDashboardZone/HealthDashboardCardComponent.vue'
 
 const props = defineProps({
   userHealthTargets: {
@@ -228,6 +115,87 @@ const hrvStatus = ref(null)
 const avgSkinTempDeviation = ref(null)
 const activeFasting = ref(null)
 const activeFastingElapsed = ref(0)
+
+// Sleep computed properties
+const sleepDisplay = computed(() =>
+  todaySleep.value ? formatSecondsToHoursMinutes(todaySleep.value) : null
+)
+const sleepTargetDisplay = computed(() =>
+  props.userHealthTargets?.sleep ? formatSecondsToHoursMinutes(props.userHealthTargets.sleep) : null
+)
+const sleepArrowDirection = computed(() => {
+  if (!props.userHealthTargets?.sleep) return null
+  return todaySleep.value < props.userHealthTargets.sleep ? 'down' : 'up'
+})
+
+// Resting heart rate computed properties
+const restingHrDisplay = computed(() =>
+  restingHeartRate.value ? `${restingHeartRate.value} ${t('generalItems.unitsBpm')}` : null
+)
+const hrvFooterText = computed(() =>
+  hrvStatus.value ? t(getHrvStatusI18nKey(hrvStatus.value)) : t('generalItems.labelNoData')
+)
+
+// Skin temperature computed property
+const skinTempDisplay = computed(() =>
+  avgSkinTempDeviation.value
+    ? `${avgSkinTempDeviation.value} ${t('generalItems.unitsCelsius')}`
+    : null
+)
+
+// Weight computed properties
+const weightDisplay = computed(() => {
+  if (!currentWeight.value) return null
+  if (authStore?.user?.units === 'metric')
+    return `${currentWeight.value} ${t('generalItems.unitsKg')}`
+  return `${kgToLbs(currentWeight.value)} ${t('generalItems.unitsLbs')}`
+})
+const weightTargetDisplay = computed(() => {
+  if (!props.userHealthTargets?.weight) return null
+  if (authStore?.user?.units === 'metric')
+    return `${props.userHealthTargets.weight} ${t('generalItems.unitsKg')}`
+  return `${kgToLbs(props.userHealthTargets.weight)} ${t('generalItems.unitsLbs')}`
+})
+const weightArrowDirection = computed(() => {
+  if (!props.userHealthTargets?.weight || !currentWeight.value) return null
+  return currentWeight.value > props.userHealthTargets.weight ? 'down' : 'up'
+})
+
+// BMI computed properties
+const bmiDisplay = computed(() => (currentBMI.value ? String(currentBMI.value) : null))
+const bmiFooterText = computed(() => {
+  if (currentBMI.value) return bmiDescription.value
+  if (currentWeight.value) return t('healthDashboardZoneComponent.noHeightDefined')
+  return t('healthDashboardZoneComponent.noWeightData')
+})
+
+// Steps computed properties
+const stepsDisplay = computed(() => (todaySteps.value ? String(todaySteps.value) : null))
+const stepsTargetDisplay = computed(() => {
+  if (!props.userHealthTargets?.steps) return null
+  return `${props.userHealthTargets.steps} ${t('healthDashboardZoneComponent.stepsTargetLabel')}`
+})
+const stepsArrowDirection = computed(() => {
+  if (!props.userHealthTargets?.steps) return null
+  return todaySteps.value < props.userHealthTargets.steps ? 'down' : 'up'
+})
+
+// Fasting computed properties
+const fastingDisplay = computed(() =>
+  activeFasting.value ? formatSecondsToHoursMinutes(activeFastingElapsed.value) : null
+)
+const fastingSubtitle = computed(() =>
+  activeFasting.value ? activeFasting.value.fasting_type : null
+)
+const fastingTargetDisplay = computed(() =>
+  props.userHealthTargets?.fasting
+    ? formatSecondsToHoursMinutes(props.userHealthTargets.fasting)
+    : null
+)
+const fastingArrowDirection = computed(() => {
+  if (!props.userHealthTargets?.fasting || !activeFasting.value) return null
+  return activeFastingElapsed.value < props.userHealthTargets.fasting ? 'down' : 'up'
+})
 
 onMounted(async () => {
   try {
