@@ -1,7 +1,7 @@
 <template>
-  <div v-if="isLoading">
-    <LoadingComponent />
-  </div>
+  <h1 class="placeholder-glow" v-if="isLoading">
+    <span class="placeholder col-6 bg-secondary rounded"></span>
+  </h1>
   <h1 v-else>{{ gear?.nickname }}</h1>
 
   <div class="row row-gap-3 mt-4">
@@ -9,174 +9,202 @@
     <div class="col-lg-3 col-md-12">
       <div class="bg-body-tertiary p-3 rounded shadow-sm">
         <!-- Gear photo -->
-        <div v-if="isLoading">
-          <LoadingComponent />
+        <div class="justify-content-center align-items-center d-flex placeholder-glow mb-3">
+          <span
+            class="placeholder bg-secondary rounded-circle flex-shrink-0"
+            style="width: 180px; height: 180px"
+            aria-hidden="true"
+            v-if="isLoading"
+          ></span>
+          <img
+            :src="getGearAvatar(gear?.gear_type)"
+            :alt="
+              $t(
+                `gearView.gearTypeOption${
+                  gear.gear_type >= 1 && gear.gear_type <= 8 ? gear.gear_type : 8
+                }`
+              ) + ' avatar'
+            "
+            width="180"
+            height="180"
+            class="rounded-circle"
+            v-else-if="gear"
+          />
         </div>
-        <div v-else>
-          <div class="justify-content-center align-items-center d-flex">
-            <img
-              :src="getGearAvatar(gear?.gear_type)"
-              :alt="
+        <div class="vstack justify-content-center align-items-center d-flex">
+          <!-- badges placeholder -->
+          <div class="hstack justify-content-center gap-1 mb-2 placeholder-glow" v-if="isLoading">
+            <span class="placeholder bg-secondary rounded" style="width: 70px; height: 22px"></span>
+            <span class="placeholder bg-secondary rounded" style="width: 70px; height: 22px"></span>
+          </div>
+          <!-- badges -->
+          <div class="hstack justify-content-center mb-2" v-else-if="gear">
+            <span
+              class="badge bg-success-subtle border border-success-subtle text-success-emphasis align-middle"
+              v-if="gear.active == true"
+            >
+              {{ $t('gearView.gearIsActiveBadge') }}
+            </span>
+            <span
+              class="badge bg-danger-subtle border border-danger-subtle text-danger-emphasis align-middle"
+              v-else
+            >
+              {{ $t('gearView.gearIsInactiveBadge') }}
+            </span>
+            <span
+              class="ms-2 badge bg-primary-subtle border border-primary-subtle text-primary-emphasis align-middle"
+            >
+              {{
                 $t(
-                  `gearView.gearTypeOption${
-                    gear?.gear_type >= 1 && gear?.gear_type <= 8 ? gear?.gear_type : 8
-                  }`
-                ) + ' avatar'
-              "
-              width="180"
-              height="180"
-              class="rounded-circle"
-            />
-          </div>
-          <br />
-          <div class="vstack justify-content-center align-items-center d-flex">
-            <!-- badges  -->
-            <div class="hstack justify-content-center">
-              <span
-                class="badge bg-success-subtle border border-success-subtle text-success-emphasis align-middle"
-                v-if="gear?.active == true"
-              >
-                {{ $t('gearView.gearIsActiveBadge') }}
-              </span>
-              <span
-                class="badge bg-danger-subtle border border-danger-subtle text-danger-emphasis align-middle"
-                v-else
-              >
-                {{ $t('gearView.gearIsInactiveBadge') }}
-              </span>
-              <span
-                class="ms-2 badge bg-primary-subtle border border-primary-subtle text-primary-emphasis align-middle"
-              >
-                {{
-                  $t(
-                    `gearView.gearTypeOption${gear?.gear_type >= 1 && gear?.gear_type <= 8 ? gear?.gear_type : 8}`
-                  )
-                }}
-              </span>
-              <span
-                class="ms-2 badge bg-primary-subtle border border-primary-subtle text-primary-emphasis align-middle"
-                v-if="gear?.strava_gear_id"
-              >
-                {{ $t('gearView.gearFromStrava') }}
-              </span>
-              <span
-                class="ms-2 badge bg-primary-subtle border border-primary-subtle text-primary-emphasis align-middle"
-                v-if="gear?.garminconnect_gear_id"
-              >
-                {{ $t('gearView.gearFromGarminConnect') }}
-              </span>
-            </div>
-          </div>
-          <!-- add component zone -->
-          <button
-            type="button"
-            class="mt-2 w-100 btn btn-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#addGearComponentModal"
-            :disabled="![1, 2, 4, 7].includes(gear?.gear_type)"
-          >
-            {{ $t('gearView.buttonAddComponent') }}
-          </button>
-
-          <!-- add component modal -->
-          <GearComponentAddEditModalComponent
-            :action="'add'"
-            :gear="gear"
-            @createdGearComponent="addGearComponentList"
-            @isLoadingNewGearComponent="setIsLoadingNewGearComponent"
-          />
-
-          <hr />
-
-          <!-- edit gear zone -->
-          <button
-            type="button"
-            class="w-100 btn btn-primary"
-            data-bs-toggle="modal"
-            :data-bs-target="`#editGearModal${gear?.id}`"
-          >
-            {{ $t('gearView.buttonEditGear') }}
-          </button>
-
-          <!-- edit gear modal -->
-          <GearsAddEditGearModalComponent
-            :action="'edit'"
-            :gear="gear"
-            @editedGear="editGearList"
-          />
-
-          <button
-            type="button"
-            class="mt-2 w-100 btn btn-danger"
-            data-bs-toggle="modal"
-            data-bs-target="#deleteGearModal"
-          >
-            {{ $t('gearView.buttonDeleteGear') }}
-          </button>
-
-          <!-- Modal delete gear -->
-          <ModalComponent
-            modalId="deleteGearModal"
-            :title="t('gearView.buttonDeleteGear')"
-            :body="`${t('gearView.modalDeleteGearBody1')} <b>${gear?.nickname}</b>?<br>${t('gearView.modalDeleteGearBody2')}`"
-            :actionButtonType="`danger`"
-            :actionButtonText="t('gearView.buttonDeleteGear')"
-            @submitAction="submitDeleteGear"
-          />
-
-          <hr />
-
-          <!-- details  -->
-          <div class="vstack align-items-center">
-            <span class="mt-2" v-if="gear?.gear_type !== 4">
-              <strong> {{ $t('gearView.labelDistance') }}: </strong>
-              <span v-if="authStore?.user?.units === 'metric'">
-                {{ gearDistance }} {{ $t('generalItems.unitsKm') }}</span
-              >
-              <span v-else> {{ kmToMiles(gearDistance) }} {{ $t('generalItems.unitsMiles') }}</span>
+                  `gearView.gearTypeOption${gear.gear_type >= 1 && gear.gear_type <= 8 ? gear.gear_type : 8}`
+                )
+              }}
             </span>
-            <span v-else>
-              <strong> {{ $t('gearView.labelTime') }}: </strong>
-              <span>{{ formatSecondsToHoursMinutesSeconds(gearTime) }}</span>
+            <span
+              class="ms-2 badge bg-primary-subtle border border-primary-subtle text-primary-emphasis align-middle"
+              v-if="gear.strava_gear_id"
+            >
+              {{ $t('gearView.gearFromStrava') }}
             </span>
-            <span class="mt-2" v-if="gear?.brand"
-              ><strong>{{ $t('gearView.labelBrand') }}:</strong> {{ gear?.brand }}</span
+            <span
+              class="ms-2 badge bg-primary-subtle border border-primary-subtle text-primary-emphasis align-middle"
+              v-if="gear.garminconnect_gear_id"
             >
-            <span class="mt-2" v-if="gear?.model"
-              ><strong>{{ $t('gearView.labelModel') }}:</strong> {{ gear?.model }}</span
+              {{ $t('gearView.gearFromGarminConnect') }}
+            </span>
+          </div>
+        </div>
+        <!-- add component zone -->
+        <button
+          type="button"
+          class="mt-2 w-100 btn btn-primary"
+          data-bs-toggle="modal"
+          data-bs-target="#addGearComponentModal"
+          :disabled="![1, 2, 4, 7].includes(gear?.gear_type) || isLoading"
+        >
+          {{ $t('gearView.buttonAddComponent') }}
+        </button>
+
+        <!-- add component modal -->
+        <GearComponentAddEditModalComponent
+          :action="'add'"
+          :gear="gear"
+          @createdGearComponent="addGearComponentList"
+          @isLoadingNewGearComponent="setIsLoadingNewGearComponent"
+          v-if="!isLoading"
+        />
+
+        <hr />
+
+        <!-- edit gear zone -->
+        <button
+          type="button"
+          class="w-100 btn btn-primary"
+          data-bs-toggle="modal"
+          :data-bs-target="`#editGearModal${gear?.id}`"
+          :disabled="isLoading"
+        >
+          {{ $t('gearView.buttonEditGear') }}
+        </button>
+
+        <!-- edit gear modal -->
+        <GearsAddEditGearModalComponent
+          :action="'edit'"
+          :gear="gear"
+          @editedGear="editGearList"
+          v-if="!isLoading"
+        />
+
+        <button
+          type="button"
+          class="mt-2 w-100 btn btn-danger"
+          data-bs-toggle="modal"
+          data-bs-target="#deleteGearModal"
+          :disabled="isLoading"
+        >
+          {{ $t('gearView.buttonDeleteGear') }}
+        </button>
+
+        <!-- Modal delete gear -->
+        <ModalComponent
+          modalId="deleteGearModal"
+          :title="t('gearView.buttonDeleteGear')"
+          :body="`${t('gearView.modalDeleteGearBody1')} <b>${gear?.nickname}</b>?<br>${t('gearView.modalDeleteGearBody2')}`"
+          :actionButtonType="`danger`"
+          :actionButtonText="t('gearView.buttonDeleteGear')"
+          @submitAction="submitDeleteGear"
+          v-if="!isLoading"
+        />
+
+        <hr />
+
+        <!-- details  -->
+        <div v-if="isLoading">
+          <div class="placeholder-glow mb-2">
+            <span class="placeholder w-100 bg-secondary rounded"></span>
+          </div>
+          <div class="placeholder-glow mb-2">
+            <span class="placeholder w-100 bg-secondary rounded"></span>
+          </div>
+          <div class="placeholder-glow mb-2">
+            <span class="placeholder w-100 bg-secondary rounded"></span>
+          </div>
+          <div class="placeholder-glow mb-2">
+            <span class="placeholder w-100 bg-secondary rounded"></span>
+          </div>
+        </div>
+        <div class="vstack align-items-center" v-else-if="gear">
+          <span class="mt-2" v-if="gear?.gear_type !== 4">
+            <strong> {{ $t('gearView.labelDistance') }}: </strong>
+            <span v-if="authStore?.user?.units === 'metric'">
+              {{ gearDistance }} {{ $t('generalItems.unitsKm') }}</span
             >
-            <div class="mt-2" v-if="gear?.purchase_value">
-              <span class="me-1"
-                ><strong>{{ $t('gearView.labelPurchaseValue') }}:</strong>
-                {{ gear?.purchase_value }}</span
-              >
-              <span v-if="authStore.user.currency === 'euro'">{{
-                $t('generalItems.currencyEuroSymbol')
-              }}</span>
-              <span v-else-if="authStore.user.currency === 'dollar'">{{
-                $t('generalItems.currencyDollarSymbol')
-              }}</span>
-              <span v-else>{{ $t('generalItems.currencyPoundSymbol') }}</span>
-            </div>
-            <div class="mt-2">
-              <span class="me-1"
-                ><strong>{{ $t('gearView.labelTotalCost') }}:</strong> {{ gearTotalValue }}</span
-              >
-              <span v-if="authStore.user.currency === 'euro'">{{
-                $t('generalItems.currencyEuroSymbol')
-              }}</span>
-              <span v-else-if="authStore.user.currency === 'dollar'">{{
-                $t('generalItems.currencyDollarSymbol')
-              }}</span>
-              <span v-else>{{ $t('generalItems.currencyPoundSymbol') }}</span>
-            </div>
+            <span v-else> {{ kmToMiles(gearDistance) }} {{ $t('generalItems.unitsMiles') }}</span>
+          </span>
+          <span v-else>
+            <strong> {{ $t('gearView.labelTime') }}: </strong>
+            <span>{{ formatSecondsToHoursMinutesSeconds(gearTime) }}</span>
+          </span>
+          <span class="mt-2" v-if="gear?.brand"
+            ><strong>{{ $t('gearView.labelBrand') }}:</strong> {{ gear?.brand }}</span
+          >
+          <span class="mt-2" v-if="gear?.model"
+            ><strong>{{ $t('gearView.labelModel') }}:</strong> {{ gear?.model }}</span
+          >
+          <div class="mt-2" v-if="gear?.purchase_value">
+            <span class="me-1"
+              ><strong>{{ $t('gearView.labelPurchaseValue') }}:</strong>
+              {{ gear?.purchase_value }}</span
+            >
+            <span v-if="authStore.user.currency === 'euro'">{{
+              $t('generalItems.currencyEuroSymbol')
+            }}</span>
+            <span v-else-if="authStore.user.currency === 'dollar'">{{
+              $t('generalItems.currencyDollarSymbol')
+            }}</span>
+            <span v-else>{{ $t('generalItems.currencyPoundSymbol') }}</span>
+          </div>
+          <div class="mt-2">
+            <span class="me-1"
+              ><strong>{{ $t('gearView.labelTotalCost') }}:</strong> {{ gearTotalValue }}</span
+            >
+            <span v-if="authStore.user.currency === 'euro'">{{
+              $t('generalItems.currencyEuroSymbol')
+            }}</span>
+            <span v-else-if="authStore.user.currency === 'dollar'">{{
+              $t('generalItems.currencyDollarSymbol')
+            }}</span>
+            <span v-else>{{ $t('generalItems.currencyPoundSymbol') }}</span>
           </div>
         </div>
       </div>
     </div>
     <div class="col-lg-5">
-      <div v-if="isLoading">
-        <LoadingComponent />
+      <div class="bg-body-tertiary p-3 rounded" v-if="isLoading">
+        <h5 class="placeholder-glow">
+          <span class="placeholder col-6 bg-secondary rounded"></span>
+        </h5>
+        <ListWithIconPlaceholderComponent :numberOfRows="5" />
       </div>
       <div v-else class="bg-body-tertiary p-3 rounded shadow-sm">
         <div class="hstack align-items-baseline justify-content-between">
@@ -226,8 +254,11 @@
       </div>
     </div>
     <div class="col">
-      <div v-if="isLoading">
-        <LoadingComponent />
+      <div class="bg-body-tertiary p-3 rounded" v-if="isLoading">
+        <h5 class="placeholder-glow">
+          <span class="placeholder col-6 bg-secondary rounded"></span>
+        </h5>
+        <ListPlaceholderComponent :numberOfRows="5" />
       </div>
       <div v-else class="bg-body-tertiary p-3 rounded shadow-sm">
         <div class="hstack align-items-baseline">
@@ -307,6 +338,8 @@ import GearsAddEditGearModalComponent from '@/components/Gears/GearsAddEditGearM
 import GearComponentListComponent from '@/components/Gears/GearComponentListComponent.vue'
 import GearComponentAddEditModalComponent from '@/components/Gears/GearComponentAddEditModalComponent.vue'
 import PaginationComponent from '@/components/GeneralComponents/PaginationComponent.vue'
+import ListPlaceholderComponent from '@/components/PlaceholderComponents/ListPlaceholderComponent.vue'
+import ListWithIconPlaceholderComponent from '@/components/PlaceholderComponents/ListWithIconPlaceholderComponent.vue'
 import { gears } from '@/services/gearsService'
 import { gearsComponents } from '@/services/gearsComponentsService'
 import { activities } from '@/services/activitiesService'
@@ -462,8 +495,9 @@ onMounted(async () => {
       })
     }
     push.error(`${t('gearView.errorFetchingGears')} - ${error}`)
+  } finally {
+    isLoading.value = false
   }
-  isLoading.value = false
 })
 
 // Watch the page number variable.

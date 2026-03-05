@@ -14,10 +14,10 @@
         ></span>
         <div class="ms-3 flex-grow-1">
           <div class="placeholder-glow mb-1">
-            <span class="placeholder col-4 bg-secondary rounded"></span>
+            <span class="placeholder col-6 bg-secondary rounded"></span>
           </div>
           <div class="placeholder-glow">
-            <span class="placeholder col-2 bg-secondary rounded"></span>
+            <span class="placeholder col-3 bg-secondary rounded"></span>
           </div>
         </div>
       </div>
