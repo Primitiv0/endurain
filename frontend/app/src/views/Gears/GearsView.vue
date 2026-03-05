@@ -122,6 +122,9 @@ const pageNumber = ref(1)
 const totalPages = ref(1)
 const numRecords = serverSettingsStore.serverSettings.num_records_per_page || 25
 const searchNickname = ref('')
+const filterValues = ref({
+  showInactive: false
+})
 
 const performSearch = debounce(async () => {
   // If the search nickname is empty, reset the list to initial state.
@@ -129,7 +132,7 @@ const performSearch = debounce(async () => {
     // Reset the list to the initial state when search text is cleared
     pageNumber.value = 1
     // Fetch gears
-    await fetchGears()
+    await updateGears()
     // Exit the function
     return
   }
@@ -151,30 +154,20 @@ async function updateGears() {
     // Set the loading variable to true.
     isGearsUpdatingLoading.value = true
 
-    // Fetch the gears with pagination.
-    userGears.value = await gears.getUserGearsWithPagination(pageNumber.value, numRecords)
-
-    // Set the loading variable to false.
-    isGearsUpdatingLoading.value = false
-  } catch (error) {
-    // If there is an error, set the error message and show the error alert.
-    push.error(`${t('gearsView.errorFetchingGears')} - ${error}`)
-  }
-}
-
-async function fetchGears() {
-  try {
-    // Get the total number of user gears.
-    userGearsNumber.value = await gears.getUserGearsNumber()
-
-    // Fetch the gears with pagination.
-    await updateGears()
-
-    // Update total pages
+    const gearsDataPagination = await gears.getUserGearsWithPagination(
+      pageNumber.value,
+      numRecords,
+      filterValues.value
+    )
+    userGears.value = gearsDataPagination.records
+    userGearsNumber.value = gearsDataPagination.total
     totalPages.value = Math.ceil(userGearsNumber.value / numRecords)
   } catch (error) {
     // If there is an error, set the error message and show the error alert.
     push.error(`${t('gearsView.errorFetchingGears')} - ${error}`)
+  } finally {
+    // Set the loading variable to false.
+    isGearsUpdatingLoading.value = false
   }
 }
 
@@ -190,7 +183,7 @@ onMounted(async () => {
   }
 
   // Fetch gears
-  await fetchGears()
+  await updateGears()
 
   // Set the isLoading variables to false.
   isGearsUpdatingLoading.value = false

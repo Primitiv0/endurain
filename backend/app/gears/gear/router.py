@@ -1,6 +1,6 @@
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, status, Security
+from fastapi import APIRouter, Depends, HTTPException, status, Security, Query
 from sqlalchemy.orm import Session
 
 import auth.security as auth_security
@@ -10,50 +10,19 @@ import gears.gear.crud as gears_crud
 import gears.gear.dependencies as gears_dependencies
 
 import core.database as core_database
+import core.dependencies as core_dependencies
 
 # Define the API router
 router = APIRouter()
 
-
 @router.get(
     "",
-    response_model=list[gears_schema.Gear] | None,
+    response_model=gears_schema.GearsListResponse,
 )
-async def read_gears(
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["gears:read"])
+async def read_gears_user_all_pagination(
+    _validate_pagination_values_on_query: Annotated[
+        Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
-    db: Annotated[Session, Depends(core_database.get_db)],
-):
-    # Return the gear
-    return gears_crud.get_gear_user(token_user_id, db)
-
-
-@router.get(
-    "/id/{gear_id}",
-    response_model=gears_schema.Gear | None,
-)
-async def read_gear_id(
-    gear_id: int,
-    validate_gear_id: Annotated[Callable, Depends(gears_dependencies.validate_gear_id)],
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["gears:read"])
-    ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
-    db: Annotated[Session, Depends(core_database.get_db)],
-):
-    # Return the gear
-    return gears_crud.get_gear_user_by_id(token_user_id, gear_id, db)
-
-
-@router.get(
-    "/page_number/{page_number}/num_records/{num_records}",
-    response_model=list[gears_schema.Gear] | None,
-)
-async def read_gear_user_pagination(
-    page_number: int,
-    num_records: int,
     _check_scopes: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["gears:read"])
     ],
@@ -62,36 +31,30 @@ async def read_gear_user_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    page_number: Annotated[
+        int | None,
+        Query(description="Pagination page number"),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(description="Number of records per page"),
+    ] = None,
+    show_inactive: Annotated[
+        bool | None,
+        Query(description="Filter by inactive status"),
+    ] = None,
 ):
-    # Return the gear
-    return gears_crud.get_gear_users_with_pagination(
-        token_user_id, db, page_number, num_records
+    total = gears_crud.get_gears_number(db)
+    gears = gears_crud.get_gear_users_with_pagination(
+        token_user_id, db, page_number, num_records, show_inactive
     )
 
-
-@router.get(
-    "/number",
-    response_model=int,
-)
-async def read_gear_user_number(
-    _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["gears:read"])
-    ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
-):
-    # Get the gear
-    gear = gears_crud.get_gear_user(token_user_id, db)
-
-    # Check if gear is None and return 0 if it is
-    if gear is None:
-        return 0
-
-    # Return the number of gears
-    return len(gear)
+    return gears_schema.GearsListResponse(
+        total=total,
+        num_records=num_records,
+        page_number=page_number,
+        records=gears,
+    )
 
 
 @router.get(

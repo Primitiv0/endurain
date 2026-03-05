@@ -9,7 +9,7 @@ import { fetchPublicGetRequest } from '@/utils/servicePublicUtils'
 
 export const users = {
   // Users authenticated
-  getUsersWithPagination(pageNumber, numRecords, filters = {}) {
+  getUsersWithPagination(pageNumber = null, numRecords = null, filters = {}) {
     let queryString = `users?`
 
     Object.keys(filters).forEach((key) => {

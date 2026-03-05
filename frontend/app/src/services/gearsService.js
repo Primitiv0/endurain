@@ -6,8 +6,26 @@ import {
 } from '@/utils/serviceUtils'
 
 export const gears = {
-  getGears() {
-    return fetchGetRequest('gears')
+  getUserGearsWithPagination(pageNumber = null, numRecords = null, filters = {}) {
+    let queryString = `gears?`
+
+    Object.keys(filters).forEach((key) => {
+      if (filters[key] !== null && filters[key] !== undefined) {
+        // Convert camelCase to snake_case
+        const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+        queryString += `${snakeKey}=${encodeURIComponent(filters[key])}&`
+      }
+    })
+
+    // Add pagination parameters only if they are provided
+    if (pageNumber !== null && numRecords !== null) {
+      queryString += `page_number=${pageNumber}&num_records=${numRecords}&`
+    }
+
+    // Remove trailing '&' or '?' if no filters were added
+    queryString = queryString.slice(0, -1)
+
+    return fetchGetRequest(queryString)
   },
   getGearById(gearId) {
     return fetchGetRequest(`gears/id/${gearId}`)
@@ -20,12 +38,6 @@ export const gears = {
   },
   getGearByNickname(nickname) {
     return fetchGetRequest(`gears/nickname/${nickname}`)
-  },
-  getUserGearsWithPagination(pageNumber, numRecords) {
-    return fetchGetRequest(`gears/page_number/${pageNumber}/num_records/${numRecords}`)
-  },
-  getUserGearsNumber() {
-    return fetchGetRequest('gears/number')
   },
   createGear(data) {
     return fetchPostRequest('gears', data)

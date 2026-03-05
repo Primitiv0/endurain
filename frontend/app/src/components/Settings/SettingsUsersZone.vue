@@ -171,9 +171,10 @@ async function updateUsers() {
     usersArray.value = usersDataPagination.records
     usersNumber.value = usersDataPagination.total
     totalPages.value = Math.ceil(usersNumber.value / numRecords)
-    isUsersUpdatingLoading.value = false
   } catch (error) {
     push.error(`${t('settingsUsersZone.errorFetchingUsers')} - ${error}`)
+  } finally {
+    isUsersUpdatingLoading.value = false
   }
 }
 

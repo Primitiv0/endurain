@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from urllib.parse import unquote
@@ -8,6 +8,7 @@ import gears.gear.schema as gears_schema
 import gears.gear.utils as gears_utils
 import gears.gear.models as gears_models
 
+import core.decorators as core_decorators
 import core.logger as core_logger
 
 
@@ -41,42 +42,69 @@ def get_gear_user_by_id(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from err
+    
 
+@core_decorators.handle_db_errors
+def get_gears_number(db: Session) -> int:
+    """
+    Get total count of gears in the database.
 
+    Args:
+        db: SQLAlchemy database session.
+
+    Returns:
+        Total number of gears.
+
+    Raises:
+        HTTPException: 500 error if database query fails.
+    """
+    stmt = select(func.count(gears_models.Gear.id))
+    return db.execute(stmt).scalar_one()
+    
+@core_decorators.handle_db_errors
 def get_gear_users_with_pagination(
-    user_id: int, db: Session, page_number: int = 1, num_records: int = 5
-) -> list[gears_schema.Gear] | None:
-    try:
-        # Get the gear by user ID from the database
-        gears = (
-            db.query(gears_models.Gear)
-            .filter(gears_models.Gear.user_id == user_id)
-            .order_by(gears_models.Gear.nickname.asc())
-            .offset((page_number - 1) * num_records)
-            .limit(num_records)
-            .all()
-        )
+    user_id: int,
+    db: Session,
+    page_number: int | None = None,
+    num_records: int | None = None,
+    show_inactive: bool | None = True,
+) -> list[gears_models.Gear]:
+    """
+    Retrieve a paginated list of gears for a specific user with optional 
+    filtering.
 
-        # Check if gear is None and return None if it is
-        if gears is None:
-            return None
+    Args:
+        db (Session): Database session for executing queries.
+        page_number (int | None): The page number for pagination (1-indexed).
+            If None, pagination is not applied. Defaults to None.
+        num_records (int | None): The number of records per page.
+            If None, pagination is not applied. Defaults to None.
+        show_inactive (bool | None): If False, excludes inactive gears.
+            Defaults to True (includes inactive gears).
 
-        # Format the created_at date
-        for g in gears:
-            g = gears_utils.serialize_gear(g)
+    Returns:
+        list[gears_models.Gear]: A list of Gear objects matching the specified
+            criteria, ordered by nickname. Returns an empty list if no gears
+            match the filters.
+    """
+    stmt = select(gears_models.Gear).where(gears_models.Gear.user_id == user_id)
 
-        # Return the gear
-        return gears
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_gear_users_with_pagination: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    if show_inactive is False:
+        stmt = stmt.where(gears_models.Gear.active.is_(True))
+
+    stmt = stmt.order_by(gears_models.Gear.nickname)
+
+    if page_number is not None and num_records is not None:
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
+
+    gears = db.execute(stmt).scalars().all()
+
+    # Format the created_at date
+    for g in gears:
+        g = gears_utils.serialize_gear(g)
+
+    # Return the gear
+    return gears
 
 
 def get_gear_user(user_id: int, db: Session) -> list[gears_schema.Gear] | None:
