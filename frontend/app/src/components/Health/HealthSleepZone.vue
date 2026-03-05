@@ -38,7 +38,11 @@
         @fieldsToEmitAction="submitSetSleepTarget"
       />
 
-      <LoadingComponent class="mt-3" v-if="isLoadingParent || isLoading" />
+      <BarChartPlaceholderComponent
+        class="mt-3"
+        :number-of-bars="7"
+        v-if="isLoadingParent || isLoading"
+      />
       <!-- Checking if userHealthSleepPagination is loaded and has length -->
       <!-- show graph -->
       <HealthSleepBarChartComponent
@@ -51,7 +55,10 @@
 
       <div class="row row-gap-3 mt-3 align-items-center">
         <div class="col-sm-7">
-          <span>
+          <div class="placeholder-glow" v-if="isLoadingParent || isLoading">
+            <span class="placeholder col-8 bg-secondary rounded"></span>
+          </div>
+          <span v-else>
             {{ $t('healthSleepZoneComponent.labelNumberOfHealthSleep1') }}{{ userHealthSleepNumber
             }}{{ $t('healthSleepZoneComponent.labelNumberOfHealthSleep2')
             }}{{ userHealthSleepPagination.length
@@ -61,7 +68,11 @@
 
         <div class="col">
           <form class="d-flex">
-            <select class="form-select" v-model="intervalFilter">
+            <select
+              class="form-select"
+              :disabled="isLoadingParent || isLoading"
+              v-model="intervalFilter"
+            >
               <option value="last_7_days">{{ $t('healthView.filter_last_7_days') }}</option>
               <option value="last_30_days">{{ $t('healthView.filter_last_30_days') }}</option>
               <option value="last_90_days">{{ $t('healthView.filter_last_90_days') }}</option>
@@ -69,7 +80,11 @@
               <option value="all_time">{{ $t('healthView.filter_all_time') }}</option>
             </select>
 
-            <select class="form-select ms-2" v-model="paginationFilter">
+            <select
+              class="form-select ms-2"
+              :disabled="isLoadingParent || isLoading"
+              v-model="paginationFilter"
+            >
               <option value="disabled">{{ $t('healthView.paginationDisabled') }}</option>
               <option value="5">5</option>
               <option value="10">10</option>
@@ -82,13 +97,13 @@
       </div>
 
       <!-- Displaying loading new sleep if applicable -->
-      <ul class="mt-3 list-group list-group-flush" v-if="isLoadingNewSleep">
-        <li class="list-group-item rounded">
-          <LoadingComponent />
-        </li>
-      </ul>
+      <ListPlaceholderComponent class="mt-3" :numberOfRows="1" v-if="isLoadingNewSleep" />
 
-      <LoadingComponent class="mt-3" v-if="isLoadingParent || isLoading" />
+      <ListPlaceholderComponent
+        class="mt-3"
+        :numberOfRows="5"
+        v-if="isLoadingParent || isLoading"
+      />
       <div v-else-if="userHealthSleepPagination && userHealthSleepPagination.length" class="mt-3">
         <!-- list zone -->
         <ul
@@ -129,9 +144,10 @@ import HealthSleepAddEditModalComponent from './HealthSleepZone/HealthSleepAddEd
 import ModalComponentHoursMinutesInput from '../Modals/ModalComponentHoursMinutesInput.vue'
 import HealthSleepBarChartComponent from './HealthSleepZone/HealthSleepBarChartComponent.vue'
 import HealthSleepListComponent from './HealthSleepZone/HealthSleepListComponent.vue'
-import LoadingComponent from '../GeneralComponents/LoadingComponent.vue'
+import BarChartPlaceholderComponent from '../PlaceholderComponents/BarChartPlaceholderComponent.vue'
 import NoItemsFoundComponent from '../GeneralComponents/NoItemsFoundComponents.vue'
 import PaginationComponent from '../GeneralComponents/PaginationComponent.vue'
+import ListPlaceholderComponent from '../PlaceholderComponents/ListPlaceholderComponent.vue'
 // import stores
 import { health_sleep } from '@/services/health_sleepService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'

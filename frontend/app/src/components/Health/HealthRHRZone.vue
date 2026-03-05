@@ -1,17 +1,20 @@
 <template>
   <div class="col">
     <div class="bg-body-tertiary rounded p-3 shadow-sm">
-      <LoadingComponent v-if="isLoadingParent || isLoading" />
+      <LineChartPlaceholderComponent class="mt-3" v-if="isLoadingParent || isLoading" />
       <!-- show graph -->
       <HealthRHRLineChartComponent
         :userHealthSleep="userHealthSleepPagination"
         :isLoading="isLoading"
-        v-if="userHealthSleepPagination && userHealthSleepPagination.length"
+        v-else-if="userHealthSleepPagination && userHealthSleepPagination.length"
       />
 
       <div class="row row-gap-3 mt-3 align-items-center">
         <div class="col-sm-7">
-          <span>
+          <div class="placeholder-glow" v-if="isLoadingParent || isLoading">
+            <span class="placeholder col-8 bg-secondary rounded"></span>
+          </div>
+          <span v-else>
             {{ $t('healthRHRZoneComponent.labelNumberOfHealthRHR1') }}{{ userHealthSleepNumber
             }}{{ $t('healthRHRZoneComponent.labelNumberOfHealthRHR2')
             }}{{ userHealthSleepPagination.length
@@ -21,7 +24,11 @@
 
         <div class="col">
           <form class="d-flex">
-            <select class="form-select" v-model="intervalFilter">
+            <select
+              class="form-select"
+              :disabled="isLoadingParent || isLoading"
+              v-model="intervalFilter"
+            >
               <option value="last_7_days">{{ $t('healthView.filter_last_7_days') }}</option>
               <option value="last_30_days">{{ $t('healthView.filter_last_30_days') }}</option>
               <option value="last_90_days">{{ $t('healthView.filter_last_90_days') }}</option>
@@ -29,7 +36,11 @@
               <option value="all_time">{{ $t('healthView.filter_all_time') }}</option>
             </select>
 
-            <select class="form-select ms-2" v-model="paginationFilter">
+            <select
+              class="form-select ms-2"
+              :disabled="isLoadingParent || isLoading"
+              v-model="paginationFilter"
+            >
               <option value="disabled">{{ $t('healthView.paginationDisabled') }}</option>
               <option value="5">5</option>
               <option value="10">10</option>
@@ -41,8 +52,13 @@
         </div>
       </div>
 
+      <ListPlaceholderComponent
+        class="mt-3"
+        :numberOfRows="5"
+        v-if="isLoadingParent || isLoading"
+      />
       <!-- Checking if userHealthSleep is loaded and has length -->
-      <div v-if="userHealthSleepPagination && userHealthSleepPagination.length">
+      <div v-else-if="userHealthSleepPagination && userHealthSleepPagination.length">
         <!-- list zone -->
         <ul
           class="my-3 list-group list-group-flush"
@@ -76,9 +92,10 @@ import { useI18n } from 'vue-i18n'
 
 import HealthRHRLineChartComponent from './HealthRHRZone/HealthRHRLineChartComponent.vue'
 import HealthRHRListComponent from './HealthRHRZone/HealthRHRListComponent.vue'
-import LoadingComponent from '../GeneralComponents/LoadingComponent.vue'
+import LineChartPlaceholderComponent from '../PlaceholderComponents/LineChartPlaceholderComponent.vue'
 import NoItemsFoundComponent from '../GeneralComponents/NoItemsFoundComponents.vue'
 import PaginationComponent from '../GeneralComponents/PaginationComponent.vue'
+import ListPlaceholderComponent from '../PlaceholderComponents/ListPlaceholderComponent.vue'
 // import stores
 import { health_sleep } from '@/services/health_sleepService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
