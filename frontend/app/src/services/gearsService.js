@@ -42,8 +42,8 @@ export const gears = {
   createGear(data) {
     return fetchPostRequest('gears', data)
   },
-  editGear(gearId, data) {
-    return fetchPutRequest(`gears/${gearId}`, data)
+  editGear(data) {
+    return fetchPutRequest('gears', data)
   },
   deleteGear(gearId) {
     return fetchDeleteRequest(`gears/${gearId}`)

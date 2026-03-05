@@ -121,7 +121,17 @@ class GearRead(GearBase):
 
 
 class GearUpdate(GearBase):
-    """Schema for updating a gear record."""
+    """
+    Schema for updating a gear record.
+
+    Attributes:
+        id: Unique identifier.
+    """
+
+    id: StrictInt = Field(
+        ...,
+        description="Unique identifier",
+    )
 
 
 class GearsListResponse(BaseModel):

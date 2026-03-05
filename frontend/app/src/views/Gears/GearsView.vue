@@ -39,50 +39,49 @@
         </form>
       </div>
     </div>
-    <div class="col">
-      <div v-if="isLoading">
-        <LoadingComponent />
+    <div class="col p-3 bg-body-tertiary rounded shadow-sm">
+      <!-- Iterating over userGears to display them -->
+      <div class="placeholder-glow" v-if="isLoading">
+        <span class="placeholder col-8 bg-secondary rounded"></span>
       </div>
-      <div v-else>
-        <!-- Checking if userGears is loaded and has length -->
-        <div v-if="userGears && userGears.length" class="p-3 bg-body-tertiary rounded shadow-sm">
-          <!-- Iterating over userGears to display them -->
-          <span class="mb-1"
-            >{{ $t('gearsView.displayUserNumberOfGears1') }}{{ userGearsNumber
-            }}{{ $t('gearsView.displayUserNumberOfGears2') }}{{ userGears.length
-            }}{{ $t('gearsView.displayUserNumberOfGears3') }}</span
-          >
+      <div class="d-flex align-items-center justify-content-between" v-else>
+        <span class="mb-1"
+          >{{ $t('gearsView.displayUserNumberOfGears1') }}{{ userGearsNumber
+          }}{{ $t('gearsView.displayUserNumberOfGears2') }}{{ userGears.length
+          }}{{ $t('gearsView.displayUserNumberOfGears3') }}</span
+        >
+        <FilterDropdownComponent
+          :options="filterOptions"
+          v-model="filterValues"
+          :aria-label="$t('generalItems.filterOptionsLabel')"
+        />
+      </div>
 
-          <!-- Displaying loading new gear if applicable -->
-          <ul class="list-group list-group-flush" v-if="isLoadingNewGear">
-            <li class="list-group-item rounded">
-              <LoadingComponent />
-            </li>
-          </ul>
+      <!-- Displaying loading new gear if applicable -->
+      <ListWithIconPlaceholderComponent :numberOfRows="1" v-if="isLoadingNewGear" />
 
-          <!-- Displaying loading if gears are updating -->
-          <LoadingComponent v-if="isGearsUpdatingLoading" />
-
-          <!-- List gears -->
-          <ul class="list-group list-group-flush" v-for="gear in userGears" :key="gear.id" v-else>
-            <GearsListComponent
-              :gear="gear"
-              @editedGear="editGearList"
-              @gearDeleted="updateGearListOnDelete"
-            />
-          </ul>
-
-          <!-- pagination area -->
-          <PaginationComponent
-            :totalPages="totalPages"
-            :pageNumber="pageNumber"
-            @pageNumberChanged="setPageNumber"
-            v-if="!searchNickname"
+      <!-- Displaying loading if gears are updating -->
+      <ListWithIconPlaceholderComponent class="mt-2" :numberOfRows="5" v-if="isLoading" />
+      <!-- List gears -->
+      <div v-else-if="userGears && userGears.length">
+        <ul class="list-group list-group-flush" v-for="gear in userGears" :key="gear.id">
+          <GearsListComponent
+            :gear="gear"
+            @editedGear="editGearList"
+            @gearDeleted="updateGearListOnDelete"
           />
-        </div>
-        <!-- Displaying a message or component when there are no activities -->
-        <NoItemsFoundComponent v-else />
+        </ul>
+
+        <!-- pagination area -->
+        <PaginationComponent
+          :totalPages="totalPages"
+          :pageNumber="pageNumber"
+          @pageNumberChanged="setPageNumber"
+          v-if="!searchNickname && !isLoading"
+        />
       </div>
+      <!-- Displaying a message or component when there are no activities -->
+      <NoItemsFoundComponent v-else />
     </div>
   </div>
   <!-- back button -->
@@ -91,7 +90,7 @@
 
 <script setup>
 // Importing the vue composition API
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 // import lodash
@@ -100,11 +99,12 @@ import { debounce } from 'lodash'
 import { push } from 'notivue'
 // Importing the components
 import NoItemsFoundComponent from '@/components/GeneralComponents/NoItemsFoundComponents.vue'
-import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
+import ListWithIconPlaceholderComponent from '@/components/PlaceholderComponents/ListWithIconPlaceholderComponent.vue'
 import BackButtonComponent from '@/components/GeneralComponents/BackButtonComponent.vue'
 import PaginationComponent from '@/components/GeneralComponents/PaginationComponent.vue'
 import GearsAddEditUserModalComponent from '@/components/Gears/GearsAddEditGearModalComponent.vue'
 import GearsListComponent from '@/components/Gears/GearsListComponent.vue'
+import FilterDropdownComponent from '@/components/GeneralComponents/FilterDropdownComponent.vue'
 // Importing the services
 import { gears } from '@/services/gearsService'
 // Importing the stores
@@ -114,7 +114,6 @@ const { t } = useI18n()
 const serverSettingsStore = useServerSettingsStore()
 const route = useRoute()
 const isLoading = ref(true)
-const isGearsUpdatingLoading = ref(true)
 const isLoadingNewGear = ref(false)
 const userGears = ref([])
 const userGearsNumber = ref(0)
@@ -125,6 +124,9 @@ const searchNickname = ref('')
 const filterValues = ref({
   showInactive: false
 })
+const filterOptions = computed(() => [
+  { id: 'showInactive', label: t('gearsView.showInactiveGears') }
+])
 
 const performSearch = debounce(async () => {
   // If the search nickname is empty, reset the list to initial state.
@@ -138,9 +140,12 @@ const performSearch = debounce(async () => {
   }
   try {
     // Fetch the users based on the search nickname.
+    isLoading.value = true
     userGears.value = await gears.getGearContainsNickname(searchNickname.value)
   } catch (error) {
     push.error(`${t('gearsView.errorGearNotFound')} - ${error}`)
+  } finally {
+    isLoading.value = false
   }
 }, 500)
 
@@ -152,7 +157,7 @@ function setPageNumber(page) {
 async function updateGears() {
   try {
     // Set the loading variable to true.
-    isGearsUpdatingLoading.value = true
+    isLoading.value = true
 
     const gearsDataPagination = await gears.getUserGearsWithPagination(
       pageNumber.value,
@@ -167,7 +172,7 @@ async function updateGears() {
     push.error(`${t('gearsView.errorFetchingGears')} - ${error}`)
   } finally {
     // Set the loading variable to false.
-    isGearsUpdatingLoading.value = false
+    isLoading.value = false
   }
 }
 
@@ -184,10 +189,6 @@ onMounted(async () => {
 
   // Fetch gears
   await updateGears()
-
-  // Set the isLoading variables to false.
-  isGearsUpdatingLoading.value = false
-  isLoading.value = false
 })
 
 function addGearList(createdGear) {
@@ -214,4 +215,5 @@ watch(searchNickname, performSearch, { immediate: false })
 
 // Watch the page number variable.
 watch(pageNumber, updateGears, { immediate: false })
+watch(filterValues, updateGears, { immediate: false })
 </script>

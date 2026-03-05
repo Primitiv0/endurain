@@ -440,15 +440,13 @@ def create_gear(
 
 @core_decorators.handle_db_errors
 def edit_gear(
-    gear_id: int,
-    gear: gears_schema.GearBase,
+    gear: gears_schema.GearUpdate,
     db: Session,
 ) -> gears_models.Gear:
     """
     Edit an existing gear by ID.
 
     Args:
-        gear_id: Gear ID to edit.
         gear: Gear schema with updated fields.
         db: Database session.
 
@@ -459,7 +457,7 @@ def edit_gear(
         HTTPException: If a database error occurs.
     """
     stmt = select(gears_models.Gear).where(
-        gears_models.Gear.id == gear_id,
+        gears_models.Gear.id == gear.id,
     )
     db_gear = db.execute(stmt).scalar_one_or_none()
 

@@ -363,18 +363,11 @@ async def create_gear(
 
 
 @router.put(
-    "/{gear_id}",
+    "",
     response_model=gears_schema.GearRead,
     status_code=status.HTTP_200_OK,
 )
 async def edit_gear(
-    gear_id: int,
-    validate_id: Annotated[
-        Callable,
-        Depends(
-            gears_dependencies.validate_gear_id,
-        ),
-    ],
     gear: gears_schema.GearUpdate,
     _check_scopes: Annotated[
         Callable,
@@ -399,8 +392,6 @@ async def edit_gear(
     Update an existing gear by ID.
 
     Args:
-        gear_id: Gear ID to update.
-        validate_id: Validates gear ID exists.
         gear: Updated gear data.
         _check_scopes: Validates gears:write scope.
         token_user_id: Authenticated user ID.
@@ -414,14 +405,14 @@ async def edit_gear(
             or unauthorized.
     """
     gear_db = gears_crud.get_gear_user_by_id(
-        token_user_id, gear_id, db,
+        token_user_id, gear.id, db,
     )
 
     if gear_db is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=(
-                f"Gear ID {gear_id} not found"
+                f"Gear ID {gear.id} not found"
             ),
         )
 
@@ -429,13 +420,13 @@ async def edit_gear(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
-                f"Gear ID {gear_id} does not "
+                f"Gear ID {gear.id} does not "
                 f"belong to user {token_user_id}"
             ),
         )
 
     return gears_crud.edit_gear(
-        gear_id, gear, db,
+        gear, db,
     )
 
 

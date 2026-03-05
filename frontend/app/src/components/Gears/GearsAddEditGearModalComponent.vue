@@ -131,10 +131,10 @@
               v-model="newEditGearActive"
               required
             >
-              <option value="true">
+              <option :value="true">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddIsActiveOption1') }}
               </option>
-              <option value="false">
+              <option :value="false">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddIsActiveOption0') }}
               </option>
             </select>
@@ -377,7 +377,7 @@ async function submitEditGearForm() {
       purchase_value: newEditGearPurchaseValue.value
     }
     // change the gear in the database
-    await gears.editGear(props.gear.id, data)
+    await gears.editGear(data)
     // emit the edited gear
     emit('editedGear', data)
     // show success message
