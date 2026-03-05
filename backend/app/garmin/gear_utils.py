@@ -47,7 +47,7 @@ def fetch_and_process_gear(
     return len(processed_gears)
 
 
-def process_gear(gear, user_id: int, db: Session) -> gears_schema.Gear | None:
+def process_gear(gear, user_id: int, db: Session) -> gears_schema.GearCreate | None:
     # Get the gear by garminconnect uuid from user id
     gear_db = gears_crud.get_gear_by_garminconnect_id_from_user_id(
         gear["uuid"], user_id, db
@@ -57,7 +57,7 @@ def process_gear(gear, user_id: int, db: Session) -> gears_schema.Gear | None:
     if gear_db:
         return None
 
-    new_gear = gears_schema.Gear(
+    new_gear = gears_schema.GearCreate(
         brand=gear["gearMakeName"] if gear["gearMakeName"] else None,
         model=gear["gearModelName"] if gear["gearModelName"] else None,
         nickname=(
@@ -74,7 +74,7 @@ def process_gear(gear, user_id: int, db: Session) -> gears_schema.Gear | None:
 
 def iterate_over_activities_and_set_gear(
     activity: activities_schema.Activity,
-    gears: list[gears_schema.Gear],
+    gears: list[gears_schema.GearRead],
     counter: int,
 ) -> dict:
 

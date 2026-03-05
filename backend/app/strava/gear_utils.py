@@ -85,7 +85,7 @@ def fetch_and_process_gear(strava_client: Client, user_id: int, db: Session) -> 
 
 def process_gear(
     gear, gear_type: str, user_id: int, strava_client: Client, db: Session
-) -> gears_schema.Gear | None:
+) -> gears_schema.GearCreate | None:
     # Get the gear by strava id from user id
     gear_db = gears_crud.get_gear_by_strava_id_from_user_id(gear.id, user_id, db)
 
@@ -99,7 +99,7 @@ def process_gear(
     except Exception as err:
         raise err
 
-    new_gear = gears_schema.Gear(
+    new_gear = gears_schema.GearCreate(
         brand=strava_gear.brand_name,
         model=strava_gear.model_name,
         nickname=strava_gear.name,
@@ -113,7 +113,7 @@ def process_gear(
 
 
 def iterate_over_activities_and_set_gear(
-    activity: activities_schema.Activity, gears: list[gears_schema.Gear], counter: int
+    activity: activities_schema.Activity, gears: list[gears_schema.GearRead], counter: int
 ) -> dict:
 
     # Iterate over gears and set gear if applicable
@@ -329,7 +329,7 @@ def iterate_over_shoes_csv() -> list:
 
 def transform_csv_bike_gear_to_schema_gear(
     bikes_dict: dict, token_user_id: int
-) -> list[gears_schema.Gear]:
+) -> list[gears_schema.GearCreate]:
     """
     Transforms a dictionary of bike data (parsed from CSV) into a list of Gear schema objects.
 
@@ -339,11 +339,11 @@ def transform_csv_bike_gear_to_schema_gear(
         token_user_id (int): The user ID to associate with each Gear object.
 
     Returns:
-        list[gears_schema.Gear]: A list of Gear schema objects created from the input bike data.
+        list[gears_schema.GearCreate]: A list of Gear schema objects created from the input bike data.
     """
     gears = []
     for bike in bikes_dict:
-        new_gear = gears_schema.Gear(
+        new_gear = gears_schema.GearCreate(
             user_id=token_user_id,
             brand=bikes_dict[bike]["Bike Brand"],
             model=bikes_dict[bike]["Bike Model"],
@@ -358,7 +358,7 @@ def transform_csv_bike_gear_to_schema_gear(
 
 def transform_csv_shoe_gear_to_schema_gear(
     shoes_list: list, token_user_id: int, db: Session
-) -> list[gears_schema.Gear]:
+) -> list[gears_schema.GearCreate]:
     """
     Transforms a list of shoe data (parsed from CSV) into a list of Gear schema objects.
     Renames any name-less shoes to a default name plus a unique number, as Strava allows name-less shoes, but Endurain does not.
@@ -369,10 +369,11 @@ def transform_csv_shoe_gear_to_schema_gear(
         db (session): Database session
 
     Returns:
-        list[gears_schema.Gear]: A list of Gear schema objects created from the input shoe data.
+        list[gears_schema.GearCreate]: A list of Gear schema objects created from the input shoe data.
     """
     gears = []
     newnumber = 1
+    shoe_name = ""
     for shoerow in shoes_list:
         # 1 - Check for nameless shoes and add a novel name. Why?  Because Strava allows nameless shoes, but Endurain does not.
         if (
@@ -403,7 +404,7 @@ def transform_csv_shoe_gear_to_schema_gear(
             shoe_name = shoerow["Shoe Name"]
 
         # 2 - Add (possibly renamed) gear item to the list of gear to be added.
-        new_gear = gears_schema.Gear(
+        new_gear = gears_schema.GearCreate(
             user_id=token_user_id,
             brand=shoerow["Shoe Brand"],
             model=shoerow["Shoe Model"],
