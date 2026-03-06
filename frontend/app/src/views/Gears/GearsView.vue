@@ -1,7 +1,7 @@
 <template>
   <h1>{{ $t('gearsView.title') }}</h1>
   <div class="row row-gap-3">
-    <div class="col-lg-4 col-md-12">
+    <div class="col-lg-3 col-md-12">
       <div class="p-3 bg-body-tertiary rounded shadow-sm">
         <!-- Add gear zone -->
         <p>{{ $t('gearsView.buttonAddGear') }}</p>
@@ -39,49 +39,51 @@
         </form>
       </div>
     </div>
-    <div class="col p-3 bg-body-tertiary rounded shadow-sm">
-      <!-- Iterating over userGears to display them -->
-      <div class="placeholder-glow" v-if="isLoading">
-        <span class="placeholder col-8 bg-secondary rounded"></span>
-      </div>
-      <div class="d-flex align-items-center justify-content-between" v-else>
-        <span class="mb-1"
-          >{{ $t('gearsView.displayUserNumberOfGears1') }}{{ userGearsNumber
-          }}{{ $t('gearsView.displayUserNumberOfGears2') }}{{ userGears.length
-          }}{{ $t('gearsView.displayUserNumberOfGears3') }}</span
-        >
-        <FilterDropdownComponent
-          :options="filterOptions"
-          v-model="filterValues"
-          :aria-label="$t('generalItems.filterOptionsLabel')"
-        />
-      </div>
-
-      <!-- Displaying loading new gear if applicable -->
-      <ListWithIconPlaceholderComponent :numberOfRows="1" v-if="isLoadingNewGear" />
-
-      <!-- Displaying loading if gears are updating -->
-      <ListWithIconPlaceholderComponent class="mt-2" :numberOfRows="5" v-if="isLoading" />
-      <!-- List gears -->
-      <div v-else-if="userGears && userGears.length">
-        <ul class="list-group list-group-flush" v-for="gear in userGears" :key="gear.id">
-          <GearsListComponent
-            :gear="gear"
-            @editedGear="editGearList"
-            @gearDeleted="updateGearListOnDelete"
+    <div class="col">
+      <div class="p-3 bg-body-tertiary rounded shadow-sm">
+        <!-- Iterating over userGears to display them -->
+        <div class="placeholder-glow" v-if="isLoading">
+          <span class="placeholder col-8 bg-secondary rounded"></span>
+        </div>
+        <div class="d-flex align-items-center justify-content-between" v-else>
+          <span class="mb-1"
+            >{{ $t('gearsView.displayUserNumberOfGears1') }}{{ userGearsNumber
+            }}{{ $t('gearsView.displayUserNumberOfGears2') }}{{ userGears.length
+            }}{{ $t('gearsView.displayUserNumberOfGears3') }}</span
+          >
+          <FilterDropdownComponent
+            :options="filterOptions"
+            v-model="filterValues"
+            :aria-label="$t('generalItems.filterOptionsLabel')"
           />
-        </ul>
+        </div>
 
-        <!-- pagination area -->
-        <PaginationComponent
-          :totalPages="totalPages"
-          :pageNumber="pageNumber"
-          @pageNumberChanged="setPageNumber"
-          v-if="!searchNickname && !isLoading"
-        />
+        <!-- Displaying loading new gear if applicable -->
+        <ListWithIconPlaceholderComponent :numberOfRows="1" v-if="isLoadingNewGear" />
+
+        <!-- Displaying loading if gears are updating -->
+        <ListWithIconPlaceholderComponent class="mt-2" :numberOfRows="5" v-if="isLoading" />
+        <!-- List gears -->
+        <div v-else-if="userGears && userGears.length">
+          <ul class="list-group list-group-flush" v-for="gear in userGears" :key="gear.id">
+            <GearsListComponent
+              :gear="gear"
+              @editedGear="editGearList"
+              @gearDeleted="updateGearListOnDelete"
+            />
+          </ul>
+
+          <!-- pagination area -->
+          <PaginationComponent
+            :totalPages="totalPages"
+            :pageNumber="pageNumber"
+            @pageNumberChanged="setPageNumber"
+            v-if="!searchNickname && !isLoading"
+          />
+        </div>
+        <!-- Displaying a message or component when there are no activities -->
+        <NoItemsFoundComponent v-else />
       </div>
-      <!-- Displaying a message or component when there are no activities -->
-      <NoItemsFoundComponent v-else />
     </div>
   </div>
   <!-- back button -->

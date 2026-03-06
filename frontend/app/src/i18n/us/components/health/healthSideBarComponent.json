@@ -4,5 +4,7 @@
   "RHRSection": "Resting heart rate",
   "stepsSection": "Steps",
   "weightSection": "Weight",
-  "fastingSection": "Fasting"
+  "fastingSection": "Fasting",
+  "waterSection": "Water intake",
+  "poopSection": "Bowel movements"
 }

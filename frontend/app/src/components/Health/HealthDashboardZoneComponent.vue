@@ -72,6 +72,28 @@
         :no-target-label="$t('healthDashboardZoneComponent.noFastingTarget')"
         :arrow-direction="fastingArrowDirection"
       />
+
+      <!-- Water intake -->
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.water')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="waterDisplay"
+        :no-data-label="$t('generalItems.labelNoData')"
+        :target-display-value="waterTargetDisplay"
+        :no-target-label="$t('healthDashboardZoneComponent.noWaterTarget')"
+        :arrow-direction="waterArrowDirection"
+      />
+
+      <!-- Bowel movements -->
+      <HealthDashboardCardComponent
+        :title="$t('healthDashboardZoneComponent.poop')"
+        :is-loading="isLoadingParent || isLoading"
+        :value="poopDisplay"
+        :no-data-label="$t('generalItems.labelNoData')"
+        :target-display-value="poopTargetDisplay"
+        :no-target-label="$t('healthDashboardZoneComponent.noPoopTarget')"
+        :arrow-direction="poopArrowDirection"
+      />
     </div>
   </div>
 </template>
@@ -82,7 +104,7 @@ import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 // Importing the stores
 import { useAuthStore } from '@/stores/authStore'
-import { kgToLbs } from '@/utils/unitsUtils'
+import { kgToLbs, mlToFlOz } from '@/utils/unitsUtils'
 import { formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey } from '@/utils/healthUtils'
 // Import services
@@ -115,6 +137,8 @@ const hrvStatus = ref(null)
 const avgSkinTempDeviation = ref(null)
 const activeFasting = ref(null)
 const activeFastingElapsed = ref(0)
+const todayWater = ref(null)
+const todayPoop = ref(null)
 
 // Sleep computed properties
 const sleepDisplay = computed(() =>
@@ -197,6 +221,36 @@ const fastingArrowDirection = computed(() => {
   return activeFastingElapsed.value < props.userHealthTargets.fasting ? 'down' : 'up'
 })
 
+// Water computed properties
+const waterDisplay = computed(() => {
+  if (todayWater.value == null) return null
+  if (authStore?.user?.units === 'imperial')
+    return `${mlToFlOz(todayWater.value)} ${t('generalItems.unitsFlOz')}`
+  return `${todayWater.value} ${t('generalItems.unitsMl')}`
+})
+const waterTargetDisplay = computed(() => {
+  if (props.userHealthTargets?.water_ml == null) return null
+  if (authStore?.user?.units === 'imperial')
+    return `${mlToFlOz(props.userHealthTargets.water_ml)} ${t('generalItems.unitsFlOz')}`
+  return `${props.userHealthTargets.water_ml} ${t('generalItems.unitsMl')}`
+})
+const waterArrowDirection = computed(() => {
+  if (props.userHealthTargets?.water_ml == null || todayWater.value == null) return null
+  return todayWater.value < props.userHealthTargets.water_ml ? 'down' : 'up'
+})
+
+// Poop computed properties
+const poopDisplay = computed(() => (todayPoop.value != null ? String(todayPoop.value) : null))
+const poopTargetDisplay = computed(() =>
+  props.userHealthTargets?.poop_count != null
+    ? `${props.userHealthTargets.poop_count} ${t('healthDashboardZoneComponent.poopTargetLabel')}`
+    : null
+)
+const poopArrowDirection = computed(() => {
+  if (props.userHealthTargets?.poop_count == null || todayPoop.value == null) return null
+  return todayPoop.value < props.userHealthTargets.poop_count ? 'down' : 'up'
+})
+
 onMounted(async () => {
   try {
     isLoading.value = true
@@ -253,6 +307,14 @@ onMounted(async () => {
         activeFastingElapsed.value = activeFasting.value.actual_duration_seconds
       }
     }
+    // Process water data
+    todayWater.value =
+      healthDashboardData.value.water?.amount_ml != null
+        ? healthDashboardData.value.water.amount_ml
+        : null
+    // Process poop data
+    todayPoop.value =
+      healthDashboardData.value.poop?.count != null ? healthDashboardData.value.poop.count : null
   } catch (error) {
     push.error(`${t('healthDashboardZoneComponent.errorFetchingHealthDailyStats')} - ${error}`)
   } finally {

@@ -49,6 +49,8 @@
   "unitsLbs": "lbs",
   "labelWeightInLbs": "Weight in lbs",
   "labelWeightTargetInLbs": "Weight target in lbs",
+  "unitsFlOz": "fl oz",
+  "unitsMl": "ml",
   "labelSteps": "Steps",
   "labelStepsTarget": "Steps target",
   "labelSleep": "Sleep",

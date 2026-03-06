@@ -73,6 +73,32 @@
           >
         </a>
       </li>
+      <li class="nav-item">
+        <a
+          href="#"
+          class="nav-link link-body-emphasis"
+          :class="{ active: activeSection === 'water' }"
+          @click.prevent="changeActive('water')"
+        >
+          <font-awesome-icon :icon="['fas', 'droplet']" />
+          <span class="ms-1"
+            >{{ $t('healthSideBarComponent.waterSection') }}{{ $t('generalItems.betaTag') }}</span
+          >
+        </a>
+      </li>
+      <li class="nav-item">
+        <a
+          href="#"
+          class="nav-link link-body-emphasis"
+          :class="{ active: activeSection === 'poop' }"
+          @click.prevent="changeActive('poop')"
+        >
+          <font-awesome-icon :icon="['fas', 'poo']" />
+          <span class="ms-1"
+            >{{ $t('healthSideBarComponent.poopSection') }}{{ $t('generalItems.betaTag') }}</span
+          >
+        </a>
+      </li>
     </ul>
   </div>
 </template>

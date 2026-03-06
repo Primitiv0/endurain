@@ -1,0 +1,11 @@
+{
+  "buttonAddPoop": "Add bowel movement",
+  "buttonPoopTarget": "Bowel movement target",
+  "modalPoopTargetLabel": "Enter your daily bowel movement target",
+  "labelNumberOfHealthPoop1": "There is a total of ",
+  "labelNumberOfHealthPoop2": " bowel movement entries inserted (",
+  "labelNumberOfHealthPoop3": " loaded):",
+  "errorFetchingHealthPoop": "Error fetching bowel movement data",
+  "labelPoopCount": "Bowel movements",
+  "labelPoopTarget": "Bowel movement target"
+}

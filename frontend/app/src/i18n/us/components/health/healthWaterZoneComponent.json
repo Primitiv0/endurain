@@ -1,0 +1,11 @@
+{
+  "buttonAddWater": "Add water intake",
+  "buttonWaterTarget": "Water target",
+  "modalWaterTargetLabel": "Enter your daily water target (ml)",
+  "labelNumberOfHealthWater1": "There is a total of ",
+  "labelNumberOfHealthWater2": " water entries inserted (",
+  "labelNumberOfHealthWater3": " loaded):",
+  "errorFetchingHealthWater": "Error fetching water intake data",
+  "labelWaterMl": "Water (ml)",
+  "labelWaterTarget": "Water target"
+}

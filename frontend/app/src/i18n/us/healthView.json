@@ -14,5 +14,9 @@
   "successUpdatingSleepTarget": "Successfully updated sleep target",
   "errorUpdatingSleepTarget": "Error updating sleep target",
   "successUpdatingFastingTarget": "Successfully updated fasting target",
-  "errorUpdatingFastingTarget": "Error updating fasting target"
+  "errorUpdatingFastingTarget": "Error updating fasting target",
+  "successUpdatingWaterTarget": "Successfully updated water target",
+  "errorUpdatingWaterTarget": "Error updating water target",
+  "successUpdatingPoopTarget": "Successfully updated bowel movement target",
+  "errorUpdatingPoopTarget": "Error updating bowel movement target"
 }

@@ -50,6 +50,22 @@
       @setFastingTarget="setFastingTarget"
       v-if="activeSection === 'fasting' && !isLoading"
     />
+
+    <!-- Include the HealthWaterZone -->
+    <HealthWaterZone
+      :userHealthTargets="userHealthTargets"
+      :isLoadingParent="isLoading"
+      @setWaterTarget="setWaterTarget"
+      v-if="activeSection === 'water' && !isLoading"
+    />
+
+    <!-- Include the HealthPoopZone -->
+    <HealthPoopZone
+      :userHealthTargets="userHealthTargets"
+      :isLoadingParent="isLoading"
+      @setPoopTarget="setPoopTarget"
+      v-if="activeSection === 'poop' && !isLoading"
+    />
   </div>
   <!-- back button -->
   <BackButtonComponent />
@@ -67,6 +83,8 @@ import HealthRHRZone from '@/components/Health/HealthRHRZone.vue'
 import HealthStepsZone from '../components/Health/HealthStepsZone.vue'
 import HealthWeightZone from '../components/Health/HealthWeightZone.vue'
 import HealthFastingZone from '../components/Health/HealthFastingZone.vue'
+import HealthWaterZone from '../components/Health/HealthWaterZone.vue'
+import HealthPoopZone from '../components/Health/HealthPoopZone.vue'
 import BackButtonComponent from '@/components/GeneralComponents/BackButtonComponent.vue'
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 import { health_targets } from '@/services/health_targetsService'
@@ -153,6 +171,36 @@ function setFastingTarget(fastingTarget) {
     push.success(t('healthView.successUpdatingFastingTarget'))
   } catch (error) {
     push.error(`${t('healthView.errorUpdatingFastingTarget')} - ${error}`)
+  }
+}
+
+function setWaterTarget(waterTarget) {
+  const data = {
+    id: userHealthTargets.value.id,
+    user_id: userHealthTargets.value.user_id,
+    water_ml: waterTarget
+  }
+  try {
+    health_targets.setUserHealthTargets(data)
+    userHealthTargets.value.water_ml = waterTarget
+    push.success(t('healthView.successUpdatingWaterTarget'))
+  } catch (error) {
+    push.error(`${t('healthView.errorUpdatingWaterTarget')} - ${error}`)
+  }
+}
+
+function setPoopTarget(poopTarget) {
+  const data = {
+    id: userHealthTargets.value.id,
+    user_id: userHealthTargets.value.user_id,
+    poop_count: poopTarget
+  }
+  try {
+    health_targets.setUserHealthTargets(data)
+    userHealthTargets.value.poop_count = poopTarget
+    push.success(t('healthView.successUpdatingPoopTarget'))
+  } catch (error) {
+    push.error(`${t('healthView.errorUpdatingPoopTarget')} - ${error}`)
   }
 }
 

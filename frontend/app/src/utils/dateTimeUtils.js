@@ -16,6 +16,14 @@ export function formatDateMed(dateString) {
   return date.toLocaleString(DateTime.DATE_MED)
 }
 
+export function formatDateTimeShort(dateString) {
+  // Create a DateTime object from the date string
+  const date = DateTime.fromISO(dateString, { setZone: true })
+
+  // Return the formatted date and time string respecting browser's locale
+  return date.toLocaleString(DateTime.DATETIME_SHORT)
+}
+
 export function formatTime(dateString) {
   // Create a DateTime object from the date string and preserve its time zone offset
   const date = DateTime.fromISO(dateString, { setZone: true })

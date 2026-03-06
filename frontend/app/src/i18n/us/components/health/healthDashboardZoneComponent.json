@@ -19,5 +19,10 @@
   "noStepsTarget": "No steps target",
   "fasting": "Fasting",
   "noFastingTarget": "No fasting target",
+  "water": "Water intake",
+  "noWaterTarget": "No water target",
+  "poop": "Bowel movements",
+  "poopTargetLabel": "/ day",
+  "noPoopTarget": "No bowel movement target",
   "errorFetchingHealthDailyStats": "Error fetching health daily stats"
 }

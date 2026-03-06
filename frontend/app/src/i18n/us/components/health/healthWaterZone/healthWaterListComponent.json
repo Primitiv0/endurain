@@ -1,0 +1,9 @@
+{
+  "labelDate": "Date",
+  "modalDeleteWaterTitle": "Delete water entry",
+  "modalDeleteWaterBody": "Are you sure you want to delete the water entry for ",
+  "successDeleteWater": "Water entry deleted",
+  "errorDeleteWater": "It was not possible to delete the water entry",
+  "successEditWater": "Water entry edited",
+  "errorEditWater": "It was not possible to edit the water entry"
+}
