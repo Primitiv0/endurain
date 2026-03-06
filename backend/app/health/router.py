@@ -17,6 +17,8 @@ import health.health_sleep.crud as health_sleep_crud
 import health.health_weight.crud as health_weight_crud
 import health.health_steps.crud as health_steps_crud
 import health.health_fasting.crud as health_fasting_crud
+import health.health_water.crud as health_water_crud
+import health.health_poop.crud as health_poop_crud
 
 import auth.security as auth_security
 
@@ -60,6 +62,8 @@ async def read_health_daily_stats(
             - weight: Latest weight and BMI data
             - steps: Today's step count
             - fasting: Active or most recent fasting session
+            - water: Today's water intake in milliliters
+            - poop: Today's bowel movement count
 
     Raises:
         HTTPException: If the user lacks required 'health:read' scope.
@@ -82,6 +86,20 @@ async def read_health_daily_stats(
     # Get active fasting or most recent
     active_fasting = health_fasting_crud.get_active_fasting_by_user_id(
         token_user_id, db
+    )
+
+    # Get today's water intake
+    today_water = (
+        health_water_crud.get_health_water_by_date_and_user_id(
+            token_user_id, today, db
+        )
+    )
+
+    # Get today's poop records
+    today_poop_records = (
+        health_poop_crud.get_health_poop_by_date_and_user_id(
+            token_user_id, today, db
+        )
     )
 
     # Build dashboard response with only necessary fields
@@ -117,9 +135,23 @@ async def read_health_daily_stats(
             actual_duration_seconds=active_fasting.actual_duration_seconds,
         )
 
+    water_data = None
+    if today_water:
+        water_data = health_schema.HealthWaterDashboard(
+            amount_ml=float(today_water.amount_ml),
+        )
+
+    poop_data = None
+    if today_poop_records:
+        poop_data = health_schema.HealthPoopDashboard(
+            count=len(today_poop_records),
+        )
+
     return health_schema.HealthDashboardResponse(
         sleep=sleep_data,
         weight=weight_data,
         steps=steps_data,
         fasting=fasting_data,
+        water=water_data,
+        poop=poop_data,
     )

@@ -14,6 +14,9 @@ class HealthTargets(Base):
         weight: Target weight in kg.
         steps: Target daily steps count.
         sleep: Target sleep duration in seconds.
+        fasting: Target fasting duration in seconds.
+        water_ml: Target daily water intake in milliliters.
+        poop_count: Target daily bowel movement count.
         user: Relationship to Users model.
     """
 
@@ -46,6 +49,15 @@ class HealthTargets(Base):
     fasting: Mapped[int | None] = mapped_column(
         nullable=True,
         comment="Target fasting duration in seconds",
+    )
+    water_ml: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=10, scale=2),
+        nullable=True,
+        comment="Target daily water intake in milliliters",
+    )
+    poop_count: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Target daily bowel movement count",
     )
 
     # Define a relationship to the Users model

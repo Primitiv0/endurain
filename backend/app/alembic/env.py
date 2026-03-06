@@ -20,10 +20,12 @@ import activities.activity_workout_steps.models
 import followers.models
 import gears.gear.models
 import gears.gear_components.models
+import health.health_poop.models
 import health.health_fasting.models
 import health.health_sleep.models
 import health.health_steps.models
 import health.health_targets.models
+import health.health_water.models
 import health.health_weight.models
 import migrations.models
 import notifications.models

@@ -158,6 +158,46 @@ class HealthFastingDashboard(BaseModel):
     )
 
 
+class HealthWaterDashboard(BaseModel):
+    """
+    Today's water intake for dashboard display.
+
+    Attributes:
+        amount_ml: Total water consumed today in milliliters.
+    """
+
+    amount_ml: StrictFloat | None = Field(
+        default=None,
+        description="Total water consumed today in ml",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class HealthPoopDashboard(BaseModel):
+    """
+    Today's bowel movement summary for dashboard display.
+
+    Attributes:
+        count: Number of bowel movements recorded today.
+    """
+
+    count: StrictInt = Field(
+        ...,
+        description="Number of bowel movements recorded today",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
 class HealthDashboardResponse(BaseModel):
     """
     Consolidated dashboard response with current health metrics.
@@ -165,8 +205,10 @@ class HealthDashboardResponse(BaseModel):
     Attributes:
         sleep: Latest sleep data.
         weight: Latest weight data.
-        steps: Latest steps data.
+        steps: Today's step count.
         fasting: Active or most recent fasting session.
+        water: Today's water intake.
+        poop: Today's bowel movement summary.
     """
 
     sleep: HealthSleepDashboard | None = Field(
@@ -184,6 +226,14 @@ class HealthDashboardResponse(BaseModel):
     fasting: HealthFastingDashboard | None = Field(
         default=None,
         description="Active or latest fasting session",
+    )
+    water: HealthWaterDashboard | None = Field(
+        default=None,
+        description="Today's water intake",
+    )
+    poop: HealthPoopDashboard | None = Field(
+        default=None,
+        description="Today's bowel movement summary",
     )
 
     model_config = ConfigDict(

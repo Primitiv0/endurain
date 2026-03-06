@@ -130,7 +130,7 @@ class ServerSettings(Base):
         nullable=False,
         comment=(
             "Delete and regenerate all activity thumbnails when "
-            "tile server settings change (true - yes, false - no)"
+            "tile server settings change"
         ),
     )
     map_background_color: Mapped[str] = mapped_column(

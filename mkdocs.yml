@@ -53,12 +53,17 @@ nav:
     - Supported types: developer-guide/supported-types.md
   - Gallery: gallery.md
   - Backend reference:
+    - Gears:
+      - Gear: reference/gears/gear.md
+    - GPX: reference/gpx.md
     - Health:
+      - Health: reference/health.md
+      - Health poop: reference/health/health_poop.md
       - Health sleep: reference/health/health_sleep.md
       - Health steps: reference/health/health_steps.md
       - Health targets: reference/health/health_targets.md
+      - Health water: reference/health/health_water.md
       - Health weight: reference/health/health_weight.md
-    - GPX: reference/gpx.md
     - Migrations: reference/migrations.md
     - Notifications: reference/notifications.md
     - Password reset tokens: reference/password_reset_tokens.md

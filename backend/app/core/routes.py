@@ -29,8 +29,10 @@ import health.router as health_router
 import health.health_fasting.router as health_fasting_router
 import health.health_sleep.router as health_sleep_router
 import health.health_weight.router as health_weight_router
+import health.health_poop.router as health_poop_router
 import health.health_steps.router as health_steps_router
 import health.health_targets.router as health_targets_router
+import health.health_water.router as health_water_router
 import notifications.router as notifications_router
 import password_reset_tokens.router as password_reset_tokens_router
 import profile.browser_redirect_router as profile_browser_redirect_router
@@ -169,9 +171,21 @@ router.include_router(
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(
+    health_poop_router.router,
+    prefix=core_config.ROOT_PATH + "/health/poop",
+    tags=["health_poop"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
     health_targets_router.router,
     prefix=core_config.ROOT_PATH + "/health/targets",
     tags=["health_targets"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
+    health_water_router.router,
+    prefix=core_config.ROOT_PATH + "/health/water",
+    tags=["health_water"],
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(

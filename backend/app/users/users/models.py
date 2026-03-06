@@ -57,6 +57,8 @@ class Users(Base):
         health_steps: List of health steps records.
         health_targets: List of health targets.
         health_fasting: List of health fasting records.
+        health_water: List of health water intake records.
+        health_poop: List of health poop records.
         notifications: List of notifications.
         goals: List of user goals.
         user_identity_providers: List of identity providers
@@ -264,6 +266,16 @@ class Users(Base):
     )
     health_fasting = relationship(
         "HealthFasting",
+        back_populates="users",
+        cascade="all, delete-orphan",
+    )
+    health_water = relationship(
+        "HealthWater",
+        back_populates="users",
+        cascade="all, delete-orphan",
+    )
+    health_poop = relationship(
+        "HealthPoop",
         back_populates="users",
         cascade="all, delete-orphan",
     )
