@@ -4,9 +4,9 @@
     <div class="col-lg-3 col-md-12">
       <div class="p-3 bg-body-tertiary rounded shadow-sm">
         <!-- Add gear zone -->
-        <p>{{ $t('gearsView.buttonAddGear') }}</p>
+        <span>{{ $t('gearsView.buttonAddGear') }}</span>
         <a
-          class="w-100 btn btn-primary"
+          class="w-100 btn btn-primary mt-2"
           href="#"
           role="button"
           data-bs-toggle="modal"
@@ -23,7 +23,6 @@
         />
 
         <!-- Search gear by nickname zone -->
-        <br />
         <p class="mt-2">{{ $t('gearsView.subTitleSearchGearByNickname') }}</p>
         <form>
           <div class="mb-3">

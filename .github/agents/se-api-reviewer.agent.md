@@ -128,7 +128,38 @@ Check `backend/app/auth/` and how dependencies are applied to routes:
 
 ---
 
-## Step 6: OpenAPI / Documentation Quality
+## Step 6: Endpoint Design & Optimization Review
+
+Analyse the module's route definitions holistically to identify design inefficiencies:
+
+### Endpoint Count & Redundancy
+- Count the total number of routes per module. Flag modules with more than ~15 routes as candidates for splitting into sub-routers or separate modules.
+- Identify routes that perform nearly identical operations and could be unified with a query parameter or a flexible request body (e.g., two separate `GET /activities/mine` and `GET /activities/user/{user_id}` could be one endpoint with an optional `user_id` param).
+- Identify routes that are doing too much (fat endpoints) — these should be split.
+
+### Consolidation Candidates
+- Multiple `GET` endpoints differing only by filter could share a single endpoint with optional query parameters.
+- `POST` endpoints that differ only by a flag in the body should be unified with an enum/discriminator field.
+- Batch operations: if clients must loop to call the same endpoint N times, consider a bulk endpoint (`POST /activities/bulk`, `DELETE /activities/bulk`).
+
+### Separation Candidates
+- A single endpoint doing creation **and** notification **and** external sync should be decomposed — the route should delegate to a service layer rather than orchestrate everything inline.
+- Endpoints mixing resource concerns (e.g., updating a gear **and** reassigning all its activities in one call) should be separated unless atomicity is a hard requirement.
+
+### Versioning Readiness
+- Is the API path prefix versioned (e.g., `/api/v1/...`)? If not, flag as a future-proofing concern.
+- Are any endpoints already deprecated without a versioned replacement?
+
+### Performance-Impacting Design
+- N+1 patterns: endpoints that return a list but trigger per-item queries in a loop inside the route or crud layer.
+- Endpoints that load entire ORM relationships when only a subset of fields is needed (check for missing `response_model` field filtering or lazy-load traps).
+- Sync I/O inside async route handlers — all database and external calls must use `await`.
+
+**Flag:** Bloated modules (>15 routes), redundant near-duplicate endpoints, missing bulk operations where clearly needed, sync blocking calls in async handlers, unversioned API paths.
+
+---
+
+## Step 7: OpenAPI / Documentation Quality
 
 - Every router must have a `tags` list for grouping in the Swagger UI
 - Routes should have `summary` and `description` where non-obvious
@@ -139,7 +170,7 @@ Check `backend/app/auth/` and how dependencies are applied to routes:
 
 ---
 
-## Step 7: Cross-Module Consistency Audit
+## Step 8: Cross-Module Consistency Audit
 
 Compare patterns across modules (`activities/`, `users/`, `gears/`, `followers/`, etc.):
 
@@ -175,14 +206,17 @@ Recommendation: What should be done instead (describe the fix — do not apply i
 Severity levels:
 - **CRITICAL** — Security vulnerability or data integrity risk
 - **HIGH** — Functional incorrectness or significant REST violation
-- **MEDIUM** — Inconsistency, missing validation, or documentation gap
+- **MEDIUM** — Inconsistency, missing validation, documentation gap, or optimization opportunity
 - **LOW** — Style, naming, or minor documentation improvement
+
+### Endpoint Optimization Summary
+Dedicated section listing consolidation candidates, separation candidates, and performance-impacting patterns found in Step 6. Include the current route count for the reviewed module.
 
 ### Positive Observations
 Note patterns that are well-implemented and should be preserved.
 
 ### Recommendations Summary
-Prioritised list of improvements ordered by severity.
+Prioritised list of improvements ordered by severity. Include endpoint optimization items alongside REST and security findings.
 
 ---
 
