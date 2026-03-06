@@ -42,6 +42,7 @@ nav:
     - Proxmox community script: https://community-scripts.github.io/ProxmoxVE/scripts?id=endurain&category=Gaming+%26+Leisure
     - MariaDB to Postgres migration: getting-started/maria-to-postgres-migration.md
   - Features:
+    - Importing data: features/importing.md
     - Single Sign-On (SSO): features/single-sign-on.md
     - Sleep Scoring: features/sleep-scoring.md
   - Integrations:
@@ -51,6 +52,7 @@ nav:
     - Setup a development environment: developer-guide/setup-dev-env.md
     - Authentication: developer-guide/authentication.md
     - Supported types: developer-guide/supported-types.md
+    - Import development notes: developer-guide/import-dev-notes.md
   - Gallery: gallery.md
   - Backend reference:
     - Gears:

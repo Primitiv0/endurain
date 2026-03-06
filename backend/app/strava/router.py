@@ -1,8 +1,13 @@
 import os
+
 from datetime import datetime, timedelta, timezone, date
 from typing import Annotated, Callable
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Security
 from sqlalchemy.orm import Session
+
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 from stravalib.exc import AccessUnauthorized
 
@@ -17,6 +22,7 @@ import activities.activity.utils as activities_utils
 
 import strava.gear_utils as strava_gear_utils
 import strava.activity_utils as strava_activity_utils
+import strava.bulk_import_utils as strava_bulk_import_utils
 import strava.utils as strava_utils
 import strava.schema as strava_schema
 
@@ -30,6 +36,8 @@ import websocket.manager as websocket_manager
 # Define the API router
 router = APIRouter()
 
+# Define the thread pool executor with 2 workers
+executor = ThreadPoolExecutor(max_workers=2)
 
 @router.put(
     "/link",
@@ -211,7 +219,7 @@ async def import_bikes_from_strava_export(
 
         # Define variables for moving the bikes file
         processed_dir = core_config.FILES_PROCESSED_DIR
-        bulk_import_dir = core_config.FILES_BULK_IMPORT_DIR
+        bulk_import_dir = core_config.STRAVA_BULK_IMPORT_DIR
         bikes_file_name = core_config.STRAVA_BULK_IMPORT_BIKES_FILE
         bikes_file_path = os.path.join(bulk_import_dir, bikes_file_name)
 
@@ -241,7 +249,7 @@ async def import_bikes_from_strava_export(
 async def import_shoes_from_strava_export(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sid_from_access_token),
+        Depends(auth_security.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -255,15 +263,19 @@ async def import_shoes_from_strava_export(
         # Get shoes from Strava export CSV file
         shoes_list = strava_gear_utils.iterate_over_shoes_csv()
 
+        #core_logger.print_to_log_and_console("Shoe list created.") # testing code
         # Transform shoes list to list of Gear schema objects
         if shoes_list:
             shoes = strava_gear_utils.transform_csv_shoe_gear_to_schema_gear(
                 shoes_list, token_user_id, db
             )
-
+            #core_logger.print_to_log_and_console("Shoe list converted to schema gear.") # testing code
             # Add shoes to the database
             if shoes:
                 gears_crud.create_multiple_gears(shoes, token_user_id, db)
+ 
+        #core_logger.print_to_log_and_console("Shoes added to db.") # testing code
+ 
 
         # Define variables for moving the shoes file
         processed_dir = core_config.FILES_PROCESSED_DIR
@@ -291,6 +303,77 @@ async def import_shoes_from_strava_export(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from err
+
+
+@router.post("/import/activities", status_code=201)
+async def import_activities_and_media_from_strava_export(
+    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    _check_scopes: Annotated[
+        Callable, Security(auth_security.check_scopes, scopes=["activities:write"])
+    ],
+    db: Annotated[
+        Session,
+        Depends(core_database.get_db),
+    ],
+    ws_manager: Annotated[
+        websocket_manager.WebSocketManager,
+        Depends(websocket_manager.get_websocket_manager),
+    ],
+):
+    """
+    Starts an import of activity and media files contained in a Strava bulk export.
+
+    Queues up files for import via strava/bulk_import_utils.queue_bulk_export_activities_for_import() function.
+
+    Actual import is done by the primary activity/utils.parse_and_store_activity_from_file() function
+
+    """
+    try:
+        # Get time of import initiation to pass to function for recording in import_data dictionary, ensuring all activities imported via this bulk import action share an identical import time.
+        import_time = datetime.now().isoformat()
+        core_logger.print_to_log_and_console(f"Strava bulk import: Initiated at {import_time}.")
+
+        # Parse activities data from activities.csv into a dictionary
+        strava_activities_dict = strava_bulk_import_utils.iterate_over_activities_csv()
+
+        if strava_activities_dict is None:  # Potentially add other test conditions that should trigger an import abort
+            core_logger.print_to_log_and_console("ABORTING IMPORT: Aborting strava bulk import due to improperly parsed CSV.", "error")
+            return {"Strava import ABORTED due to lack of, or improperly parsed, activities.csv file."}
+
+        # Create gear list here, so it does not have to be done separately for every single activity that is imported (AND because Strava has a wacked format for shoe naming in their export)
+        users_existing_gear_nickname_to_id = strava_bulk_import_utils.create_gear_dictionary_for_bulk_import(token_user_id, db)
+
+        # Queue files for processing.  Submit ONE task that processes all files
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(
+            executor,
+            partial(
+                strava_bulk_import_utils.queue_bulk_export_activities_for_import,
+                token_user_id, 
+                ws_manager, 
+                db, 
+                strava_activities_dict, 
+                users_existing_gear_nickname_to_id, 
+                import_time
+            ),
+        )
+
+        # Log a success message that explains processing will continue elsewhere.
+        core_logger.print_to_log_and_console(f"Strava bulk import initiated. Processing of files will continue in the background.")
+
+        # Return a success message
+        return {"Strava bulk import initiated. Processing of files will continue in the background."}
+    except Exception as err:
+        # Log the exception
+        core_logger.print_to_log_and_console(
+            f"Error in strava_bulk_import: {err}", "error"
+        )
+        # Raise an HTTPException with a 500 Internal Server Error status code
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal Server Error",
+        ) from err
+
 
 
 @router.put("/client")

@@ -15,6 +15,7 @@ import core.database as core_database
 import core.dependencies as core_dependencies
 import core.logger as core_logger
 import core.config as core_config
+import gears.gear.crud as gears_crud
 import gears.gear.dependencies as gears_dependencies
 import auth.security as auth_security
 import users.users.dependencies as users_dependencies
@@ -687,7 +688,10 @@ async def create_activity_with_bulk_import(
     ],
 ):
     try:
-        core_logger.print_to_log_and_console("Bulk import initiated.")
+        # Get time of import initiation to pass to function for recording in import_data
+        import_time = datetime.now().isoformat()
+
+        core_logger.print_to_log_and_console(f"Bulk import initiated at {import_time}.")
 
         # Ensure the 'bulk_import' directory exists
         bulk_import_dir = core_config.FILES_BULK_IMPORT_DIR
@@ -714,7 +718,7 @@ async def create_activity_with_bulk_import(
                 files_to_process.append(file_path)
                 # Log the file being processed
                 core_logger.print_to_log_and_console(
-                    f"Queuing file for processing: {file_path}"
+                    f"Found file with supported file format; adding to list of files that will be imported: {file_path}"
                 )
 
         # Submit ONE task that processes all files
@@ -726,6 +730,7 @@ async def create_activity_with_bulk_import(
                 token_user_id,
                 files_to_process,
                 ws_manager,
+                import_initiated_time=import_time,
             ),
         )
 

@@ -211,7 +211,7 @@ def iterate_over_bikes_csv() -> dict:
         HTTPException: If the CSV file is missing, has invalid headers, or cannot be parsed.
     """
     # CSV file location
-    bulk_import_dir = core_config.FILES_BULK_IMPORT_DIR
+    bulk_import_dir = core_config.STRAVA_BULK_IMPORT_DIR
     bikes_file_name = core_config.STRAVA_BULK_IMPORT_BIKES_FILE
     bikes_file_path = os.path.join(bulk_import_dir, bikes_file_name)
 
