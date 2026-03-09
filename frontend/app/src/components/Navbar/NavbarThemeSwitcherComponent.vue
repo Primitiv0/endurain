@@ -14,7 +14,7 @@
     </a>
 
     <!-- dropdown menu -->
-    <ul class="dropdown-menu">
+    <ul class="dropdown-menu dropdown-menu-end">
       <li v-for="theme in themes" :key="theme.value">
         <a
           class="btn dropdown-item"

@@ -37,7 +37,7 @@
               >
                 {{ $t('settingsIntegrationsZone.buttonDropdownOptions') }}
               </button>
-              <ul class="dropdown-menu">
+              <ul class="dropdown-menu dropdown-menu-end">
                 <li>
                   <!-- retrieve strava activities by days -->
                   <a
@@ -135,7 +135,7 @@
               >
                 {{ $t('settingsIntegrationsZone.buttonDropdownOptions') }}
               </button>
-              <ul class="dropdown-menu">
+              <ul class="dropdown-menu dropdown-menu-end">
                 <li>
                   <!-- retrieve garmin connect activities by days -->
                   <a

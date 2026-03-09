@@ -18,7 +18,7 @@
     </a>
 
     <!-- dropdown menu -->
-    <ul class="dropdown-menu">
+    <ul class="dropdown-menu dropdown-menu-end">
       <li v-for="language in languages" :key="language.value">
         <a
           class="btn dropdown-item"

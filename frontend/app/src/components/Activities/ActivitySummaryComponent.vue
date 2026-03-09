@@ -84,7 +84,7 @@
           >
             <font-awesome-icon :icon="['fas', 'fa-ellipsis-vertical']" />
           </button>
-          <ul class="dropdown-menu">
+          <ul class="dropdown-menu dropdown-menu-end">
             <li v-if="source === 'activity'">
               <a
                 class="dropdown-item"
