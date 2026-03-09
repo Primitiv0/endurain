@@ -70,6 +70,10 @@ backend/app/data/activity_files/processed/*.fit
 backend/app/data/activity_files/processed/*.tcx
 backend/app/data/activity_files/processed/*.gz
 backend/app/data/activity_files/processed/*.csv
+backend/app/data/strava_import/import_errors/*.gpx
+backend/app/data/strava_import/import_errors/*.fit
+backend/app/data/strava_import/import_errors/*.tcx
+backend/app/data/strava_import/import_errors/*.gz
 backend/data/activity_files/
 
 # Frontend

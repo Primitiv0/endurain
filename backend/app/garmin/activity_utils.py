@@ -118,13 +118,13 @@ async def fetch_and_process_activities_by_dates(
 
             parsed_activities.extend(
                 await activities_utils.parse_and_store_activity_from_file(
-                    user_id,
-                    full_file_path,
-                    ws_manager,
-                    db,
-                    True,
-                    activity_gear,
-                    activity_name,
+                    token_user_id=user_id,
+                    file_path=full_file_path,
+                    websocket_manager=ws_manager,
+                    db=db,
+                    from_garmin=True,
+                    garminconnect_gear=activity_gear,
+                    activity_name=activity_name,
                 )
                 or []
             )

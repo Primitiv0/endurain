@@ -691,7 +691,7 @@ async def create_activity_with_bulk_import(
         # Get time of import initiation to pass to function for recording in import_data
         import_time = datetime.now().isoformat()
 
-        core_logger.print_to_log_and_console(f"Bulk import initiated at {import_time}.")
+        core_logger.print_to_log_and_console(f"Bulk import initiated at {import_time}.", "info")
 
         # Ensure the 'bulk_import' directory exists
         bulk_import_dir = core_config.FILES_BULK_IMPORT_DIR
@@ -718,7 +718,7 @@ async def create_activity_with_bulk_import(
                 files_to_process.append(file_path)
                 # Log the file being processed
                 core_logger.print_to_log_and_console(
-                    f"Found file with supported file format; adding to list of files that will be imported: {file_path}"
+                    f"Queuing file for processing: {file_path}", "info"
                 )
 
         # Submit ONE task that processes all files

@@ -55,6 +55,7 @@ import server_settings.crud as server_settings_crud
 
 import core.logger as core_logger
 import core.config as core_config
+import core.cryptography as core_cryptography
 import core.database as core_database
 import core.sanitization as core_sanitization
 
@@ -402,19 +403,43 @@ async def parse_and_store_activity_from_file(
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
     from_garmin: bool = False,
+    is_bulk_import: bool = False,
     garminconnect_gear: dict | None = None,
-    strava_activities: dict = None,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
-    import_initiated_time: str = None,  # String containing the time the bulk import was initiated.
-    users_existing_gear_nickname_to_id: dict = None,  # Dictionary containing gear nickname to ID, needed for Strava bulk import
+    strava_activities: dict | None = None,
+    import_initiated_time: str | None = None,
+    users_existing_gear_nickname_to_id: dict | None = None,
     activity_name: str | None = None,
 ):
     """
-    The core function to parse and store activities that are being imported from a file.
+    Parse an activity file and persist the result to the database.
 
-    Used by both the basic bulk import function as well as the Strava bulk import function.
+    Supports .gpx, .tcx, .fit, and .gz files. Handles Garmin Connect and Strava
+    bulk imports, moves processed files to the appropriate directory, and emits
+    WebSocket notifications.
 
-    Importing additional information from the Strava bulk import requires some additional routines; these are all deliniated by testing whether strava_activities is None or not.
+    Args:
+        token_user_id: ID of the authenticated user performing the import.
+        file_path: Absolute path to the activity file to parse.
+        websocket_manager: Manager used to push real-time notifications to
+            connected clients.
+        db: SQLAlchemy database session.
+        from_garmin: Whether the file originates from a Garmin Connect sync.
+        garminconnect_gear: Garmin Connect gear metadata to associate with the
+            activity.
+        strava_activities: Strava bulk-import metadata dict keyed by filename,
+            then by activities.csv column header.
+        import_initiated_time: ISO timestamp of when the bulk import was
+            initiated.
+        users_existing_gear_nickname_to_id: Mapping of gear nickname to
+            internal gear ID, used during Strava bulk imports.
+        activity_name: Optional override for the activity name.
 
+    Returns:
+        List of created activity schema objects, or None if the file could not
+            be parsed.
+
+    Raises:
+        HTTPException: When the user is not found.
     """
     try:
         # Get file extension
@@ -422,9 +447,6 @@ async def parse_and_store_activity_from_file(
 
         # Get pathless file name with extension, as this is the dictionary key for Strava's bulk import activities dictionary.
         _, file_base_name = os.path.split(file_path)
-
-        # Print import progress information to log  # Bulk imports already print a processing status.
-        # core_logger.print_to_log_and_console(f"Bulk file import: Beginning processing of {file_base_name}.")
 
         garmin_connect_activity_id = None
 
@@ -464,17 +486,31 @@ async def parse_and_store_activity_from_file(
                 )
             )
 
-            # Gather supplemental metadata. Check if a Strava bulk import is in progress, and if so check to see if any additional information can be added to the activity.
+            # Gather supplemental metadata. Check if a Strava bulk import is in
+            # progress, and if so check to see if any additional information 
+            # can be added to the activity.
             activity_metadata_dict = {}
-            if strava_activities:
-                # Build a metadata dict (which will also include an import_dict) based on information in the strava_activities dict.
-                activity_metadata_dict = strava_bulk_import_utils.build_metadata_dict(file_base_name, strava_activities, import_initiated_time, users_existing_gear_nickname_to_id)
-            else:
-                # Not doing a Strava bulk import, so build an import info dict that reflects the generic import.
-                import_dict = strava_bulk_import_utils.build_import_dictionary(file_base_name, import_initiated_time, False)
-                activity_metadata_dict["import_dict"]=import_dict
+            if strava_activities and isinstance(strava_activities, dict) and import_initiated_time and is_bulk_import:
+                # Build a metadata dict (which will also include an 
+                # import_dict) based on information in the strava_activities 
+                # dict.
+                activity_metadata_dict = strava_bulk_import_utils.build_metadata_dict(
+                    file_base_name,
+                    strava_activities,
+                    import_initiated_time,
+                    users_existing_gear_nickname_to_id,
+                )
+            elif import_initiated_time and is_bulk_import:
+                # Not doing a Strava bulk import, so build an import info dict 
+                # that reflects the generic import.
+                import_dict = strava_bulk_import_utils.build_import_dictionary(
+                    file_base_name, import_initiated_time, False
+                )
+                activity_metadata_dict["import_dict"] = import_dict
 
-            # Work through the parsed info; process and store any activity information found (specific routines depend on file type - .gpx/.tcx and .fit have very different needs)
+            # Work through the parsed info; process and store any activity 
+            # information found (specific routines depend on file type 
+            # .gpx/.tcx and .fit have very different needs)
             if parsed_info is not None:
                 created_activities = []
                 idsToFileName = ""
@@ -482,8 +518,11 @@ async def parse_and_store_activity_from_file(
                     ".gpx",
                     ".tcx",
                 ):
-                    #Add import metadata and Strava activities.csv metadata to parsed_info
-                    parsed_info = strava_bulk_import_utils.append_bulk_import_metadata_to_activity(parsed_info, activity_metadata_dict)
+                    # Add import metadata and Strava activities.csv metadata to parsed_info
+                    if is_bulk_import:
+                        parsed_info = strava_bulk_import_utils.append_bulk_import_metadata_to_activity(
+                            parsed_info, activity_metadata_dict
+                        )
 
                     # Store the activity in the database
                     created_activity = await store_activity(
@@ -521,27 +560,44 @@ async def parse_and_store_activity_from_file(
                             db,
                         )
 
-                    # Check number of activities in fit file, to allow simple metadata importing of single-activity-containing fit files
-                    numberoffitactivities=len(created_activities_objects)
-
                     for activity in created_activities_objects:
                         # Iterate through activities and add them one at a time.
-                        
-                        # For a Strava bulk import of a multi-activity .fit file, check to see if this is the same activity referenced in the activities.csv for this file.
-                        if numberoffitactivities > 1 and strava_activities and activity_metadata_dict["metadata_found_in_csv"] is True:
-                            # We must check to see if this activity matches the start time of the activity contained in the activities.csv (to avoid double-importing activities)
-                            if not strava_bulk_import_utils.does_activity_start_time_match_the_data_in_strava_activities_csv(activity, activity_metadata_dict):
-                                # This is not the activity that aligns with the Strava info - skip import.
-                                core_logger.print_to_log_and_console(f"Bulk activity import of multi-activity .fit file: skipping likely duplicate import. Start time does not align with start time for this .fit file in the Strava activities.csv file.", "debug" ) # 
-                                continue
 
-                        #Add import metadata and Strava activities.csv metadata
-                        activity = strava_bulk_import_utils.append_bulk_import_metadata_to_activity(activity, activity_metadata_dict)
+                        if is_bulk_import:
+                            # For a Strava bulk import of a multi-activity .fit file, check to see if this is the same activity referenced in the activities.csv for this file.
+                            if (
+                                len(created_activities_objects) > 1
+                                and strava_activities
+                                and activity_metadata_dict["metadata_found_in_csv"] is True
+                            ):
+                                # We must check to see if this activity matches the start time of the activity contained in the activities.csv (to avoid double-importing activities)
+                                if not strava_bulk_import_utils.does_activity_start_time_match_the_data_in_strava_activities_csv(
+                                    activity, activity_metadata_dict
+                                ):
+                                    # This is not the activity that aligns with the Strava info - skip import.
+                                    core_logger.print_to_log_and_console(
+                                        f"Bulk activity import of multi-activity .fit file: skipping likely duplicate import. Start time does not align with start time for this .fit file in the Strava activities.csv file.",
+                                        "debug",
+                                    )  #
+                                    continue
+
+                            # Add import metadata and Strava activities.csv metadata
+                            activity = strava_bulk_import_utils.append_bulk_import_metadata_to_activity(
+                                activity, activity_metadata_dict
+                            )
 
                         # Store the activity in the database
                         created_activity = await store_activity(
                             activity, websocket_manager, db
                         )
+
+                        # Deal with Strava bulk import media.
+                        # Note - even multi-activity .fit files are good with this code, as there should only be a single imported activity per file in the Strava activities file directory.
+                        if strava_activities and is_bulk_import:
+                            strava_bulk_import_utils.import_media_from_strava_bulk_export(
+                                strava_activities, created_activity, file_base_name, db
+                            )
+                        
                         created_activities.append(created_activity)
 
                     for index, activity in enumerate(created_activities):
@@ -552,8 +608,11 @@ async def parse_and_store_activity_from_file(
                                 "_"  # Add an underscore if it's not the last item
                             )
                 else:
-                    # Should no longer get here due to screening of extensions in router.py, but why not.
-                    core_logger.print_to_log_and_console(f"File extension not supported: {file_extension}", "error")
+                    # Should no longer get here due to screening of extensions 
+                    # in router.py, but why not.
+                    core_logger.print_to_log_and_console(
+                        f"File extension not supported: {file_extension}", "error"
+                    )
 
                 # Define the directory where the processed files will be stored
                 processed_dir = core_config.FILES_PROCESSED_DIR
@@ -563,41 +622,51 @@ async def parse_and_store_activity_from_file(
 
                 # Move the file to the processed directory
                 move_file(processed_dir, new_file_name, file_path)
-                core_logger.print_to_log_and_console(f"Bulk file import: File successfully processed and moved. {file_path} - has become {new_file_name}")
+                
+                if is_bulk_import:
+                    core_logger.print_to_log_and_console(
+                        f"Bulk file import: File successfully processed and moved. {file_path} - has become {new_file_name}"
+                    )
 
-                # Deal with Strava bulk import media.
-                # Note - even multi-activity .fit files are good with this code, as there should only be a single imported activity per file in the Strava activities file directory.
-                if strava_activities: strava_bulk_import_utils.import_media_from_Strava_bulk_export(strava_activities, created_activity, file_base_name, db)
-
-                core_logger.print_to_log_and_console(f"Bulk file import: Import work complete for file {file_base_name}.")
+                    core_logger.print_to_log_and_console(
+                        f"Bulk file import: Import work complete for file {file_base_name}."
+                    )
 
                 # Return the created activity
                 return created_activities
             else:
                 return None
-    # except HTTPException as http_err:
-    # This is causing a crash on the back end when the try fails.  Looks like we cannot raise an http exception in a background task.
-    # raise http_err
     except Exception as err:
-        # Log the exception
+        if is_bulk_import:
+            # Log the exception
+            core_logger.print_to_log_and_console(
+                f"Bulk file import: Error while parsing {file_path} in parse_and_store_activity_from_file - {str(err)}",
+                "error",
+                exc=err,
+            )
+            try:
+                # Move the exception-causing file to an import errors directory.
+                if strava_activities:
+                    # Use Strava bulk import errors directory if we are doing a Strava bulk import
+                    error_file_dir = core_config.STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR
+                else:
+                    # otherwise use standard bulk import error directory
+                    error_file_dir = core_config.FILES_BULK_IMPORT_IMPORT_ERRORS_DIR
+                os.makedirs(error_file_dir, exist_ok=True)
+                move_file(error_file_dir, os.path.basename(file_path), file_path)
+                core_logger.print_to_log_and_console(
+                    f"Bulk file import: Due to import error, file {file_path} has been moved to {error_file_dir}",
+                    "error",
+                )
+            except Exception:
+                core_logger.print_to_log_and_console(
+                    f"Bulk file import: Failed to move the error-producing file {file_path} to the import-error directory.",
+                    "error",
+                )
         core_logger.print_to_log_and_console(
-            f"Bulk file import: Error while parsing {file_path} in parse_and_store_activity_from_file - {str(err)}",
-            "error",
-            exc=err,
+            f"Error in parse_and_store_activity_from_file - {str(err)}", "error", exc=err
         )
-        try:
-            # Move the exception-causing file to an import errors directory.
-            if strava_activities:  
-                # Use Strava bulk import errors directory if we are doing a Strava bulk import
-                error_file_dir = core_config.STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR
-            else: 
-                # otherwise use standard bulk import error directory
-                error_file_dir = core_config.FILES_BULK_IMPORT_IMPORT_ERRORS_DIR
-            os.makedirs(error_file_dir, exist_ok=True)
-            move_file(error_file_dir, os.path.basename(file_path), file_path)
-            core_logger.print_to_log_and_console(f"Bulk file import: Due to import error, file {file_path} has been moved to {error_file_dir}", "error")
-        except Exception:
-            core_logger.print_to_log_and_console(f"Bulk file import: Failed to move the error-producing file {file_path} to the import-error directory.", "error")
+
 
 async def parse_and_store_activity_from_uploaded_file(
     token_user_id: int,
@@ -754,6 +823,7 @@ def move_file(new_dir: str, new_filename: str, file_path: str):
             detail=f"Internal Server Error: {str(err)}",
         ) from err
 
+
 def parse_file(
     token_user_id: int,
     user_privacy_settings: users_privacy_settings_models.UsersPrivacySettings,
@@ -811,7 +881,7 @@ async def store_activity(
     parsed_info: dict,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-):
+) -> activities_models.Activity:
     # create the activity in the database
     created_activity = await activities_crud.create_activity(
         parsed_info["activity"], websocket_manager, db
@@ -858,9 +928,7 @@ async def store_activity(
         )
 
     # Generate a static map thumbnail if GPS data is present
-    if parsed_info.get("is_lat_lon_set") and parsed_info.get(
-        "lat_lon_waypoints"
-    ):
+    if parsed_info.get("is_lat_lon_set") and parsed_info.get("lat_lon_waypoints"):
         server_settings = server_settings_crud.get_server_settings(db)
         tile_url = (
             server_settings.tileserver_url
@@ -874,10 +942,7 @@ async def store_activity(
         )
         # Decrypt tile API key if the provider requires backend auth
         api_key = None
-        if (
-            server_settings
-            and server_settings.tileserver_api_key
-        ):
+        if server_settings and server_settings.tileserver_api_key:
             api_key = core_cryptography.decrypt_token_fernet(
                 server_settings.tileserver_api_key
             )
@@ -1293,7 +1358,7 @@ def process_all_files_sync(
     user_id: int,
     file_paths: list[str],
     websocket_manager: websocket_manager.WebSocketManager,
-    import_initiated_time: str = None,  # String containing the time the Strava bulk import was initiated.
+    import_initiated_time: str,
 ):
     """
     Process all files sequentially in single thread.
@@ -1308,7 +1373,7 @@ def process_all_files_sync(
         total_files = len(file_paths)
         for idx, file_path in enumerate(file_paths, 1):
             core_logger.print_to_log_and_console(
-                f"Processing file {idx}/{total_files}: " f"{file_path}" 
+                f"Processing file {idx}/{total_files}: " f"{file_path}"
             )
             asyncio.run(
                 parse_and_store_activity_from_file(
@@ -1316,6 +1381,7 @@ def process_all_files_sync(
                     file_path,
                     websocket_manager,
                     db,
+                    is_bulk_import=True,
                     import_initiated_time=import_initiated_time,
                 )
             )
@@ -1364,8 +1430,7 @@ def delete_and_regenerate_all_activity_thumbnails() -> None:
                 deleted += 1
             except OSError as err:
                 core_logger.print_to_log(
-                    f"Thumbnail regeneration: could not delete "
-                    f"{thumb_file}: {err}",
+                    f"Thumbnail regeneration: could not delete " f"{thumb_file}: {err}",
                     "warning",
                 )
 
@@ -1394,14 +1459,13 @@ def generate_missing_activity_thumbnails() -> None:
         None — errors are logged per-activity; execution continues.
     """
     with core_database.SessionLocal() as db:
-        activities_without_thumbnail = (
-            activities_crud.get_activities_without_thumbnail(db)
+        activities_without_thumbnail = activities_crud.get_activities_without_thumbnail(
+            db
         )
 
         if not activities_without_thumbnail:
             core_logger.print_to_log(
-                "Thumbnail scheduler: no activities without "
-                "thumbnail found",
+                "Thumbnail scheduler: no activities without " "thumbnail found",
                 "debug",
             )
             return
@@ -1412,9 +1476,7 @@ def generate_missing_activity_thumbnails() -> None:
             "info",
         )
 
-        server_settings = (
-            server_settings_crud.get_server_settings(db)
-        )
+        server_settings = server_settings_crud.get_server_settings(db)
         tile_url = (
             server_settings.tileserver_url
             if server_settings
@@ -1437,9 +1499,7 @@ def generate_missing_activity_thumbnails() -> None:
                 db.query(activity_streams_models.ActivityStreams)
                 .filter_by(
                     activity_id=activity.id,
-                    stream_type=(
-                        activity_streams_constants.STREAM_TYPE_MAP
-                    ),
+                    stream_type=(activity_streams_constants.STREAM_TYPE_MAP),
                 )
                 .first()
             )
@@ -1447,15 +1507,13 @@ def generate_missing_activity_thumbnails() -> None:
             if not gps_stream or not gps_stream.stream_waypoints:
                 continue
 
-            thumbnail_path = (
-                activities_thumbnail.generate_activity_thumbnail(
-                    activity.id,
-                    gps_stream.stream_waypoints,
-                    core_config.ACTIVITY_THUMBNAILS_DIR,
-                    tile_url=tile_url,
-                    background_color=bg_color,
-                    api_key=api_key,
-                )
+            thumbnail_path = activities_thumbnail.generate_activity_thumbnail(
+                activity.id,
+                gps_stream.stream_waypoints,
+                core_config.ACTIVITY_THUMBNAILS_DIR,
+                tile_url=tile_url,
+                background_color=bg_color,
+                api_key=api_key,
             )
 
             if thumbnail_path is not None:

@@ -3,52 +3,30 @@ import asyncio
 import csv
 import time
 from datetime import datetime
-from fastapi import HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
-from stravalib.client import Client
+from fastapi import Depends
 
-from typing import Annotated, Callable
+from typing import Annotated
 
 import core.config as core_config
 import core.logger as core_logger
 import core.database as core_database
-import core.dependencies as core_dependencies
 
 import users.users.crud as users_crud
 
-import strava.utils as strava_utils
-import strava.athlete_utils as strava_athlete_utils
-
-import gears.gear.schema as gears_schema
 import gears.gear.crud as gears_crud
-import gears.gear.utils as gears_utils
 
-import activities.activity.schema as activities_schema
-import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
+import activities.activity.models as activities_models
 import activities.activity_media.crud as activity_media_crud
 
 import auth.security as auth_security
 
-import users.users_integrations.crud as user_integrations_crud
-
-from core.database import SessionLocal
-
 import websocket.manager as websocket_manager
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Security,
-    Query,
-    UploadFile,
-    status,
-)
 from sqlalchemy.orm import Session
 
-def iterate_over_activities_csv() -> dict:
+def iterate_over_activities_csv() -> dict | None:
     """
     Parses information in a Strava activities.csv file.
 
@@ -95,7 +73,7 @@ def create_gear_dictionary_for_bulk_import(
         Session,
         Depends(core_database.get_db),
     ],
-) -> dict:
+) -> dict | None:
     """
     Creates a dictionary that links gear nicknames in Endurain to their Endurain gear IDs. 
 
@@ -104,20 +82,22 @@ def create_gear_dictionary_for_bulk_import(
     Returns: Dictionary that uses the gear name as a key to look up the gear ID.
     """
     user = users_crud.get_user_by_id(token_user_id, db)
-    user_gear_list = gears_crud.get_gear_user(user.id, db)
-    if user_gear_list is None:
-            #User has no gear.
-            users_existing_gear_nickname_to_id = None
-    else:
-            #User has gear - build dictionary to facilitate gear to ID work during import.
-            users_existing_gear_nickname_to_id = {}
-            for item in user_gear_list:
-                users_existing_gear_nickname_to_id[item.nickname] = [item.id]
-                # Strava apparently exports shoe names as a smoosh of "{brand} {model} {name}", so adding that as a second key for each gear item
-                strava_name_smoosh = item.brand + " " + item.model + " " + item.nickname
-                if strava_name_smoosh not in users_existing_gear_nickname_to_id:
-                        users_existing_gear_nickname_to_id[strava_name_smoosh] = [item.id]
-    return users_existing_gear_nickname_to_id
+    if user is not None:
+        user_gear_list = gears_crud.get_gear_user(user.id, db)
+        if user_gear_list is None:
+                #User has no gear.
+                users_existing_gear_nickname_to_id = None
+        else:
+                #User has gear - build dictionary to facilitate gear to ID work during import.
+                users_existing_gear_nickname_to_id = {}
+                for item in user_gear_list:
+                    users_existing_gear_nickname_to_id[item.nickname] = [item.id]
+                    # Strava apparently exports shoe names as a smoosh of "{brand} {model} {name}", so adding that as a second key for each gear item
+                    strava_name_smoosh = item.brand + " " + item.model + " " + item.nickname
+                    if strava_name_smoosh not in users_existing_gear_nickname_to_id:
+                            users_existing_gear_nickname_to_id[strava_name_smoosh] = [item.id]
+        return users_existing_gear_nickname_to_id
+    return None
 
 def queue_bulk_export_activities_for_import(
     token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
@@ -192,10 +172,10 @@ def queue_bulk_export_activities_for_import(
                     file_path,
                     websocket_manager,
                     db,
+                    is_bulk_import=True,
                     strava_activities=strava_activities_dict,
                     import_initiated_time=import_time,
                     users_existing_gear_nickname_to_id=users_existing_gear_nickname_to_id,
-                    #file_progress_dict=file_progress_dict, # TESTING REMOVAL OF THIS
                 )
             )
             # Small delay between files
@@ -209,7 +189,7 @@ def build_metadata_dict(
     file_base_name: str, # String with the base filename being processed (also key to strava_activities dictionary)
     strava_activities: dict,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
     import_initiated_time: str,  # String containing the time the Strava bulk import was initiated.
-    users_existing_gear_nickname_to_id: dict = None,  # Dictionary containing gear nickname to ID, needed for Strava bulk import
+    users_existing_gear_nickname_to_id: dict | None = None,  # Dictionary containing gear nickname to ID, needed for Strava bulk import
 ) -> dict:
     """
     Creates a dictionary with metadata information pulled from a Strava activities file.
@@ -219,7 +199,7 @@ def build_metadata_dict(
     Returns: Dictionary that contains the gear name as a key to look up the gear ID.
     """
     strava_activity_metadata = {}
-    if strava_activities.get(file_base_name):  # We have information on the activity
+    if isinstance(strava_activities, dict) and strava_activities.get(file_base_name):  # We have information on the activity
         core_logger.print_to_log_and_console(f"TESTING CODE: Inside metadata dict building if statemment: {strava_activities.get(file_base_name)}", "debug")
         # Strava bulk import notes:
         #     Importing Strava activity id to the activity's "strava_activity_id" field results in Endurain thinking the activity is linked to Strava via the Strava active linking mechanism.
@@ -236,11 +216,11 @@ def build_metadata_dict(
         activity_gear = strava_activities[file_base_name]["Activity Gear"]
         if activity_gear and activity_gear is not None: 
             if activity_gear.replace("+", " ").strip() in users_existing_gear_nickname_to_id:
-                    # Gear names in Endurain have all +'s swapped to spaces, thus need to do this here as well.
-                    strava_activity_metadata["gear_id"]=users_existing_gear_nickname_to_id[activity_gear][0]
+                # Gear names in Endurain have all +'s swapped to spaces, thus need to do this here as well.
+                strava_activity_metadata["gear_id"] = users_existing_gear_nickname_to_id[activity_gear][0]
             else:
-                    strava_activity_metadata["gear_id"]=None
-                    core_logger.print_to_log_and_console(f"Bulk file import: Gear for activity {file_base_name}, which activities.csv shows as {activity_gear}, was not found in the user's existing gear. Not adding gear to activity.")
+                strava_activity_metadata["gear_id"] = None
+                core_logger.print_to_log_and_console(f"Bulk file import: Gear for activity {file_base_name}, which activities.csv shows as {activity_gear}, was not found in the user's existing gear. Not adding gear to activity.")
         else:
             strava_activity_metadata["gear_id"]=None
         import_dict = build_import_dictionary(file_base_name, import_initiated_time, True, strava_activities)
@@ -262,7 +242,7 @@ def build_import_dictionary (
     file_base_name: str, # String with the base filename being processed (also key to strav_activities dictionary)
     import_initiated_time: str,  # String containing the time the Strava bulk import was initiated.
     is_Strava_bulk_import: bool = False,  # Boolean to track if we are doing a Strava bulk import or not
-    strava_activities: dict = None,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
+    strava_activities: dict | None = None,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
 )  -> dict:
     """
     Creates the "import_info" dictionary that is added to all activities that are imported from files. 
@@ -348,15 +328,36 @@ def does_activity_start_time_match_the_data_in_strava_activities_csv(
     else: return False
 
 
-def import_media_from_Strava_bulk_export(
-    strava_activities: dict,  # dictionary with info for a Strava bulk import - format strava_activities["filename"]["column header from Strava activities spreadsheet"]
-    created_activity: dict, #The activity that was just created, and to which we will be adding media.
-    file_base_name: str, # String with the base filename being processed (also key to strava_activities dictionary)
+def import_media_from_strava_bulk_export(
+    strava_activities: dict,
+    created_activity: activities_models.Activity,
+    file_base_name: str,
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> None:
+    """
+    Import media files associated with a Strava bulk export activity.
+
+    Reads the pipe-separated media list from the Strava
+    activities.csv entry for the given file, then creates
+    activity media records for each referenced media file
+    found in the Strava bulk import media directory.
+
+    Args:
+        strava_activities: Strava bulk-import metadata dict
+            keyed by filename, then by activities.csv column
+            header.
+        created_activity: The newly created activity object
+            to which media will be attached.
+        file_base_name: Base filename of the activity file,
+            used as the lookup key in strava_activities.
+        db: SQLAlchemy database session.
+
+    Returns:
+        None
+    """
     if strava_activities.get(file_base_name):
         media_string = strava_activities[file_base_name]["Media"].strip()
         media_list = []
@@ -368,6 +369,53 @@ def import_media_from_Strava_bulk_export(
                 strava_media_dir = core_config.STRAVA_BULK_IMPORT_MEDIA_DIR
                 _, media_file_base_name = os.path.split(media_item)
                 media_path = os.path.join(strava_media_dir, media_file_base_name)
-                activity_media_crud.create_activity_media_from_strava_bulk_import(created_activity.id, media_file_base_name, media_path, db)
+                create_activity_media_from_strava_bulk_import(created_activity.id, media_file_base_name, media_path, db)
+
+
+def create_activity_media_from_strava_bulk_import(
+    activity_id: int,
+    media_strava_filename: str,
+    media_path_from_strava: str,
+    db: Session,
+):
+    """
+    Imports a media file that is attached to an activity that has just been imported via the Strava bulk import routines.
+
+    Note that the imported activity must be created before this function is called, as the activity_id must be known for media import to be successful.
+
+    Returns: nothing
+    """
+
+    core_logger.print_to_log_and_console(
+        f"Media import: Beginning processing of {media_path_from_strava}", "debug"
+    )
+    try:
+        # Ensure the 'data/activity_media' directory exists
+        final_media_dir = core_config.ACTIVITY_MEDIA_DIR
+        os.makedirs(final_media_dir, exist_ok=True)
+
+        # Create new file name and new file path
+        new_file_name = f"{activity_id}_{media_strava_filename}"
+        new_file_path = os.path.join(final_media_dir, new_file_name)
+
+        if os.path.exists(media_path_from_strava):
+            activities_utils.move_file(final_media_dir, new_file_name, media_path_from_strava)
+
+            # Add media file to db
+            activity_media_crud.create_activity_media(activity_id, new_file_path, db)
+            core_logger.print_to_log_and_console(
+                f"Bulk file import media import: Media file {media_strava_filename} has been imported to db."
+            )
+        else:
+            core_logger.print_to_log_and_console(
+                f"Bulk file import media import warning: Media file {media_strava_filename} does not exist, skipping import of it - {media_path_from_strava}",
+                "warning",
+            )
+            return
+    except Exception as err:
+        core_logger.print_to_log_and_console(
+            f"Bulk file import media import: Error during processing of {media_path_from_strava}: {err}",
+            "error",
+        )
 
                   

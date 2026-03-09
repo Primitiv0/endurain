@@ -2,13 +2,6 @@
   <div class="col">
     <div class="bg-body-tertiary rounded p-3 shadow-sm">
       <!-- list zone -->
-      <!-- Page header -->
-      <div>
-         <h4 class="mt-4">{{ $t('settingsImportZone.settingsimportpageTitle') }}
-         </h4>
-         <span>{{ $t('settingsImportZone.settingsimportpageDescription') }}</span>
-      </div>
-      <hr />
       <ul class="list-group list-group-flush">
         <!-- bulk import zone -->
         <li class="list-group-item d-flex justify-content-between bg-body-tertiary px-0">
@@ -34,51 +27,47 @@
             <font-awesome-icon :icon="['fas', 'file-import']" size="2x" />
             <div class="ms-3">
               <div class="fw-bold">
-                {{ $t('settingsImportZone.stravaGearImportTitle') }}
+                {{ $t('settingsImportZone.stravaBulkImportTitle') }}
                 {{ $t('generalItems.betaTag') }}
               </div>
               {{ $t('settingsImportZone.stravaGearImportBody') }}
             </div>
           </div>
           <div class="d-flex align-items-center">
-            <!-- import bikes button -->
-            <a 
-              href="#" 
-              class="btn btn-primary" 
-              role="button" 
-              @click="submitStravaBikesImport">{{ $t("settingsImportZone.stravaGearImportButtonBikes") }}
-            </a>
-          </div>
-          <div class="d-flex align-items-center">
-            <!-- import shoes button -->
-            <a 
-              href="#" 
-              class="btn btn-primary" 
-              role="button" 
-              @click="submitStravaShoesImport">{{ $t("settingsImportZone.stravaGearImportButtonShoes") }}
-            </a>
-          </div>
-        </li>
-        <!-- Strava activity and media bulk-export import zone -->
-        <li class="list-group-item d-flex justify-content-between bg-body-tertiary px-0">
-          <div class="d-flex align-items-center">
-            <font-awesome-icon :icon="['fas', 'file-import']" size="2x" />
-            <div class="ms-3">
-              <div class="fw-bold">
-                {{ $t("settingsImportZone.stravaBulkImportTitle") }}{{ $t('generalItems.betaTag') }}
-              </div>
-              {{ $t("settingsImportZone.stravaBulkImportBody") }}
+            <div class="dropdown">
+              <a
+                class="btn btn-secondary dropdown-toggle"
+                href="#"
+                role="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+              >
+                {{ $t('settingsImportZone.importTitle') }}
+              </a>
+
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item" @click="submitStravaBulkImport">{{
+                    $t('settingsImportZone.stravaBulkImportButton')
+                  }}</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
+                <li>
+                  <a class="dropdown-item" @click="submitStravaBikesImport">{{
+                    $t('settingsImportZone.stravaGearImportButtonBikes')
+                  }}</a>
+                </li>
+                <li>
+                  <a class="dropdown-item" @click="submitStravaShoesImport">{{
+                    $t('settingsImportZone.stravaGearImportButtonShoes')
+                  }}</a>
+                </li>
+              </ul>
             </div>
           </div>
-	  <div class="d-flex align-items-center">
-            <!-- bulk importbutton -->
-            <a 
-              href="#" 
-              class="btn btn-primary" 
-              role="button" 
-              @click="submitStravaBulkImport">{{ $t("settingsImportZone.stravaBulkImportButton") }}</a>
-          </div>
-	</li>
+        </li>
       </ul>
     </div>
   </div>
@@ -131,15 +120,13 @@ async function submitStravaShoesImport() {
 async function submitStravaBulkImport() {
   // Set the loading message
   const notification = push.promise(t('settingsImportZone.loadingMessageStravaBulkImport'))
-	try {
-		await stravaService.stravaBulkImport();
-		// Resolve the loading message with a success message
-		notification.resolve(t("settingsImportZone.successMessageStravaBulkImport"));
-	} catch (error) {
-		// If there is an error, show the error alert.
-		push.error(
-			`${t("settingsImportZone.errorMessageUnableToBulkImport")} - ${error}`,
-		);
-	}
+  try {
+    await stravaService.stravaBulkImport()
+    // Resolve the loading message with a success message
+    notification.resolve(t('settingsImportZone.successMessageStravaBulkImport'))
+  } catch (error) {
+    // If there is an error, show the error alert.
+    push.error(`${t('settingsImportZone.errorMessageUnableToBulkImport')} - ${error}`)
+  }
 }
 </script>

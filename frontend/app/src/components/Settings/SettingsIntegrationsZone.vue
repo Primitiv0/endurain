@@ -6,7 +6,9 @@
         <!-- strava zone -->
         <li class="list-group-item d-flex justify-content-between bg-body-tertiary px-0 pt-0">
           <div class="d-flex align-items-center">
-            <font-awesome-icon class="me-2" :icon="['fab', 'strava']" size="2x" />
+            <div class="d-flex justify-content-center align-items-center" style="width: 2.5rem">
+              <font-awesome-icon :icon="['fab', 'strava']" size="2x" />
+            </div>
             <div class="ms-3">
               <div class="fw-bold">
                 {{ $t('settingsIntegrationsZone.stravaIntegrationTitle') }}
@@ -99,8 +101,13 @@
         <!-- Garmin Connect zone -->
         <li class="list-group-item d-flex justify-content-between bg-body-tertiary px-0 pb-0">
           <div class="d-flex align-items-center">
-            <!--<font-awesome-icon :icon="['fas', 'file-import']" size="2x" />-->
-            <img :src="INTEGRATION_LOGOS.garminConnectApp" alt="Garmin Connect logo" height="32" />
+            <div class="d-flex justify-content-center align-items-center" style="width: 2.5rem">
+              <img
+                :src="INTEGRATION_LOGOS.garminConnectApp"
+                alt="Garmin Connect logo"
+                height="32"
+              />
+            </div>
             <div class="ms-3">
               <div class="fw-bold">
                 {{ $t('settingsIntegrationsZone.garminConnectIntegrationTitle') }}
