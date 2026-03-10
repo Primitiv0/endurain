@@ -2,7 +2,7 @@
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import users.users_goals.schema as user_goals_schema
 import users.users_goals.models as user_goals_models
@@ -42,7 +42,7 @@ def calculate_user_goals(
         HTTPException: If database error occurs.
     """
     if not date:
-        date = datetime.now().strftime("%Y-%m-%d")
+        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     try:
         goals = user_goals_crud.get_user_goals_by_user_id(user_id, db)
 

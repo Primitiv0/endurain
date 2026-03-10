@@ -38,7 +38,8 @@ class ActivitySets(Base):
     )
     set_type = Column(String(length=250), nullable=False, comment="Workout set type")
     start_time = Column(
-        DateTime, nullable=False, comment="Workout set start date (DATETIME)"
+        DateTime(timezone=True), nullable=False,
+        comment="Workout set start date (DATETIME)",
     )
     category = Column(
         Integer,

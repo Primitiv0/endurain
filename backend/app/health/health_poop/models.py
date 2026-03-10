@@ -7,7 +7,7 @@ optional notes.
 """
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -46,6 +46,7 @@ class HealthPoop(Base):
         comment="User ID that the health_poop belongs",
     )
     date_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         index=True,
         comment="Date and time of bowel movement",

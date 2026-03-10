@@ -81,14 +81,14 @@ class OAuthState(Base):
     )
 
     created_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
         comment="OAuth state creation timestamp",
     )
 
     expires_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         index=True,
         comment="Hard expiry at 10 minutes (cleanup marker)",

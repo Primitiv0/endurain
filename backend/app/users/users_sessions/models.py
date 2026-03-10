@@ -1,7 +1,7 @@
 """User session database models."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -89,14 +89,17 @@ class UsersSessions(Base):
         comment="Browser version",
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Session creation date (datetime)",
     )
     last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Last activity timestamp for idle timeout",
     )
     expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Session expiration date (datetime)",
     )
@@ -125,6 +128,7 @@ class UsersSessions(Base):
         comment="Number of times refresh token has been rotated",
     )
     last_rotation_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Timestamp of last token rotation",
     )

@@ -446,7 +446,7 @@ async def edit_user(
         # Raise an HTTPException with a 409 Conflict status code
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=("Duplicate entry error. " "Check if email and username are unique"),
+            detail=("Duplicate entry error. Check if email and username are unique"),
         ) from integrity_error
 
 

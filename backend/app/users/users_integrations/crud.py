@@ -1,6 +1,6 @@
 """CRUD operations for user integrations."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -134,7 +134,7 @@ def link_strava_account(
         tokens["refresh_token"]
     )
     user_integrations.strava_token_expires_at = datetime.fromtimestamp(
-        tokens["expires_at"]
+        tokens["expires_at"], tz=timezone.utc
     )
 
     # Set the strava state to None

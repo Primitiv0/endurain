@@ -6,7 +6,7 @@ including timing, duration, type, and status information.
 """
 
 from datetime import date as date_type, datetime
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -42,10 +42,12 @@ class HealthFasting(Base):
         comment="User ID that the health_fasting belongs",
     )
     fast_start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Start time of fast",
     )
     fast_end_time: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="End time of fast (null if ongoing)",
     )

@@ -2,7 +2,7 @@
 
 from datetime import datetime as datetime_type
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
@@ -37,10 +37,12 @@ class PasswordResetToken(Base):
         comment="Hashed password reset token",
     )
     created_at: Mapped[datetime_type] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Token creation date (datetime)",
     )
     expires_at: Mapped[datetime_type] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Token expiration date (datetime)",
     )

@@ -21,7 +21,10 @@ class ActivityLaps(Base):
         index=True,
         comment="Activity ID that the activity lap belongs",
     )
-    start_time = Column(DateTime, nullable=False, comment="Lap start date (DATETIME)")
+    start_time = Column(
+        DateTime(timezone=True), nullable=False,
+        comment="Lap start date (DATETIME)",
+    )
     start_position_lat = Column(
         DECIMAL(precision=20, scale=10),
         nullable=True,

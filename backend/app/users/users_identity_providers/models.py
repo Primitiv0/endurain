@@ -1,7 +1,7 @@
 """User identity provider database models."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from core.database import Base
@@ -50,11 +50,13 @@ class UsersIdentityProvider(Base):
         comment="Subject/ID from the identity provider",
     )
     linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         comment="When this IdP was linked to the user",
     )
     last_login: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Last login using this IdP",
     )
@@ -64,10 +66,12 @@ class UsersIdentityProvider(Base):
         comment="Encrypted refresh token",
     )
     idp_access_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Access token expiry time",
     )
     idp_refresh_token_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Last refresh token update",
     )

@@ -267,14 +267,15 @@ def split_records_by_activity(parsed_data: dict) -> dict:
         start_time = session["first_waypoint_time"]
         if not isinstance(start_time, datetime):
             start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S")
+        # Ensure tz-aware for consistent comparisons
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
 
         end_time = session.get("last_waypoint_time", start_time)
         if not isinstance(end_time, datetime):
             end_time = datetime.strptime(end_time, "%Y-%m-%dT%H:%M:%S")
-
-        # Make both timezone-naive (removes timezone info).
-        start_time = start_time.replace(tzinfo=None)
-        end_time = end_time.replace(tzinfo=None)
+        if end_time.tzinfo is None:
+            end_time = end_time.replace(tzinfo=timezone.utc)
 
         laps_records = []
 
@@ -868,8 +869,6 @@ def parse_frame_record(frame):
     longitude = get_value_from_frame(frame, "position_long")
     elevation = get_value_from_frame(frame, "enhanced_altitude")
     time = get_value_from_frame(frame, "timestamp")
-    if time:
-        time = time.replace(tzinfo=None)
     heart_rate = get_value_from_frame(frame, "heart_rate")
     cadence = get_value_from_frame(frame, "cadence")
     power = get_value_from_frame(frame, "power")
@@ -920,10 +919,6 @@ def parse_frame_lap(frame):
 
     lap_data = tuple(get_value_from_frame(frame, key) for key in keys)
     lap_dict = dict(zip(keys, lap_data))
-
-    # Ensure start_time and end_time is timezone-naive
-    if isinstance(lap_dict["start_time"], datetime):
-        lap_dict["start_time"] = lap_dict["start_time"].replace(tzinfo=None)
 
     (
         lap_dict["start_position_lat"],

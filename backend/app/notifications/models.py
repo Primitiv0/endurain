@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, JSON
+from sqlalchemy import DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -51,6 +51,7 @@ class Notification(Base):
         comment=("Has the notification been read (True) or not (False)"),
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         comment=("Notification creation date (DateTime)"),

@@ -51,14 +51,14 @@ class IdpLinkToken(Base):
     )
 
     created_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
         comment="Token creation timestamp",
     )
 
     expires_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         index=True,
         comment="Token expiry at 60 seconds (cleanup marker)",

@@ -33,13 +33,13 @@ def upgrade() -> None:
         ),
         sa.Column(
             "fast_start_time",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             nullable=False,
             comment="Start time of fast",
         ),
         sa.Column(
             "fast_end_time",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             nullable=True,
             comment="End time of fast (null if ongoing)",
         ),
@@ -136,19 +136,19 @@ def upgrade() -> None:
         ),
         sa.Column(
             "expires_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             nullable=True,
             comment="Key expiration timestamp (NULL = no expiry)",
         ),
         sa.Column(
             "last_used_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             nullable=True,
             comment="Timestamp of last successful authentication",
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             nullable=False,
             comment="Key creation timestamp",
         ),
@@ -255,7 +255,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "date_time",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             nullable=False,
             comment="Date and time of bowel movement",
         ),
@@ -345,11 +345,620 @@ def upgrade() -> None:
             comment="Target daily bowel movement count",
         ),
     )
+    # Migrate datetime to datetime with timezone
+    # Ensure all TIMESTAMP → TIMESTAMPTZ conversions interpret
+    # existing naive values as UTC.  Without this, PostgreSQL uses
+    # the session timezone, which would silently shift data for
+    # users whose DB or container TZ differs from UTC.
+    op.execute("SET LOCAL timezone = 'UTC'")
+    op.alter_column(
+        "activities",
+        "start_time",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Activity start date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities",
+        "end_time",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Activity end date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Activity creation date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activity_laps",
+        "start_time",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Lap start date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activity_sets",
+        "start_time",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Workout set start date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "gear",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Gear creation date (DateTime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "gear_components",
+        "purchase_date",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Gear component purchase date (DateTime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "gear_components",
+        "retired_date",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Gear component retired date (DateTime)",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_start_time_gmt",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Start time of sleep in GMT",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_end_time_gmt",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="End time of sleep in GMT",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_start_time_local",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Start time of sleep in local time",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_end_time_local",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="End time of sleep in local time",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "identity_providers",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="When this provider was created",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "identity_providers",
+        "updated_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="When this provider was last updated",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "idp_link_tokens",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Token creation timestamp",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "idp_link_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Token expiry at 60 seconds (cleanup marker)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "mfa_backup_codes",
+        "used_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="When this code was used",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "mfa_backup_codes",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="When this code was generated",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "mfa_backup_codes",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Optional expiry for code rotation policy",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "notifications",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Notification creation date (DateTime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "oauth_states",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="OAuth state creation timestamp",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "oauth_states",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Hard expiry at 10 minutes (cleanup marker)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "password_reset_tokens",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Token creation date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "password_reset_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Token expiration date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "rotated_refresh_tokens",
+        "rotated_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="When this token was rotated",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "rotated_refresh_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Cleanup marker (rotated_at + 60 seconds)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "sign_up_tokens",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Token creation date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "sign_up_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Token expiration date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "linked_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="When this IdP was linked to the user",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "last_login",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Last login using this IdP",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "idp_access_token_expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Access token expiry time",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "idp_refresh_token_updated_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Last refresh token update",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_integrations",
+        "strava_token_expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Strava token expiration date",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_sessions",
+        "created_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Session creation date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_sessions",
+        "last_activity_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Last activity timestamp for idle timeout",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_sessions",
+        "expires_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Session expiration date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_sessions",
+        "last_rotation_at",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        existing_comment="Timestamp of last token rotation",
+        existing_nullable=True,
+    )
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
+    # Revert datetime with timezone to datetime without timezone
+    op.alter_column(
+        "users_sessions",
+        "last_rotation_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Timestamp of last token rotation",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_sessions",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Session expiration date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_sessions",
+        "last_activity_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Last activity timestamp for idle timeout",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_sessions",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Session creation date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "users_integrations",
+        "strava_token_expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Strava token expiration date",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "idp_refresh_token_updated_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Last refresh token update",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "idp_access_token_expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Access token expiry time",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "last_login",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Last login using this IdP",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "users_identity_providers",
+        "linked_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="When this IdP was linked to the user",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "sign_up_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Token expiration date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "sign_up_tokens",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Token creation date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "rotated_refresh_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Cleanup marker (rotated_at + 60 seconds)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "rotated_refresh_tokens",
+        "rotated_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="When this token was rotated",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "password_reset_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Token expiration date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "password_reset_tokens",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Token creation date (datetime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "oauth_states",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Hard expiry at 10 minutes (cleanup marker)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "oauth_states",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="OAuth state creation timestamp",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "notifications",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Notification creation date (DateTime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "mfa_backup_codes",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Optional expiry for code rotation policy",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "mfa_backup_codes",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="When this code was generated",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "mfa_backup_codes",
+        "used_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="When this code was used",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "idp_link_tokens",
+        "expires_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Token expiry at 60 seconds (cleanup marker)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "idp_link_tokens",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Token creation timestamp",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "identity_providers",
+        "updated_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="When this provider was last updated",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "identity_providers",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="When this provider was created",
+        existing_nullable=False,
+        existing_server_default=sa.text("now()"),
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_end_time_local",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="End time of sleep in local time",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_start_time_local",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Start time of sleep in local time",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_end_time_gmt",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="End time of sleep in GMT",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "health_sleep",
+        "sleep_start_time_gmt",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Start time of sleep in GMT",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "gear_components",
+        "retired_date",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Gear component retired date (DateTime)",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "gear_components",
+        "purchase_date",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Gear component purchase date (DateTime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "gear",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Gear creation date (DateTime)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activity_sets",
+        "start_time",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Workout set start date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activity_laps",
+        "start_time",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Lap start date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities",
+        "created_at",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Activity creation date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities",
+        "end_time",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Activity end date (DATETIME)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities",
+        "start_time",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        existing_comment="Activity start date (DATETIME)",
+        existing_nullable=False,
+    )
     # Drop columns from health_targets table
     op.drop_column("health_targets", "poop_count")
     op.drop_column("health_targets", "water_ml")

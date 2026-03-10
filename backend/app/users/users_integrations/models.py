@@ -1,7 +1,7 @@
 """User integrations database models."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, JSON, String
+from sqlalchemy import DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -76,6 +76,7 @@ class UsersIntegrations(Base):
         ),
     )
     strava_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         default=None,
         nullable=True,
         comment="Strava token expiration date",

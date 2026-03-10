@@ -2,7 +2,7 @@ import os
 import asyncio
 import csv
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
@@ -324,6 +324,17 @@ def does_activity_start_time_match_the_data_in_strava_activities_csv(
     """    
     endurain_parsed_file_start_date = datetime.fromisoformat(activity["activity"].start_time)
     strava_csv_start_date = datetime.strptime(activity_metadata_dict["activity date"], "%b %d, %Y, %-I:%-M:%-S %p")
+    # Ensure both are tz-aware (or both naive) for comparison
+    if strava_csv_start_date.tzinfo is None:
+        strava_csv_start_date = strava_csv_start_date.replace(
+            tzinfo=timezone.utc
+        )
+    if endurain_parsed_file_start_date.tzinfo is None:
+        endurain_parsed_file_start_date = (
+            endurain_parsed_file_start_date.replace(
+                tzinfo=timezone.utc
+            )
+        )
     if endurain_parsed_file_start_date == strava_csv_start_date: return True
     else: return False
 

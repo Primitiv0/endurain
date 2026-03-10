@@ -1,7 +1,7 @@
 """User API key database models."""
 
 from datetime import datetime
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -66,14 +66,17 @@ class UsersApiKeys(Base):
         comment="JSON-encoded list of granted scope strings",
     )
     expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Key expiration timestamp (NULL = no expiry)",
     )
     last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Timestamp of last successful authentication",
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Key creation timestamp",
     )

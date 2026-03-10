@@ -3,7 +3,7 @@
 from datetime import datetime as datetime_type
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String
+from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -91,6 +91,7 @@ class Gear(Base):
         ),
     )
     created_at: Mapped[datetime_type] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         comment="Gear creation date (DateTime)",

@@ -394,10 +394,6 @@ def complete_health_fasting(
     start_time = db_health_fasting.fast_start_time
     end_time = complete_data.fast_end_time
 
-    # Make both timezone-naive (removes timezone info).
-    start_time = start_time.replace(tzinfo=None)
-    end_time = end_time.replace(tzinfo=None)
-
     # Calculate actual_duration in seconds
     actual_duration = int((end_time - start_time).total_seconds())
 

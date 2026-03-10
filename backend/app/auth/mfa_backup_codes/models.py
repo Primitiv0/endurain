@@ -54,15 +54,21 @@ class MFABackupCode(Base):
         index=True,
         comment="Whether this code has been consumed",
     )
-    used_at = Column(DateTime, nullable=True, comment="When this code was used")
+    used_at = Column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="When this code was used",
+    )
     created_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         comment="When this code was generated",
     )
     expires_at = Column(
-        DateTime, nullable=True, comment="Optional expiry for code rotation policy"
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Optional expiry for code rotation policy",
     )
 
     # Establish relationship back to Users model

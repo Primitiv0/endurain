@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from urllib.parse import unquote
 
 import activities.activity.models as activities_models
@@ -995,7 +995,10 @@ def get_activity_by_start_time(
 ) -> activities_schema.Activity | None:
     try:
         if isinstance(start_time, str):
-            start_time = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S")
+            start_time = datetime.fromisoformat(start_time)
+        # Ensure timezone-aware for TIMESTAMPTZ comparison
+        if start_time.tzinfo is None:
+            start_time = start_time.replace(tzinfo=timezone.utc)
         # Get the activities from the database
         activity = (
             db.query(activities_models.Activity)

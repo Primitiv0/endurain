@@ -689,7 +689,7 @@ async def create_activity_with_bulk_import(
 ):
     try:
         # Get time of import initiation to pass to function for recording in import_data
-        import_time = datetime.now().isoformat()
+        import_time = datetime.now(timezone.utc).isoformat()
 
         core_logger.print_to_log_and_console(f"Bulk import initiated at {import_time}.", "info")
 

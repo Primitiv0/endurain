@@ -1,7 +1,7 @@
 """Rotated refresh token database models for reuse detection."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -44,10 +44,12 @@ class RotatedRefreshToken(Base):
         comment="Which rotation this token belonged to",
     )
     rotated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="When this token was rotated",
     )
     expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Cleanup marker (rotated_at + 60 seconds)",
     )

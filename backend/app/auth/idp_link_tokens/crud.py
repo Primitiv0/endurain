@@ -35,8 +35,8 @@ def get_idp_link_token_by_id(
             )
             return None
 
-        # Check expiry
-        if datetime.now(timezone.utc) > token.expires_at.replace(tzinfo=timezone.utc):
+        # Check expiry (TIMESTAMPTZ columns return aware datetimes)
+        if datetime.now(timezone.utc) > token.expires_at:
             core_logger.print_to_log(
                 f"IdP link token expired: {token_id[:8]}...", "warning"
             )

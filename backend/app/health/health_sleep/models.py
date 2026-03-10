@@ -1,6 +1,6 @@
 from datetime import date as date_type, datetime
 from decimal import Decimal
-from sqlalchemy import ForeignKey, JSON, Numeric, String
+from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -72,18 +72,22 @@ class HealthSleep(Base):
         comment="Calendar date of the sleep session",
     )
     sleep_start_time_gmt: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Start time of sleep in GMT",
     )
     sleep_end_time_gmt: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="End time of sleep in GMT",
     )
     sleep_start_time_local: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Start time of sleep in local time",
     )
     sleep_end_time_local: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="End time of sleep in local time",
     )

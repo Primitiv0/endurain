@@ -400,7 +400,9 @@ def transform_activity_streams_hr(activity_stream, activity, db):
     elif detail_user.birthdate:
         # Calculate the maximum heart rate based on the user's birthdate
         year = detail_user.birthdate.year
-        current_year = datetime.datetime.now().year
+        current_year = datetime.datetime.now(
+            datetime.timezone.utc
+        ).year
         max_heart_rate = 220 - (current_year - year)
     else:
         # If neither max_heart_rate nor birthdate is available, return the activity stream as is

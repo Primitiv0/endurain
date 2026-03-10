@@ -324,7 +324,7 @@ async def import_activities_and_media_from_strava_export(
 ):
     try:
         # Get time of import initiation to pass to function for recording in import_data dictionary, ensuring all activities imported via this bulk import action share an identical import time.
-        import_time = datetime.now().isoformat()
+        import_time = datetime.now(timezone.utc).isoformat()
         core_logger.print_to_log_and_console(f"Strava bulk import: Initiated at {import_time}.", "info")
 
         # Parse activities data from activities.csv into a dictionary

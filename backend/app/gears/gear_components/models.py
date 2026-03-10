@@ -49,13 +49,13 @@ class GearComponents(Base):
         comment="Gear component model (May include spaces)",
     )
     purchase_date = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         comment="Gear component purchase date (DateTime)",
     )
     retired_date = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=True,
         comment="Gear component retired date (DateTime)",
     )

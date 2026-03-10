@@ -735,11 +735,7 @@ async def validate_api_key(
         )
 
     if db_key.expires_at is not None:
-        expires = db_key.expires_at
-        # Ensure timezone-aware comparison
-        if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) > expires:
+        if datetime.now(timezone.utc) > db_key.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="API key has expired",

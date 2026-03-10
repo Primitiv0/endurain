@@ -105,13 +105,13 @@ class IdentityProvider(Base):
         JSON, nullable=True, comment="JSON mapping of IdP claims to user fields"
     )
     created_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         comment="When this provider was created",
     )
     updated_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         onupdate=func.now(),
