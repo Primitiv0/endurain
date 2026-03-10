@@ -30,10 +30,10 @@
       <ModalComponentNumberInput
         modalId="addWeightTargetModal"
         :title="t('healthWeightZoneComponent.buttonWeightTarget')"
-        :numberFieldLabel="t('healthWeightZoneComponent.modalWeightTargetLabel')"
+        :numberFieldLabel="weightTargetLabel"
         actionButtonType="success"
         :actionButtonText="t('generalItems.buttonSubmit')"
-        :numberDefaultValue="props.userHealthTargets?.weight || parseInt(70)"
+        :numberDefaultValue="weightTargetDefaultValue"
         @numberToEmitAction="submitSetWeightTarget"
       />
 
@@ -131,6 +131,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { kgToLbs, lbsToKg } from '@/utils/unitsUtils'
 import HealthWeightAddEditModalComponent from './HealthWeightZone/HealthWeightAddEditModalComponent.vue'
 import HealthWeightLineChartComponent from './HealthWeightZone/HealthWeightLineChartComponent.vue'
 import HealthWeightListComponent from './HealthWeightZone/HealthWeightListComponent.vue'
@@ -142,6 +143,7 @@ import ListPlaceholderComponent from '../PlaceholderComponents/ListPlaceholderCo
 // import stores
 import { health_weight } from '@/services/health_weightService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
+import { useAuthStore } from '@/stores/authStore'
 
 const props = defineProps({
   userHealthTargets: {
@@ -158,6 +160,7 @@ const emit = defineEmits(['setWeightTarget'])
 
 const { t } = useI18n()
 const serverSettingsStore = useServerSettingsStore()
+const authStore = useAuthStore()
 const isLoadingNewWeight = ref(false)
 const isLoading = ref(false)
 const userHealthWeightNumber = ref(0)
@@ -172,6 +175,17 @@ const numRecords = computed(() => {
 })
 const paginationFilter = ref('disabled')
 const intervalFilter = ref('last_7_days')
+
+const weightTargetDefaultValue = computed(() => {
+  const storedKg = props.userHealthTargets?.weight ?? 70
+  return authStore?.user?.units === 'imperial' ? kgToLbs(storedKg) : storedKg
+})
+
+const weightTargetLabel = computed(() => {
+  return authStore?.user?.units === 'imperial'
+    ? t('generalItems.labelWeightTargetInLbs')
+    : t('generalItems.labelWeightTargetInKg')
+})
 
 async function updateHealthWeightPagination() {
   try {
@@ -234,7 +248,8 @@ function setPageNumber(page) {
 }
 
 function submitSetWeightTarget(weightTarget) {
-  emit('setWeightTarget', weightTarget)
+  const weightInKg = authStore?.user?.units === 'imperial' ? lbsToKg(weightTarget) : weightTarget
+  emit('setWeightTarget', weightInKg)
 }
 
 function handleFilterChange() {

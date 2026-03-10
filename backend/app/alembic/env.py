@@ -1,10 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
-
 
 import auth.identity_providers.models
 import auth.mfa_backup_codes.models
@@ -97,11 +93,6 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    """ connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    ) """
 
     # Here, instead of creating a new engine, we use the existing engine
     # from database configuration.
