@@ -48,7 +48,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=semver,pattern={{raw}}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
             type=raw,value=dev-{{sha}},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push Docker image
