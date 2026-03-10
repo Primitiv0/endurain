@@ -30,10 +30,10 @@
       <ModalComponentNumberInput
         modalId="addWaterTargetModal"
         :title="t('healthWaterZoneComponent.buttonWaterTarget')"
-        :numberFieldLabel="t('healthWaterZoneComponent.modalWaterTargetLabel')"
+        :numberFieldLabel="waterTargetLabel"
         actionButtonType="success"
         :actionButtonText="t('generalItems.buttonSubmit')"
-        :numberDefaultValue="props.userHealthTargets?.water_ml || parseInt(2000)"
+        :numberDefaultValue="waterTargetDefaultValue"
         @numberToEmitAction="submitSetWaterTarget"
       />
 
@@ -129,6 +129,7 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
+import { mlToFlOz, flOzToMl } from '@/utils/unitsUtils'
 import HealthWaterAddEditModalComponent from './HealthWaterZone/HealthWaterAddEditModalComponent.vue'
 import HealthWaterBarChartComponent from './HealthWaterZone/HealthWaterBarChartComponent.vue'
 import HealthWaterListComponent from './HealthWaterZone/HealthWaterListComponent.vue'
@@ -139,6 +140,7 @@ import ModalComponentNumberInput from '../Modals/ModalComponentNumberInput.vue'
 import ListPlaceholderComponent from '../PlaceholderComponents/ListPlaceholderComponent.vue'
 import { health_water } from '@/services/health_waterService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
+import { useAuthStore } from '@/stores/authStore'
 
 const props = defineProps({
   userHealthTargets: {
@@ -155,6 +157,7 @@ const emit = defineEmits(['setWaterTarget'])
 
 const { t } = useI18n()
 const serverSettingsStore = useServerSettingsStore()
+const authStore = useAuthStore()
 const isLoadingNewWater = ref(false)
 const isLoading = ref(false)
 const userHealthWaterNumber = ref(0)
@@ -169,6 +172,17 @@ const numRecords = computed(() => {
 })
 const paginationFilter = ref('disabled')
 const intervalFilter = ref('last_7_days')
+
+const waterTargetDefaultValue = computed(() => {
+  const storedMl = props.userHealthTargets?.water_ml ?? 2000
+  return authStore?.user?.units === 'imperial' ? mlToFlOz(storedMl) : storedMl
+})
+
+const waterTargetLabel = computed(() => {
+  return authStore?.user?.units === 'imperial'
+    ? t('generalItems.labelWaterTargetInFlOz')
+    : t('generalItems.labelWaterTargetInMl')
+})
 
 async function updateHealthWaterPagination() {
   try {
@@ -228,7 +242,8 @@ function setPageNumber(page) {
 }
 
 function submitSetWaterTarget(waterTarget) {
-  emit('setWaterTarget', waterTarget)
+  const waterInMl = authStore?.user?.units === 'imperial' ? flOzToMl(waterTarget) : waterTarget
+  emit('setWaterTarget', waterInMl)
 }
 
 function handleFilterChange() {

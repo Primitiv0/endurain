@@ -51,6 +51,8 @@
   "labelWeightTargetInLbs": "Weight target in lbs",
   "unitsFlOz": "fl oz",
   "unitsMl": "ml",
+  "labelWaterTargetInMl": "Water target in ml",
+  "labelWaterTargetInFlOz": "Water target in fl oz",
   "labelSteps": "Steps",
   "labelStepsTarget": "Steps target",
   "labelSleep": "Sleep",
