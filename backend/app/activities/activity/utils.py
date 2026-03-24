@@ -590,13 +590,6 @@ async def parse_and_store_activity_from_file(
                         created_activity = await store_activity(
                             activity, websocket_manager, db
                         )
-
-                        # Deal with Strava bulk import media.
-                        # Note - even multi-activity .fit files are good with this code, as there should only be a single imported activity per file in the Strava activities file directory.
-                        if strava_activities and is_bulk_import:
-                            strava_bulk_import_utils.import_media_from_strava_bulk_export(
-                                strava_activities, created_activity, file_base_name, db
-                            )
                         
                         created_activities.append(created_activity)
 
@@ -623,10 +616,18 @@ async def parse_and_store_activity_from_file(
                 # Move the file to the processed directory
                 move_file(processed_dir, new_file_name, file_path)
                 
+                # Log file move, import any associated media, and log completion.
                 if is_bulk_import:
                     core_logger.print_to_log_and_console(
                         f"Bulk file import: File successfully processed and moved. {file_path} - has become {new_file_name}"
                     )
+
+                    # Deal with Strava bulk import media.
+                    # Note - even multi-activity .fit files are good with this code, as there should only be a single imported activity per file in the Strava activities file directory.
+                    if strava_activities:
+                        strava_bulk_import_utils.import_media_from_strava_bulk_export(
+                            strava_activities, created_activity, file_base_name, db
+                        )
 
                     core_logger.print_to_log_and_console(
                         f"Bulk file import: Import work complete for file {file_base_name}."
