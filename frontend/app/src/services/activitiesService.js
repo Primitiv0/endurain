@@ -32,6 +32,13 @@ export const activities = {
       `activities/gear/${gear_id}/page_number/${pageNumber}/num_records/${numRecords}`
     )
   },
+  getGearActivitiesList(gear_id, pageNumber, numRecords) {
+    const params = new URLSearchParams()
+    if (pageNumber) params.append('page_number', pageNumber)
+    if (numRecords) params.append('num_records', numRecords)
+    const query = params.toString()
+    return fetchGetRequest(`activities/gear/${gear_id}/list${query ? `?${query}` : ''}`)
+  },
   getUserNumberOfActivities(filters = {}) {
     let baseUrl = 'activities/number'
     const params = new URLSearchParams()

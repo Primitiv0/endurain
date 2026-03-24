@@ -745,6 +745,56 @@ def get_user_following_activities(user_id, db):
         ) from err
 
 
+def get_gear_activities_count_by_user_id(
+    user_id: int,
+    gear_id: int,
+    db: Session,
+) -> int:
+    """Count activities for a gear owned by user.
+
+    Args:
+        user_id: Owner user ID.
+        gear_id: Gear ID.
+        db: Database session.
+
+    Returns:
+        Number of activities for the gear.
+
+    Raises:
+        HTTPException: 500 on database error.
+    """
+    try:
+        count = (
+            db.query(func.count())
+            .select_from(
+                activities_models.Activity,
+            )
+            .filter(
+                activities_models.Activity.user_id
+                == user_id,
+                activities_models.Activity.gear_id
+                == gear_id,
+            )
+            .scalar()
+        )
+        return count or 0
+    except Exception as err:
+        core_logger.print_to_log(
+            "Error in "
+            "get_gear_activities_count_by_user_id"
+            f": {err}",
+            "error",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=(
+                status
+                .HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            detail="Internal Server Error",
+        ) from err
+
+
 def get_user_activities_by_gear_id_and_user_id(user_id: int, gear_id: int, db: Session):
     try:
         # Get the activities from the database

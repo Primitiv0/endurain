@@ -1,234 +1,364 @@
+"""CRUD operations for gear components."""
+
 from fastapi import HTTPException, status
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 import gears.gear_components.schema as gear_components_schema
-import gears.gear_components.utils as gear_components_utils
 import gears.gear_components.models as gear_components_models
+import activities.activity.models as activity_models
 
-import core.logger as core_logger
+import core.decorators as core_decorators
+
+# Fields that must never be overwritten via
+# user-supplied data during updates.
+_IMMUTABLE_FIELDS: set[str] = {
+    "id",
+    "user_id",
+    "gear_id",
+}
 
 
+@core_decorators.handle_db_errors
 def get_gear_component_by_id(
-    gear_component_id: int, db: Session
-) -> gear_components_schema.GearComponents | None:
-    try:
-        gear_component = (
-            db.query(gear_components_models.GearComponents)
-            .filter(gear_components_models.GearComponents.id == gear_component_id)
-            .first()
-        )
+    gear_component_id: int,
+    db: Session,
+) -> gear_components_models.GearComponents | None:
+    """
+    Retrieve a gear component by its ID.
 
-        # Check if gear component is None and return None if it is
-        if gear_component is None:
-            return None
+    Args:
+        gear_component_id: Primary key.
+        db: Database session.
 
-        gear_component = gear_components_utils.serialize_gear_component(gear_component)
+    Returns:
+        ORM gear component or None.
 
-        # Return the gear component
-        return gear_component
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_gear_component_by_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Raises:
+        HTTPException: On database error (500).
+    """
+    stmt = select(
+        gear_components_models.GearComponents,
+    ).where(
+        gear_components_models.GearComponents.id
+        == gear_component_id,
+    )
+    return (
+        db.execute(stmt).scalar_one_or_none()
+    )
 
 
+@core_decorators.handle_db_errors
 def get_gear_components_user(
-    user_id: int, db: Session
-) -> list[gear_components_schema.GearComponents] | None:
-    try:
-        # Get the gear components by user ID from the database
-        gear_components = (
-            db.query(gear_components_models.GearComponents)
-            .filter(gear_components_models.GearComponents.user_id == user_id)
-            .all()
-        )
+    user_id: int,
+    db: Session,
+) -> list[gear_components_models.GearComponents]:
+    """
+    Retrieve all gear components for a user.
 
-        # Check if gear components is None and return None if it is
-        if gear_components is None:
-            return None
+    Args:
+        user_id: Owner user ID.
+        db: Database session.
 
-        # Serialize the gear components
-        for g in gear_components:
-            g = gear_components_utils.serialize_gear_component(g)
+    Returns:
+        List of ORM gear components.
 
-        # Return the gear components
-        return gear_components
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_gear_components_user: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Raises:
+        HTTPException: On database error (500).
+    """
+    stmt = select(
+        gear_components_models.GearComponents,
+    ).where(
+        gear_components_models.GearComponents
+        .user_id
+        == user_id,
+    )
+    return db.execute(stmt).scalars().all()
 
 
+@core_decorators.handle_db_errors
 def get_gear_components_user_by_gear_id(
-    user_id: int, gear_id: int, db: Session
-) -> list[gear_components_schema.GearComponents] | None:
-    try:
-        gear_components = (
-            db.query(gear_components_models.GearComponents)
-            .filter(
-                gear_components_models.GearComponents.user_id == user_id,
-                gear_components_models.GearComponents.gear_id == gear_id,
-            )
-            .all()
+    user_id: int,
+    gear_id: int,
+    db: Session,
+    active: bool | None = None,
+) -> list[gear_components_models.GearComponents]:
+    """
+    Retrieve gear components by user and gear.
+
+    Args:
+        user_id: Owner user ID.
+        gear_id: Gear ID to filter by.
+        db: Database session.
+        active: Optional active-status filter.
+
+    Returns:
+        List of ORM gear components.
+
+    Raises:
+        HTTPException: On database error (500).
+    """
+    stmt = select(
+        gear_components_models.GearComponents,
+    ).where(
+        gear_components_models.GearComponents
+        .user_id
+        == user_id,
+        gear_components_models.GearComponents
+        .gear_id
+        == gear_id,
+    )
+    if active is not None:
+        stmt = stmt.where(
+            gear_components_models
+            .GearComponents.active
+            == active,
         )
-
-        # Check if gear components is None and return None if it is
-        if gear_components is None:
-            return None
-
-        # Serialize the gear components
-        for g in gear_components:
-            g = gear_components_utils.serialize_gear_component(g)
-
-        # Return the gear components
-        return gear_components
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_gear_components_user_by_gear_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    return db.execute(stmt).scalars().all()
 
 
+@core_decorators.handle_db_errors
 def create_gear_component(
-    gear_component: gear_components_schema.GearComponents, user_id: int, db: Session
-):
-    try:
-        new_gear_component = gear_components_models.GearComponents(
-            user_id=gear_component.user_id,
+    gear_component: (
+        gear_components_schema.GearComponentCreate
+    ),
+    user_id: int,
+    db: Session,
+) -> gear_components_models.GearComponents:
+    """
+    Create a new gear component.
+
+    Args:
+        gear_component: Create schema data.
+        user_id: Authenticated user ID (token).
+        db: Database session.
+
+    Returns:
+        Created ORM gear component.
+
+    Raises:
+        HTTPException: On database error (500).
+    """
+    new_gear_component = (
+        gear_components_models.GearComponents(
+            user_id=user_id,
             gear_id=gear_component.gear_id,
             type=gear_component.type,
             brand=gear_component.brand,
             model=gear_component.model,
-            purchase_date=gear_component.purchase_date,
+            purchase_date=(
+                gear_component.purchase_date
+            ),
             active=True,
-            expected_kms=gear_component.expected_kms,
-            purchase_value=gear_component.purchase_value,
+            expected_kms=(
+                gear_component.expected_kms
+            ),
+            purchase_value=(
+                gear_component.purchase_value
+            ),
         )
+    )
 
-        # Add the gear component to the database
-        db.add(new_gear_component)
-        db.commit()
-        db.refresh(new_gear_component)
+    db.add(new_gear_component)
+    db.commit()
+    db.refresh(new_gear_component)
 
-        gear_component_serialized = gear_components_utils.serialize_gear_component(
-            new_gear_component
-        )
-
-        # Return the gear component
-        return gear_component_serialized
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in create_gear_component: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    return new_gear_component
 
 
+@core_decorators.handle_db_errors
 def edit_gear_component(
-    gear_component: gear_components_schema.GearComponents, db: Session
-):
-    try:
-        # Get the gear component from the database
-        db_gear_component = (
-            db.query(gear_components_models.GearComponents)
-            .filter(gear_components_models.GearComponents.id == gear_component.id)
-            .first()
+    gear_component: (
+        gear_components_schema.GearComponentUpdate
+    ),
+    db: Session,
+) -> gear_components_models.GearComponents:
+    """
+    Edit an existing gear component by ID.
+
+    Args:
+        gear_component: Update schema data.
+        db: Database session.
+
+    Returns:
+        Updated ORM gear component.
+
+    Raises:
+        HTTPException: If not found (404) or
+            database error (500).
+    """
+    stmt = select(
+        gear_components_models.GearComponents,
+    ).where(
+        gear_components_models.GearComponents.id
+        == gear_component.id,
+    )
+    db_gear_component = (
+        db.execute(stmt).scalar_one_or_none()
+    )
+
+    if db_gear_component is None:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail="Gear component not found",
         )
 
-        if db_gear_component is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Gear component not found",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Dictionary of the fields to update if they are not None
-        gear_component_data = gear_component.model_dump(exclude_unset=True)
-        # Iterate over the fields and update the db_user dynamically
-        for key, value in gear_component_data.items():
+    gear_component_data = (
+        gear_component.model_dump(
+            exclude_unset=True,
+        )
+    )
+    for key, value in gear_component_data.items():
+        if key not in _IMMUTABLE_FIELDS:
             setattr(db_gear_component, key, value)
 
-        # Commit the transaction
-        db.commit()
+    # Enforce retired_date / active invariant.
+    if db_gear_component.retired_date is not None:
+        db_gear_component.active = False
+    elif "retired_date" in gear_component_data:
+        # retired_date explicitly cleared.
+        db_gear_component.active = True
 
-        return db_gear_component
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
+    db.commit()
+    db.refresh(db_gear_component)
 
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in edit_gear_component: {err}", "error", exc=err
-        )
+    return db_gear_component
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
+
+@core_decorators.handle_db_errors
+def delete_gear_component(
+    user_id: int,
+    gear_component_id: int,
+    db: Session,
+) -> None:
+    """
+    Delete a gear component by user and ID.
+
+    Args:
+        user_id: Owner user ID.
+        gear_component_id: Component ID to delete.
+        db: Database session.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: If not found (404) or
+            database error (500).
+    """
+    stmt = delete(
+        gear_components_models.GearComponents,
+    ).where(
+        gear_components_models.GearComponents
+        .user_id
+        == user_id,
+        gear_components_models.GearComponents.id
+        == gear_component_id,
+    )
+    result = db.execute(stmt)
+
+    if result.rowcount == 0:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error: {err}",
-        ) from err
-
-
-def delete_gear_component(user_id: int, gear_component_id: int, db: Session):
-    try:
-        # Delete the gear component
-        num_deleted = (
-            db.query(gear_components_models.GearComponents)
-            .filter(
-                gear_components_models.GearComponents.user_id == user_id,
-                gear_components_models.GearComponents.id == gear_component_id,
-            )
-            .delete()
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail=(
+                f"Gear component with ID "
+                f"{gear_component_id} not found"
+            ),
         )
 
-        # Check if the gear component was found and deleted
-        if num_deleted == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Gear component with ID {gear_component_id} not found",
-            )
+    db.commit()
 
-        # Commit the transaction
-        db.commit()
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
 
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in delete_gear_component: {err}", "error", exc=err
+@core_decorators.handle_db_errors
+def get_components_activity_stats(
+    gear_id: int,
+    db: Session,
+) -> dict[int, dict[str, float]]:
+    """
+    Get per-component activity stats for a gear.
+
+    Computes distance and time accumulated
+    between each component's purchase_date
+    and retired_date from the gear's activities.
+
+    Args:
+        gear_id: Gear ID to query.
+        db: Database session.
+
+    Returns:
+        Dict mapping component ID to
+        {distance, time} in meters/seconds.
+
+    Raises:
+        HTTPException: On database error.
+    """
+    comp = (
+        select(
+            gear_components_models.GearComponents.id
+            .label("comp_id"),
+            gear_components_models
+            .GearComponents.purchase_date,
+            gear_components_models
+            .GearComponents.retired_date,
         )
+        .where(
+            gear_components_models.GearComponents.gear_id
+            == gear_id,
+        )
+        .subquery()
+    )
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = (
+        select(
+            comp.c.comp_id,
+            func.coalesce(
+                func.sum(
+                    activity_models
+                    .Activity.distance
+                ),
+                0,
+            ).label("distance"),
+            func.coalesce(
+                func.sum(
+                    activity_models
+                    .Activity.total_timer_time
+                ),
+                0,
+            ).label("time"),
+        )
+        .select_from(comp)
+        .outerjoin(
+            activity_models.Activity,
+            (
+                activity_models.Activity.gear_id
+                == gear_id
+            )
+            & (
+                activity_models
+                .Activity.start_time
+                >= comp.c.purchase_date
+            )
+            & (
+                (comp.c.retired_date.is_(None))
+                | (
+                    activity_models
+                    .Activity.start_time
+                    <= comp.c.retired_date
+                )
+            ),
+        )
+        .group_by(comp.c.comp_id)
+    )
+
+    rows = db.execute(stmt).all()
+    return {
+        row.comp_id: {
+            "distance": float(row.distance),
+            "time": float(row.time),
+        }
+        for row in rows
+    }

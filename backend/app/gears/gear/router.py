@@ -116,7 +116,9 @@ async def read_gears_user_all_pagination(
 
 @router.get(
     "/id/{gear_id}",
-    response_model=gears_schema.GearRead | None,
+    response_model=(
+        gears_schema.GearDetailRead | None
+    ),
     status_code=status.HTTP_200_OK,
 )
 async def read_gear_id(
@@ -145,9 +147,10 @@ async def read_gear_id(
         Session,
         Depends(core_database.get_db),
     ],
-) -> gears_schema.GearRead | None:
+) -> gears_schema.GearDetailRead | None:
     """
-    Retrieve a gear by ID for the authenticated user.
+    Retrieve a gear by ID with computed stats.
+
     Args:
         gear_id: Gear ID to retrieve.
         validate_id: Validates gear ID exists.
@@ -156,13 +159,45 @@ async def read_gear_id(
         db: Database session.
 
     Returns:
-        GearRead if found, None otherwise.
+        GearDetailRead with stats, or None.
 
     Raises:
         HTTPException: If unauthorized.
     """
-    return gears_crud.get_gear_user_by_id(
+    gear = gears_crud.get_gear_user_by_id(
         token_user_id, gear_id, db,
+    )
+    if gear is None:
+        return None
+
+    activity_stats = (
+        gears_crud.get_gear_activity_stats(
+            gear_id, db,
+        )
+    )
+    components_cost = (
+        gears_crud.get_gear_components_total_cost(
+            gear_id, token_user_id, db,
+        )
+    )
+    initial_kms_m = float(
+        gear.initial_kms or 0,
+    ) * 1000
+
+    return gears_schema.GearDetailRead(
+        **gears_schema.GearRead
+        .model_validate(gear)
+        .model_dump(),
+        total_distance=(
+            activity_stats["total_distance"]
+            + initial_kms_m
+        ),
+        total_time=(
+            activity_stats["total_time"]
+        ),
+        total_components_cost=(
+            components_cost
+        ),
     )
 
 

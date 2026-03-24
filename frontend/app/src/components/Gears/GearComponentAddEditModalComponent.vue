@@ -53,36 +53,11 @@
               required
             >
               <option
-                v-for="type in GEAR_BIKE_COMPONENT_TYPES"
+                v-for="type in componentTypes"
                 :key="type"
                 :value="type"
-                v-if="gear.gear_type === 1"
               >
-                {{ getGearBikeComponentType(type, t) }}
-              </option>
-              <option
-                v-for="type in GEAR_SHOES_COMPONENT_TYPES"
-                :key="type"
-                :value="type"
-                v-if="gear.gear_type === 2"
-              >
-                {{ getGearShoesComponentType(type, t) }}
-              </option>
-              <option
-                v-for="type in GEAR_RACQUET_COMPONENT_TYPES"
-                :key="type"
-                :value="type"
-                v-if="gear.gear_type === 4"
-              >
-                {{ getGearRacquetComponentType(type, t) }}
-              </option>
-              <option
-                v-for="type in GEAR_WINDSURF_COMPONENT_TYPES"
-                :key="type"
-                :value="type"
-                v-if="gear.gear_type === 7"
-              >
-                {{ getGearWindsurfComponentType(type, t) }}
+                {{ getComponentTypeLabel(type) }}
               </option>
             </select>
             <!-- brand fields -->
@@ -335,13 +310,9 @@ import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 import { useAuthStore } from '@/stores/authStore'
 import {
-  GEAR_BIKE_COMPONENT_TYPES,
   getGearBikeComponentType,
-  GEAR_SHOES_COMPONENT_TYPES,
   getGearShoesComponentType,
-  GEAR_RACQUET_COMPONENT_TYPES,
   getGearRacquetComponentType,
-  GEAR_WINDSURF_COMPONENT_TYPES,
   getGearWindsurfComponentType
 } from '@/utils/gearComponentsUtils'
 import { kmToMiles, milesToKm } from '@/utils/unitsUtils'
@@ -371,7 +342,6 @@ const authStore = useAuthStore()
 const { t } = useI18n()
 const newEditGearComponentType = ref('back_break_oil')
 const editGearComponentModalId = ref('')
-const newEditGearComponentUserId = ref(null)
 const newEditGearComponentGearId = ref(null)
 const newEditGearComponentBrand = ref(null)
 const newEditGearComponentModel = ref(null)
@@ -382,9 +352,37 @@ const newEditGearComponentExpectedTime = ref(null)
 const newEditGearComponentPurchaseValue = ref(null)
 const newEditGearComponentRetiredDate = ref(null)
 const newEditGearComponentActive = ref(true)
+const componentTypes = ref([])
 
-onMounted(() => {
-  newEditGearComponentUserId.value = props.gear.user_id
+const GEAR_TYPE_TO_KEY = {
+  1: 'bike',
+  2: 'shoes',
+  4: 'racquet',
+  7: 'windsurf'
+}
+
+const GEAR_TYPE_TO_LABEL_FN = {
+  1: getGearBikeComponentType,
+  2: getGearShoesComponentType,
+  4: getGearRacquetComponentType,
+  7: getGearWindsurfComponentType
+}
+
+function getComponentTypeLabel(type) {
+  const fn = GEAR_TYPE_TO_LABEL_FN[props.gear.gear_type]
+  return fn ? fn(type, t) : type
+}
+
+onMounted(async () => {
+  try {
+    const types = await gearsComponents.getGearComponentTypes()
+    const key = GEAR_TYPE_TO_KEY[props.gear.gear_type]
+    if (key && types[key]) {
+      componentTypes.value = types[key]
+    }
+  } catch {
+    // Fallback: empty list, user will see no options
+  }
   newEditGearComponentGearId.value = props.gear.id
   if (props.gearComponent) {
     if (props.action === 'edit') {
@@ -394,6 +392,8 @@ onMounted(() => {
     newEditGearComponentBrand.value = props.gearComponent.brand
     newEditGearComponentModel.value = props.gearComponent.model
     newEditGearComponentPurchaseDate.value = props.gearComponent.purchase_date
+      ? props.gearComponent.purchase_date.split('T')[0]
+      : null
     if (props.gear.gear_type !== 4) {
       newEditGearComponentExpectedDistanceKms.value = props.gearComponent.expected_kms / 1000
       if (props.gearComponent.expected_kms && props.gearComponent.expected_kms !== 0) {
@@ -406,6 +406,8 @@ onMounted(() => {
     }
     newEditGearComponentPurchaseValue.value = props.gearComponent.purchase_value
     newEditGearComponentRetiredDate.value = props.gearComponent.retired_date
+      ? props.gearComponent.retired_date.split('T')[0]
+      : null
     newEditGearComponentActive.value = props.gearComponent.active
   } else {
     if (props.gear.gear_type === 1) {
@@ -439,7 +441,6 @@ async function submitAddGearComponentForm() {
       expected_kms = newEditGearComponentExpectedTime.value * 3600
     }
     const data = {
-      user_id: newEditGearComponentUserId.value,
       gear_id: newEditGearComponentGearId.value,
       type: newEditGearComponentType.value,
       brand: newEditGearComponentBrand.value,
@@ -492,7 +493,6 @@ async function submitEditGearComponentForm() {
     }
     const data = {
       id: props.gearComponent.id,
-      user_id: newEditGearComponentUserId.value,
       gear_id: newEditGearComponentGearId.value,
       type: newEditGearComponentType.value,
       brand: newEditGearComponentBrand.value,

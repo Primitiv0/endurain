@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from urllib.parse import unquote
 
+import activities.activity.models as activity_models
 import gears.gear.schema as gears_schema
 import gears.gear.utils as gears_utils
 import gears.gear.models as gears_models
+import gears.gear_components.models as gear_components_models
 
 import core.decorators as core_decorators
 import core.logger as core_logger
@@ -35,6 +37,89 @@ def get_gear_user_by_id(
         gears_models.Gear.id == gear_id,
     )
     return db.execute(stmt).scalar_one_or_none()
+
+
+@core_decorators.handle_db_errors
+def get_gear_activity_stats(
+    gear_id: int,
+    db: Session,
+) -> dict[str, float]:
+    """
+    Get aggregated activity stats for a gear.
+
+    Args:
+        gear_id: Gear ID to aggregate.
+        db: Database session.
+
+    Returns:
+        Dict with total_distance (meters)
+        and total_time (seconds).
+
+    Raises:
+        HTTPException: On database error.
+    """
+    stmt = select(
+        func.coalesce(
+            func.sum(
+                activity_models.Activity.distance
+            ),
+            0,
+        ),
+        func.coalesce(
+            func.sum(
+                activity_models
+                .Activity.total_timer_time
+            ),
+            0,
+        ),
+    ).where(
+        activity_models.Activity.gear_id
+        == gear_id,
+    )
+    row = db.execute(stmt).one()
+    return {
+        "total_distance": float(row[0]),
+        "total_time": float(row[1]),
+    }
+
+
+@core_decorators.handle_db_errors
+def get_gear_components_total_cost(
+    gear_id: int,
+    user_id: int,
+    db: Session,
+) -> float:
+    """
+    Get total purchase value of all components.
+
+    Args:
+        gear_id: Gear to sum costs for.
+        user_id: Owner user ID.
+        db: Database session.
+
+    Returns:
+        Total component cost as float.
+
+    Raises:
+        HTTPException: On database error.
+    """
+    stmt = select(
+        func.coalesce(
+            func.sum(
+                gear_components_models
+                .GearComponents.purchase_value
+            ),
+            0,
+        ),
+    ).where(
+        gear_components_models.GearComponents.gear_id
+        == gear_id,
+        gear_components_models.GearComponents.user_id
+        == user_id,
+    )
+    return float(
+        db.execute(stmt).scalar_one()
+    )
 
 
 @core_decorators.handle_db_errors

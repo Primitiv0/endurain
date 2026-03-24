@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Activity(BaseModel):
@@ -157,6 +157,46 @@ class ActivityStats(BaseModel):
     sailing: ActivitySportStats = ActivitySportStats()
     snowshoeing: ActivitySportStats = ActivitySportStats()
     inline_skating: ActivitySportStats = ActivitySportStats()
+
+
+class GearActivitiesListResponse(BaseModel):
+    """Response model for paginated gear activities.
+
+    Attributes:
+        total: Total number of activities for gear.
+        num_records: Number of records returned.
+        page_number: Current page number.
+        records: List of activity records.
+    """
+
+    total: int = Field(
+        ...,
+        ge=0,
+        description=(
+            "Total number of activities"
+            " for this gear"
+        ),
+    )
+    num_records: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of records returned",
+    )
+    page_number: int | None = Field(
+        default=None,
+        ge=1,
+        description="Current page number",
+    )
+    records: list[Activity] = Field(
+        default_factory=list,
+        description="List of activity records",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
 
 
 class ActivityEdit(BaseModel):

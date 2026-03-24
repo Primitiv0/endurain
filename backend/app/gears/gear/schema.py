@@ -120,6 +120,42 @@ class GearRead(GearBase):
     )
 
 
+class GearDetailRead(GearRead):
+    """
+    Extended gear with computed stats.
+
+    Attributes:
+        total_distance: Total distance (m).
+        total_time: Total time (seconds).
+        total_components_cost: Sum of parts.
+    """
+
+    total_distance: StrictFloat = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Total activity distance"
+            " in meters"
+        ),
+    )
+    total_time: StrictFloat = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Total activity time"
+            " in seconds"
+        ),
+    )
+    total_components_cost: StrictFloat = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Sum of component"
+            " purchase values"
+        ),
+    )
+
+
 class GearUpdate(GearBase):
     """
     Schema for updating a gear record.

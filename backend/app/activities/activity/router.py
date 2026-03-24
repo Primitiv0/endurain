@@ -232,6 +232,99 @@ async def read_activities_user_activities_this_month_number(
 
 
 @router.get(
+    "/gear/{gear_id}/list",
+    response_model=(
+        activities_schema.GearActivitiesListResponse
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def read_gear_activities_list(
+    gear_id: int,
+    _validate_gear_id: Annotated[
+        Callable,
+        Depends(
+            gears_dependencies.validate_gear_id,
+        ),
+    ],
+    _check_scopes: Annotated[
+        Callable,
+        Security(
+            auth_security.check_scopes,
+            scopes=["activities:read"],
+        ),
+    ],
+    token_user_id: Annotated[
+        int,
+        Depends(
+            auth_security
+            .get_sub_from_access_token,
+        ),
+    ],
+    db: Annotated[
+        Session,
+        Depends(core_database.get_db),
+    ],
+    page_number: Annotated[
+        int | None,
+        Query(
+            description="Page number",
+        ),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(
+            description="Records per page",
+        ),
+    ] = None,
+) -> (
+    activities_schema.GearActivitiesListResponse
+):
+    """
+    Retrieve paginated gear activities with total
+    count.
+
+    Args:
+        gear_id: Gear ID.
+        _validate_gear_id: Validates gear ID exists.
+        _check_scopes: Validates activities:read.
+        token_user_id: Authenticated user ID.
+        db: Database session.
+        page_number: Optional page number.
+        num_records: Optional records per page.
+
+    Returns:
+        GearActivitiesListResponse with total count
+        and paginated records.
+    """
+    total = (
+        activities_crud
+        .get_gear_activities_count_by_user_id(
+            token_user_id, gear_id, db,
+        )
+    )
+    records = (
+        activities_crud
+        .get_user_activities_by_gear_id_and_user_id_with_pagination(
+            token_user_id,
+            gear_id,
+            page_number or 1,
+            num_records or 10,
+            db,
+        )
+    )
+
+    return (
+        activities_schema
+        .GearActivitiesListResponse(
+            total=total,
+            num_records=num_records,
+            page_number=page_number,
+            records=records or [],
+        )
+    )
+
+
+@router.get(
     "/gear/{gear_id}",
     response_model=list[activities_schema.Activity] | None,
 )

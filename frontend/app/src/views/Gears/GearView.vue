@@ -243,7 +243,6 @@
           >
             <GearComponentListComponent
               :gear="gear"
-              :gearActivities="gearActivities"
               :gearComponent="gearComponent"
               @createdGearComponent="addGearComponentList"
               @editedGearComponent="editGearComponentList"
@@ -366,7 +365,6 @@ const numRecords = serverSettingsStore.serverSettings.num_records_per_page || 25
 const gear = ref(null)
 const gearActivitiesNumber = ref(0)
 const gearActivitiesWithPagination = ref([])
-const gearActivities = ref([])
 const gearDistance = ref(0)
 const gearTime = ref(0)
 const gearComponents = ref(null)
@@ -377,7 +375,6 @@ const filterValues = ref({
 const filterOptions = computed(() => [
   { id: 'showInactive', label: t('gearView.showInactiveComponents') }
 ])
-const gearComponentsTotalValue = ref(0)
 const gearTotalValue = ref(0)
 
 async function submitDeleteGear() {
@@ -391,7 +388,6 @@ async function submitDeleteGear() {
 
 function editGearList(editedGear) {
   gear.value = editedGear
-  updateTotalCosts()
 }
 
 function setPageNumber(page) {
@@ -406,7 +402,6 @@ function setIsLoadingNewGearComponent(state) {
 function addGearComponentList(createdGearComponent) {
   gearComponents.value.unshift(createdGearComponent)
   updateGearComponentsActive()
-  updateTotalCosts()
 }
 
 function editGearComponentList(editedGearComponent) {
@@ -415,26 +410,24 @@ function editGearComponentList(editedGearComponent) {
   )
   gearComponents.value[index] = editedGearComponent
   updateGearComponentsActive()
-  updateTotalCosts()
 }
 
 function updateGearComponentListOnDelete(gearComponentDeletedId) {
   gearComponents.value = gearComponents.value.filter(
     (gearComponent) => gearComponent.id !== gearComponentDeletedId
   )
-  updateTotalCosts()
 }
 
 async function updateGearActivities() {
   try {
     isLoadingGearActivities.value = true
-    gearActivities.value = await activities.getUserActivitiesByGearId(route.params.id)
-    gearActivitiesNumber.value = await activities.getUserActivitiesByGearIdNumber(route.params.id)
-    gearActivitiesWithPagination.value = await activities.getUserActivitiesByGearIdWithPagination(
+    const response = await activities.getGearActivitiesList(
       route.params.id,
       pageNumber.value,
       numRecords
     )
+    gearActivitiesNumber.value = response.total
+    gearActivitiesWithPagination.value = response.records
     // Update total pages
     totalPages.value = Math.ceil(gearActivitiesNumber.value / numRecords)
   } catch (error) {
@@ -448,21 +441,6 @@ function updateGearComponentsActive() {
   gearComponentsActive.value = gearComponents.value.filter(
     (gearComponent) => gearComponent.active === true
   )
-  updateTotalCosts()
-}
-
-function updateTotalCosts() {
-  gearComponentsTotalValue.value = 0
-  for (const gearComponent of gearComponents.value) {
-    if (gearComponent.purchase_value) {
-      gearComponentsTotalValue.value += gearComponent.purchase_value
-    }
-  }
-  if (!gear.value.purchase_value) {
-    gearTotalValue.value = gearComponentsTotalValue.value
-    return
-  }
-  gearTotalValue.value = gear.value.purchase_value + gearComponentsTotalValue.value
 }
 
 onMounted(async () => {
@@ -475,18 +453,18 @@ onMounted(async () => {
       })
     }
     await updateGearActivities()
-    if (gearActivities.value) {
-      for (const activity of gearActivities.value) {
-        gearDistance.value += activity.distance
-        gearTime.value += activity.total_timer_time || 0
-      }
-      gearDistance.value = (gearDistance.value / 1000).toFixed(2)
+    // Use backend-computed stats (total_distance in meters, total_time in seconds)
+    gearDistance.value = Math.floor(
+      (gear.value.total_distance || 0) / 1000
+    )
+    gearTime.value = gear.value.total_time || 0
+    gearTotalValue.value = gear.value.total_components_cost || 0
+    if (gear.value.purchase_value) {
+      gearTotalValue.value += gear.value.purchase_value
     }
-    gearDistance.value = Math.floor(Number(gearDistance.value) + gear.value.initial_kms)
 
     gearComponents.value = await gearsComponents.getGearComponentsByGearId(route.params.id)
     updateGearComponentsActive()
-    updateTotalCosts()
   } catch (error) {
     if (error.toString().includes('422')) {
       return router.push({
