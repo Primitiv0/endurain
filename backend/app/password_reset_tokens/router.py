@@ -29,7 +29,7 @@ router = APIRouter()
     response_model=password_reset_tokens_schema.PasswordResetResponse,
     status_code=status.HTTP_200_OK,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.PASSWORD_RESET_REQUEST_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def request_password_reset(
     request: Request,
     request_data: password_reset_tokens_schema.PasswordResetRequest,
@@ -83,7 +83,7 @@ async def request_password_reset(
     response_model=password_reset_tokens_schema.PasswordResetResponse,
     status_code=status.HTTP_200_OK,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.PASSWORD_RESET_CONFIRM_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def confirm_password_reset(
     request: Request,
     confirm_data: password_reset_tokens_schema.PasswordResetConfirm,

@@ -55,8 +55,11 @@ nav:
     - Import development notes: developer-guide/import-dev-notes.md
   - Gallery: gallery.md
   - Backend reference:
+    - Activities:
+      - Activity workout steps: reference/activities/activity_workout_steps.md
     - Gears:
       - Gear: reference/gears/gear.md
+      - Gear components: reference/gears/gear_components.md
     - GPX: reference/gpx.md
     - Health:
       - Health: reference/health.md

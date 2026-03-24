@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from alembic.config import Config
@@ -211,8 +212,10 @@ def create_app() -> FastAPI:
     # Add rate limiting
     fastapi_app.state.limiter = core_rate_limit.limiter
     fastapi_app.add_exception_handler(
-        core_rate_limit.RateLimitExceeded, core_rate_limit.rate_limit_exceeded_handler
+        core_rate_limit.RateLimitExceeded,
+        core_rate_limit.rate_limit_exceeded_handler,  # type: ignore[arg-type]
     )
+    fastapi_app.add_middleware(SlowAPIMiddleware)
 
     # Router files
     fastapi_app.include_router(api_router)

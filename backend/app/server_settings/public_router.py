@@ -7,14 +7,12 @@ import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
 
 import core.database as core_database
-import core.rate_limit as core_rate_limit
 
 # Define the API router
 router = APIRouter()
 
 
 @router.get("", response_model=server_settings_schema.ServerSettingsReadPublic)
-@core_rate_limit.limiter.limit(core_rate_limit.API_READ_LIMIT)
 async def read_public_server_settings(
     request: Request,
     response: Response,
@@ -44,7 +42,6 @@ async def read_public_server_settings(
     "/tile_maps_templates",
     response_model=list[server_settings_schema.TileMapsTemplate],
 )
-@core_rate_limit.limiter.limit(core_rate_limit.API_READ_LIMIT)
 async def list_tile_maps_templates(
     request: Request,
     response: Response,

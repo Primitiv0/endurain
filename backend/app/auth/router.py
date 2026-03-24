@@ -42,7 +42,7 @@ router = APIRouter()
 
 
 @router.post("/login")
-@core_rate_limit.limiter.limit(core_rate_limit.SESSION_LOGIN_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def login_for_access_token(
     response: Response,
     request: Request,
@@ -186,7 +186,7 @@ async def login_for_access_token(
 
 
 @router.post("/mfa/verify")
-@core_rate_limit.limiter.limit(core_rate_limit.MFA_VERIFY_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def verify_mfa_and_login(
     response: Response,
     request: Request,
@@ -327,7 +327,7 @@ async def verify_mfa_and_login(
 
 
 @router.post("/refresh")
-@core_rate_limit.limiter.limit(core_rate_limit.SESSION_REFRESH_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def refresh_token(
     response: Response,
     request: Request,
@@ -562,7 +562,7 @@ async def refresh_token(
 
 
 @router.post("/logout")
-@core_rate_limit.limiter.limit(core_rate_limit.SESSION_LOGOUT_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def logout(
     response: Response,
     request: Request,

@@ -39,7 +39,7 @@ router = APIRouter()
     status_code=201,
     response_model=sign_up_tokens_schema.SignUpResponse,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.SIGNUP_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def signup(
     request: Request,
     user: users_schema.UsersSignup,
@@ -124,7 +124,7 @@ async def signup(
     "/sign-up/confirm",
     response_model=sign_up_tokens_schema.SignUpResponse,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.SIGNUP_CONFIRM_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def verify_email(
     request: Request,
     confirm_data: sign_up_tokens_schema.SignUpConfirm,

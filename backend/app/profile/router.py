@@ -209,7 +209,7 @@ async def read_sessions_me(
         return []
 
 
-@core_rate_limit.limiter.limit(core_rate_limit.OAUTH_DISCONNECT_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 @router.post(
     "/idp/{idp_id}/link/token",
     status_code=status.HTTP_201_CREATED,
@@ -937,7 +937,7 @@ async def verify_mfa(
     status_code=status.HTTP_201_CREATED,
     response_model=mfa_backup_codes_schema.MFABackupCodesResponse,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.MFA_VERIFY_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def generate_mfa_backup_codes(
     response: Response,
     request: Request,
