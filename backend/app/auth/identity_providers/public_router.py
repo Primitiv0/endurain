@@ -57,7 +57,7 @@ async def get_enabled_providers(db: Annotated[Session, Depends(core_database.get
 
 
 @router.get("/login/{idp_slug}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-@core_rate_limit.limiter.limit(core_rate_limit.OAUTH_AUTHORIZE_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def initiate_login(
     idp_slug: str,
     request: Request,
@@ -179,7 +179,7 @@ async def initiate_login(
 
 
 @router.get("/callback/{idp_slug}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-@core_rate_limit.limiter.limit(core_rate_limit.OAUTH_CALLBACK_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def handle_callback(
     request: Request,
     response: Response,
@@ -347,7 +347,7 @@ async def handle_callback(
     response_model=idp_schema.TokenExchangeResponse,
     status_code=status.HTTP_200_OK,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.PKCE_TOKEN_EXCHANGE_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def exchange_tokens_for_session(
     session_id: str,
     request: Request,
