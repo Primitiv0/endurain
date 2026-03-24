@@ -56,6 +56,8 @@ nav:
   - Gallery: gallery.md
   - Backend reference:
     - Activities:
+      - Activity streams: reference/activities/activity_streams.md
+      - Activity summaries: reference/activities/activity_summaries.md
       - Activity workout steps: reference/activities/activity_workout_steps.md
     - Gears:
       - Gear: reference/gears/gear.md
