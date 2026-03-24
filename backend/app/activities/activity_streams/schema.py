@@ -1,25 +1,32 @@
-from pydantic import BaseModel
-from typing import List
+"""Pydantic schemas for activity stream data."""
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    StrictInt,
+)
 
 
 class ActivityStreams(BaseModel):
     """
-    Represents a stream of activity data associated with an activity.
+    Schema for activity stream data.
 
     Attributes:
-        id (int | None): Unique identifier for the activity stream (optional).
-        activity_id (int): Identifier of the related activity.
-        stream_type (int): Type of the stream (e.g., GPS, heart rate, etc.).
-        stream_waypoints (List[dict]): List of waypoints or data points in the stream.
-        strava_activity_stream_id (int | None): Identifier for the corresponding Strava activity stream (optional).
-        hr_zone_percentages (dict | None): Heart rate zone percentages for the activity (optional).
+        id: Unique stream identifier.
+        activity_id: Parent activity identifier.
+        stream_type: Stream type code (1-7).
+        stream_waypoints: Waypoint data points.
+        strava_activity_stream_id: Strava stream ID.
+        hr_zone_percentages: HR zone breakdown.
     """
 
-    id: int | None = None
-    activity_id: int
-    stream_type: int
-    stream_waypoints: List[dict]
-    strava_activity_stream_id: int | None = None
-    hr_zone_percentages: dict | None = None
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
 
-    model_config = {"from_attributes": True}
+    id: StrictInt | None = None
+    activity_id: StrictInt
+    stream_type: StrictInt
+    stream_waypoints: list[dict]
+    strava_activity_stream_id: StrictInt | None = None
+    hr_zone_percentages: dict | None = None

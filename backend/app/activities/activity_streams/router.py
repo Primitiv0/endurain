@@ -1,3 +1,5 @@
+"""Authenticated activity stream endpoints."""
+
 from typing import Annotated, Callable
 
 from fastapi import APIRouter, Depends, Security
@@ -13,61 +15,133 @@ import auth.security as auth_security
 
 import core.database as core_database
 
-# Define the API router
 router = APIRouter()
 
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=list[activity_streams_schema.ActivityStreams] | None,
+    response_model=(
+        list[
+            activity_streams_schema
+            .ActivityStreams
+        ]
+        | None
+    ),
 )
 async def read_activities_streams_for_activity_all(
     activity_id: int,
-    validate_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
+    _validate_id: Annotated[
+        Callable,
+        Depends(
+            activities_dependencies
+            .validate_activity_id
+        ),
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
+        Callable,
+        Security(
+            auth_security.check_scopes,
+            scopes=["activities:read"],
+        ),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(
+            auth_security
+            .get_sub_from_access_token
+        ),
     ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
 ):
-    # Get the activity streams from the database and return them
-    return activity_streams_crud.get_activity_streams(activity_id, token_user_id, db)
+    """
+    Get all streams for an activity.
+
+    Args:
+        activity_id: The activity identifier.
+        validate_id: Activity ID validator dep.
+        _check_scopes: Scope authorization dep.
+        token_user_id: Authenticated user ID.
+        db: Database session.
+
+    Returns:
+        List of activity streams or None.
+    """
+    return (
+        activity_streams_crud
+        .get_activity_streams(
+            activity_id, token_user_id, db
+        )
+    )
 
 
 @router.get(
-    "/activity_id/{activity_id}/stream_type/{stream_type}",
-    response_model=activity_streams_schema.ActivityStreams | None,
+    "/activity_id/{activity_id}"
+    "/stream_type/{stream_type}",
+    response_model=(
+        activity_streams_schema.ActivityStreams
+        | None
+    ),
 )
 async def read_activities_streams_for_activity_stream_type(
     activity_id: int,
-    validate_activity_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
+    _validate_activity_id: Annotated[
+        Callable,
+        Depends(
+            activities_dependencies
+            .validate_activity_id
+        ),
     ],
     stream_type: int,
-    validate_activity_stream_type: Annotated[
-        Callable, Depends(activity_streams_dependencies.validate_activity_stream_type)
+    _validate_activity_stream_type: Annotated[
+        Callable,
+        Depends(
+            activity_streams_dependencies
+            .validate_activity_stream_type
+        ),
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
+        Callable,
+        Security(
+            auth_security.check_scopes,
+            scopes=["activities:read"],
+        ),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(
+            auth_security
+            .get_sub_from_access_token
+        ),
     ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
 ):
-    # Get the activity stream from the database and return them
-    return activity_streams_crud.get_activity_stream_by_type(
-        activity_id, stream_type, token_user_id, db
+    """
+    Get a specific stream type for an activity.
+
+    Args:
+        activity_id: The activity identifier.
+        validate_activity_id: Activity ID dep.
+        stream_type: The stream type code.
+        validate_activity_stream_type: Type dep.
+        _check_scopes: Scope authorization dep.
+        token_user_id: Authenticated user ID.
+        db: Database session.
+
+    Returns:
+        The activity stream or None.
+    """
+    return (
+        activity_streams_crud
+        .get_activity_stream_by_type(
+            activity_id,
+            stream_type,
+            token_user_id,
+            db,
+        )
     )
