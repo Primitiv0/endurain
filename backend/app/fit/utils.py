@@ -261,6 +261,11 @@ def split_records_by_activity(parsed_data: dict) -> dict:
 
     sessions_records = []
 
+    def _parse_wp_time(time_str: str) -> datetime:
+        """Parse a waypoint time string into a UTC-aware datetime."""
+        dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
+        return dt.replace(tzinfo=timezone.utc)
+
     # Convert session times to datetime objects for easier comparison
     for i, session in enumerate(sessions):
         # Use the time as is if it’s already a datetime object; otherwise, parse it
@@ -321,7 +326,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in lat_lon_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
@@ -360,7 +365,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in ele_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
@@ -372,7 +377,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in hr_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
@@ -384,7 +389,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in cad_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
@@ -396,7 +401,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in power_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
@@ -410,7 +415,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in vel_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
@@ -421,7 +426,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 wp
                 for wp in pace_waypoints
                 if start_time
-                <= datetime.strptime(wp["time"], "%Y-%m-%dT%H:%M:%S")
+                <= _parse_wp_time(wp["time"])
                 <= end_time
             ]
             # If there are waypoints, set the parsed session's waypoints and flag
