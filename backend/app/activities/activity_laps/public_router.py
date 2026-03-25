@@ -16,7 +16,9 @@ router = APIRouter()
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=list[activity_laps_schema.ActivityLaps] | None,
+    response_model=list[
+        activity_laps_schema.ActivityLapsRead
+    ] | None,
 )
 async def read_public_activities_laps_for_activity_all(
     activity_id: int,

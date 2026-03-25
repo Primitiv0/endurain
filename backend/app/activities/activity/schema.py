@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -77,9 +79,9 @@ class Activity(BaseModel):
     distance: int
     name: str
     activity_type: int
-    start_time: str | None = None
+    start_time: datetime | str | None = None
     start_time_tz_applied: str | None = None
-    end_time: str | None = None
+    end_time: datetime | str | None = None
     end_time_tz_applied: str | None = None
     timezone: str | None = None
     total_elapsed_time: float | None = None
@@ -87,7 +89,7 @@ class Activity(BaseModel):
     city: str | None = None
     town: str | None = None
     country: str | None = None
-    created_at: str | None = None
+    created_at: datetime | str | None = None
     created_at_tz_applied: str | None = None
     elevation_gain: int | None = None
     elevation_loss: int | None = None

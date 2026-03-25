@@ -1,46 +1,154 @@
-from pydantic import BaseModel
+"""Activity laps schemas."""
+
+from datetime import datetime
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    field_serializer,
+)
+
+import core.timezone as core_timezone
 
 
-class ActivityLaps(BaseModel):
-    id: int | None = None
-    activity_id: int | None = None
-    start_time: str
-    start_position_lat: float | None = None
-    start_position_long: float | None = None
-    end_position_lat: float | None = None
-    end_position_long: float | None = None
-    total_elapsed_time: float | None = None
-    total_timer_time: float | None = None
-    total_distance: float | None = None
-    total_cycles: int | None = None
-    total_calories: int | None = None
-    avg_heart_rate: int | None = None
-    max_heart_rate: int | None = None
-    avg_cadence: int | None = None
-    max_cadence: int | None = None
-    avg_power: int | None = None
-    max_power: int | None = None
-    total_ascent: int | None = None
-    total_descent: int | None = None
-    intensity: str | None = None
-    lap_trigger: str | None = None
-    sport: str | None = None
-    sub_sport: str | None = None
-    normalized_power: int | None = None
-    total_work: int | None = None
-    avg_vertical_oscillation: float | None = None
-    avg_stance_time: float | None = None
-    avg_fractional_cadence: float | None = None
-    max_fractional_cadence: float | None = None
-    enhanced_avg_pace: float | None = None
-    enhanced_avg_speed: float | None = None
-    enhanced_max_pace: float | None = None
-    enhanced_max_speed: float | None = None
-    enhanced_min_altitude: float | None = None
-    enhanced_max_altitude: float | None = None
-    avg_vertical_ratio: float | None = None
-    avg_step_length: float | None = None
+class ActivityLapsBase(BaseModel):
+    """
+    Base schema for activity laps.
 
-    model_config = {
-        "from_attributes": True
-    }
+    Attributes:
+        start_time: Lap start time ISO string.
+        start_position_lat: Start latitude.
+        start_position_long: Start longitude.
+        end_position_lat: End latitude.
+        end_position_long: End longitude.
+        total_elapsed_time: Total elapsed time.
+        total_timer_time: Total timer time.
+        total_distance: Total distance.
+        total_cycles: Total cycles.
+        total_calories: Total calories.
+        avg_heart_rate: Average heart rate.
+        max_heart_rate: Maximum heart rate.
+        avg_cadence: Average cadence.
+        max_cadence: Maximum cadence.
+        avg_power: Average power.
+        max_power: Maximum power.
+        total_ascent: Total ascent.
+        total_descent: Total descent.
+        intensity: Lap intensity.
+        lap_trigger: Lap trigger type.
+        sport: Sport type.
+        sub_sport: Sub sport type.
+        normalized_power: Normalized power.
+        total_work: Total work.
+        avg_vertical_oscillation: Avg oscillation.
+        avg_stance_time: Average stance time.
+        avg_fractional_cadence: Avg frac cadence.
+        max_fractional_cadence: Max frac cadence.
+        enhanced_avg_pace: Enhanced avg pace.
+        enhanced_avg_speed: Enhanced avg speed.
+        enhanced_max_pace: Enhanced max pace.
+        enhanced_max_speed: Enhanced max speed.
+        enhanced_min_altitude: Enhanced min alt.
+        enhanced_max_altitude: Enhanced max alt.
+        avg_vertical_ratio: Avg vertical ratio.
+        avg_step_length: Average step length.
+    """
+
+    start_time: StrictStr
+    start_position_lat: StrictFloat | None = None
+    start_position_long: StrictFloat | None = None
+    end_position_lat: StrictFloat | None = None
+    end_position_long: StrictFloat | None = None
+    total_elapsed_time: StrictFloat | None = None
+    total_timer_time: StrictFloat | None = None
+    total_distance: StrictFloat | None = None
+    total_cycles: StrictInt | None = None
+    total_calories: StrictInt | None = None
+    avg_heart_rate: StrictInt | None = None
+    max_heart_rate: StrictInt | None = None
+    avg_cadence: StrictInt | None = None
+    max_cadence: StrictInt | None = None
+    avg_power: StrictInt | None = None
+    max_power: StrictInt | None = None
+    total_ascent: StrictInt | None = None
+    total_descent: StrictInt | None = None
+    intensity: StrictStr | None = None
+    lap_trigger: StrictStr | None = None
+    sport: StrictStr | None = None
+    sub_sport: StrictStr | None = None
+    normalized_power: StrictInt | None = None
+    total_work: StrictInt | None = None
+    avg_vertical_oscillation: (
+        StrictFloat | None
+    ) = None
+    avg_stance_time: StrictFloat | None = None
+    avg_fractional_cadence: (
+        StrictFloat | None
+    ) = None
+    max_fractional_cadence: (
+        StrictFloat | None
+    ) = None
+    enhanced_avg_pace: StrictFloat | None = None
+    enhanced_avg_speed: StrictFloat | None = None
+    enhanced_max_pace: StrictFloat | None = None
+    enhanced_max_speed: StrictFloat | None = None
+    enhanced_min_altitude: (
+        StrictFloat | None
+    ) = None
+    enhanced_max_altitude: (
+        StrictFloat | None
+    ) = None
+    avg_vertical_ratio: StrictFloat | None = None
+    avg_step_length: StrictFloat | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class ActivityLapsRead(ActivityLapsBase):
+    """
+    Schema for reading activity laps.
+
+    Attributes:
+        id: Lap primary key.
+        activity_id: Parent activity ID.
+        start_time: Lap start time as datetime.
+        timezone: Activity timezone for
+            serialization (excluded from output).
+    """
+
+    id: StrictInt
+    activity_id: StrictInt
+    start_time: datetime  # type: ignore[assignment]
+    timezone: StrictStr | None = Field(
+        default=None, exclude=True
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+    @field_serializer("start_time")
+    def serialize_start_time(
+        self, value: datetime
+    ) -> str:
+        """
+        Format start_time with activity timezone.
+
+        Args:
+            value: The datetime value to serialize.
+
+        Returns:
+            Formatted datetime string.
+        """
+        return core_timezone.format_aware_datetime(
+            value, self.timezone
+        )

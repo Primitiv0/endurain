@@ -31,11 +31,11 @@ def get_all_activities(db: Session):
         if not activities:
             return None
 
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-
         # Return the activities
-        return activities
+        return [
+            activities_utils.serialize_activity(a)
+            for a in activities
+        ]
 
     except Exception as err:
         # Log the exception
@@ -139,21 +139,23 @@ def get_user_activities(
 
         # Serialize all activities in one pass
         serialized_activities = []
-        for activity in activities:
-            serialized_activities.append(activities_utils.serialize_activity(activity))
-
-            if activity.user_id != user_id:
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            if orm_activity.user_id != user_id:
+                if orm_activity.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if orm_activity.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if orm_activity.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            serialized_activities.append(schema)
 
         # Return the activities
         return serialized_activities
@@ -189,25 +191,28 @@ def get_user_activities_by_user_id_and_garminconnect_gear_set(
         if not activities:
             return None
 
-        # Iterate and format the dates
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-
-            if activity.user_id != user_id:
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+        # Serialize and apply visibility rules
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            if schema.user_id != user_id:
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -347,23 +352,24 @@ def get_user_activities_with_pagination(
         # Serialize activities
         serialized_activities = []
         if activities:
-            for activity in activities:
-                if not user_is_owner:
-                    activity.private_notes = None
-                    if activity.hide_start_time:
-                        activity.start_time = None
-                        activity.end_time = None
-                    if activity.hide_location:
-                        activity.city = None
-                        activity.town = None
-                        activity.country = None
-                    if activity.hide_gear:
-                        activity.gear_id = None
-                        activity.strava_gear_id = None
-                        activity.garminconnect_gear_id = None
-                serialized_activities.append(
-                    activities_utils.serialize_activity(activity)
+            for orm_activity in activities:
+                schema = activities_utils.serialize_activity(
+                    orm_activity
                 )
+                if not user_is_owner:
+                    schema.private_notes = None
+                    if schema.hide_start_time:
+                        schema.start_time = None
+                        schema.end_time = None
+                    if schema.hide_location:
+                        schema.city = None
+                        schema.town = None
+                        schema.country = None
+                    if schema.hide_gear:
+                        schema.gear_id = None
+                        schema.strava_gear_id = None
+                        schema.garminconnect_gear_id = None
+                serialized_activities.append(schema)
 
         # Return the activities
         return serialized_activities if serialized_activities else None
@@ -432,25 +438,28 @@ def get_user_activities_per_timeframe(
         if not activities:
             return None
 
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
             if not user_is_owner:
-                activity.private_notes = None
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+                schema.private_notes = None
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -488,25 +497,28 @@ def get_user_activities_per_timeframe_and_activity_type(
         if not activities:
             return None
 
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
             if not user_is_owner:
-                activity.private_notes = None
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+                schema.private_notes = None
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -546,25 +558,28 @@ def get_user_activities_per_timeframe_and_activity_types(
         if not activities:
             return None
 
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
             if not user_is_owner:
-                activity.private_notes = None
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+                schema.private_notes = None
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -606,23 +621,27 @@ def get_user_following_activities_per_timeframe(
         if not activities:
             return None
 
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-            activity.private_notes = None
-            if activity.hide_start_time:
-                activity.start_time = None
-                activity.end_time = None
-            if activity.hide_location:
-                activity.city = None
-                activity.town = None
-                activity.country = None
-            if activity.hide_gear:
-                activity.gear_id = None
-                activity.strava_gear_id = None
-                activity.garminconnect_gear_id = None
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            schema.private_notes = None
+            if schema.hide_start_time:
+                schema.start_time = None
+                schema.end_time = None
+            if schema.hide_location:
+                schema.city = None
+                schema.town = None
+                schema.country = None
+            if schema.hide_gear:
+                schema.gear_id = None
+                schema.strava_gear_id = None
+                schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
 
     except Exception as err:
         # Log the exception
@@ -670,23 +689,27 @@ def get_user_following_activities_with_pagination(
             return None
 
         # Iterate and format the dates
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-            activity.private_notes = None
-            if activity.hide_start_time:
-                activity.start_time = None
-                activity.end_time = None
-            if activity.hide_location:
-                activity.city = None
-                activity.town = None
-                activity.country = None
-            if activity.hide_gear:
-                activity.gear_id = None
-                activity.strava_gear_id = None
-                activity.garminconnect_gear_id = None
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            schema.private_notes = None
+            if schema.hide_start_time:
+                schema.start_time = None
+                schema.end_time = None
+            if schema.hide_location:
+                schema.city = None
+                schema.town = None
+                schema.country = None
+            if schema.hide_gear:
+                schema.gear_id = None
+                schema.strava_gear_id = None
+                schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -728,11 +751,10 @@ def get_user_following_activities(user_id, db):
             return None
 
         # Iterate and format the dates
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-
-        # Return the activities
-        return activities
+        return [
+            activities_utils.serialize_activity(a)
+            for a in activities
+        ]
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -813,24 +835,28 @@ def get_user_activities_by_gear_id_and_user_id(user_id: int, gear_id: int, db: S
             return None
 
         # Iterate and format the dates
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-            if activity.user_id != user_id:
-                activity.private_notes = None
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            if schema.user_id != user_id:
+                schema.private_notes = None
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -867,24 +893,28 @@ def get_user_activities_by_gear_id_and_user_id_with_pagination(
             return None
 
         # Iterate and format the dates
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-            if activity.user_id != user_id:
-                activity.private_notes = None
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            if schema.user_id != user_id:
+                schema.private_notes = None
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -1211,24 +1241,28 @@ def get_activities_if_contains_name(name: str, user_id: int, db: Session):
             return None
 
         # Iterate and format the dates
-        for activity in activities:
-            activity = activities_utils.serialize_activity(activity)
-            if activity.user_id != user_id:
-                activity.private_notes = None
-                if activity.hide_start_time:
-                    activity.start_time = None
-                    activity.end_time = None
-                if activity.hide_location:
-                    activity.city = None
-                    activity.town = None
-                    activity.country = None
-                if activity.hide_gear:
-                    activity.gear_id = None
-                    activity.strava_gear_id = None
-                    activity.garminconnect_gear_id = None
+        result = []
+        for orm_activity in activities:
+            schema = activities_utils.serialize_activity(
+                orm_activity
+            )
+            if schema.user_id != user_id:
+                schema.private_notes = None
+                if schema.hide_start_time:
+                    schema.start_time = None
+                    schema.end_time = None
+                if schema.hide_location:
+                    schema.city = None
+                    schema.town = None
+                    schema.country = None
+                if schema.hide_gear:
+                    schema.gear_id = None
+                    schema.strava_gear_id = None
+                    schema.garminconnect_gear_id = None
+            result.append(schema)
 
         # Return the activities
-        return activities
+        return result
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(

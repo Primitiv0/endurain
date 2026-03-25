@@ -18,7 +18,9 @@ router = APIRouter()
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=list[activity_sets_schema.ActivitySets] | None,
+    response_model=list[
+        activity_sets_schema.ActivitySetsRead
+    ] | None,
 )
 async def read_activities_sets_for_activity_all(
     activity_id: int,

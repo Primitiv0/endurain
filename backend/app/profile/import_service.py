@@ -758,7 +758,7 @@ class ImportService:
             for activity_set in sets_for_activity:
                 activity_set.pop("id", None)
                 activity_set["activity_id"] = new_activity_id
-                set_activity = activity_sets_schema.ActivitySets(**activity_set)
+                set_activity = activity_sets_schema.ActivitySetsCreate(**activity_set)
                 sets.append(set_activity)
 
             if sets:

@@ -58,6 +58,7 @@ import core.config as core_config
 import core.cryptography as core_cryptography
 import core.database as core_database
 import core.sanitization as core_sanitization
+import core.timezone as core_timezone
 
 # Global Activity Type Mappings (ID to Name)
 ACTIVITY_ID_TO_NAME = {
@@ -329,45 +330,60 @@ def transform_schema_activity_to_model_activity(
     return new_activity
 
 
-def serialize_activity(activity: activities_schema.Activity):
-    def make_aware_and_format(dt, timezone):
-        if isinstance(dt, str):
-            dt = datetime.fromisoformat(dt)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-        return dt.astimezone(timezone).strftime("%Y-%m-%dT%H:%M:%S")
+def serialize_activity(
+    activity: activities_models.Activity,
+) -> activities_schema.Activity:
+    """
+    Convert an ORM Activity to a schema with TZ.
 
-    def convert_to_datetime_if_string(dt: str | datetime | None) -> datetime:
-        if dt is None:
-            raise ValueError("Datetime cannot be None")
-        if isinstance(dt, str):
-            return datetime.fromisoformat(dt)
-        return dt
+    Converts ORM model to Pydantic schema and
+    applies timezone formatting to datetime fields.
+    Does NOT mutate the ORM object.
 
-    timezone = (
-        ZoneInfo(activity.timezone)
-        if activity.timezone
-        else ZoneInfo(os.environ.get("TZ", "UTC"))
+    Args:
+        activity: The ORM Activity instance.
+
+    Returns:
+        An Activity schema with formatted datetimes.
+    """
+    schema = activities_schema.Activity.model_validate(
+        activity
     )
 
-    activity.start_time_tz_applied = make_aware_and_format(
-        activity.start_time, timezone
+    tz_name = activity.timezone
+    schema.start_time_tz_applied = (
+        core_timezone.format_aware_datetime(
+            activity.start_time, tz_name
+        )
     )
-    activity.end_time_tz_applied = make_aware_and_format(activity.end_time, timezone)
-    activity.created_at_tz_applied = make_aware_and_format(
-        activity.created_at, timezone
+    schema.end_time_tz_applied = (
+        core_timezone.format_aware_datetime(
+            activity.end_time, tz_name
+        )
+    )
+    schema.created_at_tz_applied = (
+        core_timezone.format_aware_datetime(
+            activity.created_at, tz_name
+        )
     )
 
-    # Convert to datetime objects if they are strings before calling astimezone
-    start_time_dt = convert_to_datetime_if_string(activity.start_time)
-    end_time_dt = convert_to_datetime_if_string(activity.end_time)
-    created_at_dt = convert_to_datetime_if_string(activity.created_at)
+    schema.start_time = (
+        core_timezone.format_aware_datetime(
+            activity.start_time, None
+        )
+    )
+    schema.end_time = (
+        core_timezone.format_aware_datetime(
+            activity.end_time, None
+        )
+    )
+    schema.created_at = (
+        core_timezone.format_aware_datetime(
+            activity.created_at, None
+        )
+    )
 
-    activity.start_time = start_time_dt.astimezone(None).strftime("%Y-%m-%dT%H:%M:%S")
-    activity.end_time = end_time_dt.astimezone(None).strftime("%Y-%m-%dT%H:%M:%S")
-    activity.created_at = created_at_dt.astimezone(None).strftime("%Y-%m-%dT%H:%M:%S")
-
-    return activity
+    return schema
 
 
 def handle_gzipped_file(
