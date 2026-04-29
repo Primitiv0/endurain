@@ -3,7 +3,7 @@
 
   # Endurain
 
-  <a title="Crowdin" target="_blank" href="https://crowdin.com/project/endurain"><img src="https://badges.crowdin.net/endurain/localized.svg"></a>
+  <a title="Codeberg Translate" target="_blank" href="https://translate.codeberg.org/projects/endurain/"><img src="https://img.shields.io/badge/translate-Codeberg%20Translate-2f7d32"></a>
   [![License](https://img.shields.io/badge/license-AGPL%20v3-blue)](./LICENSE)
   [![Release](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain/releases/latest&query=$.tag_name&label=release&color=blue)](https://codeberg.org/endurain-project/endurain/releases)
   [![Stars](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.stars_count&label=stars&logo=codeberg)](https://codeberg.org/endurain-project/endurain)
@@ -63,7 +63,7 @@ Contributions are welcomed! Please open an issue to discuss any changes or impro
 
 ## Help Translate
 
-Endurain has multi-language support, and you can help translate it into more languages via [Crowdin](https://crowdin.com/project/endurain). 
+Endurain has multi-language support, and you can help translate it into more languages via [Codeberg Translate](https://translate.codeberg.org/projects/endurain/). 
 
 ## License
 

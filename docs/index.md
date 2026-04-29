@@ -4,8 +4,8 @@
   </p>
 
   <p>
-    <a href="https://crowdin.com/project/endurain">
-      <img src="https://badges.crowdin.net/endurain/localized.svg" alt="Crowdin">
+    <a href="https://translate.codeberg.org/projects/endurain/">
+      <img src="https://img.shields.io/badge/translate-Codeberg%20Translate-2f7d32" alt="Codeberg Translate">
     </a>
     <img src="https://img.shields.io/badge/license-AGPL%20v3-blue" alt="License">
     <a href="https://codeberg.org/endurain-project/endurain/releases">
@@ -104,7 +104,7 @@ This project is licensed under the AGPL-3.0 or later License.
 
 ## Help Translate
 
-Endurain has multi-language support, and you can help translate it into more languages via [Crowdin](https://crowdin.com/project/endurain). 
+Endurain has multi-language support, and you can help translate it into more languages via [Codeberg Translate](https://translate.codeberg.org/projects/endurain/). 
 
 Currently supported in:
 
