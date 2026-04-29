@@ -4,9 +4,9 @@
   # Endurain
 
   <a title="Crowdin" target="_blank" href="https://crowdin.com/project/endurain"><img src="https://badges.crowdin.net/endurain/localized.svg"></a>
-  ![License](https://img.shields.io/github/license/endurain-project/endurain)
-  [![GitHub release](https://img.shields.io/github/v/release/endurain-project/endurain)](https://github.com/endurain-project/endurain/releases)
-  [![GitHub stars](https://img.shields.io/github/stars/endurain-project/endurain.svg?style=social&label=Star)](https://github.com/endurain-project/endurain/stargazers)
+  [![License](https://img.shields.io/badge/license-AGPL%20v3-blue)](./LICENSE)
+  [![Release](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.release_tag&label=release&color=blue)](https://codeberg.org/endurain-project/endurain/releases)
+  [![Stars](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.stars_count&label=stars&color=yellow&logo=gitea)](https://codeberg.org/endurain-project/endurain)
   [![Trademark Policy](https://img.shields.io/badge/trademark-Endurain%E2%84%A2-blue)](./TRADEMARK.md)
 
   **A self-hosted fitness tracking service**  
@@ -55,7 +55,7 @@ For more information please see the Endurain's [documentation](https://docs.endu
 
 A huge thank you to the project sponsors! Your support helps keep this project going.
 
-Consider [sponsoring Endurain on GitHub](https://github.com/sponsors/joaovitoriasilva) to ensure continuous development.
+Support Endurain's development on [Codeberg](https://codeberg.org/endurain-project).
 
 ## Contributing
 
@@ -79,5 +79,5 @@ Commercial use of the Endurain name or logos (such as offering paid hosting, pro
 See [`TRADEMARK.md`](./TRADEMARK.md) for full details.
 
 <div align="center">
-  <sub>Built with ❤️ from Portugal | Part of the <a href="https://github.com/endurain-project">Endurain</a> ecosystem</sub>
+  <sub>Built with ❤️ from Portugal | Part of the <a href="https://codeberg.org/endurain-project">Endurain</a> ecosystem</sub>
 </div>
