@@ -29,7 +29,7 @@ jobs:
       - name: Run Renovate
         uses: docker://ghcr.io/renovatebot/renovate:latest
         env:
-          LOG_LEVEL: debug
+          LOG_LEVEL: info
           RENOVATE_CONFIG_FILE: renovate.json
           RENOVATE_ENDPOINT: https://codeberg.org/api/v1/
           RENOVATE_PLATFORM: gitea
