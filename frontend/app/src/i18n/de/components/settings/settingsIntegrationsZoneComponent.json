@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava ist ein amerikanischer Internetdienst zum Tracking körperlicher Betätigungen, der Soziale-Netwerk-Funktionen integriert.",
   "buttonConnect": "Verbinden",
   "buttonDropdownOptions": "Optionen",
@@ -12,7 +11,6 @@
   "buttonRelink": "Erneut verknüpfen",
   "buttonUnlink": "Trennen",
   "modalRetrieveClientIdTitle": "Strava verbinden",
-  "modalRetrieveClientIdLabel": "Client ID",
   "modalRetrieveClientSecretLabel": "Client-Secret",
   "errorMessageUnableToLinkStrava": "Strava-Konto konnte nicht getrennt werden",
   "errorMessageUnableToUnsetStravaClientSettings": "Strava-Client- und Statuseinstellungen können nach Verbindungsfehler nicht entfernt werden",
@@ -27,7 +25,6 @@
   "errorMessageUnableToUnlinkStrava": "Strava-Konto konnte nicht getrennt werden",
   "modalUnlinkStravaTitle": "Strava entfernen",
   "modalUnlinkStravaBody": "Bist du dir sicher, dass du die Verknüpfung deines Strava-Kontos aufheben möchtest? Wenn du dein Strava-Konto aufhebst, werden alle deine Strava-Aktivitäten und Ausrüstungen aus Endurain entfernt.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect ist eine Gesundheits- und Fitness-Aktivitätsplattform für Nutzer von Garmin Geräten",
   "loadingMessageRetrievingGarminConnectActivities": "Garmin Connect Aktivitäten abrufen",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Garmin Connect Aktivitäten konnten nicht nach Tagen abgerufen werden",

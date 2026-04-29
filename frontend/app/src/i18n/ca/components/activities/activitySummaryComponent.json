@@ -13,7 +13,6 @@
   "processingMediaUpload": "Processant pujada de foto...",
   "successMediaUpload": "Foto pujada correctament",
   "errorMediaUpload": "Error pujant media",
-  "labelVirtual": "(Virtual) ",
   "privateNotes": "Notes privades",
   "activityDescription": "Descripció de l’activitat",
   "activityDistance": "Distància",
@@ -25,7 +24,6 @@
   "activityAvgSpeed": "Vel mitja",
   "activityEleGain": "Desnivell +",
   "activityEleLoss": "Desnivell -",
-  "activityCalories": "Calories",
   "activityNoData": "Sense dades",
   "errorFetchingUserById": "Error obtenint usuari per id",
   "errorDeletingActivity": "Error esborrant activitat"

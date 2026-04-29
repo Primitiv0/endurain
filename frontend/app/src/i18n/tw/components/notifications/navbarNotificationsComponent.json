@@ -1,6 +1,1 @@
-{
-  "errorFetchingNotificationsPagination": "Error fetching notifications with pagination",
-  "errorFetchingNotificationsNumber": "Error fetching notifications number",
-  "errorFetchingNotificationById": "Error fetching notification by ID",
-  "errorFetchingMessageFromWebSocket": "Error fetching message from WebSocket"
-}
+{}

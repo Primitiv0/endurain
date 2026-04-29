@@ -7,7 +7,6 @@
   "garminConnectAuthModalMfaCodeLabel": "Codi MFA",
   "garminConnectAuthModalMfaCodePlaceholder": "Codi MFA",
   "buttonSubmitMfaCode": "Entra codi MFA",
-  "garminConnectAuthModalLoginButton": "Login",
   "processingMessageLinkGarminConnect": "Enllaçant el compte de Garmin Connect...",
   "successMessageLinkGarminConnect": "Compte de Garmin Connect enllaçat",
   "errorMessageUnableToLinkGarminConnect": "No es pot enllaçar el compte de Garmin Connect"

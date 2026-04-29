@@ -53,13 +53,5 @@
   "unlinkModalConfirmation": "Tes certeza de querer desligar a túa conta {providerName}? Non poderás volver acceder usando este provedor.",
   "unlinkModalLastMethodWarning": "Aviso: este é o teu único método de autenticación. Establece un contrasinal antes de desligar a conta.",
   "unlinkAccountSuccess": "Conta desligada correctamente",
-  "unlinkAccountError": "Erro ao desligar a conta",
-  "unlinkAccountLastMethodError": "Cannot unlink last authentication method. Please set a password first.",
-  "linkAccountSuccess": "{providerName} account linked successfully",
-  "linkAccountError": "Error linking account",
-  "linkAccountRateLimitError": "Too many link attempts. Please wait a moment and try again.",
-  "linkAccountAlreadyLinked": "This {providerName} account is already linked",
-  "linkAccountInUse": "This {providerName} account is already linked to another user",
-  "errorLoadingLinkedAccounts": "Error loading linked accounts",
-  "refreshButton": "Refresh"
+  "unlinkAccountError": "Erro ao desligar a conta"
 }

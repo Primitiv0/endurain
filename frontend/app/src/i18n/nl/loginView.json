@@ -46,6 +46,5 @@
   "ssoAccountDisabled": "Uw account is uitgeschakeld. Neem contact op met uw beheerder",
   "ssoAutoCreateDisabled": "Automatisch aanmaken van account is uitgeschakeld. Neem contact op met uw beheerder",
   "ssoErrorUndefined": "Er is een onverwachte fout opgetreden tijdens de SSO authenticatie",
-  "forceLocalLogin": "Lokale inlogmodus ingeschakeld. Gebruik uw gebruikersnaam en wachtwoord om in te loggen.",
-  "ssoTokenExchangeFailed": "SSO token exchange failed."
+  "forceLocalLogin": "Lokale inlogmodus ingeschakeld. Gebruik uw gebruikersnaam en wachtwoord om in te loggen."
 }

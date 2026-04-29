@@ -2,7 +2,6 @@
   "userListAccessTypeOption1": "Reguliere gebruiker",
   "userListAccessTypeOption2": "Beheerder",
   "userListUserIsMeBadge": "Ik",
-  "userListUserIsAdminBadge": "Admin",
   "userListUserIsInactiveBadge": "Inactief",
   "userListUserHasUnverifiedEmailBadge": "Ongeverifieerd e-mailadres",
   "userListUserHasExternalAuthBadge": "Externe authenticatie",

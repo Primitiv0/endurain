@@ -1,6 +1,5 @@
 {
   "title": "Résumé des activités",
-  "filterLabelActivityType": "Type",
   "filterOptionAllTypes": "Tous les types",
   "labelViewType": "Voir",
   "optionDaily": "Quotidien",
@@ -25,10 +24,8 @@
   "colDay": "Jour",
   "colWeekNum": "Semaine n°",
   "colMonth": "Mois",
-  "colDistance": "Distance",
   "colDuration": "Durée",
   "colElevation": "Dénivelé",
-  "colCalories": "Calories",
   "colActivities": "Activités",
   "metricTotalDistance": "Distance totale",
   "metricTotalDuration": "Durée totale",
@@ -37,7 +34,6 @@
   "metricTotalActivities": "Total des activités",
   "invalidYearSelected": "Année sélectionnée invalide",
   "headerTypeBreakdown": "Répartition par type",
-  "colActivityType": "Type",
   "headerYear": "Année {year}",
   "headerWeekStarting": "Semaine du {date}",
   "colYear": "Année"

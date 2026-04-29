@@ -6,9 +6,7 @@
   "labelLapPace": "Ritme",
   "labelLapSpeed": "Velocitat",
   "labelLapElevation": "Elevació",
-  "labelLapElev": "Elev",
   "labelLapAvgHr": "Freqüència cardíaca mitjana",
   "labelLapHR": "FC",
-  "labelLapStrokeRate": "Freqüència batecs",
-  "labelLapSR": "SR"
+  "labelLapStrokeRate": "Freqüència batecs"
 }

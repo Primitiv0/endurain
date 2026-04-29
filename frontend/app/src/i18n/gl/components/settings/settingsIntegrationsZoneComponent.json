@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava é un servizo de internet de Estados Unidos para facer seguimento da actividade física e que incorpora elementos do internet social.",
   "buttonConnect": "Conectar",
   "buttonDropdownOptions": "Opcións",
@@ -27,7 +26,6 @@
   "errorMessageUnableToUnlinkStrava": "Non se puido desligar a conta de Strava",
   "modalUnlinkStravaTitle": "Desligar Strava",
   "modalUnlinkStravaBody": "Tes certeza de querer desligar a túa conta de Strava? Ao desligarte de Strava vas eliminar todas as túas actividades e equipamentos de Strava de Endurain.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect é unha plataforma de actividades de saúde e deporte para persoas que usan dispositivos Garmin",
   "loadingMessageRetrievingGarminConnectActivities": "Obtendo actividades desde Garmin Connect",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Non se puideron obter as actividades diarias desde Garmin Connect",

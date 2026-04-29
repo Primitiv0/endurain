@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava je ameriška spletna storitev za sledenje telesni vadbi, ki vključuje funkcije družbenega omrežja.",
   "buttonConnect": "Poveži",
   "buttonDropdownOptions": "Možnosti",
@@ -27,7 +26,6 @@
   "errorMessageUnableToUnlinkStrava": "Povezave z računom Strava ni bilo mogoče odstraniti",
   "modalUnlinkStravaTitle": "Odstrani povezavo Strava",
   "modalUnlinkStravaBody": "Ali ste prepričani, da želite odstraniti povezavo z računom Strava? Odstranitev povezave bo odstranila vse vaše aktivnosti in opremo Strava iz Endurain.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect je platforma za zdravje in telesno aktivnost za uporabnike naprav Garmin",
   "loadingMessageRetrievingGarminConnectActivities": "Pridobivanje aktivnosti Garmin Connect",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Aktivnosti Garmin Connect po dnevih ni bilo mogoče pridobiti",

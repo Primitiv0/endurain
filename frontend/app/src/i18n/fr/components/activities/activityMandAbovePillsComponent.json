@@ -6,11 +6,9 @@
   "labelGraphHR": "Fréquence cardiaque",
   "labelHRZones": "Zone de fréquence cardiaque",
   "labelGraphPower": "Puissance",
-  "labelGraphCadence": "Cadence",
   "labelGraphElevation": "Altitude",
   "labelGraphVelocity": "Vitesse",
   "labelGraphPace": "Allure",
-  "labelGraphHRZone": "Zone",
   "errorMessageProcessingActivityStreams": "Erreur lors du traitement des flux d'activité",
   "labelGraphStrokeRate": "Rythme de foulée"
 }

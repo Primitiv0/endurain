@@ -1,6 +1,5 @@
 {
   "title": "Overzicht activiteit",
-  "filterLabelActivityType": "Type",
   "filterOptionAllTypes": "Alle typen",
   "labelViewType": "Bekijk per",
   "optionDaily": "Dagelijks",
@@ -8,7 +7,6 @@
   "optionMonthly": "maand",
   "optionYearly": "jaar",
   "optionLifetime": "Levenslang",
-  "labelSelectWeek": "Week",
   "labelSelectMonth": "Maand",
   "labelSelectYear": "Jaar",
   "labelSelectPeriod": "Periode",

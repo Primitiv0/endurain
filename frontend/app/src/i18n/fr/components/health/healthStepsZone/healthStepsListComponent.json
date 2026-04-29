@@ -1,7 +1,5 @@
 {
   "labelSteps": "pas",
-  "labelDate": "Date",
-  "labelGarminConnect": "Garmin Connect",
   "modalDeleteStepsTitle": "Supprimer les pas saisis",
   "modalDeleteStepsBody": "Êtes-vous sûr(e) de vouloir supprimer les pas saisis pour ",
   "successDeleteSteps": "Pas supprimés",

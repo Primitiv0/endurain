@@ -18,16 +18,5 @@
   "currency": "Valuta",
   "signUpButton": "Account maken",
   "alreadyHaveAccount": "Heb je al een account? Aanmelden",
-  "success": "Aanmelding succesvol",
-  "errorNameRequired": "Full name is required",
-  "errorUsernameRequired": "Username is required",
-  "errorEmailRequired": "Email address is required",
-  "errorEmailInvalid": "Please enter a valid email address",
-  "errorPasswordRequired": "Password is required",
-  "errorPasswordTooShort": "Password must be at least 8 characters long",
-  "errorUserExists": "A user with this email or username already exists",
-  "errorSignupDisabled": "Sign-up is not enabled on this server",
-  "errorValidation": "Please check your input and try again",
-  "errorGeneral": "An error occurred during sign-up",
-  "signupDisabled": "User sign-up is not enabled on this server"
+  "success": "Aanmelding succesvol"
 }

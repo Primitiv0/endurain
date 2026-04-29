@@ -11,7 +11,6 @@
   "labelSelectWeek": "Vecka",
   "labelSelectMonth": "Månad",
   "labelSelectYear": "År",
-  "labelSelectPeriod": "Period",
   "buttonPreviousPeriod": "Föregående",
   "buttonNextPeriod": "Nästa",
   "headerSummaryFor": "Sammanfattning för {period}",

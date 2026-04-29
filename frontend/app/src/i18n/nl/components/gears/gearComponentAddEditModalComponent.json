@@ -1,9 +1,7 @@
 {
   "addEditGearComponentModalAddTitle": "Voeg uitrustingsonderdeel toe",
   "addEditGearComponentModalEditTitle": "Bewerk uitrustingsonderdeel",
-  "addEditGearComponentModalAddEditTypeLabel": "Type",
   "addEditGearComponentModalAddEditBrandLabel": "Merk",
-  "addEditGearComponentModalAddEditModelLabel": "Model",
   "addEditGearComponentModalAddEditPurchaseDateLabel": "Aankoopdatum",
   "addEditGearComponentModalAddEditExpectedDistanceLabel": "Verwachte afstand",
   "addEditGearComponentModalAddEditExpectedTimeLabel": "Verwachte tijd",

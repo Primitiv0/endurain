@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava è un servizio internet americano per il tracciamento dell'esercizio fisico che incorpora funzionalità di social network.",
   "buttonConnect": "Connetti",
   "buttonDropdownOptions": "Opzioni",
@@ -27,7 +26,6 @@
   "errorMessageUnableToUnlinkStrava": "Impossibile scollegare l'account Strava",
   "modalUnlinkStravaTitle": "Scollega Strava",
   "modalUnlinkStravaBody": "Sei sicuro di voler scollegare il tuo account Strava? Lo scollegamento rimuoverà tutte le attività e l'attrezzatura Strava da Endurain.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect è una piattaforma per attività di salute e fitness per utenti di dispositivi Garmin",
   "loadingMessageRetrievingGarminConnectActivities": "Recupero attività Garmin Connect",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Impossibile ottenere le attività Garmin Connect per giorni",

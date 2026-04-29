@@ -1,8 +1,6 @@
 {
   "userListAccessTypeOption1": "Regulärer Benutzer",
-  "userListAccessTypeOption2": "Administrator",
   "userListUserIsMeBadge": "Ich",
-  "userListUserIsAdminBadge": "Admin",
   "userListUserIsInactiveBadge": "Inaktiv",
   "userListUserHasUnverifiedEmailBadge": "Unbestätigte E-Mail-Adresse",
   "userListUserHasExternalAuthBadge": "Externe Anmeldung",

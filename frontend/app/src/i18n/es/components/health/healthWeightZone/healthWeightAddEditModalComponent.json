@@ -4,11 +4,7 @@
   "addWeightWeightLabel": "Peso",
   "addWeightDateLabel": "Fecha",
   "addWeightHiddenItemsLabel": "Detalles",
-  "addWeightBMILabel": "BMI",
   "addWeightBodyFatLabel": "",
-  "addWeightBodyWaterLabel": "Body water",
-  "addWeightBoneMassLabel": "Bone mass",
-  "addWeightMuscleMassLabel": "Muscle mass",
   "successAddWeight": "Peso agregado",
   "errorAddWeight": "Error al añadir peso"
 }

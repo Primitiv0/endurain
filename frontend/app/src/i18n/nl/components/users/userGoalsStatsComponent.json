@@ -5,10 +5,5 @@
   "activityTypeSwim": "Zwemmen",
   "activityTypeWalk": "Wandelen",
   "activityTypeStrength": "Kracht",
-  "activityTypeCardio": "Cardio",
-  "intervalDaily": "Daily",
-  "intervalWeekly": "Weekly",
-  "intervalMonthly": "Monthly",
-  "intervalYearly": "Yearly",
   "activities": "activiteiten"
 }

@@ -4,8 +4,6 @@
   "garminConnectAuthModalUsernamePlaceholder": "Garmin Connect e-mail",
   "garminConnectAuthModalPasswordLabel": "Garmin Connect wachtwoord",
   "garminConnectAuthModalPasswordPlaceholder": "Garmin Connect wachtwoord",
-  "garminConnectAuthModalMfaCodeLabel": "MFA code",
-  "garminConnectAuthModalMfaCodePlaceholder": "MFA code",
   "buttonSubmitMfaCode": "MFA code versturen",
   "garminConnectAuthModalLoginButton": "Inloggen",
   "processingMessageLinkGarminConnect": "Garmin Connect account koppelen...",

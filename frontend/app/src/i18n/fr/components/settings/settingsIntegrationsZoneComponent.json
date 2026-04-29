@@ -1,8 +1,6 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava est un service internet américain pour le suivi d'exercices physiques qui intègre des fonctionnalités de réseau social.",
   "buttonConnect": "Connecter",
-  "buttonDropdownOptions": "Options",
   "modalRetrieveActivitiesByDaysTitle": "Récupérer les activités par jours",
   "modalRetrieveActivitiesByDateRangeTitle": "Récupérer les activités par période",
   "modalRetrieveActivitiesByDaysLabel": "Jours",
@@ -27,7 +25,6 @@
   "errorMessageUnableToUnlinkStrava": "Impossible de dissocier le compte Strava",
   "modalUnlinkStravaTitle": "Dissocier Strava",
   "modalUnlinkStravaBody": "Êtes-vous sûr de vouloir dissocier votre compte Strava ? La dissociation de votre compte Strava supprimera toutes vos activités et équipements Strava de Endurain.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect est une plate-forme d'activités de santé et de fitness pour les utilisateurs de dispositifs Garmin",
   "loadingMessageRetrievingGarminConnectActivities": "Récupération des activités de Garmin Connect",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Impossible d'obtenir les activités de Garmin Connect par jours",

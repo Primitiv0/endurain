@@ -2,7 +2,6 @@
   "userListAccessTypeOption1": "Vanlig användare",
   "userListAccessTypeOption2": "Administratör",
   "userListUserIsMeBadge": "Jag",
-  "userListUserIsAdminBadge": "Admin",
   "userListUserIsInactiveBadge": "Inaktiv",
   "userListUserHasUnverifiedEmailBadge": "Obekräftad e-postadress",
   "userListUserHasExternalAuthBadge": "Extern auth",
