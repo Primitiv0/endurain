@@ -8,7 +8,7 @@
           ><font-awesome-icon :icon="['fab', 'fa-github']"
         /></a>
         •
-        <a class="link-body-emphasis" href="https://docs.endurain.com"
+        <a class="link-body-emphasis" href="https://endurain-project.codeberg.page/endurain"
           ><font-awesome-icon :icon="['fas', 'book']"
         /></a>
         •
