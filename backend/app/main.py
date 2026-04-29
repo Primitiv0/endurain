@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +37,7 @@ from core.routes import router as api_router
 from core.database import SessionLocal
 
 
-async def startup_event():
+async def startup_event(fastapi_app: FastAPI):
     core_logger.print_to_log_and_console(
         f"Backend startup event - {core_config.API_VERSION}"
     )
@@ -102,11 +103,11 @@ async def startup_event():
     )
     with SessionLocal() as db:
         try:
-            app.state.allowed_tile_domains = (
+            fastapi_app.state.allowed_tile_domains = (
                 server_settings_utils.get_allowed_tile_domains(db)
             )
             core_logger.print_to_log_and_console(
-                f"Allowed tile domains: {app.state.allowed_tile_domains}"
+                f"Allowed tile domains: {fastapi_app.state.allowed_tile_domains}"
             )
         except Exception as err:
             core_logger.print_to_log(
@@ -115,7 +116,7 @@ async def startup_event():
                 exc=err,
             )
             # Fallback to built-in providers
-            app.state.allowed_tile_domains = (
+            fastapi_app.state.allowed_tile_domains = (
                 server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
             )
 
@@ -128,9 +129,19 @@ def shutdown_event():
     core_scheduler.stop_scheduler()
 
 
+@asynccontextmanager
+async def lifespan(fastapi_app: FastAPI):
+    await startup_event(fastapi_app)
+    try:
+        yield
+    finally:
+        shutdown_event()
+
+
 def create_app() -> FastAPI:
     # Define the FastAPI object
     fastapi_app = FastAPI(
+        lifespan=lifespan,
         docs_url=core_config.ROOT_PATH + "/docs",
         redoc_url=core_config.ROOT_PATH + "/redoc",
         title="Endurain",
@@ -226,9 +237,3 @@ core_logger.setup_main_logger()
 
 # Setup tracing
 core_tracing.setup_tracing(app)
-
-# Register the startup event handler
-app.add_event_handler("startup", startup_event)
-
-# Register the shutdown event handler
-app.add_event_handler("shutdown", shutdown_event)
