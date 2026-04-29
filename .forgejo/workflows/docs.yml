@@ -1,13 +1,16 @@
 name: Deploy documentation
 
 on:
+  workflow_dispatch:
   push:
     branches:
+      - main
       - master
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
       - 'backend/app/**/*.py'
+      - '.forgejo/workflows/docs.yml'
 
 permissions:
   contents: write
@@ -20,7 +23,7 @@ jobs:
 
   deploy:
 
-    runs-on: codeberg-medium
+    runs-on: codeberg-small
 
     steps:
       - name: Checkout code
