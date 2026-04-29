@@ -20,7 +20,7 @@ jobs:
 
   deploy:
 
-    runs-on: docker
+    runs-on: codeberg-medium
 
     steps:
       - name: Checkout code
