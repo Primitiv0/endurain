@@ -20,7 +20,6 @@
   "userListUserSessionsTitle": "Sessions de l'utilisateur",
   "userSessionDeleteSuccessMessage": "Session supprimée avec succès",
   "userSessionDeleteErrorMessage": "Erreur lors de la suppression de session",
-  "tabSessions": "Sessions",
   "tabIdentityProviders": "Fournisseurs d’identité",
   "userIdpsLoadErrorMessage": "Erreur lors du chargement des fournisseurs d'identité",
   "userIdpDeleteSuccessMessage": "Fournisseur d'identité dissocié avec succès",

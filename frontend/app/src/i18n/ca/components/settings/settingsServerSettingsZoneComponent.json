@@ -2,7 +2,6 @@
   "defaultsTitle": "Per defecte",
   "unitsLabel": "Unitats per defecte",
   "unitsMetric": "Mètrica",
-  "unitsImperial": "Imperial",
   "currencyLabel": "Divisa defecte",
   "numRecordsLabel": "Número d'items per pàgina",
   "passwordTitle": "Política de contrasenyes",
@@ -14,9 +13,6 @@
   "signupTitle": "Registre",
   "adminApprovalLabel": "Aprovació d'administrador",
   "emailConfirmationLabel": "Confirmació d'email",
-  "ssoTitle": "Single Sign-On (SSO)",
-  "ssoEnabledInfoAlert": "Enable SSO to allow users to authenticate using external identity providers.",
-  "localLoginEnabledLabel": "Local login enabled",
   "localLoginEnabledWarningAlert": "Deshabilitar logins locals no permetrà entrar amb usuari/contrasenya. Assegura un SSO abans de deshabilitar-ho.",
   "ssoAutoRedirectLabel": "Redireccionant a SSO",
   "ssoAutoRedirectInfoAlert": "Redireccionar a SSO quan només hi ha um configurat i accés local deshabilitat.",
@@ -45,7 +41,6 @@
   "tileTemplateFrontendApiKeyWarning": "La plantilla requereix una clau API configurada al frontend",
   "tileserverUrlLabel": "URL del servidor de teseles",
   "tileserverAttributionLabel": "Atribució del servidor de teseles",
-  "tileserverApiKeyLabel": "Tile server API key",
   "tileApiKeyWarning": "Canviant la plantilla resetejarà la clau API",
   "mapBackgroundColorLabel": "Color de fons del mapa"
 }

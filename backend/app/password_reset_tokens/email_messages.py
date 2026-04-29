@@ -22,10 +22,29 @@ def get_password_reset_email_en(
     """
     safe_name = html.escape(user_name)
     subject = "Endurain - Password reset"
-    html_content = (
-        core_email_templates.html_header(subject, "Password reset request")
-        + f"""
-            <p>Hi {safe_name},</p>
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{subject}</title>
+</head>
+
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
+    <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <div style="font-size: 34px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <img src="https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.svg"
+                    alt="Endurain logo" style="height: 32px; width: auto;">
+                <span>Endurain</span>
+            </div>
+            <h3 style="margin: 0;">Password reset request</h3>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <p>Hi {user_name},</p>
 
             <p>You requested to reset your password for your Endurain account. Click the button below to reset your
                 password:</p>
@@ -42,11 +61,20 @@ def get_password_reset_email_en(
             </p>
 
             <p>If the button above doesn't work, you can copy and paste the following link into your browser:</p>
-            <p style="word-break: break-all; color: {core_email_templates.LINK_COLOR_PRIMARY};">{reset_link}</p>"""
-        + core_email_templates.html_footer(
-            email_service.frontend_host, core_email_templates.LINK_COLOR_PRIMARY
-        )
-    )
+            <p style="word-break: break-all; color: #0d6efd;">{reset_link}</p>
+        </div>
+
+        <div style="text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p>Best regards,<br>The Endurain team</p>
+            <p>Visit Endurain at: <a style="color: #0d6efd;" href="{email_service.frontend_host}">{email_service.frontend_host}</a> -
+                Source code at: <a style="color: #0d6efd;"
+                    href="https://codeberg.org/endurain-project/endurain">Codeberg</a></p>
+        </div>
+    </div>
+</body>
+
+</html>
+    """.strip()
 
     # Create text version
     text_content = f"""

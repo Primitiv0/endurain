@@ -1,7 +1,6 @@
 {
   "labelSteps": "stappen",
   "labelDate": "Datum",
-  "labelGarminConnect": "Garmin Connect",
   "modalDeleteStepsTitle": "Stap invoer verwijderen",
   "modalDeleteStepsBody": "Weet u zeker dat u de stappen wilt verwijderen voor ",
   "successDeleteSteps": "Stappen verwijderd",

@@ -1,7 +1,3 @@
 {
-  "thisWeekDistancesTitle": "Week top 3",
-  "thisMonthDistancesTitle": "Maand top 3",
-  "toggleDistance": "Afstand",
-  "toggleTime": "Tijd",
-  "toggleCalories": "Calorieën"
+  "thisMonthDistancesTitle": "Maand top 3"
 }

@@ -1,8 +1,4 @@
 {
   "buttonAddWeight": "Afegir pes",
-  "buttonWeightTarget": "Objectiu de pes",
-  "modalWeightTargetLabel": "Enter your weight target",
-  "labelNumberOfHealthWeightWeight1": "There is a total of ",
-  "labelNumberOfHealthWeightWeight2": " weight measure(s) inserted (",
-  "labelNumberOfHealthWeightWeight3": " loaded):"
+  "buttonWeightTarget": "Objectiu de pes"
 }

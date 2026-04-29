@@ -3,7 +3,6 @@
   "labelWorkoutStepTime": "Temps pas",
   "labelWorkoutStepReps": "Reps passos",
   "labelWorkoutStepIntensity": "Intensitat",
-  "labelWorkoutStepNotes": "Notes",
   "labelWorkoutStepExerciseName": "Nom del pas",
   "labelWorkoutStepExerciseWeight": "Pes",
   "labelWorkoutStepSwimStroke": "Braçada",
@@ -14,7 +13,6 @@
   "labelWorkoutSetExerciseWeight": "Estableix pes",
   "labelWorkoutSetTypeMobile": "Tipus",
   "labelWorkoutSetTimeMobile": "Temps",
-  "labelWorkoutSetRepsMobile": "Reps",
   "labelWorkoutSetExerciseNameMobile": "Nom",
   "labelWorkoutSetExerciseWeightMobile": "Pes"
 }

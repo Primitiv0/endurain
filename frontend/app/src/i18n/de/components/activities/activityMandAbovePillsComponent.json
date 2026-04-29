@@ -1,7 +1,6 @@
 {
   "labelPillGraphs": "Diagramme",
   "labelPillLaps": "Runden",
-  "labelPillWorkoutSets": "Sets",
   "labelGraph": "Aktivitätsdiagramme",
   "labelGraphHR": "Herzfrequenz",
   "labelHRZones": "Herzfrequenzzonen",
@@ -10,7 +9,6 @@
   "labelGraphElevation": "Steigung",
   "labelGraphVelocity": "Geschwindigkeit",
   "labelGraphPace": "Tempo",
-  "labelGraphHRZone": "Zone",
   "errorMessageProcessingActivityStreams": "Fehler beim Verarbeiten der Aktivitäten",
   "labelGraphStrokeRate": "Schlagzahl"
 }

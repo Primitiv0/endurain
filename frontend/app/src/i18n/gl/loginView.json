@@ -46,6 +46,5 @@
   "ssoAccountDisabled": "A túa conta está desactivada. Contacta coa administración",
   "ssoAutoCreateDisabled": "A creación automática de contas está desactivada. Contacta coa administración",
   "ssoErrorUndefined": "Aconteceu un fallo descoñecido durante a autenticación SSO",
-  "forceLocalLogin": "Activada a marca de acceso local. Utiliza identificador e contrasinal para acceder.",
-  "ssoTokenExchangeFailed": "SSO token exchange failed."
+  "forceLocalLogin": "Activada a marca de acceso local. Utiliza identificador e contrasinal para acceder."
 }

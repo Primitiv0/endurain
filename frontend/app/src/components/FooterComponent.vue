@@ -4,11 +4,11 @@
       <p class="text-center text-muted">
         {{ new Date().getFullYear() === 2023 ? '2023' : '2023 - ' + new Date().getFullYear() }}
         Endurain&reg; •
-        <a class="link-body-emphasis" href="https://github.com/endurain-project" role="button"
-          ><font-awesome-icon :icon="['fab', 'fa-github']"
+        <a class="link-body-emphasis" href="https://codeberg.org/endurain-project" role="button"
+          ><font-awesome-icon :icon="['fas', 'fa-code-branch']"
         /></a>
         •
-        <a class="link-body-emphasis" href="https://docs.endurain.com"
+        <a class="link-body-emphasis" href="https://endurain-project.codeberg.page/endurain"
           ><font-awesome-icon :icon="['fas', 'book']"
         /></a>
         •

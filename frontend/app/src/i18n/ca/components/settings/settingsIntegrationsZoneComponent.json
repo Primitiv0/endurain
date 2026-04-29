@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava és un servei d'Internet americà per al seguiment de l'exercici físic que incorpora funcions de xarxes socials.",
   "buttonConnect": "Connecta",
   "buttonDropdownOptions": "Opcions",
@@ -12,8 +11,6 @@
   "buttonRelink": "Torna a enllaçar",
   "buttonUnlink": "Desenllaça",
   "modalRetrieveClientIdTitle": "Connectar Strava",
-  "modalRetrieveClientIdLabel": "Client ID",
-  "modalRetrieveClientSecretLabel": "Client secret",
   "errorMessageUnableToLinkStrava": "No s'ha pogut enllaçar Strava",
   "errorMessageUnableToUnsetStravaClientSettings": "No es pot treure Strava client ni opcions d'estat després d'un error",
   "successMessageStravaAccountLinked": "Strava enllaçat",
@@ -27,7 +24,6 @@
   "errorMessageUnableToUnlinkStrava": "No s'ha pogut desenllaçar Strava",
   "modalUnlinkStravaTitle": "Desenllaça Strava",
   "modalUnlinkStravaBody": "Segur que vols desenllaçar el vostre compte de Strava? Si desenllaçeu el compte, s'eliminaran les activitats i equipament d'Endurain.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect és una plataforma d'activitats de salut i fitness pels usuaris de dispositius Garmin",
   "loadingMessageRetrievingGarminConnectActivities": "Obtenint activitats de Garmin Connect",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "No es poden obtenir les activitats per dies de GC",

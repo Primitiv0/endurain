@@ -5,7 +5,6 @@
   "userListUserIsAdminBadge": "Administrador",
   "userListUserIsInactiveBadge": "Inactivo",
   "userListUserHasUnverifiedEmailBadge": "Correo no verificado",
-  "userListUserHasExternalAuthBadge": "External auth",
   "modalApproveSignUpTitle": "Aprobar registro de usuario",
   "modalApproveSignUpBody": "Confirma si quieres aprobar al usuario ",
   "processingApproval": "Procesando aprobación...",
@@ -19,10 +18,5 @@
   "modalDeleteUserBody": "¿Está seguro de que desea eliminar el usuario?",
   "userListUserSessionsTitle": "Sesiones de usuario",
   "userSessionDeleteSuccessMessage": "Sesión eliminada exitosamente",
-  "userSessionDeleteErrorMessage": "Error al eliminar la sesión",
-  "tabSessions": "Sessions",
-  "tabIdentityProviders": "Identity providers",
-  "userIdpsLoadErrorMessage": "Error loading identity providers",
-  "userIdpDeleteSuccessMessage": "Identity provider unlinked successfully",
-  "userIdpDeleteErrorMessage": "Error unlinking identity provider"
+  "userSessionDeleteErrorMessage": "Error al eliminar la sesión"
 }

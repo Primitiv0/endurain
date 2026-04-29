@@ -1,7 +1,6 @@
 {
   "labelSteps": "passos",
   "labelDate": "Data",
-  "labelGarminConnect": "Garmin Connect",
   "modalDeleteStepsTitle": "Excluir entrada de passos",
   "modalDeleteStepsBody": "Tem a certeza que deseja eliminar a entrada de passos para ",
   "successDeleteSteps": "Passos eliminados",

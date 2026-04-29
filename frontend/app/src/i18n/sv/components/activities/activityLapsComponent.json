@@ -9,6 +9,5 @@
   "labelLapElev": "Höjd",
   "labelLapAvgHr": "Snittpuls",
   "labelLapHR": "Puls",
-  "labelLapStrokeRate": "Slagfrekvens",
-  "labelLapSR": "SR"
+  "labelLapStrokeRate": "Slagfrekvens"
 }

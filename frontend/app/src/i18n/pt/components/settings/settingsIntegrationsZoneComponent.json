@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava é um serviço cloud americano para monitorizar a sua atividade física com componentes sociais.",
   "buttonConnect": "Associar",
   "buttonDropdownOptions": "Opções",
@@ -27,7 +26,6 @@
   "errorMessageUnableToUnlinkStrava": "Não foi possível desassociar a conta de Strava",
   "modalUnlinkStravaTitle": "Desassociar Strava",
   "modalUnlinkStravaBody": "Tem certeza que deseja desassociar a sua conta Strava? Desassociar a sua conta Strava irá remover todas as suas atividades e equipamentos do Strava do Endurain.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect é uma plataforma de atividade de saúde e fitness para utilizadores de dispositivos Garmin",
   "loadingMessageRetrievingGarminConnectActivities": "A obter atividades do Garmin Connect",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Não foi possível obter as atividades do Garmin Connect por dias",

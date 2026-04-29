@@ -1,7 +1,6 @@
 {
   "labelPillGraphs": "Grafieken",
   "labelPillLaps": "Rondes",
-  "labelPillWorkoutSets": "Sets",
   "labelGraph": "Activiteit data grafieken",
   "labelGraphHR": "Hartslag",
   "labelHRZones": "Hartslag zones",
@@ -10,7 +9,6 @@
   "labelGraphElevation": "Hoogte",
   "labelGraphVelocity": "Snelheid",
   "labelGraphPace": "Tempo",
-  "labelGraphHRZone": "Zone",
   "errorMessageProcessingActivityStreams": "Fout bij verwerken activiteit streams",
   "labelGraphStrokeRate": "Slagsnelheid"
 }

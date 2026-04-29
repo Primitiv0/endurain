@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava 是一家美国的互联网服务平台，用于记录身体锻炼，并融合了社交网络功能。",
   "buttonConnect": "连接",
   "buttonDropdownOptions": "选项",
@@ -27,7 +26,6 @@
   "errorMessageUnableToUnlinkStrava": "无法解除 Strava 账户连接",
   "modalUnlinkStravaTitle": "解除 Strava 连接",
   "modalUnlinkStravaBody": "确定要解除 Strava 账户连接吗？解除连接后，来自 Strava 的所有活动和装备数据将从 Endurain 中删除。",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect 是 Garmin 设备用户的健康与健身活动平台",
   "loadingMessageRetrievingGarminConnectActivities": "正在获取 Garmin Connect 活动数据",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "无法按天获取 Garmin Connect 活动数据",

@@ -3,10 +3,10 @@ services:
     container_name: endurain
     image: ghcr.io/endurain-project/endurain:latest
     environment:
-      # Read the Getting Started section on https://docs.endurain.com for all available env variables
+      # Read the Getting Started section on https://endurain-project.codeberg.page/endurain for all available env variables
       - TZ=Europe/Lisbon
       - DB_PASSWORD=changeme
-      - SECRET_KEY=chnageme # openssl rand -hex 32
+      - SECRET_KEY=~changeme # openssl rand -hex 32
       - FERNET_KEY=changeme # https://fernetkeygen.com or python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
       - ENDURAIN_HOST=http://localhost:8080 # host or local ip (example: http://192.168.1.10:8080 or https://endurain.com), default is http://localhost:8080
     volumes:
@@ -23,22 +23,20 @@ services:
 
   # postgres logic
   postgres:
-    image: postgres:latest
+    image: postgres:18
     container_name: postgres
     environment:
       - POSTGRES_PASSWORD=changeme
       - POSTGRES_DB=endurain
       - POSTGRES_USER=endurain
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    ports:
-      - "5432:5432"
+      - PGDATA=/var/lib/postgresql/18/docker
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U endurain"]
       interval: 5s
       timeout: 5s
       retries: 5
     volumes:
-      - <local_path>/postgres:/var/lib/postgresql/data
+      - <local_path>/postgres:/var/lib/postgresql
     restart: unless-stopped
 
   # Jaeger for opentelemetry - optional

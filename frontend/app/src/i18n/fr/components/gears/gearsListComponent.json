@@ -1,11 +1,8 @@
 {
-  "gearListTypeLabel": "Type",
   "gearListTypeOption1": "Vélo",
   "gearListTypeOption2": "Chaussures",
   "gearListTypeOption3": "Combinaison",
   "gearListTypeOption4": "Raquette",
-  "gearListTypeOption5": "Skis",
-  "gearListTypeOption6": "Snowboard",
   "gearListTypeOption7": "Planche à voile",
   "gearListTypeOption8": "Sports de planche nautique",
   "gearListGearIsInactiveBadge": "Inactif",

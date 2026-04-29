@@ -235,7 +235,7 @@ You should now be able to access your site on endurain.yourdomain.com
 ## How to update
 
 * Take a backup of your files and db.
-* Check for new releases of the container image [here](https://github.com/endurain-project/endurain). Read release notes carefully for breaking changes.
+* Check for new releases of the container image [here](https://codeberg.org/endurain-project/endurain). Read release notes carefully for breaking changes.
 * Log on your server and run:
 * Inside `/opt/endurain/docker-compose.yml`, change out the version tag (the version after `:`). If you are running `:latest` tag on the docker image, you do not have to edit anything in the docker-compose.yml file. 
 

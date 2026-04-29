@@ -1,7 +1,6 @@
 {
   "labelSteps": "steg",
   "labelDate": "Datum",
-  "labelGarminConnect": "Garmin Connect",
   "modalDeleteStepsTitle": "Ta bort stegpost",
   "modalDeleteStepsBody": "Är du säker på att du vill ta bort stegposten för ",
   "successDeleteSteps": "Steg borttagna",

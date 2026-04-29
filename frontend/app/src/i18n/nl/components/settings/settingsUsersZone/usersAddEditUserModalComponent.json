@@ -36,8 +36,6 @@
   "addEditUserModalUserTypeOption1": "Reguliere gebruiker",
   "addEditUserModalUserTypeOption2": "Beheerder",
   "addEditUserModalIsActiveLabel": "Is actief",
-  "addEditUserModalIsEmailVerifiedLabel": "Is email verified",
-  "addEditUserModalIsPendingAdminApprovalLabel": "Is pending admin approval",
   "addEditUserModalDefaultActivityVisibilityLabel": "Standaard zichtbaarheid van activiteit",
   "addEditUserModalDefaultActivityVisibilityOption1": "Openbaar",
   "addEditUserModalDefaultActivityVisibilityOption2": "Volgers",

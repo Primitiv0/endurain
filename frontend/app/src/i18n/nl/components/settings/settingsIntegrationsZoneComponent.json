@@ -1,5 +1,4 @@
 {
-  "stravaIntegrationTitle": "Strava",
   "stravaIntegrationBody": "Strava is een Amerikaanse internetservice voor het volgen van fysieke beweging, waarin ook sociale netwerkkenmerken zijn opgenomen.",
   "buttonConnect": "Verbinden",
   "buttonDropdownOptions": "Opties",
@@ -12,8 +11,6 @@
   "buttonRelink": "Opnieuw koppelen",
   "buttonUnlink": "Ontkoppel",
   "modalRetrieveClientIdTitle": "Strava koppelen",
-  "modalRetrieveClientIdLabel": "Client ID",
-  "modalRetrieveClientSecretLabel": "Client secret",
   "errorMessageUnableToLinkStrava": "Kan Strava account niet koppelen",
   "errorMessageUnableToUnsetStravaClientSettings": "Er is een fout opgetreden tijdens het ontkoppelen van de Strava client en status instellingen",
   "successMessageStravaAccountLinked": "Strava account gekoppeld",
@@ -27,7 +24,6 @@
   "errorMessageUnableToUnlinkStrava": "Kan Strava account niet ontkoppelen",
   "modalUnlinkStravaTitle": "Strava ontkoppelen",
   "modalUnlinkStravaBody": "Weet je zeker dat je je Strava account wilt ontkoppelen? Als je je Strava account ontkoppelt, worden al je Strava activiteiten en uitrusting uit Endurain verwijderd.",
-  "garminConnectIntegrationTitle": "Garmin Connect",
   "garminConnectIntegrationBody": "Garmin Connect is een gezondheidsplatform en fitness voor gebruikers van Garmin apparaten",
   "loadingMessageRetrievingGarminConnectActivities": "Ophalen van Garmin Connect activiteiten",
   "errorMessageUnableToGetGarminConnectActivitiesDays": "Kan Garmin Connect activiteiten niet ophalen",

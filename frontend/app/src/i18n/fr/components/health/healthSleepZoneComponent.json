@@ -2,7 +2,6 @@
   "buttonAddSleep": "Ajouter du sommeil",
   "buttonSleepTarget": "Cible de sommeil",
   "modalSleepTargetHoursLabel": "heures",
-  "modalSleepTargetMinutesLabel": "minutes",
   "labelNumberOfHealthSleep1": "Il y a un total de ",
   "labelNumberOfHealthSleep2": " entrées de sommeil insérées (",
   "labelNumberOfHealthSleep3": " chargées) :"

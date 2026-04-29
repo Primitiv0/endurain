@@ -3,10 +3,10 @@
 
   # Endurain
 
-  <a title="Crowdin" target="_blank" href="https://crowdin.com/project/endurain"><img src="https://badges.crowdin.net/endurain/localized.svg"></a>
-  ![License](https://img.shields.io/github/license/endurain-project/endurain)
-  [![GitHub release](https://img.shields.io/github/v/release/endurain-project/endurain)](https://github.com/endurain-project/endurain/releases)
-  [![GitHub stars](https://img.shields.io/github/stars/endurain-project/endurain.svg?style=social&label=Star)](https://github.com/endurain-project/endurain/stargazers)
+  <a href="https://translate.codeberg.org/engage/endurain/"><img src="https://translate.codeberg.org/widget/endurain/svg-badge.svg" alt="Translation status"></a>
+  [![License](https://img.shields.io/badge/license-AGPL%20v3-blue)](./LICENSE)
+  [![Release](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain/releases/latest&query=$.tag_name&label=release&color=blue)](https://codeberg.org/endurain-project/endurain/releases)
+  [![Stars](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.stars_count&label=stars&logo=codeberg)](https://codeberg.org/endurain-project/endurain)
   [![Trademark Policy](https://img.shields.io/badge/trademark-Endurain%E2%84%A2-blue)](./TRADEMARK.md)
 
   **A self-hosted fitness tracking service**  
@@ -29,9 +29,9 @@ Experience Endurain without installation:
 
 ## Table of Contents
 
-- [Endurain documentation](https://docs.endurain.com)
+- [Endurain documentation](https://endurain-project.codeberg.page/endurain)
 - [What is Endurain?](#what-is-endurain)
-- [Endurain screenshots](https://docs.endurain.com/gallery/)
+- [Endurain screenshots](https://endurain-project.codeberg.page/endurain/gallery/)
 - [Sponsors](#sponsors)
 - [Contributing](#contributing)
 - [Help Translate](#help-translate)
@@ -49,13 +49,13 @@ Endurain is a self-hosted fitness tracking service designed to give users full c
 
 To deploy Endurain, a Docker image is available, and a comprehensive example can be found in the "docker-compose.yml.example" file provided. Configuration is facilitated through environment variables, ensuring flexibility and ease of customization.
 
-For more information please see the Endurain's [documentation](https://docs.endurain.com).
+For more information please see the Endurain's [documentation](https://endurain-project.codeberg.page/endurain).
 
 ## Sponsors
 
 A huge thank you to the project sponsors! Your support helps keep this project going.
 
-Consider [sponsoring Endurain on GitHub](https://github.com/sponsors/joaovitoriasilva) to ensure continuous development.
+Support Endurain's development on [Codeberg](https://codeberg.org/endurain-project).
 
 ## Contributing
 
@@ -63,7 +63,7 @@ Contributions are welcomed! Please open an issue to discuss any changes or impro
 
 ## Help Translate
 
-Endurain has multi-language support, and you can help translate it into more languages via [Crowdin](https://crowdin.com/project/endurain). 
+Endurain has multi-language support, and you can help translate it into more languages via [Codeberg Translate](https://translate.codeberg.org/projects/endurain/). 
 
 ## License
 
@@ -79,5 +79,5 @@ Commercial use of the Endurain name or logos (such as offering paid hosting, pro
 See [`TRADEMARK.md`](./TRADEMARK.md) for full details.
 
 <div align="center">
-  <sub>Built with ❤️ from Portugal | Part of the <a href="https://github.com/endurain-project">Endurain</a> ecosystem</sub>
+  <sub>Built with ❤️ from Portugal | Part of the <a href="https://codeberg.org/endurain-project">Endurain</a> ecosystem</sub>
 </div>
