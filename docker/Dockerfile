@@ -85,8 +85,11 @@ COPY backend/app ./
 # Copy the entrypoint script for starting the FastAPI app
 COPY docker/start.sh /docker-entrypoint.d/start.sh
 
-# Make the script executable
-RUN chmod +x /docker-entrypoint.d/start.sh
+# Normalize line endings and make the script executable.
+# This avoids '/bin/sh\r: no such file or directory' when the file
+# is checked out with CRLF on Windows hosts.
+RUN sed -i 's/\r$//' /docker-entrypoint.d/start.sh \
+ && chmod +x /docker-entrypoint.d/start.sh
 
 # Make port 8080 available to the world outside this container
 EXPOSE 8080

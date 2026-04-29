@@ -5,7 +5,7 @@
         {{ new Date().getFullYear() === 2023 ? '2023' : '2023 - ' + new Date().getFullYear() }}
         Endurain&reg; •
         <a class="link-body-emphasis" href="https://codeberg.org/endurain-project" role="button"
-          ><font-awesome-icon :icon="['fab', 'fa-github']"
+          ><font-awesome-icon :icon="['fas', 'fa-code-branch']"
         /></a>
         •
         <a class="link-body-emphasis" href="https://endurain-project.codeberg.page/endurain"
@@ -19,7 +19,7 @@
         <a class="link-body-emphasis" href="https://discord.gg/6VUjUq2uZR"
           ><font-awesome-icon :icon="['fab', 'fa-discord']"
         /></a>
-        • v0.17.7
+        • v0.17.8
       </p>
       <p class="text-center text-muted">
         <img :src="INTEGRATION_LOGOS.strava" alt="Compatible with STRAVA image" height="25" />
