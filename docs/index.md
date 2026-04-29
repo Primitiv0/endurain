@@ -4,8 +4,7 @@
   </p>
 
   <p>
-    <a href="https://translate.codeberg.org/projects/endurain/">
-      <img src="https://img.shields.io/badge/translate-Codeberg%20Translate-2f7d32" alt="Codeberg Translate">
+    <a href="https://translate.codeberg.org/engage/endurain/"><img src="https://translate.codeberg.org/widget/endurain/svg-badge.svg" alt="Translation status"></a>
     </a>
     <img src="https://img.shields.io/badge/license-AGPL%20v3-blue" alt="License">
     <a href="https://codeberg.org/endurain-project/endurain/releases">

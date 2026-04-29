@@ -3,7 +3,7 @@
 
   # Endurain
 
-  <a title="Codeberg Translate" target="_blank" href="https://translate.codeberg.org/projects/endurain/"><img src="https://img.shields.io/badge/translate-Codeberg%20Translate-2f7d32"></a>
+  <a href="https://translate.codeberg.org/engage/endurain/"><img src="https://translate.codeberg.org/widget/endurain/svg-badge.svg" alt="Translation status"></a>
   [![License](https://img.shields.io/badge/license-AGPL%20v3-blue)](./LICENSE)
   [![Release](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain/releases/latest&query=$.tag_name&label=release&color=blue)](https://codeberg.org/endurain-project/endurain/releases)
   [![Stars](https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.stars_count&label=stars&logo=codeberg)](https://codeberg.org/endurain-project/endurain)
