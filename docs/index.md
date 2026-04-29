@@ -9,10 +9,10 @@
     </a>
     <img src="https://img.shields.io/badge/license-AGPL%20v3-blue" alt="License">
     <a href="https://codeberg.org/endurain-project/endurain/releases">
-      <img src="https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.release_tag&label=release&color=blue" alt="Latest Release">
+      <img src="https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain/releases/latest&query=$.tag_name&label=release&color=blue" alt="Latest Release">
     </a>
     <a href="https://codeberg.org/endurain-project/endurain">
-      <img src="https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.stars_count&label=stars&color=yellow&logo=gitea" alt="Stars">
+      <img src="https://img.shields.io/badge/dynamic/json?url=https://codeberg.org/api/v1/repos/endurain-project/endurain&query=$.stars_count&label=stars&logo=codeberg" alt="Stars">
     </a>
     <a href="https://codeberg.org/endurain-project/endurain/blob/master/TRADEMARK.md">
       <img src="https://img.shields.io/badge/trademark-Endurain%E2%84%A2-blue" alt="Trademark Policy">
