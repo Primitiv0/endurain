@@ -1,0 +1,37 @@
+name: Dependency updates
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ${{ forgejo.workflow }}-${{ forgejo.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  renovate:
+
+    runs-on: codeberg-small
+
+    steps:
+      - name: Set up Node.js
+        uses: https://data.forgejo.org/actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run Renovate
+        run: npx --yes renovate
+        env:
+          LOG_LEVEL: info
+          RENOVATE_CONFIG_FILE: renovate.json
+          RENOVATE_ENDPOINT: https://codeberg.org
+          RENOVATE_PLATFORM: forgejo
+          RENOVATE_REPOSITORIES: ${{ forgejo.repository }}
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
