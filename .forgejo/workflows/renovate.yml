@@ -21,13 +21,13 @@ jobs:
     runs-on: codeberg-small
 
     steps:
-      - name: Set up Node.js
-        uses: https://data.forgejo.org/actions/setup-node@v4
+      - name: Checkout code
+        uses: https://data.forgejo.org/actions/checkout@v4
         with:
-          node-version: '20'
+          fetch-depth: 1
 
       - name: Run Renovate
-        run: npx --yes renovate
+        uses: docker://ghcr.io/renovatebot/renovate:latest
         env:
           LOG_LEVEL: info
           RENOVATE_CONFIG_FILE: renovate.json
