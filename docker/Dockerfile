@@ -6,7 +6,7 @@ WORKDIR /tmp/frontend
 
 # Copy and install dependencies
 COPY frontend/app/package*.json ./
-RUN npm ci --prefer-offline
+RUN npm ci
 
 # Copy the frontend directory
 COPY frontend/app ./
