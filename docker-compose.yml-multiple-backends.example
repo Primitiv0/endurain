@@ -73,6 +73,8 @@ services:
     image: adminer
     ports:
       - 8081:8080
+    profiles:
+      - dev
     restart: unless-stopped
 
 networks:

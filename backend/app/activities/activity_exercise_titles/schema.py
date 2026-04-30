@@ -1,12 +1,22 @@
-from pydantic import BaseModel
+"""Pydantic schemas for activity exercise titles."""
+
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
 
 class ActivityExerciseTitles(BaseModel):
-    id: int | None = None
-    exercise_category: int
-    exercise_name: int
-    wkt_step_name: str
+    """
+    Schema describing an activity exercise title entry.
 
-    model_config = {
-        "from_attributes": True
-    }
+    Attributes:
+        id: Optional database identifier.
+        exercise_category: FIT exercise category code.
+        exercise_name: FIT exercise name identifier.
+        wkt_step_name: Workout step name (may include spaces).
+    """
+
+    id: StrictInt | None = None
+    exercise_category: StrictInt
+    exercise_name: StrictInt
+    wkt_step_name: StrictStr = Field(..., max_length=250)
+
+    model_config = ConfigDict(from_attributes=True)
