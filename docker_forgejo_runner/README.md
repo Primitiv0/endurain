@@ -80,6 +80,9 @@ runner:
   capacity: 1 # or 2
   labels:
     - local-runner:docker://node:20-bookworm
+
+container:
+  privileged: true
 ```
 
 `data/runner-config.yml` contains a secret token and must not be committed. The repository `.gitignore` ignores `docker_forgejo_runner/data` for this reason.
@@ -159,6 +162,25 @@ docker compose logs -f runner
 This setup uses Docker-in-Docker. The workflow jobs get access to the dedicated `docker-in-docker` daemon, not the host Docker daemon. Keep `runner.capacity` set to `1` so the AMD64 build, ARM64 build, and manifest job run one after another on the same local runner.
 
 Only register this runner for repositories or organizations you trust. A Forgejo runner executes workflow code from the repositories it is allowed to serve.
+
+If a workflow requires `container.privileged: true` in `data/runner-config.yml`, treat that as a significant security tradeoff rather than a routine fix.
+
+### Risks of Privileged Job Containers
+
+- A privileged workflow container has much weaker isolation from the runner environment than a standard container.
+- Malicious or compromised workflow code can interact with kernel features, devices, namespaces, and container runtime behavior that would normally be blocked.
+- Container breakout risk is materially higher if a workflow step, dependency, or third-party action is hostile or vulnerable.
+- Secrets, runtime state, mounted filesystems, network configuration, and other containers may be easier to inspect or influence.
+- Any repository allowed to use the runner effectively gains a higher level of trust, because its workflow code runs with much broader powers.
+
+### Recommended Guardrails
+
+- Prefer a dedicated runner host or VM for privileged workloads instead of using a general-purpose machine.
+- Restrict the runner to repositories and organizations you fully trust.
+- Keep credentials short-lived and scoped as narrowly as possible, especially registry tokens.
+- Pin third-party actions to specific revisions instead of moving references such as `@main`.
+- Avoid colocating unrelated services or sensitive data on the same runner host.
+- Reevaluate whether the build can be reworked to avoid privileged job containers before enabling them.
 
 ## Verifying Published Images
 
