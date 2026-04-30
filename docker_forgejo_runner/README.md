@@ -7,8 +7,8 @@ This directory contains the local Forgejo runner setup used by the Docker publis
 The workflow in `.forgejo/workflows/docker-publish.yml` has two jobs:
 
 1. `build-arch-images` builds and pushes architecture-specific images.
-  - `linux/amd64` runs on the self-hosted runner label `local_runner`.
-  - `linux/arm64` runs on the self-hosted runner label `local_runner`.
+  - `linux/amd64` runs on the self-hosted runner label `local-runner`.
+  - `linux/arm64` runs on the self-hosted runner label `local-runner`.
 2. `publish-manifests` waits for both builds and publishes manifest tags.
 
 Release builds push these architecture images:
@@ -79,7 +79,7 @@ server:
 runner:
   capacity: 1 # or 2
   labels:
-    - local_runner:docker://node:20-bookworm
+    - local-runner:docker://node:20-bookworm
 ```
 
 `data/runner-config.yml` contains a secret token and must not be committed. The repository `.gitignore` ignores `docker_forgejo_runner/data` for this reason.
