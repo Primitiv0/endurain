@@ -26,10 +26,10 @@ jobs:
         include:
           - arch: amd64
             platform: linux/amd64
-            runner: local_runner
+            runner: local-runner
           - arch: arm64
             platform: linux/arm64
-            runner: local_runner
+            runner: local-runner
     env:
       IMAGE_NAME: codeberg.org/${{ forgejo.repository }}
 
@@ -69,7 +69,7 @@ jobs:
   publish-manifests:
 
     name: Publish multi-arch manifests
-    runs-on: local_runner
+    runs-on: local-runner
     needs: build-arch-images
     env:
       IMAGE_NAME: codeberg.org/${{ forgejo.repository }}
