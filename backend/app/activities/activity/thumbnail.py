@@ -173,7 +173,7 @@ def generate_activity_thumbnail(
 
         return str(output_path)
 
-    except Exception as exc:
+    except (OSError, ValueError, KeyError, RuntimeError) as exc:
         core_logger.print_to_log_and_console(
             f"Activity {activity_id}: thumbnail generation "
             f"failed — {type(exc).__name__}: {exc}",

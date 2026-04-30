@@ -17,7 +17,7 @@ def validate_activity_id(activity_id: int):
     Raises:
         ValueError: If the activity ID is less than 0.
     """
-    # Check if id higher than 0
+    # Activity primary keys are >= 0; align with schema field constraint.
     core_dependencies.validate_id(id=activity_id, min=0, message="Invalid activity ID")
 
 

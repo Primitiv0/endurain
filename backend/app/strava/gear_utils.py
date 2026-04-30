@@ -112,20 +112,17 @@ def process_gear(
     return new_gear
 
 
-def iterate_over_activities_and_set_gear(
-    activity: activities_schema.Activity, gears: list[gears_schema.GearRead], counter: int
-) -> dict:
-
-    # Iterate over gears and set gear if applicable
-    if activity.strava_gear_id is not None:
-        for gear in gears:
-            if activity.strava_gear_id == gear.strava_gear_id:
-                activity.gear_id = gear.id
-                counter += 1
-                break
-
-    # Return the counter
-    return {"counter": counter, "activity": activity}
+def match_gear_for_activity(
+    activity: activities_schema.Activity,
+    gears: list[gears_schema.GearRead],
+) -> int | None:
+    """Return the local gear ID matching this activity's Strava gear, else None."""
+    if activity.strava_gear_id is None:
+        return None
+    for gear in gears:
+        if activity.strava_gear_id == gear.strava_gear_id:
+            return gear.id
+    return None
 
 
 def set_activities_gear(user_id: int, db: Session) -> int:
@@ -143,21 +140,19 @@ def set_activities_gear(user_id: int, db: Session) -> int:
     if gears is None:
         return 0
 
-    # Initialize a counter
-    counter = 0
-
-    # Initialize an empty list for results
-    activities_parsed = []
-
-    # iterate over activities and set gear if applicable
+    # Build {activity_id: gear_id} for all activities with a match
+    gear_assignments: dict[int, int | None] = {}
     for activity in activities:
-        parsed_activity = iterate_over_activities_and_set_gear(activity, gears, counter)
-        counter = parsed_activity["counter"]
-        activities_parsed.append(parsed_activity["activity"])
+        matched_gear_id = match_gear_for_activity(activity, gears)
+        if matched_gear_id is not None:
+            gear_assignments[activity.id] = matched_gear_id
 
-    activities_crud.edit_multiple_activities_gear_id(activities_parsed, user_id, db)
+    # Persist via CRUD (single UPDATE per distinct gear_id)
+    activities_crud.bulk_set_activities_gear_id(
+        user_id, gear_assignments, db
+    )
 
-    return counter
+    return len(gear_assignments)
 
 
 def get_user_gear(user_id: int):

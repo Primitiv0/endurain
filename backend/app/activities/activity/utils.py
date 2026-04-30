@@ -1,3 +1,5 @@
+"""Activity import, parsing and aggregation utilities."""
+
 import functools
 import gzip
 import os
@@ -19,7 +21,8 @@ from datetime import datetime
 from urllib.parse import urlencode
 from statistics import mean
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 
 import activities.activity.schema as activities_schema
 import activities.activity.crud as activities_crud
@@ -386,31 +389,138 @@ def serialize_activity(
     return schema
 
 
+def apply_visibility_mask(
+    schema: activities_schema.Activity,
+    *,
+    is_owner: bool,
+    mask_private_notes: bool = True,
+) -> activities_schema.Activity:
+    """Mask hidden activity fields for non-owners.
+
+    Mutates and returns the provided Pydantic schema instance.
+    For owners no masking is applied.
+
+    Args:
+        schema: Activity schema to potentially mask.
+        is_owner: Whether the requesting user owns the
+            activity.
+        mask_private_notes: Whether to clear private_notes
+            for non-owners. Defaults to True.
+
+    Returns:
+        The (possibly mutated) Activity schema.
+    """
+    if is_owner:
+        return schema
+    if mask_private_notes:
+        schema.private_notes = None
+    if schema.hide_start_time:
+        schema.start_time = None
+        schema.end_time = None
+    if schema.hide_location:
+        schema.city = None
+        schema.town = None
+        schema.country = None
+    if schema.hide_gear:
+        schema.gear_id = None
+        schema.strava_gear_id = None
+        schema.garminconnect_gear_id = None
+    return schema
+
+
+def escape_like(term: str) -> str:
+    """Escape SQL LIKE wildcards in a user-provided term.
+
+    Escapes ``\\``, ``%`` and ``_`` so they are matched
+    literally. Use together with ``.like(..., escape="\\\\")``.
+
+    Args:
+        term: Raw search term.
+
+    Returns:
+        Escaped search term safe for use inside a ``LIKE``
+        pattern.
+    """
+    return (
+        term.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
 def handle_gzipped_file(
     file_path: str,
 ) -> tuple[str, str]:
-    """Handle gzipped files by extracting the inner file and returning its path and extension.
-    The gzipped file is moved to the processed directory after extraction.
+    """Handle gzipped files with bounded extraction.
+
     Args:
-        file_path: the path to the gzipped file, e.g. "activity_files/activity_1234567890.fit.gz"
-    Returns: A tuple containing the path to the temporary file and the inner file extension.
+        file_path: Path to the gzipped activity file.
+
+    Returns:
+        Tuple containing the temporary file path and inner
+        extension.
+
+    Raises:
+        HTTPException: 400 for invalid gzip content or 413 when
+            decompressed content exceeds the configured limit.
     """
     path = Path(file_path)
 
     inner_filename = path.stem  # eg "activity_1234567890.fit"
     inner_file_extension = Path(inner_filename).suffix  # eg ".gz"
+    temp_file_path: str | None = None
+    bytes_written = 0
 
-    with gzip.open(path) as gzipped_file:
-        with NamedTemporaryFile(suffix=inner_filename, delete=False) as temp_file:
-            temp_file.write(gzipped_file.read())
-            temp_file.flush()
-            core_logger.print_to_log_and_console(
-                f"Decompressed {path} with inner type {inner_file_extension} to {temp_file.name}"
-            )
+    try:
+        with gzip.open(path, "rb") as gzipped_file:
+            with NamedTemporaryFile(
+                suffix=inner_file_extension,
+                delete=False,
+            ) as temp_file:
+                temp_file_path = temp_file.name
+                while True:
+                    chunk = gzipped_file.read(_UPLOAD_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    bytes_written += len(chunk)
+                    if bytes_written > _MAX_UPLOAD_BYTES:
+                        temp_file.close()
+                        try:
+                            os.remove(temp_file_path)
+                        except OSError:
+                            pass
+                        raise HTTPException(
+                            status_code=(
+                                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                            ),
+                            detail=(
+                                "Decompressed file exceeds maximum "
+                                "allowed size"
+                            ),
+                        )
+                    temp_file.write(chunk)
+                temp_file.flush()
 
-            move_file(core_config.FILES_PROCESSED_DIR, path.name, str(path))
+        core_logger.print_to_log_and_console(
+            f"Decompressed {path} with inner type "
+            f"{inner_file_extension} to {temp_file_path}"
+        )
 
-            return temp_file.name, inner_file_extension
+        move_file(core_config.FILES_PROCESSED_DIR, path.name, str(path))
+
+        return temp_file_path, inner_file_extension
+    except HTTPException:
+        raise
+    except (OSError, EOFError, gzip.BadGzipFile) as err:
+        if temp_file_path is not None:
+            try:
+                os.remove(temp_file_path)
+            except OSError:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid gzip file",
+        ) from err
 
 
 async def parse_and_store_activity_from_file(
@@ -460,6 +570,18 @@ async def parse_and_store_activity_from_file(
     try:
         # Get file extension
         _, file_extension = os.path.splitext(file_path)
+        file_extension = file_extension.lower()
+
+        if file_extension not in core_config.SUPPORTED_FILE_FORMATS:
+            raise HTTPException(
+                status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                detail=(
+                    "File extension not supported. Supported file "
+                    "extensions are .gpx, .fit, .tcx and .gz"
+                ),
+            )
+
+        _validate_file_signature(file_path, file_extension)
 
         # Get pathless file name with extension, as this is the dictionary key for Strava's bulk import activities dictionary.
         _, file_base_name = os.path.split(file_path)
@@ -469,8 +591,20 @@ async def parse_and_store_activity_from_file(
         if from_garmin:
             garmin_connect_activity_id = os.path.basename(file_path).split("_")[0]
 
-        if file_extension.lower() == ".gz":
+        if file_extension == ".gz":
             file_path, file_extension = handle_gzipped_file(file_path)
+            file_extension = file_extension.lower()
+            if (
+                file_extension not in core_config.SUPPORTED_FILE_FORMATS
+                or file_extension == ".gz"
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Decompressed file extension is not supported"
+                    ),
+                )
+            _validate_file_signature(file_path, file_extension)
 
         # Open the file and process it
         with open(file_path, "rb"):
@@ -529,7 +663,7 @@ async def parse_and_store_activity_from_file(
             # .gpx/.tcx and .fit have very different needs)
             if parsed_info is not None:
                 created_activities = []
-                idsToFileName = ""
+                ids_to_filename = ""
                 if file_extension.lower() in (
                     ".gpx",
                     ".tcx",
@@ -545,7 +679,7 @@ async def parse_and_store_activity_from_file(
                         parsed_info, websocket_manager, db
                     )
                     created_activities.append(created_activity)
-                    idsToFileName = idsToFileName + str(created_activity.id)
+                    ids_to_filename += str(created_activity.id)
                 elif file_extension.lower() == ".fit":
                     # Split the records by activity (check for multiple activities in the file)
                     split_records_by_activity = fit_utils.split_records_by_activity(
@@ -606,16 +740,12 @@ async def parse_and_store_activity_from_file(
                         created_activity = await store_activity(
                             activity, websocket_manager, db
                         )
-                        
+
                         created_activities.append(created_activity)
 
-                    for index, activity in enumerate(created_activities):
-                        idsToFileName += str(activity.id)  # Add the id to the string
-                        # Add an underscore if it's not the last item
-                        if index < len(created_activities) - 1:
-                            idsToFileName += (
-                                "_"  # Add an underscore if it's not the last item
-                            )
+                    ids_to_filename = "_".join(
+                        str(activity.id) for activity in created_activities
+                    )
                 else:
                     # Should no longer get here due to screening of extensions 
                     # in router.py, but why not.
@@ -627,11 +757,11 @@ async def parse_and_store_activity_from_file(
                 processed_dir = core_config.FILES_PROCESSED_DIR
 
                 # Define new file path with activity ID as filename
-                new_file_name = f"{idsToFileName}{file_extension}"
+                new_file_name = f"{ids_to_filename}{file_extension}"
 
                 # Move the file to the processed directory
                 move_file(processed_dir, new_file_name, file_path)
-                
+
                 # Log file move, import any associated media, and log completion.
                 if is_bulk_import:
                     core_logger.print_to_log_and_console(
@@ -653,7 +783,18 @@ async def parse_and_store_activity_from_file(
                 return created_activities
             else:
                 return None
-    except Exception as err:
+    except (
+        HTTPException,
+        OSError,
+        EOFError,
+        gzip.BadGzipFile,
+        shutil.Error,
+        SQLAlchemyError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+    ) as err:
         if is_bulk_import:
             # Log the exception
             core_logger.print_to_log_and_console(
@@ -675,14 +816,161 @@ async def parse_and_store_activity_from_file(
                     f"Bulk file import: Due to import error, file {file_path} has been moved to {error_file_dir}",
                     "error",
                 )
-            except Exception:
+            except OSError:
                 core_logger.print_to_log_and_console(
                     f"Bulk file import: Failed to move the error-producing file {file_path} to the import-error directory.",
                     "error",
                 )
         core_logger.print_to_log_and_console(
-            f"Error in parse_and_store_activity_from_file - {str(err)}", "error", exc=err
+            f"Error in parse_and_store_activity_from_file - {err}",
+            "error",
+            exc=err,
         )
+        # Background-task callers expect ``None`` on failure rather
+        # than re-raising; make that contract explicit.
+        return None
+
+
+# Maximum size accepted for an uploaded activity file.
+# 200 MiB is enough for very large multi-day .fit files while
+# still capping memory consumption per upload.
+_MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+# Chunk size used when streaming uploads to disk
+_UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+def _safe_upload_path(upload_dir: str, raw_filename: str) -> str:
+    """Return a sanitized absolute path inside ``upload_dir``.
+
+    Rejects path traversal attempts and any filename that does
+    not resolve underneath ``upload_dir``.
+
+    Args:
+        upload_dir: Directory where uploads should be stored.
+        raw_filename: User-supplied filename.
+
+    Returns:
+        Absolute, real path safe for writing.
+
+    Raises:
+        HTTPException: 400 when the filename is empty or
+            attempts to escape ``upload_dir``.
+    """
+    safe_name = os.path.basename(raw_filename or "")
+    if not safe_name or safe_name in (".", ".."):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+    upload_root = os.path.realpath(upload_dir)
+    candidate = os.path.realpath(os.path.join(upload_root, safe_name))
+    if (
+        candidate != upload_root
+        and not candidate.startswith(upload_root + os.sep)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+    return candidate
+
+
+def _validate_file_signature(file_path: str, file_extension: str) -> None:
+    """Validate a file's content matches its declared extension.
+
+    Reads the leading bytes from ``file_path`` and rejects content
+    that does not match the expected magic-number / shape for the
+    declared extension. This stops attackers from uploading
+    arbitrary content (shell scripts, archives, polyglots, etc.)
+    disguised with a permitted extension (OWASP A04).
+
+    Args:
+        file_path: Absolute path to the saved upload.
+        file_extension: Lower-case extension including the leading
+            dot (``.gpx``, ``.tcx``, ``.fit``, ``.gz``).
+
+    Raises:
+        HTTPException: 400 when the content does not match the
+            declared extension.
+    """
+    ext = file_extension.lower()
+    try:
+        with open(file_path, "rb") as fh:
+            head = fh.read(512)
+    except OSError as err:
+        core_logger.print_to_log(
+            f"_validate_file_signature read failed: {err}",
+            "error",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file content",
+        ) from err
+
+    if not head:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty file",
+        )
+
+    valid = False
+    if ext == ".gz":
+        # RFC 1952 gzip magic number
+        valid = head[:2] == b"\x1f\x8b"
+    elif ext == ".fit":
+        # FIT files start with a 12 or 14 byte header; bytes 8..12
+        # contain the literal ASCII data type identifier '.FIT'.
+        valid = len(head) >= 12 and head[8:12] == b".FIT"
+    elif ext in (".gpx", ".tcx"):
+        # XML-based formats; allow optional UTF-8 BOM and whitespace.
+        sniff = head.lstrip(b"\xef\xbb\xbf").lstrip()
+        lower = sniff[:512].lower()
+        if not (sniff.startswith(b"<?xml") or sniff.startswith(b"<")):
+            valid = False
+        elif ext == ".gpx":
+            valid = b"<gpx" in lower
+        else:  # .tcx
+            valid = b"trainingcenterdatabase" in lower
+
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File content does not match declared extension",
+        )
+
+
+def _save_upload_to_disk(file: UploadFile, destination: str) -> None:
+    """Stream an UploadFile to disk in fixed-size chunks.
+
+    Args:
+        file: Incoming FastAPI UploadFile.
+        destination: Absolute path to write to.
+
+    Raises:
+        HTTPException: 413 when the upload exceeds the
+            configured maximum size.
+    """
+    bytes_written = 0
+    with open(destination, "wb") as save_file:
+        while True:
+            chunk = file.file.read(_UPLOAD_CHUNK_BYTES)
+            if not chunk:
+                break
+            bytes_written += len(chunk)
+            if bytes_written > _MAX_UPLOAD_BYTES:
+                save_file.close()
+                try:
+                    os.remove(destination)
+                except OSError:
+                    pass
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=(
+                        "Uploaded file exceeds maximum allowed size"
+                    ),
+                )
+            save_file.write(chunk)
 
 
 async def parse_and_store_activity_from_uploaded_file(
@@ -691,6 +979,25 @@ async def parse_and_store_activity_from_uploaded_file(
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
 ):
+    """Persist an uploaded activity file and return the result.
+
+    Validates the filename and extension, streams the upload to
+    disk in a thread pool, and delegates parsing to ``parse_file``.
+
+    Args:
+        token_user_id: Authenticated user ID.
+        file: Incoming FastAPI UploadFile.
+        websocket_manager: Manager used for notifications.
+        db: Database session.
+
+    Returns:
+        List of created Activity schemas, or None if no activity
+        could be parsed from the file.
+
+    Raises:
+        HTTPException: 400/404/406/413 on validation errors,
+            500 on internal failures.
+    """
     # Validate filename exists
     if file.filename is None:
         raise HTTPException(
@@ -698,23 +1005,55 @@ async def parse_and_store_activity_from_uploaded_file(
             detail="Filename is required",
         )
 
-    # Get file extension
-    _, file_extension = os.path.splitext(file.filename)
+    # Ensure the 'files' directory exists
+    upload_dir = core_config.FILES_DIR
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Sanitize the filename to prevent directory traversal
+    file_path = _safe_upload_path(upload_dir, file.filename)
+
+    # Validate the extension before touching disk
+    _, file_extension = os.path.splitext(file_path)
+    if (
+        file_extension.lower()
+        not in core_config.SUPPORTED_FILE_FORMATS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_406_NOT_ACCEPTABLE,
+            detail=(
+                "File extension not supported. Supported "
+                "file extensions are .gpx, .fit, .tcx and .gz"
+            ),
+        )
 
     try:
-        # Ensure the 'files' directory exists
-        upload_dir = core_config.FILES_DIR
-        os.makedirs(upload_dir, exist_ok=True)
+        # Stream the upload to disk in a worker thread to
+        # avoid blocking the event loop on large files.
+        await run_in_threadpool(_save_upload_to_disk, file, file_path)
 
-        # Build the full path where the file will be saved
-        file_path = os.path.join(upload_dir, file.filename)
-
-        # Save the uploaded file in the 'files' directory
-        with open(file_path, "wb") as save_file:
-            save_file.write(file.file.read())
+        # Validate file content matches the declared extension to
+        # block disguised payloads (OWASP A04 unrestricted upload).
+        _validate_file_signature(file_path, file_extension)
 
         if file_extension.lower() == ".gz":
-            file_path, file_extension = handle_gzipped_file(file_path)
+            file_path, file_extension = await run_in_threadpool(
+                handle_gzipped_file,
+                file_path,
+            )
+            # Re-validate after decompression so the inner payload
+            # still matches one of the supported activity formats.
+            if (
+                file_extension.lower()
+                not in core_config.SUPPORTED_FILE_FORMATS
+                or file_extension.lower() == ".gz"
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Decompressed file extension is not supported"
+                    ),
+                )
+            _validate_file_signature(file_path, file_extension)
 
         user = users_crud.get_user_by_id(token_user_id, db)
         if user is None:
@@ -745,14 +1084,14 @@ async def parse_and_store_activity_from_uploaded_file(
 
         if parsed_info is not None:
             created_activities = []
-            idsToFileName = ""
+            ids_to_filename = ""
             if file_extension.lower() in (".gpx", ".tcx"):
                 # Store the activity in the database
                 created_activity = await store_activity(
                     parsed_info, websocket_manager, db
                 )
                 created_activities.append(created_activity)
-                idsToFileName = idsToFileName + str(created_activity.id)
+                ids_to_filename += str(created_activity.id)
             elif file_extension.lower() == ".fit":
                 # Split the records by activity (check for multiple activities in the file)
                 split_records_by_activity = fit_utils.split_records_by_activity(
@@ -776,13 +1115,9 @@ async def parse_and_store_activity_from_uploaded_file(
                     )
                     created_activities.append(created_activity)
 
-                for index, activity in enumerate(created_activities):
-                    idsToFileName += str(activity.id)  # Add the id to the string
-                    # Add an underscore if it's not the last item
-                    if index < len(created_activities) - 1:
-                        idsToFileName += (
-                            "_"  # Add an underscore if it's not the last item
-                        )
+                ids_to_filename = "_".join(
+                    str(activity.id) for activity in created_activities
+                )
             else:
                 core_logger.print_to_log_and_console(
                     f"File extension not supported: {file_extension}", "error"
@@ -792,7 +1127,7 @@ async def parse_and_store_activity_from_uploaded_file(
             processed_dir = core_config.FILES_PROCESSED_DIR
 
             # Define new file path with activity ID as filename
-            new_file_name = f"{idsToFileName}{file_extension}"
+            new_file_name = f"{ids_to_filename}{file_extension}"
 
             # Move the file to the processed directory
             move_file(processed_dir, new_file_name, file_path)
@@ -805,9 +1140,19 @@ async def parse_and_store_activity_from_uploaded_file(
             return created_activities
         else:
             return None
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
+    except HTTPException:
+        raise
+    except (
+        OSError,
+        EOFError,
+        gzip.BadGzipFile,
+        shutil.Error,
+        SQLAlchemyError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+    ) as err:
         # Log the exception
         core_logger.print_to_log(
             f"Error in parse_and_store_activity_from_uploaded_file - {str(err)}",
@@ -817,11 +1162,21 @@ async def parse_and_store_activity_from_uploaded_file(
         # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error: {str(err)}",
+            detail="Internal Server Error",
         ) from err
 
 
-def move_file(new_dir: str, new_filename: str, file_path: str):
+def move_file(new_dir: str, new_filename: str, file_path: str) -> None:
+    """Move ``file_path`` into ``new_dir`` as ``new_filename``.
+
+    Args:
+        new_dir: Destination directory (created if missing).
+        new_filename: Final filename inside ``new_dir``.
+        file_path: Source path to move.
+
+    Raises:
+        HTTPException: 500 when the move fails.
+    """
     try:
         # Ensure the new directory exists
         os.makedirs(new_dir, exist_ok=True)
@@ -831,13 +1186,15 @@ def move_file(new_dir: str, new_filename: str, file_path: str):
 
         # Move the file
         shutil.move(file_path, new_file_path)
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(f"Error in move_file - {str(err)}", "error", exc=err)
-        # Raise an HTTPException with a 500 Internal Server Error status code
+    except (OSError, shutil.Error) as err:
+        # Log the exception with full detail and return a generic
+        # error message to the caller (no internal path disclosure).
+        core_logger.print_to_log(
+            f"Error in move_file - {err}", "error", exc=err
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error: {str(err)}",
+            detail="Internal Server Error",
         ) from err
 
 
@@ -884,13 +1241,24 @@ def parse_file(
             return None
     except HTTPException as http_err:
         raise http_err
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(f"Error in parse_file - {str(err)}", "error", exc=err)
-        # Raise an HTTPException with a 500 Internal Server Error status code
+    except (
+        OSError,
+        EOFError,
+        gzip.BadGzipFile,
+        SQLAlchemyError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+    ) as err:
+        # Log the exception with full traceback but return a generic
+        # error message to the caller to avoid internal info disclosure.
+        core_logger.print_to_log(
+            f"Error in parse_file - {err}", "error", exc=err
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error: {str(err)}",
+            detail="Internal Server Error",
         ) from err
 
 
@@ -898,7 +1266,7 @@ async def store_activity(
     parsed_info: dict,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-) -> activities_models.Activity:
+) -> activities_schema.Activity:
     # create the activity in the database
     created_activity = await activities_crud.create_activity(
         parsed_info["activity"], websocket_manager, db
@@ -1067,7 +1435,7 @@ def calculate_activity_stats(
                     bucket.time += float(activity.total_timer_time or 0)
                     bucket.calories += float(activity.calories or 0)
                     break
-    except Exception as err:
+    except (TypeError, ValueError, AttributeError) as err:
         core_logger.print_to_log(
             f"Error in calculate_activity_stats - {str(err)}", "error", exc=err
         )
@@ -1075,7 +1443,22 @@ def calculate_activity_stats(
     return stats
 
 
-def location_based_on_coordinates(latitude, longitude) -> dict | None:
+def location_based_on_coordinates(
+    latitude: float | None, longitude: float | None
+) -> dict | None:
+    """Reverse-geocode a (lat, lon) pair into a location dict.
+
+    Args:
+        latitude: Latitude in decimal degrees, or ``None``.
+        longitude: Longitude in decimal degrees, or ``None``.
+
+    Returns:
+        Dict with ``city``/``town``/``country`` keys (any of which
+        may be ``None``), or ``None`` when no provider is configured.
+
+    Raises:
+        HTTPException: 424 when the upstream provider errors out.
+    """
     # Check if latitude and longitude are provided
     if latitude is None or longitude is None:
         return {
@@ -1170,25 +1553,58 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
             "town": data.get("city"),
             "country": data.get("country"),
         }
-    except Exception as err:
-        # Log the error
+    except requests.RequestException as err:
+        # Log the error with full detail; return a generic message
+        # to the caller (no upstream URL/exception leakage).
         core_logger.print_to_log_and_console(
-            f"Error in location_based_on_coordinates - {str(err)}", "error"
+            f"Error in location_based_on_coordinates - {err}", "error"
         )
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail=f"Error in location_based_on_coordinates: {str(err)}",
+            detail="Reverse geocoding provider error",
         ) from err
 
 
-def append_if_not_none(waypoint_list, waypoint_time, value, key):
+def append_if_not_none(
+    waypoint_list: list[dict],
+    waypoint_time,
+    value,
+    key: str,
+) -> None:
+    """Append ``{time, key: value}`` to ``waypoint_list`` if value is set.
+
+    Args:
+        waypoint_list: List to mutate in place.
+        waypoint_time: Timestamp associated with the value.
+        value: The value to record; ignored when ``None``.
+        key: Dict key under which ``value`` is stored.
+    """
     if value is not None:
         waypoint_list.append({"time": waypoint_time, key: value})
 
 
 def calculate_instant_speed(
-    prev_time, waypoint_time, latitude, longitude, prev_latitude, prev_longitude
-):
+    prev_time,
+    waypoint_time,
+    latitude: float,
+    longitude: float,
+    prev_latitude: float | None,
+    prev_longitude: float | None,
+) -> float:
+    """Compute m/s speed between two GPS waypoints.
+
+    Args:
+        prev_time: Previous waypoint timestamp; ``None`` returns 0.
+        waypoint_time: Current waypoint timestamp.
+        latitude: Current latitude (decimal degrees).
+        longitude: Current longitude (decimal degrees).
+        prev_latitude: Previous latitude (decimal degrees).
+        prev_longitude: Previous longitude (decimal degrees).
+
+    Returns:
+        Instantaneous speed in m/s, or 0 when the time delta is
+        non-positive or ``prev_time`` is missing.
+    """
     # Convert the time strings to datetime objects
     time_calc = datetime.fromisoformat(waypoint_time.strftime("%Y-%m-%dT%H:%M:%S"))
 
@@ -1220,8 +1636,25 @@ def calculate_instant_speed(
 
 
 def compute_elevation_gain_and_loss(
-    elevations, median_window=6, avg_window=3, threshold=0.1
-):
+    elevations: list[dict],
+    median_window: int = 6,
+    avg_window: int = 3,
+    threshold: float = 0.1,
+) -> tuple[float, float]:
+    """Compute total elevation gain/loss in meters from waypoints.
+
+    Applies a median filter then a moving-average smoother before
+    summing per-step deltas above ``threshold``.
+
+    Args:
+        elevations: List of dicts with an ``ele`` key (meters).
+        median_window: Window size for the median pre-filter.
+        avg_window: Window size for the moving-average smoother.
+        threshold: Minimum |delta| (m) counted toward gain/loss.
+
+    Returns:
+        Tuple of (gain_m, loss_m).
+    """
     # 1) Median Filter
     def median_filter(values, window_size):
         if window_size < 2:
@@ -1273,7 +1706,21 @@ def compute_elevation_gain_and_loss(
     return total_gain, total_loss
 
 
-def calculate_pace(distance, first_waypoint_time, last_waypoint_time):
+def calculate_pace(
+    distance: float,
+    first_waypoint_time,
+    last_waypoint_time,
+) -> float:
+    """Compute average pace (seconds per meter).
+
+    Args:
+        distance: Total distance in meters.
+        first_waypoint_time: Datetime of the first waypoint.
+        last_waypoint_time: Datetime of the last waypoint.
+
+    Returns:
+        Pace in s/m, or 0 when ``distance`` is 0.
+    """
     # If the distance is 0, return 0
     if distance == 0:
         return 0
@@ -1296,7 +1743,18 @@ def calculate_pace(distance, first_waypoint_time, last_waypoint_time):
     return pace_seconds_per_meter
 
 
-def calculate_avg_and_max(data, stream_type):
+def calculate_avg_and_max(
+    data: list[dict], stream_type: str
+) -> tuple[float, float]:
+    """Compute the mean and max of ``stream_type`` across waypoints.
+
+    Args:
+        data: List of waypoint dicts.
+        stream_type: Key to read from each waypoint.
+
+    Returns:
+        Tuple of (avg, max), or (0, 0) when no values are present.
+    """
     try:
         # Get the values from the data
         values = [
@@ -1304,8 +1762,11 @@ def calculate_avg_and_max(data, stream_type):
             for waypoint in data
             if waypoint.get(stream_type) is not None
         ]
-    except (ValueError, KeyError):
+    except (ValueError, KeyError, TypeError):
         # If there are no valid values, return 0
+        return 0, 0
+
+    if not values:
         return 0, 0
 
     # Calculate the average and max values
@@ -1315,7 +1776,15 @@ def calculate_avg_and_max(data, stream_type):
     return avg_value, max_value
 
 
-def calculate_np(data):
+def calculate_np(data: list[dict]) -> float:
+    """Compute Normalized Power (NP) from power waypoints.
+
+    Args:
+        data: List of waypoint dicts with a ``power`` key.
+
+    Returns:
+        Normalized Power in watts, or 0 when no values are present.
+    """
     try:
         # Get the power values from the data
         values = [
@@ -1323,8 +1792,11 @@ def calculate_np(data):
             for waypoint in data
             if waypoint["power"] is not None
         ]
-    except:
+    except (ValueError, KeyError, TypeError):
         # If there are no valid values, return 0
+        return 0
+
+    if not values:
         return 0
 
     # Calculate the fourth power of each power value
@@ -1510,16 +1982,29 @@ def generate_missing_activity_thumbnails() -> None:
                 server_settings.tileserver_api_key
             )
 
+        activity_ids = [
+            activity.id for activity in activities_without_thumbnail
+        ]
+        gps_streams = (
+            db.execute(
+                select(activity_streams_models.ActivityStreams).where(
+                    activity_streams_models.ActivityStreams.activity_id.in_(
+                        activity_ids
+                    ),
+                    activity_streams_models.ActivityStreams.stream_type
+                    == activity_streams_constants.STREAM_TYPE_MAP,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        gps_streams_by_activity_id = {
+            stream.activity_id: stream for stream in gps_streams
+        }
+
         generated = 0
         for activity in activities_without_thumbnail:
-            gps_stream = (
-                db.query(activity_streams_models.ActivityStreams)
-                .filter_by(
-                    activity_id=activity.id,
-                    stream_type=(activity_streams_constants.STREAM_TYPE_MAP),
-                )
-                .first()
-            )
+            gps_stream = gps_streams_by_activity_id.get(activity.id)
 
             if not gps_stream or not gps_stream.stream_waypoints:
                 continue
