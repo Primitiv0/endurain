@@ -27,6 +27,8 @@ import users.users.schema as users_schema
 
 import users.users_sessions.utils as users_session_utils
 
+import core.config as core_config
+
 
 def authenticate_user(
     username: str,
@@ -197,7 +199,12 @@ def complete_login(
     # Token delivery based on client type
     if client_type == "web":
         # Web: Refresh token as httpOnly cookie (XSS protection)
-        secure = os.environ.get("FRONTEND_PROTOCOL") == "https"
+        secure = (
+            True
+            if core_config.settings.ENVIRONMENT == "production"
+            or core_config.settings.ENVIRONMENT == "demo"
+            else False
+        )
         response.set_cookie(
             key="endurain_refresh_token",
             value=refresh_token,

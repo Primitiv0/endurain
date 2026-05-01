@@ -30,7 +30,7 @@ import core.logger as core_logger
 
 # Define the OAuth2 scheme for handling bearer tokens
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="token",
+    tokenUrl="/api/v1/auth/login",
     scopes=auth_constants.SCOPE_DICT,
     auto_error=False,
 )

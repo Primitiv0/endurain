@@ -34,6 +34,7 @@ import users.users_sessions.rotated_refresh_tokens.utils as users_session_rotate
 import profile.utils as profile_utils
 
 import core.database as core_database
+import core.config as core_config
 import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 
@@ -518,7 +519,12 @@ async def refresh_token(
     # Token delivery based on client type
     if client_type == "web":
         # Web: Refresh token as httpOnly cookie
-        secure = os.environ.get("FRONTEND_PROTOCOL") == "https"
+        secure = (
+            True
+            if core_config.settings.ENVIRONMENT == "production"
+            or core_config.settings.ENVIRONMENT == "demo"
+            else False
+        )
         response.set_cookie(
             key="endurain_refresh_token",
             value=new_refresh_token,
