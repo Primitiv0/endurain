@@ -15,6 +15,7 @@ import core.config as core_config
 import core.scheduler as core_scheduler
 import core.tracing as core_tracing
 import core.middleware as core_middleware
+import core.middleware_request_id as core_middleware_request_id
 import core.migrations as core_migrations
 import core.rate_limit as core_rate_limit
 
@@ -227,6 +228,14 @@ def create_app() -> FastAPI:
         core_rate_limit.rate_limit_exceeded_handler,  # type: ignore[arg-type]
     )
     fastapi_app.add_middleware(SlowAPIMiddleware)
+
+    # RequestIdMiddleware is added last so it executes
+    # first in the request chain, ensuring every log
+    # line (including those from other middlewares and
+    # error responses) carries an X-Request-ID.
+    fastapi_app.add_middleware(
+        core_middleware_request_id.RequestIdMiddleware,
+    )
 
     # Router files
     fastapi_app.include_router(api_router)
