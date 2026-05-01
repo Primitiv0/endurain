@@ -34,7 +34,7 @@
     "pinia": "^3.0.1",
     "vue": "^3.5.13",
     "vue-i18n": "^11.1.0",
-    "vue-router": "^4.6.0"
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.10.4",
@@ -53,11 +53,14 @@
     "eslint-plugin-vue": "^10.3.0",
     "jsdom": "^29.0.2",
     "npm-run-all2": "^8.0.4",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vite": "^7.1.12",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^4.0.5",
     "vue-eslint-parser": "^10.2.0",
     "vue-tsc": "^3.1.0"
+  },
+  "overrides": {
+    "serialize-javascript": ">=7.0.3"
   }
 }

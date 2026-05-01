@@ -5,9 +5,7 @@ LINK_COLOR_PRIMARY = "#0d6efd"  # blue  – password reset
 LINK_COLOR_SUCCESS = "#198754"  # green – sign-up flows
 
 _LOGO_URL = (
-    "https://github.com/endurain-project/endurain/blob/"
-    "0e17fafe450b66eda7982311e6f94cee44316684/"
-    "frontend/app/public/logo/logo.svg?raw=true"
+    "https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.png"
 )
 
 
@@ -62,7 +60,7 @@ def html_footer(
 
     Closes the content ``<div>`` opened by :func:`html_header`, renders
     the footer with a sign-off greeting and links to the frontend host
-    and the GitHub repository, then closes the outer wrapper,
+    and the Codeberg repository, then closes the outer wrapper,
     ``<body>``, and ``<html>``.
 
     Args:
@@ -85,7 +83,7 @@ def html_footer(
             <p>Best regards,<br>{sign_off}</p>
             <p>Visit Endurain at: <a style="color: {link_color};" href="{frontend_host}">{frontend_host}</a> -
                 Source code at: <a style="color: {link_color};"
-                    href="https://github.com/endurain-project/endurain">GitHub</a></p>
+                    href="https://codeberg.org/endurain-project/endurain">Codeberg</a></p>
         </div>
     </div>
 </body>
