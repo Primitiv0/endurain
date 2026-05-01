@@ -2,6 +2,7 @@
 docker-compose.yml
 .vscode/
 .env
+.venv/
 docker_forgejo_runner/data
 
 # aux folder

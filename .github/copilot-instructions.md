@@ -49,7 +49,7 @@ Endurain is a self-hosted fitness tracking application with:
 - **Node.js:** v20.19.4 (for frontend development)
 - **Python:** v3.13 (for backend development)
 - **Docker:** Required for full-stack development and CI/CD builds
-- **Poetry:** For backend dependency management (when not using Docker)
+- **uv:** For backend dependency management (when not using Docker)
 
 ### Quick Start
 
@@ -94,8 +94,8 @@ Complete environment for frontend + backend + database:
 Python development without Docker (requires Python 3.13):
 
 - Navigate: `cd backend`
-- Install Poetry: `pip install poetry`
-- Install dependencies: `poetry install`
+- Install uv: `pip install uv`
+- Install dependencies: `uv sync`
 - Backend codebase in `backend/app/` with `pyproject.toml`
 - **Use Docker if system Python < 3.13**
 
