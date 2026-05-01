@@ -79,7 +79,9 @@ class Settings(BaseSettings):
     # JSON. Without this pydantic-settings would attempt
     # ``json.loads`` first and raise on plain strings.
     ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = set()
-    TRUSTED_PROXIES: Annotated[list[str], NoDecode] = ["*"]
+    TRUSTED_PROXIES: Annotated[list[str], NoDecode] = (
+        ["*"] if ENVIRONMENT == "development" else []
+    )
 
     # --- Filesystem layout ---
     FRONTEND_DIR: str = "/app/frontend/dist"
@@ -163,10 +165,12 @@ class Settings(BaseSettings):
     @classmethod
     def _parse_trusted_proxies(cls, v):
         """Accept comma-separated env value or already-parsed iterable."""
+        # If no explicit env var, let field default take precedence
         if v is None or v == "":
-            return ["*"]
+            # Only default to ["*"] in development
+            return ["*"] if settings.ENVIRONMENT == "development" else []
         if isinstance(v, str):
-            return v.split(",")
+            return [ip.strip() for ip in v.split(",") if ip.strip()]
         return v
 
     @field_validator("REVERSE_GEO_RATE_LIMIT", mode="before")
