@@ -103,6 +103,18 @@ class Settings(BaseSettings):
     GEOCODES_MAPS_API: str = "changeme"
     REVERSE_GEO_RATE_LIMIT: float = 1.0
 
+    # --- Email (SMTP) ---
+    # SMTP_PASSWORD is read separately via ``read_secret``
+    # so it inherits the Docker-secrets ``_FILE`` contract
+    # used by DB_PASSWORD / SECRET_KEY / FERNET_KEY and is
+    # never materialised into Settings (kept out of any
+    # accidental ``settings.dict()`` dump).
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_SECURE: bool = True
+    SMTP_SECURE_TYPE: str = "starttls"
+
     # ----- Validators -----
 
     @field_validator("LOG_LEVEL", "ENVIRONMENT", mode="before")
@@ -114,6 +126,28 @@ class Settings(BaseSettings):
     @classmethod
     def _host_lower(cls, v: str) -> str:
         return v.lower() if isinstance(v, str) else v
+
+    @field_validator("SMTP_SECURE_TYPE", mode="before")
+    @classmethod
+    def _smtp_secure_type_lower(cls, v):
+        """Normalise to lower-case and validate against the
+        small allow-list Apprise understands (``starttls``,
+        ``ssl``). Falls back to ``starttls`` on garbage input
+        with a warning instead of failing startup.
+        """
+        if v is None or v == "":
+            return "starttls"
+        if not isinstance(v, str):
+            return "starttls"
+        normalised = v.lower().strip()
+        if normalised not in ("starttls", "ssl"):
+            core_logger.print_to_log_and_console(
+                "Invalid SMTP_SECURE_TYPE value, expected 'starttls' or "
+                "'ssl'; defaulting to 'starttls'",
+                "warning",
+            )
+            return "starttls"
+        return normalised
 
     @field_validator("ALLOWED_REDIRECT_SCHEMES", mode="before")
     @classmethod
