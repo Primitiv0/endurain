@@ -402,7 +402,7 @@ def create_activity_media_from_strava_bulk_import(
     )
     try:
         # Ensure the 'data/activity_media' directory exists
-        final_media_dir = core_config.ACTIVITY_MEDIA_DIR
+        final_media_dir = core_config.settings.ACTIVITY_MEDIA_DIR
         os.makedirs(final_media_dir, exist_ok=True)
 
         # Create new file name and new file path

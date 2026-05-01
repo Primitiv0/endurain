@@ -25,7 +25,7 @@ def _is_trusted_peer(peer_ip: str) -> bool:
     Returns:
         True if the peer is trusted, False otherwise.
     """
-    trusted = core_config.TRUSTED_PROXIES
+    trusted = core_config.settings.TRUSTED_PROXIES
     if trusted == ["*"]:
         return True
     try:

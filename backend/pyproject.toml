@@ -26,6 +26,7 @@ dependencies = [
     "geopy>=2.4.1",
     "flexparser>=0.4",
     "pydantic-core>=2.46.2",
+    "pydantic-settings>=2.6.0",
     "importlib-metadata>=8.5.0",
     "garminconnect>=0.3.2",
     "websockets>=16.0",

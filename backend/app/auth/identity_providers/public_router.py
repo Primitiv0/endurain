@@ -266,7 +266,7 @@ async def handle_callback(
 
         # Handle link mode differently - redirect to settings without creating new session
         if is_link_mode:
-            frontend_url = core_config.ENDURAIN_HOST
+            frontend_url = core_config.settings.ENDURAIN_HOST
             redirect_url = f"{frontend_url}/settings?tab=security&idp_link=success&idp_name={idp.name}"
 
             core_logger.print_to_log(
@@ -303,7 +303,7 @@ async def handle_callback(
         )
 
         # Redirect to frontend with session_id for token exchange
-        frontend_url = core_config.ENDURAIN_HOST
+        frontend_url = core_config.settings.ENDURAIN_HOST
         redirect_url = f"{frontend_url}/login?sso=success&session_id={session_id}"
 
         redirect_path = result.get("redirect_path")
@@ -334,7 +334,7 @@ async def handle_callback(
         core_logger.print_to_log(f"Error in SSO callback: {err}", "error", exc=err)
 
         # Redirect to frontend with error
-        frontend_url = core_config.ENDURAIN_HOST
+        frontend_url = core_config.settings.ENDURAIN_HOST
         error_url = f"{frontend_url}/login?error=sso_failed"
 
         return RedirectResponse(

@@ -821,7 +821,7 @@ class ImportService:
                     filename = old_path.split("/")[-1]
                     suffix = filename.split("_", 1)[1]
                     media_data["media_path"] = (
-                        f"{core_config.ACTIVITY_MEDIA_DIR}/{new_activity_id}_{suffix}"
+                        f"{core_config.settings.ACTIVITY_MEDIA_DIR}/{new_activity_id}_{suffix}"
                     )
 
                 media_item = activity_media_schema.ActivityMedia(**media_data)
@@ -1277,7 +1277,7 @@ class ImportService:
                         # Read bytes from ZIP and save using file_uploads
                         file_bytes = zipf.read(file_path)
                         await file_uploads.save_file(
-                            file_bytes, core_config.ACTIVITY_MEDIA_DIR, new_file_name
+                            file_bytes, core_config.settings.ACTIVITY_MEDIA_DIR, new_file_name
                         )
                         self.counts["media"] += 1
                     except ValueError:

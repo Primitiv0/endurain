@@ -189,11 +189,11 @@ class TokenManager:
                 sid={"essential": True},
                 iss={
                     "essential": True,
-                    "value": f"{core_config.ENDURAIN_HOST}",
+                    "value": f"{core_config.settings.ENDURAIN_HOST}",
                 },
                 aud={
                     "essential": True,
-                    "value": f"{core_config.ENDURAIN_HOST}",
+                    "value": f"{core_config.settings.ENDURAIN_HOST}",
                 },
                 sub={"essential": True},
                 scope={"essential": True},
@@ -322,8 +322,8 @@ class TokenManager:
 
         scope_dict = {
             "sid": session_id,
-            "iss": core_config.ENDURAIN_HOST,
-            "aud": core_config.ENDURAIN_HOST,
+            "iss": core_config.settings.ENDURAIN_HOST,
+            "aud": core_config.settings.ENDURAIN_HOST,
             "sub": user.id,
             "scope": scope,
             "iat": now,

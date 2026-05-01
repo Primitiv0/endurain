@@ -61,7 +61,7 @@ def process_migration_2(db: Session) -> None:
                     )
                     continue
 
-                timezone = core_config.TZ
+                timezone = core_config.settings.TZ
 
                 # Get activity stream
                 try:

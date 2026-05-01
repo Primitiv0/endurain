@@ -180,12 +180,12 @@ def _build_handler(log_level: int) -> logging.Handler:
     """
     # Treat both "production" and "demo" as deployed
     # environments where stdout JSON is preferred.
-    is_deployed = core_config.ENVIRONMENT in ("production", "demo")
+    is_deployed = core_config.settings.ENVIRONMENT in ("production", "demo")
     if is_deployed:
         handler: logging.Handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(JsonFormatter())
     else:
-        handler = logging.FileHandler(f"{core_config.LOGS_DIR}/app.log")
+        handler = logging.FileHandler(f"{core_config.settings.LOGS_DIR}/app.log")
         handler.setFormatter(_DevFormatter())
     handler.setLevel(log_level)
     handler.addFilter(RequestIdFilter())
@@ -216,7 +216,7 @@ def setup_main_logger():
     }
 
     # Get log level from config, default to WARNING if invalid
-    log_level = log_level_map.get(core_config.LOG_LEVEL.lower(), logging.WARNING)
+    log_level = log_level_map.get(core_config.settings.LOG_LEVEL.lower(), logging.WARNING)
 
     main_logger = logging.getLogger("main_logger")
     main_logger.setLevel(log_level)

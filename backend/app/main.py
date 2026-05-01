@@ -147,7 +147,7 @@ async def startup_event(fastapi_app: FastAPI):
                 server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
             )
     core_logger.print_to_log_and_console(
-        f"Allowed trusted proxies: {core_config.TRUSTED_PROXIES}"
+        f"Allowed trusted proxies: {core_config.settings.TRUSTED_PROXIES}"
     )
 
 
@@ -192,7 +192,7 @@ def create_app() -> FastAPI:
         max_age=3600,  # 1 hour session timeout
         same_site="lax",
         https_only=(
-            core_config.ENVIRONMENT == "production" or core_config.ENVIRONMENT == "demo"
+            core_config.settings.ENVIRONMENT == "production" or core_config.settings.ENVIRONMENT == "demo"
         ),
     )
 
@@ -200,15 +200,15 @@ def create_app() -> FastAPI:
     origins = [
         "http://localhost:8080",
         "http://localhost:5173",
-        core_config.ENDURAIN_HOST,
+        core_config.settings.ENDURAIN_HOST,
     ]
 
     fastapi_app.add_middleware(
         CORSMiddleware,
         allow_origins=(
             origins
-            if core_config.ENVIRONMENT == "development"
-            else core_config.ENDURAIN_HOST
+            if core_config.settings.ENVIRONMENT == "development"
+            else core_config.settings.ENDURAIN_HOST
         ),
         allow_credentials=True,
         allow_methods=["*"],
@@ -252,13 +252,13 @@ def create_app() -> FastAPI:
         name="server_images",
     )
     fastapi_app.mount(
-        f"/{core_config.ACTIVITY_MEDIA_DIR}",
-        StaticFiles(directory=core_config.ACTIVITY_MEDIA_DIR),
+        f"/{core_config.settings.ACTIVITY_MEDIA_DIR}",
+        StaticFiles(directory=core_config.settings.ACTIVITY_MEDIA_DIR),
         name="activity_media",
     )
     fastapi_app.mount(
-        f"/{core_config.ACTIVITY_THUMBNAILS_DIR}",
-        StaticFiles(directory=core_config.ACTIVITY_THUMBNAILS_DIR),
+        f"/{core_config.settings.ACTIVITY_THUMBNAILS_DIR}",
+        StaticFiles(directory=core_config.settings.ACTIVITY_THUMBNAILS_DIR),
         name="activity_thumbnails",
     )
 

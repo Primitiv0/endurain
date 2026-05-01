@@ -1028,14 +1028,14 @@ class ExportService:
             return
 
         try:
-            if not os.path.exists(core_config.ACTIVITY_MEDIA_DIR):
+            if not os.path.exists(core_config.settings.ACTIVITY_MEDIA_DIR):
                 core_logger.print_to_log(
-                    f"Media directory does not exist: {core_config.ACTIVITY_MEDIA_DIR}",
+                    f"Media directory does not exist: {core_config.settings.ACTIVITY_MEDIA_DIR}",
                     "warning",
                 )
                 return
 
-            for root, _, files in os.walk(core_config.ACTIVITY_MEDIA_DIR):
+            for root, _, files in os.walk(core_config.settings.ACTIVITY_MEDIA_DIR):
                 for file in files:
                     try:
                         file_id, _ = os.path.splitext(file)
@@ -1057,7 +1057,7 @@ class ExportService:
                             arcname = os.path.join(
                                 "activity_media",
                                 os.path.relpath(
-                                    file_path, core_config.ACTIVITY_MEDIA_DIR
+                                    file_path, core_config.settings.ACTIVITY_MEDIA_DIR
                                 ),
                             )
                             zipf.write(file_path, arcname)

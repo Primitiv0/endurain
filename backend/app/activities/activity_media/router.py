@@ -67,7 +67,7 @@ async def upload_media(
 ):
     try:
         # Ensure the 'data/activity_media' directory exists
-        upload_dir = core_config.ACTIVITY_MEDIA_DIR
+        upload_dir = core_config.settings.ACTIVITY_MEDIA_DIR
         os.makedirs(upload_dir, exist_ok=True)
 
         new_file_name = f"{activity_id}_{file.filename}"

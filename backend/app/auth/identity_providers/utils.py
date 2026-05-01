@@ -51,7 +51,7 @@ def validate_redirect_url(redirect: str | None) -> None:
     # Handle custom URI schemes (e.g., gadgetbridge://callback)
     if "://" in value:
         scheme = value.split("://", 1)[0].lower()
-        allowed = core_config.ALLOWED_REDIRECT_SCHEMES
+        allowed = core_config.settings.ALLOWED_REDIRECT_SCHEMES
         if scheme not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

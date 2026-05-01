@@ -40,7 +40,7 @@ def create_activity_objects(
     try:
         # Create an instance of TimezoneFinder
         tf = TimezoneFinder()
-        timezone = core_config.TZ
+        timezone = core_config.settings.TZ
 
         # Define variables
         gear_id = None

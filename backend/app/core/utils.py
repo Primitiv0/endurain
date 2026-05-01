@@ -6,7 +6,7 @@ import core.config as core_config
 
 
 def return_frontend_index(path: str):
-    file_path = f"{core_config.FRONTEND_DIR}/" + path
+    file_path = f"{core_config.settings.FRONTEND_DIR}/" + path
     if not os.path.isfile(file_path):
         return None
     return FileResponse(file_path)
@@ -27,14 +27,14 @@ def return_server_img_path(server_img: str):
 
 
 def return_activity_media_path(media: str):
-    file_path = f"{core_config.ACTIVITY_MEDIA_DIR}/" + media
+    file_path = f"{core_config.settings.ACTIVITY_MEDIA_DIR}/" + media
     if not os.path.isfile(file_path):
         return None
     return FileResponse(file_path)
 
 
 def return_activity_thumbnail_path(thumbnail: str):
-    file_path = f"{core_config.ACTIVITY_THUMBNAILS_DIR}/" + thumbnail
+    file_path = f"{core_config.settings.ACTIVITY_THUMBNAILS_DIR}/" + thumbnail
     if not os.path.isfile(file_path):
         return None
     return FileResponse(file_path)

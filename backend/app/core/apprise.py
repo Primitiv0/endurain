@@ -15,7 +15,7 @@ class AppriseService:
         self.smtp_password = core_config.read_secret("SMTP_PASSWORD")
         self.smtp_secure = os.getenv("SMTP_SECURE", "true").lower()
         self.smtp_secure_type = os.getenv("SMTP_SECURE_TYPE", "starttls").lower()
-        self.frontend_host = core_config.ENDURAIN_HOST
+        self.frontend_host = core_config.settings.ENDURAIN_HOST
 
     def _build_smtp_url(self) -> str:
         """

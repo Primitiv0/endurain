@@ -854,7 +854,7 @@ def parse_gpx_file(
         tf = TimezoneFinder()
         state = _init_parsing_state(
             activity_name_input,
-            core_config.TZ,
+            core_config.settings.TZ,
         )
 
         with Path(file).open(

@@ -235,7 +235,7 @@ def get_fit_file_from_garminconnect(
 
     # Save the zip file
     gc_id = str(activity.garminconnect_activity_id)
-    output_file = f"{core_config.FILES_DIR}/{gc_id}.zip"
+    output_file = f"{core_config.settings.FILES_DIR}/{gc_id}.zip"
 
     # Write the ZIP data to the output file
     with open(output_file, "wb") as fb:
@@ -247,7 +247,7 @@ def get_fit_file_from_garminconnect(
     # Open the ZIP file
     with zipfile.ZipFile(output_file, "r") as zip_ref:
         # Extract all contents to the specified directory
-        zip_ref.extractall(core_config.FILES_DIR)
+        zip_ref.extractall(core_config.settings.FILES_DIR)
         # Populate the array with file names
         extracted_files = zip_ref.namelist()
 
@@ -263,7 +263,7 @@ def get_fit_file_from_garminconnect(
 
     try:
         # Define the directory where the processed files will be stored
-        files_dir = core_config.FILES_DIR
+        files_dir = core_config.settings.FILES_DIR
         processed_dir = core_config.FILES_PROCESSED_DIR
 
         for file in extracted_files:

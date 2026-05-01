@@ -1006,7 +1006,7 @@ async def parse_and_store_activity_from_uploaded_file(
         )
 
     # Ensure the 'files' directory exists
-    upload_dir = core_config.FILES_DIR
+    upload_dir = core_config.settings.FILES_DIR
     os.makedirs(upload_dir, exist_ok=True)
 
     # Sanitize the filename to prevent directory traversal
@@ -1334,7 +1334,7 @@ async def store_activity(
         thumbnail_path = activities_thumbnail.generate_activity_thumbnail(
             created_activity.id,
             parsed_info["lat_lon_waypoints"],
-            core_config.ACTIVITY_THUMBNAILS_DIR,
+            core_config.settings.ACTIVITY_THUMBNAILS_DIR,
             tile_url=tile_url,
             background_color=bg_color,
             api_key=api_key,
@@ -1468,7 +1468,7 @@ def location_based_on_coordinates(
         }
 
     # Create a dictionary with the parameters for the request
-    if core_config.REVERSE_GEO_PROVIDER == "nominatim":
+    if core_config.settings.REVERSE_GEO_PROVIDER == "nominatim":
         # Create the URL for the request
         url_params = {
             "format": "jsonv2",
@@ -1476,22 +1476,22 @@ def location_based_on_coordinates(
             "lon": longitude,
         }
         protocol = "https"
-        if not core_config.NOMINATIM_API_USE_HTTPS:
+        if not core_config.settings.NOMINATIM_API_USE_HTTPS:
             protocol = "http"
-        url = f"{protocol}://{core_config.NOMINATIM_API_HOST}/reverse?{urlencode(url_params)}"
-    elif core_config.REVERSE_GEO_PROVIDER == "photon":
+        url = f"{protocol}://{core_config.settings.NOMINATIM_API_HOST}/reverse?{urlencode(url_params)}"
+    elif core_config.settings.REVERSE_GEO_PROVIDER == "photon":
         # Create the URL for the request
         url_params = {
             "lat": latitude,
             "lon": longitude,
         }
         protocol = "https"
-        if not core_config.PHOTON_API_USE_HTTPS:
+        if not core_config.settings.PHOTON_API_USE_HTTPS:
             protocol = "http"
-        url = f"{protocol}://{core_config.PHOTON_API_HOST}/reverse?{urlencode(url_params)}"
-    elif core_config.REVERSE_GEO_PROVIDER == "geocode":
+        url = f"{protocol}://{core_config.settings.PHOTON_API_HOST}/reverse?{urlencode(url_params)}"
+    elif core_config.settings.REVERSE_GEO_PROVIDER == "geocode":
         # Check if the API key is set
-        if core_config.GEOCODES_MAPS_API == "changeme":
+        if core_config.settings.GEOCODES_MAPS_API == "changeme":
             return {
                 "city": None,
                 "town": None,
@@ -1501,7 +1501,7 @@ def location_based_on_coordinates(
         url_params = {
             "lat": latitude,
             "lon": longitude,
-            "api_key": core_config.GEOCODES_MAPS_API,
+            "api_key": core_config.settings.GEOCODES_MAPS_API,
         }
         url = f"https://geocode.maps.co/reverse?{urlencode(url_params)}"
     else:
@@ -1532,7 +1532,7 @@ def location_based_on_coordinates(
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
-        if core_config.REVERSE_GEO_PROVIDER in ("geocode", "nominatim"):
+        if core_config.settings.REVERSE_GEO_PROVIDER in ("geocode", "nominatim"):
             # Get the data from the response
             data = response.json().get("address", {})
             # Return the location based on the coordinates
@@ -1910,7 +1910,7 @@ def delete_and_regenerate_all_activity_thumbnails() -> None:
         activities_crud.clear_all_activity_thumbnail_paths(db)
 
     # Delete files from disk
-    thumbnails_dir = Path(core_config.ACTIVITY_THUMBNAILS_DIR)
+    thumbnails_dir = Path(core_config.settings.ACTIVITY_THUMBNAILS_DIR)
     deleted = 0
     if thumbnails_dir.is_dir():
         for thumb_file in thumbnails_dir.glob("*.png"):
@@ -2012,7 +2012,7 @@ def generate_missing_activity_thumbnails() -> None:
             thumbnail_path = activities_thumbnail.generate_activity_thumbnail(
                 activity.id,
                 gps_stream.stream_waypoints,
-                core_config.ACTIVITY_THUMBNAILS_DIR,
+                core_config.settings.ACTIVITY_THUMBNAILS_DIR,
                 tile_url=tile_url,
                 background_color=bg_color,
                 api_key=api_key,

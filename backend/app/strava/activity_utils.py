@@ -192,7 +192,7 @@ def parse_activity(
 ) -> dict:
     # Create an instance of TimezoneFinder
     tf = TimezoneFinder()
-    timezone = core_config.TZ
+    timezone = core_config.settings.TZ
 
     # Check rate limit before detailed activity fetch
     if strava_utils.rate_limit_tracker.is_rate_limited():

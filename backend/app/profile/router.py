@@ -199,7 +199,7 @@ async def read_sessions_me(
         List of session objects for the user.
     """
     # Get the sessions from the database
-    if core_config.ENVIRONMENT != "demo":
+    if core_config.settings.ENVIRONMENT != "demo":
         return users_session_crud.get_user_sessions(token_user_id, db)
     else:
         core_logger.print_to_log(

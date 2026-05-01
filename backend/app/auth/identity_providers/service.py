@@ -514,7 +514,7 @@ class IdentityProviderService:
         Returns:
             str: The complete redirect URI for the specified identity provider.
         """
-        base_url = core_config.ENDURAIN_HOST
+        base_url = core_config.settings.ENDURAIN_HOST
         return f"{base_url}/api/v1/public/idp/callback/{idp_slug}"
 
     def _decrypt_client_id(self, idp: idp_models.IdentityProvider) -> str:

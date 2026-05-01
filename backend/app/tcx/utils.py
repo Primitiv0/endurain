@@ -359,7 +359,7 @@ def parse_tcx_file(
         trackpoints = tcx_file.trackpoints_to_dict()
 
         tf = TimezoneFinder()
-        timezone = core_config.TZ
+        timezone = core_config.settings.TZ
 
         pace: float | None = None
         city: str | None = None

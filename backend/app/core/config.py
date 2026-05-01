@@ -1,82 +1,47 @@
+"""Application configuration.
+
+Environment-driven values are loaded into a single
+:class:`Settings` instance backed by ``pydantic-settings``.
+This gives us typed access, declarative validation,
+``.env`` file support, and a single override point for
+tests.
+
+Module-level constants are kept (``LOG_LEVEL``,
+``ENDURAIN_HOST``, ``DATA_DIR``, …) as thin aliases to
+``settings.X`` so that existing call sites
+(``core_config.LOG_LEVEL``, etc.) and existing test
+mocks (``mock.patch("...core_config.ATTR")``) keep
+working unchanged.
+"""
+
 import os
 import threading
 import stat
 from pathlib import Path
+from typing import Self
+
 from cryptography.fernet import Fernet
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from typing_extensions import Annotated
 
 import core.logger as core_logger
 
-# Constant related to version
+# Pure constants — neither env-driven nor derived from settings.
 API_VERSION = "v0.18.0"
 LICENSE_NAME = "GNU Affero General Public License v3.0 or later"
 LICENSE_IDENTIFIER = "AGPL-3.0-or-later"
 LICENSE_URL = "https://spdx.org/licenses/AGPL-3.0-or-later.html"
 ROOT_PATH = "/api/v1"
-LOG_LEVEL = os.getenv("LOG_LEVEL", "info").lower()
-ENDURAIN_HOST = os.getenv("ENDURAIN_HOST", "http://localhost:8080")
-_allowed_schemes_raw = os.getenv("ALLOWED_REDIRECT_SCHEMES", "")
-ALLOWED_REDIRECT_SCHEMES: set[str] = (
-    {s.strip() for s in _allowed_schemes_raw.split(",") if s.strip()}
-    if _allowed_schemes_raw.strip()
-    else set()
-)
-TRUSTED_PROXIES = os.getenv("TRUSTED_PROXIES", "*").split(",")
-FRONTEND_DIR = os.getenv("FRONTEND_DIR", "/app/frontend/dist")
-BACKEND_DIR = os.getenv("BACKEND_DIR", "/app/backend")
-DATA_DIR = os.getenv("DATA_DIR", f"{BACKEND_DIR}/data")
-LOGS_DIR = os.getenv("LOGS_DIR", f"{BACKEND_DIR}/logs")
+
 USER_IMAGES_URL_PATH = "user_images"
-USER_IMAGES_DIR = f"{DATA_DIR}/{USER_IMAGES_URL_PATH}"
 SERVER_IMAGES_URL_PATH = "server_images"
-SERVER_IMAGES_DIR = f"{DATA_DIR}/{SERVER_IMAGES_URL_PATH}"
-FILES_DIR = os.getenv("FILES_DIR", f"{DATA_DIR}/activity_files")
-ACTIVITY_MEDIA_DIR = os.getenv(
-    "ACTIVITY_MEDIA_DIR", f"{DATA_DIR}/activity_media"
-)
-ACTIVITY_THUMBNAILS_DIR = os.getenv(
-    "ACTIVITY_THUMBNAILS_DIR",
-    f"{DATA_DIR}/activity_thumbnails",
-)
-FILES_PROCESSED_DIR = f"{FILES_DIR}/processed"
-FILES_BULK_IMPORT_DIR = f"{FILES_DIR}/bulk_import"
-FILES_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{FILES_BULK_IMPORT_DIR}/import_errors"
-STRAVA_BULK_IMPORT_DIR = f"{FILES_DIR}/strava_import"
-STRAVA_BULK_IMPORT_ACTIVITIES_DIR = f"{STRAVA_BULK_IMPORT_DIR}/activities"
-STRAVA_BULK_IMPORT_MEDIA_DIR = f"{STRAVA_BULK_IMPORT_DIR}/media"
-STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{STRAVA_BULK_IMPORT_DIR}/import_errors"
+
 STRAVA_BULK_IMPORT_ACTIVITIES_FILE = "activities.csv"
 STRAVA_BULK_IMPORT_BIKES_FILE = "bikes.csv"
 STRAVA_BULK_IMPORT_SHOES_FILE = "shoes.csv"
 STRAVA_BULK_IMPORT_SHOES_UNNAMED_SHOE = "Unnamed Shoe "
-ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
-TZ = os.getenv("TZ", "UTC")
-RATE_LIMIT_ENABLED = (
-    os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
-)
-RATE_LIMIT_STORAGE_URI = os.getenv(
-    "RATE_LIMIT_STORAGE_URI", "memory://"
-)
-REVERSE_GEO_PROVIDER = os.getenv("REVERSE_GEO_PROVIDER", "nominatim").lower()
-PHOTON_API_HOST = os.getenv("PHOTON_API_HOST", "photon.komoot.io").lower()
-PHOTON_API_USE_HTTPS = os.getenv("PHOTON_API_USE_HTTPS", "true").lower() == "true"
-NOMINATIM_API_HOST = os.getenv(
-    "NOMINATIM_API_HOST", "nominatim.openstreetmap.org"
-).lower()
-NOMINATIM_API_USE_HTTPS = os.getenv("NOMINATIM_API_USE_HTTPS", "true").lower() == "true"
-GEOCODES_MAPS_API = os.getenv("GEOCODES_MAPS_API", "changeme")
-try:
-    REVERSE_GEO_RATE_LIMIT = float(os.getenv("REVERSE_GEO_RATE_LIMIT", "1"))
-except ValueError:
-    core_logger.print_to_log_and_console(
-        "Invalid REVERSE_GEO_RATE_LIMIT value, expected an int; defaulting to 1.0",
-        "warning",
-    )
-    REVERSE_GEO_RATE_LIMIT = 1.0
-REVERSE_GEO_MIN_INTERVAL = (
-    1.0 / REVERSE_GEO_RATE_LIMIT if REVERSE_GEO_RATE_LIMIT > 0 else 0
-)
-REVERSE_GEO_LOCK = threading.Lock()
-REVERSE_GEO_LAST_CALL = 0.0
+
 SUPPORTED_FILE_FORMATS = [
     ".fit",
     ".gpx",
@@ -85,6 +50,146 @@ SUPPORTED_FILE_FORMATS = [
 ]  # used to screen bulk import files
 
 
+# Settings — every value driven by an environment variable.
+class Settings(BaseSettings):
+    """Environment-driven configuration values.
+
+    Field names mirror their environment variable names
+    so the existing ``ENDURAIN_HOST``, ``LOG_LEVEL``, …
+    contract is preserved end-to-end.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    # --- Logging / environment ---
+    LOG_LEVEL: str = "info"
+    ENVIRONMENT: str = "production"
+    TZ: str = "UTC"
+
+    # --- Host / redirects ---
+    ENDURAIN_HOST: str = "http://localhost:8080"
+    # NoDecode disables the default JSON pre-parsing for
+    # complex types so the validators below see the raw
+    # comma-separated env value (e.g. "a,b,c") rather than
+    # JSON. Without this pydantic-settings would attempt
+    # ``json.loads`` first and raise on plain strings.
+    ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = set()
+    TRUSTED_PROXIES: Annotated[list[str], NoDecode] = ["*"]
+
+    # --- Filesystem layout ---
+    FRONTEND_DIR: str = "/app/frontend/dist"
+    BACKEND_DIR: str = "/app/backend"
+    DATA_DIR: str = ""
+    LOGS_DIR: str = ""
+    FILES_DIR: str = ""
+    ACTIVITY_MEDIA_DIR: str = ""
+    ACTIVITY_THUMBNAILS_DIR: str = ""
+
+    # --- Rate limiting ---
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_STORAGE_URI: str = "memory://"
+
+    # --- Reverse-geocoding providers ---
+    REVERSE_GEO_PROVIDER: str = "nominatim"
+    PHOTON_API_HOST: str = "photon.komoot.io"
+    PHOTON_API_USE_HTTPS: bool = True
+    NOMINATIM_API_HOST: str = "nominatim.openstreetmap.org"
+    NOMINATIM_API_USE_HTTPS: bool = True
+    GEOCODES_MAPS_API: str = "changeme"
+    REVERSE_GEO_RATE_LIMIT: float = 1.0
+
+    # ----- Validators -----
+
+    @field_validator("LOG_LEVEL", "ENVIRONMENT", mode="before")
+    @classmethod
+    def _to_lower(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
+
+    @field_validator("PHOTON_API_HOST", "NOMINATIM_API_HOST", mode="before")
+    @classmethod
+    def _host_lower(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
+
+    @field_validator("ALLOWED_REDIRECT_SCHEMES", mode="before")
+    @classmethod
+    def _parse_allowed_schemes(cls, v):
+        """Accept comma-separated env value or already-parsed iterable."""
+        if v is None or v == "":
+            return set()
+        if isinstance(v, str):
+            return {s.strip() for s in v.split(",") if s.strip()}
+        return v
+
+    @field_validator("TRUSTED_PROXIES", mode="before")
+    @classmethod
+    def _parse_trusted_proxies(cls, v):
+        """Accept comma-separated env value or already-parsed iterable."""
+        if v is None or v == "":
+            return ["*"]
+        if isinstance(v, str):
+            return v.split(",")
+        return v
+
+    @field_validator("REVERSE_GEO_RATE_LIMIT", mode="before")
+    @classmethod
+    def _parse_geo_rate(cls, v):
+        """Tolerate non-numeric strings instead of failing startup."""
+        if v is None or v == "":
+            return 1.0
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            core_logger.print_to_log_and_console(
+                "Invalid REVERSE_GEO_RATE_LIMIT value, expected a number;"
+                " defaulting to 1.0",
+                "warning",
+            )
+            return 1.0
+
+    @model_validator(mode="after")
+    def _fill_filesystem_defaults(self) -> Self:
+        """Derive directory defaults from BACKEND_DIR when not explicit."""
+        if not self.DATA_DIR:
+            self.DATA_DIR = f"{self.BACKEND_DIR}/data"
+        if not self.LOGS_DIR:
+            self.LOGS_DIR = f"{self.BACKEND_DIR}/logs"
+        if not self.FILES_DIR:
+            self.FILES_DIR = f"{self.DATA_DIR}/activity_files"
+        if not self.ACTIVITY_MEDIA_DIR:
+            self.ACTIVITY_MEDIA_DIR = f"{self.DATA_DIR}/activity_media"
+        if not self.ACTIVITY_THUMBNAILS_DIR:
+            self.ACTIVITY_THUMBNAILS_DIR = f"{self.DATA_DIR}/activity_thumbnails"
+        return self
+
+
+settings = Settings()
+
+
+# Derived module-level paths and runtime state.
+USER_IMAGES_DIR = f"{settings.DATA_DIR}/{USER_IMAGES_URL_PATH}"
+SERVER_IMAGES_DIR = f"{settings.DATA_DIR}/{SERVER_IMAGES_URL_PATH}"
+
+FILES_PROCESSED_DIR = f"{settings.FILES_DIR}/processed"
+FILES_BULK_IMPORT_DIR = f"{settings.FILES_DIR}/bulk_import"
+FILES_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{FILES_BULK_IMPORT_DIR}/import_errors"
+STRAVA_BULK_IMPORT_DIR = f"{settings.FILES_DIR}/strava_import"
+STRAVA_BULK_IMPORT_ACTIVITIES_DIR = f"{STRAVA_BULK_IMPORT_DIR}/activities"
+STRAVA_BULK_IMPORT_MEDIA_DIR = f"{STRAVA_BULK_IMPORT_DIR}/media"
+STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{STRAVA_BULK_IMPORT_DIR}/import_errors"
+
+REVERSE_GEO_MIN_INTERVAL = (
+    1.0 / settings.REVERSE_GEO_RATE_LIMIT if settings.REVERSE_GEO_RATE_LIMIT > 0 else 0
+)
+REVERSE_GEO_LOCK = threading.Lock()
+REVERSE_GEO_LAST_CALL = 0.0
+
+
+# Secret loading and environment validation
 def read_secret(env_var_name: str, default_value: str | None = None) -> str | None:
     """
     Read secret from environment variable or file.
@@ -206,7 +311,7 @@ def _is_safe_path(file_path: Path) -> bool:
         ]
 
         # For development, also allow relative paths in current working directory
-        if ENVIRONMENT == "development":
+        if settings.ENVIRONMENT == "development":
             cwd = Path.cwd()
             try:
                 file_path.relative_to(cwd)
@@ -217,7 +322,7 @@ def _is_safe_path(file_path: Path) -> bool:
         # Check if path starts with any allowed prefix
         return any(path_str.startswith(prefix) for prefix in allowed_prefixes)
 
-    except Exception:
+    except (OSError, ValueError, TypeError):
         return False
 
 
@@ -335,7 +440,7 @@ def check_required_env_vars():
                 "FERNET_KEY validation failed. Please check the key format and regenerate if necessary."
             )
 
-    validate_log_level(LOG_LEVEL)
+    validate_log_level(settings.LOG_LEVEL)
 
 
 def check_required_dirs():
@@ -346,16 +451,16 @@ def check_required_dirs():
         EnvironmentError: If directory is not valid.
     """
     required_dirs = [
-        DATA_DIR,
+        settings.DATA_DIR,
         USER_IMAGES_DIR,
         SERVER_IMAGES_DIR,
-        ACTIVITY_MEDIA_DIR,
-        ACTIVITY_THUMBNAILS_DIR,
-        FILES_DIR,
+        settings.ACTIVITY_MEDIA_DIR,
+        settings.ACTIVITY_THUMBNAILS_DIR,
+        settings.FILES_DIR,
         FILES_PROCESSED_DIR,
         FILES_BULK_IMPORT_DIR,
         FILES_BULK_IMPORT_IMPORT_ERRORS_DIR,
-        LOGS_DIR,
+        settings.LOGS_DIR,
     ]
 
     for required_dir in required_dirs:

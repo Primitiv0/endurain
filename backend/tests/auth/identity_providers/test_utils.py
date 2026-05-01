@@ -561,7 +561,7 @@ class TestValidateRedirectUrl:
             - No exception when scheme is in allowed set
         """
         with patch(
-            "auth.identity_providers.utils.core_config.ALLOWED_REDIRECT_SCHEMES",
+            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
             {"gadgetbridge"},
         ):
             validate_redirect_url("gadgetbridge://endurain/oauth/callback")
@@ -573,7 +573,7 @@ class TestValidateRedirectUrl:
             - GADGETBRIDGE:// is allowed when 'gadgetbridge' configured
         """
         with patch(
-            "auth.identity_providers.utils.core_config.ALLOWED_REDIRECT_SCHEMES",
+            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
             {"gadgetbridge"},
         ):
             validate_redirect_url("GADGETBRIDGE://endurain/callback")
@@ -586,7 +586,7 @@ class TestValidateRedirectUrl:
         """
         schemes = {"gadgetbridge", "myapp"}
         with patch(
-            "auth.identity_providers.utils.core_config.ALLOWED_REDIRECT_SCHEMES",
+            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
             schemes,
         ):
             validate_redirect_url("gadgetbridge://callback")
@@ -633,7 +633,7 @@ class TestValidateRedirectUrl:
             - HTTPException 400 when scheme not configured
         """
         with patch(
-            "auth.identity_providers.utils.core_config.ALLOWED_REDIRECT_SCHEMES",
+            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
             set(),
         ):
             with pytest.raises(HTTPException) as exc_info:
@@ -648,7 +648,7 @@ class TestValidateRedirectUrl:
             - HTTPException 400 when only a different scheme is configured
         """
         with patch(
-            "auth.identity_providers.utils.core_config.ALLOWED_REDIRECT_SCHEMES",
+            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
             {"gadgetbridge"},
         ):
             with pytest.raises(HTTPException) as exc_info:

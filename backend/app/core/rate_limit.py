@@ -72,8 +72,8 @@ def _get_rate_limit_key(request: Request) -> str:
 limiter: Limiter = Limiter(
     key_func=_get_rate_limit_key,
     default_limits=[DEFAULT],
-    enabled=core_config.RATE_LIMIT_ENABLED,
-    storage_uri=core_config.RATE_LIMIT_STORAGE_URI,
+    enabled=core_config.settings.RATE_LIMIT_ENABLED,
+    storage_uri=core_config.settings.RATE_LIMIT_STORAGE_URI,
 )
 
 

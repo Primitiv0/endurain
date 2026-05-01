@@ -34,7 +34,7 @@ def format_aware_datetime(
     timezone = (
         ZoneInfo(tz_name)
         if tz_name
-        else ZoneInfo(core_config.TZ)
+        else ZoneInfo(core_config.settings.TZ)
     )
 
     return dt.astimezone(timezone).strftime(
