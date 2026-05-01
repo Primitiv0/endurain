@@ -21,6 +21,7 @@ from joserfc.errors import (
 import core.config as core_config
 import core.cryptography as core_cryptography
 import core.logger as core_logger
+import core.network as core_network
 import auth.identity_providers.models as idp_models
 import auth.identity_providers.crud as idp_crud
 import users.users.crud as users_crud
@@ -139,6 +140,13 @@ class IdentityProviderService:
 
         # Fetch JWKS from IdP
         try:
+            # SSRF guard: refuse to dial private/internal
+            # IPs even though jwks_uri originates from
+            # admin configuration. A misconfigured IdP
+            # entry pointing at 127.0.0.1 or the cloud
+            # metadata service would otherwise let an
+            # attacker pivot via signed token replay.
+            core_network.reject_private_url(jwks_uri)
             client = await self._get_http_client()
             core_logger.print_to_log(f"Fetching JWKS from {jwks_uri}", "debug")
 
@@ -465,6 +473,9 @@ class IdentityProviderService:
         discovery_url = f"{idp.issuer_url.rstrip('/')}/.well-known/openid-configuration"
 
         try:
+            # SSRF guard for the admin-supplied issuer
+            # URL: see jwks_uri rationale above.
+            core_network.reject_private_url(discovery_url)
             # Fetch the configuration
             client = await self._get_http_client()
             response = await client.get(discovery_url)
