@@ -40,94 +40,98 @@ import server_settings.schema as server_settings_schema
 from core.routes import router as api_router
 from core.database import SessionLocal
 
+# Silence stravalib token warnings as early as
+# possible: this env var is consulted at import time by
+# stravalib, so it must be set before any module that
+# transitively imports it runs.
+os.environ["SILENCE_TOKEN_WARNINGS"] = "TRUE"
 
-async def startup_event(fastapi_app: FastAPI):
-    core_logger.print_to_log_and_console(
-        f"Backend startup event - {core_config.API_VERSION}"
-    )
 
-    # Run Alembic migrations to ensure the database is up to date
+def _safe_run(label: str, func, *args, **kwargs):
+    """Invoke a startup task, isolating its failure.
+
+    Logs the exception type (not the raw message, to
+    avoid leaking sensitive context) so a single
+    misbehaving integration cannot abort backend
+    startup.
+    """
+    try:
+        return func(*args, **kwargs)
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Startup task '{label}' failed: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
+        return None
+
+
+async def _safe_run_async(label: str, coro_func, *args, **kwargs):
+    """Async variant of :func:`_safe_run`."""
+    try:
+        return await coro_func(*args, **kwargs)
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Startup task '{label}' failed: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
+        return None
+
+
+def _run_alembic_migrations() -> None:
+    """Run Alembic upgrade to head.
+
+    Critical: failure here aborts startup because the
+    application cannot guarantee schema correctness.
+    """
     alembic_cfg = Config("alembic.ini")
-    # Disable the logger configuration in Alembic to avoid conflicts with FastAPI
+    # Disable Alembic's own logger configuration to
+    # avoid conflicts with FastAPI / our main logger.
     alembic_cfg.attributes["configure_logger"] = False
     command.upgrade(alembic_cfg, "head")
 
-    # Migration check
-    await core_migrations.check_migrations()
 
-    # Create a scheduler to run background jobs
-    core_scheduler.start_scheduler()
+def _refresh_strava_tokens() -> None:
+    """Refresh persisted Strava OAuth tokens."""
+    strava_utils.refresh_strava_tokens(True)
 
-    # Refresh Strava tokens on startup (non-blocking)
-    core_logger.print_to_log_and_console(
-        "Refreshing Strava tokens on startup"
-    )
-    try:
-        strava_utils.refresh_strava_tokens(True)
-    except Exception as err:
-        core_logger.print_to_log(
-            "Failed to refresh Strava tokens on"
-            f" startup: {err}",
-            "error",
-            exc=err,
-        )
 
-    # Retrieve last day activities from Garmin Connect and Strava
-    core_logger.print_to_log_and_console(
-        "Retrieving last day activities from Garmin Connect and Strava on "
-        "startup"
-    )
+async def _retrieve_recent_garmin_activities() -> None:
+    """Backfill the last day of Garmin Connect activities."""
     await garmin_activity_utils.retrieve_garminconnect_users_activities_for_days(1)
-    try:
-        await strava_activity_utils.retrieve_strava_users_activities_for_days(1, True)
-    except Exception as err:
-        core_logger.print_to_log(
-            "Failed to retrieve Strava activities"
-            f" on startup: {err}",
-            "error",
-            exc=err,
-        )
 
-    # Retrieve last day health stats from Garmin Connect
-    core_logger.print_to_log_and_console(
-        "Retrieving last day health stats from Garmin Connect on startup"
-    )
+
+async def _retrieve_recent_strava_activities() -> None:
+    """Backfill the last day of Strava activities."""
+    await strava_activity_utils.retrieve_strava_users_activities_for_days(1, True)
+
+
+def _retrieve_recent_garmin_health() -> None:
+    """Backfill the last day of Garmin Connect health stats."""
     garmin_health_utils.retrieve_garminconnect_users_health_for_days(1)
 
-    # Delete invalid password reset tokens
-    core_logger.print_to_log_and_console(
-        "Deleting invalid password reset tokens from the database"
-    )
+
+def _purge_expired_tokens() -> None:
+    """Sweep expired/invalid auth-related tokens from the DB."""
     password_reset_tokens_utils.delete_invalid_tokens_from_db()
-
-    # Delete invalid sign-up tokens
-    core_logger.print_to_log_and_console(
-        "Deleting invalid sign-up tokens from the database"
-    )
     sign_up_tokens_utils.delete_invalid_tokens_from_db()
-
-    # Delete expired OAuth states
-    core_logger.print_to_log_and_console(
-        "Deleting expired OAuth states from the database"
-    )
     oauth_state_utils.delete_expired_oauth_states_from_db()
-
-    # Delete expired IdP link tokens
-    core_logger.print_to_log_and_console(
-        "Deleting expired IdP link tokens from the database"
-    )
     idp_link_token_utils.delete_idp_link_expired_tokens_from_db()
 
-    # Generate thumbnails for activities that are missing one
-    core_logger.print_to_log_and_console(
-        "Generating missing activity map thumbnails"
-    )
+
+def _generate_missing_thumbnails() -> None:
+    """Generate map thumbnails for activities missing one."""
     activities_utils.generate_missing_activity_thumbnails()
 
-    # Initialize allowed tile domains for CSP
-    core_logger.print_to_log_and_console(
-        "Initializing allowed tile domains for Content Security Policy"
-    )
+
+def _init_allowed_tile_domains(fastapi_app: FastAPI) -> None:
+    """Populate ``app.state.allowed_tile_domains`` for CSP.
+
+    Falls back to the built-in default provider list if
+    the database lookup fails so the application can
+    still serve requests with a safe CSP.
+    """
     with SessionLocal() as db:
         try:
             fastapi_app.state.allowed_tile_domains = (
@@ -138,24 +142,85 @@ async def startup_event(fastapi_app: FastAPI):
             )
         except Exception as err:
             core_logger.print_to_log(
-                f"Error initializing tile domains, using defaults: {err}",
+                "Error initializing tile domains, using defaults: "
+                f"{type(err).__name__}",
                 "error",
                 exc=err,
             )
-            # Fallback to built-in providers
+            # Fallback to built-in providers so CSP
+            # remains restrictive but functional.
             fastapi_app.state.allowed_tile_domains = (
                 server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
             )
+
+
+async def startup_event(fastapi_app: FastAPI) -> None:
+    """Run startup tasks in well-defined phases.
+
+    Phase 1 (critical): schema migrations and the
+    background scheduler. Failure aborts startup.
+
+    Phase 2 (best-effort): third-party syncs, token
+    purges, thumbnail generation, and CSP tile-domain
+    initialisation. Each task is isolated so a single
+    failure cannot prevent the backend from serving
+    requests.
+    """
+    core_logger.print_to_log_and_console(
+        f"Backend startup event - {core_config.API_VERSION}"
+    )
+
+    # Phase 1: critical pre-flight tasks.
+    _run_alembic_migrations()
+    await core_migrations.check_migrations()
+    core_scheduler.start_scheduler()
+
+    # Phase 2: best-effort background syncs and clean-up.
+    core_logger.print_to_log_and_console("Refreshing Strava tokens on startup")
+    _safe_run("refresh_strava_tokens", _refresh_strava_tokens)
+
+    core_logger.print_to_log_and_console(
+        "Retrieving last day activities from Garmin Connect on startup"
+    )
+    await _safe_run_async(
+        "retrieve_recent_garmin_activities", _retrieve_recent_garmin_activities
+    )
+
+    core_logger.print_to_log_and_console(
+        "Retrieving last day activities from Strava on startup"
+    )
+    await _safe_run_async(
+        "retrieve_recent_strava_activities", _retrieve_recent_strava_activities
+    )
+
+    core_logger.print_to_log_and_console(
+        "Retrieving last day health stats from Garmin Connect on startup"
+    )
+    _safe_run("retrieve_recent_garmin_health", _retrieve_recent_garmin_health)
+
+    core_logger.print_to_log_and_console(
+        "Purging expired tokens (password reset, sign-up, OAuth state, IdP link)"
+    )
+    _safe_run("purge_expired_tokens", _purge_expired_tokens)
+
+    core_logger.print_to_log_and_console(
+        "Generating missing activity map thumbnails"
+    )
+    _safe_run("generate_missing_thumbnails", _generate_missing_thumbnails)
+
+    core_logger.print_to_log_and_console(
+        "Initializing allowed tile domains for Content Security Policy"
+    )
+    _init_allowed_tile_domains(fastapi_app)
+
     core_logger.print_to_log_and_console(
         f"Allowed trusted proxies: {core_config.settings.TRUSTED_PROXIES}"
     )
 
 
-def shutdown_event():
-    # Log the shutdown event
+def shutdown_event() -> None:
+    """Stop the background scheduler on shutdown."""
     core_logger.print_to_log_and_console("Backend shutdown event")
-
-    # Shutdown the scheduler when the application is shutting down
     core_scheduler.stop_scheduler()
 
 
@@ -169,11 +234,27 @@ async def lifespan(fastapi_app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    """Build, configure, and return the FastAPI app.
+
+    Pre-flight: validate required env vars, ensure data
+    directories exist, and configure the main logger so
+    every subsequent log line is captured by the
+    environment-appropriate handler.
+    """
+    # Pre-flight checks that must run before the app is
+    # constructed: required environment variables and
+    # filesystem layout. Logger setup must happen after
+    # config validation so log routing reflects the
+    # validated settings.
+    core_config.check_required_env_vars()
+    core_config.check_required_dirs()
+    core_logger.setup_main_logger()
+
     # Define the FastAPI object
     fastapi_app = FastAPI(
         lifespan=lifespan,
-        docs_url=core_config.ROOT_PATH + "/docs",
-        redoc_url=core_config.ROOT_PATH + "/redoc",
+        docs_url=core_config.ROOT_PATH + "/docs" if core_config.settings.ENVIRONMENT == "development" else None,
+        redoc_url=core_config.ROOT_PATH + "/redoc" if core_config.settings.ENVIRONMENT == "development" else None,
         title="Endurain",
         summary="Endurain API for the Endurain app",
         version=core_config.API_VERSION,
@@ -262,23 +343,12 @@ def create_app() -> FastAPI:
         name="activity_thumbnails",
     )
 
+    # Setup tracing once the app and its routes are
+    # registered so instrumentation can wrap them.
+    core_tracing.setup_tracing(fastapi_app)
+
     return fastapi_app
 
 
-# Silence stravalib token warnings
-os.environ["SILENCE_TOKEN_WARNINGS"] = "TRUE"
-
-# Check for required environment variables
-core_config.check_required_env_vars()
-
-# Check for required directories
-core_config.check_required_dirs()
-
 # Create the FastAPI application
 app = create_app()
-
-# Create logggers
-core_logger.setup_main_logger()
-
-# Setup tracing
-core_tracing.setup_tracing(app)
