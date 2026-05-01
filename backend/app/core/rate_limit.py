@@ -30,10 +30,9 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
-import users.users_sessions.utils as users_session_utils
-
 import core.config as core_config
 import core.logger as core_logger
+import core.network as core_network
 
 #: Baseline applied globally via ``SlowAPIMiddleware``.
 DEFAULT: str = "120/minute"
@@ -68,7 +67,7 @@ def _get_rate_limit_key(request: Request) -> str:
             auth[7:].encode()
         ).hexdigest()[:16]
         return f"user:{token_hash}"
-    return users_session_utils.get_ip_address(request)
+    return core_network.get_ip_address(request)
 
 limiter: Limiter = Limiter(
     key_func=_get_rate_limit_key,
