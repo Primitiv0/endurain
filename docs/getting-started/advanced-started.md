@@ -36,6 +36,7 @@ Table below shows supported environment variables. Variables marked with optiona
 | DB_USER | endurain | Yes | N/A |
 | DB_PASSWORD | No default set | `No` | Database password. Alternatively, use `DB_PASSWORD_FILE` for Docker secrets |
 | DB_DATABASE | endurain | Yes | N/A |
+| DB_SSLMODE | *(empty)* | Yes | Optional TLS mode for the PostgreSQL connection. Leave empty to disable (default — keeps local Postgres without SSL working). Accepted values match libpq: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full`. Recommended for any deployed environment: `require`. Most secure (validates CA + hostname): `verify-full` |
 | SECRET_KEY | No default set | `No` | Run `openssl rand -hex 32` on a terminal to get a secret. Alternatively, use `SECRET_KEY_FILE` for Docker secrets |
 | FERNET_KEY | No default set | `No` | Run `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on a terminal to get a secret or go to [https://fernetkeygen.com](https://fernetkeygen.com). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=`. Alternatively, use `FERNET_KEY_FILE` for Docker secrets |
 | ALGORITHM | HS256 | Yes | Currently only HS256 is supported |
