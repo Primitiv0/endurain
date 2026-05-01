@@ -14,7 +14,7 @@ Exports:
     - Models: UsersSessions (ORM model)
     - Utils: DeviceType, DeviceInfo, validate_session_timeout,
       create_session_object, edit_session_object, create_session,
-      edit_session, get_user_agent, get_ip_address,
+      edit_session, get_user_agent,
       parse_user_agent, cleanup_idle_sessions
 """
 
@@ -43,7 +43,6 @@ from .utils import (
     create_session_object,
     edit_session_object,
     get_user_agent,
-    get_ip_address,
     parse_user_agent,
     cleanup_idle_sessions,
 )
@@ -73,7 +72,6 @@ __all__ = [
     "create_session_object",
     "edit_session_object",
     "get_user_agent",
-    "get_ip_address",
     "parse_user_agent",
     "cleanup_idle_sessions",
 ]
