@@ -278,22 +278,28 @@ def create_app() -> FastAPI:
     )
 
     # Add CORS middleware to allow requests from the frontend
-    origins = [
-        "http://localhost:8080",
-        "http://localhost:5173",
-        core_config.settings.ENDURAIN_HOST,
-    ]
+    if core_config.settings.ENVIRONMENT == "development":
+        cors_allow_origins: list[str] = [
+            "http://localhost:8080",
+            "http://localhost:5173",
+            core_config.settings.ENDURAIN_HOST,
+        ]
+    else:
+        cors_allow_origins = [core_config.settings.ENDURAIN_HOST]
 
     fastapi_app.add_middleware(
         CORSMiddleware,
-        allow_origins=(
-            origins
-            if core_config.settings.ENVIRONMENT == "development"
-            else core_config.settings.ENDURAIN_HOST
-        ),
+        allow_origins=cors_allow_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Client-Type",
+            "X-CSRF-Token",
+        ],
+        expose_headers=["X-Request-ID"],
+        max_age=600,
     )
 
     # Add security headers middleware (before CSRF for proper header ordering)
