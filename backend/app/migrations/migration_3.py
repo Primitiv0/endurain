@@ -40,8 +40,8 @@ import strava.activity_utils as strava_activity_utils
 import core.logger as core_logger
 import core.config as core_config
 
-import fit.utils as fit_utils
-import gpx.utils as gpx_utils
+import activities.activity_file_import.utils_fit as fit_utils
+import activities.activity_file_import.utils_gpx as gpx_utils
 
 
 def process_migration_3(db: Session) -> None:

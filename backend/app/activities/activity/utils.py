@@ -48,9 +48,9 @@ import strava.bulk_import_utils as strava_bulk_import_utils
 
 import websocket.manager as websocket_manager
 
-import gpx.utils as gpx_utils
-import tcx.utils as tcx_utils
-import fit.utils as fit_utils
+import activities.activity_file_import.utils_fit as fit_utils
+import activities.activity_file_import.utils_gpx as gpx_utils
+import activities.activity_file_import.utils_tcx as tcx_utils
 
 import activities.activity.thumbnail as activities_thumbnail
 
