@@ -13,11 +13,11 @@ from timezonefinder import TimezoneFinder
 
 import activities.activity.utils as activities_utils
 import activities.activity.schema as activities_schema
+import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
-import users.users_privacy_settings.utils as users_privacy_settings_utils
 
 # ISO 8601 datetime format used throughout this module
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
@@ -697,7 +697,9 @@ def _build_activity_schema(
     Returns:
         Populated Activity schema instance.
     """
-    ups = user_privacy_settings
+    privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(
+        user_privacy_settings
+    )
     elapsed = (
         state["last_waypoint_time"]
         - state["first_waypoint_time"]
@@ -775,50 +777,12 @@ def _build_activity_schema(
             else None
         ),
         calories=state["calories"],
-        visibility=(
-            users_privacy_settings_utils
-            .visibility_to_int(
-                ups.default_activity_visibility
-            )
-        ),
         gear_id=state["gear_id"],
         strava_gear_id=None,
         strava_activity_id=None,
         garminconnect_activity_id=None,
         garminconnect_gear_id=None,
-        hide_start_time=(
-            ups.hide_activity_start_time or False
-        ),
-        hide_location=(
-            ups.hide_activity_location or False
-        ),
-        hide_map=ups.hide_activity_map or False,
-        hide_hr=ups.hide_activity_hr or False,
-        hide_power=(
-            ups.hide_activity_power or False
-        ),
-        hide_cadence=(
-            ups.hide_activity_cadence or False
-        ),
-        hide_elevation=(
-            ups.hide_activity_elevation or False
-        ),
-        hide_speed=(
-            ups.hide_activity_speed or False
-        ),
-        hide_pace=(
-            ups.hide_activity_pace or False
-        ),
-        hide_laps=(
-            ups.hide_activity_laps or False
-        ),
-        hide_workout_sets_steps=(
-            ups.hide_activity_workout_sets_steps
-            or False
-        ),
-        hide_gear=(
-            ups.hide_activity_gear or False
-        ),
+        **privacy_kwargs,
     )
 
 
@@ -925,38 +889,19 @@ def parse_gpx_file(
             state["vel_waypoints"],
         )
 
+        waypoints = {
+            "ele_waypoints": state["ele_waypoints"],
+            "power_waypoints": state["power_waypoints"],
+            "hr_waypoints": state["hr_waypoints"],
+            "vel_waypoints": state["vel_waypoints"],
+            "pace_waypoints": state["pace_waypoints"],
+            "cad_waypoints": state["cad_waypoints"],
+            "lat_lon_waypoints": state["lat_lon_waypoints"],
+        }
         return ParsedGpxData(
-            activity=activity,
-            is_elevation_set=(
-                state["is_elevation_set"]
-            ),
-            ele_waypoints=state["ele_waypoints"],
-            is_power_set=state["is_power_set"],
-            power_waypoints=(
-                state["power_waypoints"]
-            ),
-            is_heart_rate_set=(
-                state["is_heart_rate_set"]
-            ),
-            hr_waypoints=state["hr_waypoints"],
-            is_velocity_set=(
-                state["is_velocity_set"]
-            ),
-            vel_waypoints=state["vel_waypoints"],
-            pace_waypoints=(
-                state["pace_waypoints"]
-            ),
-            is_cadence_set=(
-                state["is_cadence_set"]
-            ),
-            cad_waypoints=state["cad_waypoints"],
-            is_lat_lon_set=(
-                state["is_lat_lon_set"]
-            ),
-            lat_lon_waypoints=(
-                state["lat_lon_waypoints"]
-            ),
-            laps=laps,
+            **activity_file_import_utils.build_activity_file_payload(
+                activity, waypoints, laps
+            )
         )
 
     except HTTPException as http_err:

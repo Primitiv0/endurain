@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo, available_timezones
 import activities.activity.utils as activities_utils
 import activities.activity.schema as activities_schema
 
+import activities.activity_file_import.utils as activity_file_import_utils
+
 import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
 
@@ -22,7 +24,6 @@ import garmin.utils as garmin_utils
 import gears.gear.crud as gears_crud
 
 import users.users_privacy_settings.models as users_privacy_settings_models
-import users.users_privacy_settings.utils as users_privacy_settings_utils
 
 import core.logger as core_logger
 
@@ -124,6 +125,12 @@ def create_activity_objects(
                         session_record["power_waypoints"]
                     )
 
+            privacy_kwargs = (
+                activity_file_import_utils.build_activity_privacy_kwargs(
+                    user_privacy_settings
+                )
+            )
+
             parsed_activity = {
                 # Create an Activity object with parsed data
                 "activity": activities_schema.Activity(
@@ -162,9 +169,6 @@ def create_activity_objects(
                     workout_feeling=session_record["session"]["workout_feeling"],
                     workout_rpe=session_record["session"]["workout_rpe"],
                     calories=session_record["session"]["calories"],
-                    visibility=users_privacy_settings_utils.visibility_to_int(
-                        user_privacy_settings.default_activity_visibility
-                    ),
                     gear_id=gear_id,
                     strava_gear_id=None,
                     strava_activity_id=None,
@@ -172,25 +176,11 @@ def create_activity_objects(
                     garminconnect_gear_id=(
                         garminconnect_gear[0]["uuid"] if garminconnect_gear else None
                     ),
-                    hide_start_time=user_privacy_settings.hide_activity_start_time
-                    or False,
-                    hide_location=user_privacy_settings.hide_activity_location or False,
-                    hide_map=user_privacy_settings.hide_activity_map or False,
-                    hide_hr=user_privacy_settings.hide_activity_hr or False,
-                    hide_power=user_privacy_settings.hide_activity_power or False,
-                    hide_cadence=user_privacy_settings.hide_activity_cadence or False,
-                    hide_elevation=user_privacy_settings.hide_activity_elevation
-                    or False,
-                    hide_speed=user_privacy_settings.hide_activity_speed or False,
-                    hide_pace=user_privacy_settings.hide_activity_pace or False,
-                    hide_laps=user_privacy_settings.hide_activity_laps or False,
-                    hide_workout_sets_steps=user_privacy_settings.hide_activity_workout_sets_steps
-                    or False,
-                    hide_gear=user_privacy_settings.hide_activity_gear or False,
                     tracker_manufacturer=session_record["file_id"].get(
                         "manufacturer", None
                     ),
                     tracker_model=str(session_record["file_id"].get("product", None)),
+                    **privacy_kwargs,
                 ),
                 "is_elevation_set": session_record["is_elevation_set"],
                 "ele_waypoints": session_record["ele_waypoints"],

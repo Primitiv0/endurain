@@ -9,11 +9,11 @@ from timezonefinder import TimezoneFinder
 
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
+import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
-import users.users_privacy_settings.utils as users_privacy_settings_utils
 
 
 def _parse_lap_power(
@@ -280,8 +280,8 @@ def _build_activity(
     fmt = "%Y-%m-%dT%H:%M:%S"
     elapsed = (tcx_file.end_time - tcx_file.start_time).total_seconds()
 
-    visibility = users_privacy_settings_utils.visibility_to_int(
-        user_privacy_settings.default_activity_visibility
+    privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(
+        user_privacy_settings
     )
 
     return activities_schema.Activity(
@@ -308,22 +308,8 @@ def _build_activity(
         average_cad=(round(tcx_file.cadence_avg) if tcx_file.cadence_avg else None),
         max_cad=(round(tcx_file.cadence_max) if tcx_file.cadence_max else None),
         calories=(tcx_file.calories if tcx_file.calories else None),
-        visibility=visibility,
         gear_id=gear_id,
-        hide_start_time=(user_privacy_settings.hide_activity_start_time or False),
-        hide_location=(user_privacy_settings.hide_activity_location or False),
-        hide_map=(user_privacy_settings.hide_activity_map or False),
-        hide_hr=(user_privacy_settings.hide_activity_hr or False),
-        hide_power=(user_privacy_settings.hide_activity_power or False),
-        hide_cadence=(user_privacy_settings.hide_activity_cadence or False),
-        hide_elevation=(user_privacy_settings.hide_activity_elevation or False),
-        hide_speed=(user_privacy_settings.hide_activity_speed or False),
-        hide_pace=(user_privacy_settings.hide_activity_pace or False),
-        hide_laps=(user_privacy_settings.hide_activity_laps or False),
-        hide_workout_sets_steps=(
-            user_privacy_settings.hide_activity_workout_sets_steps or False
-        ),
-        hide_gear=(user_privacy_settings.hide_activity_gear or False),
+        **privacy_kwargs,
     )
 
 
@@ -430,23 +416,14 @@ def parse_tcx_file(
             user_privacy_settings=user_privacy_settings,
         )
 
-        return {
-            "activity": activity,
-            "is_elevation_set": bool(waypoints["ele_waypoints"]),
-            "ele_waypoints": (waypoints["ele_waypoints"]),
-            "is_power_set": bool(power_wp),
+        waypoints_combined = {
+            **waypoints,
             "power_waypoints": power_wp,
-            "is_heart_rate_set": bool(waypoints["hr_waypoints"]),
-            "hr_waypoints": (waypoints["hr_waypoints"]),
-            "is_velocity_set": bool(waypoints["vel_waypoints"]),
-            "vel_waypoints": (waypoints["vel_waypoints"]),
-            "pace_waypoints": (waypoints["pace_waypoints"]),
-            "is_cadence_set": bool(waypoints["cad_waypoints"]),
-            "cad_waypoints": (waypoints["cad_waypoints"]),
-            "is_lat_lon_set": bool(lat_lon_wp),
             "lat_lon_waypoints": lat_lon_wp,
-            "laps": laps,
         }
+        return activity_file_import_utils.build_activity_file_payload(
+            activity, waypoints_combined, laps
+        )
 
     except HTTPException as http_err:
         raise http_err
