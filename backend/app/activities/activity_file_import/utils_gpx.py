@@ -9,6 +9,8 @@ import gpxpy.gpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from geopy.distance import geodesic
+
 import activities.activity.utils as activities_utils
 import activities.activity.schema as activities_schema
 import activities.activity_file_import.utils as activity_file_import_utils
@@ -19,7 +21,7 @@ import users.users_privacy_settings.models as users_privacy_settings_models
 
 # Re-export for backwards compatibility (migration_3.py calls
 # gpx_utils.generate_activity_laps directly).
-from activities.activity_file_import.utils import (  # noqa: E402
+from activities.activity_file_import.utils import (
     LapMetrics,
     generate_activity_laps,
 )

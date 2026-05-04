@@ -1,5 +1,4 @@
 import fitdecode
-from enum import Enum
 
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone
