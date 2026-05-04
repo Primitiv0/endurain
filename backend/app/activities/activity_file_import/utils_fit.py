@@ -131,74 +131,75 @@ def create_activity_objects(
                 )
             )
 
-            parsed_activity = {
-                # Create an Activity object with parsed data
-                "activity": activities_schema.Activity(
-                    user_id=user_id,
-                    name=activity_name,
-                    distance=(
-                        round(session_record["session"]["distance"])
-                        if session_record["session"]["distance"]
-                        else 0
-                    ),
-                    activity_type=activity_type,
-                    start_time=session_record["session"][
-                        "first_waypoint_time"
-                    ].strftime("%Y-%m-%dT%H:%M:%S"),
-                    end_time=session_record["session"]["last_waypoint_time"].strftime(
-                        "%Y-%m-%dT%H:%M:%S"
-                    ),
-                    timezone=timezone,
-                    total_elapsed_time=session_record["session"]["total_elapsed_time"],
-                    total_timer_time=total_timer_time,
-                    city=session_record["session"]["city"],
-                    town=session_record["session"]["town"],
-                    country=session_record["session"]["country"],
-                    elevation_gain=session_record["session"]["ele_gain"],
-                    elevation_loss=session_record["session"]["ele_loss"],
-                    pace=pace,
-                    average_speed=session_record["session"]["avg_speed"],
-                    max_speed=session_record["session"]["max_speed"],
-                    average_power=round(avg_power) if avg_power else None,
-                    max_power=round(max_power) if max_power else None,
-                    normalized_power=round(np_power) if np_power else None,
-                    average_hr=session_record["session"]["avg_hr"],
-                    max_hr=session_record["session"]["max_hr"],
-                    average_cad=session_record["session"]["avg_cadence"],
-                    max_cad=session_record["session"]["max_cadence"],
-                    workout_feeling=session_record["session"]["workout_feeling"],
-                    workout_rpe=session_record["session"]["workout_rpe"],
-                    calories=session_record["session"]["calories"],
-                    gear_id=gear_id,
-                    strava_gear_id=None,
-                    strava_activity_id=None,
-                    garminconnect_activity_id=garmin_activity_id,
-                    garminconnect_gear_id=(
-                        garminconnect_gear[0]["uuid"] if garminconnect_gear else None
-                    ),
-                    tracker_manufacturer=session_record["file_id"].get(
-                        "manufacturer", None
-                    ),
-                    tracker_model=str(session_record["file_id"].get("product", None)),
-                    **privacy_kwargs,
+            activity = activities_schema.Activity(
+                user_id=user_id,
+                name=activity_name,
+                distance=(
+                    round(session_record["session"]["distance"])
+                    if session_record["session"]["distance"]
+                    else 0
                 ),
-                "is_elevation_set": session_record["is_elevation_set"],
+                activity_type=activity_type,
+                start_time=session_record["session"][
+                    "first_waypoint_time"
+                ].strftime("%Y-%m-%dT%H:%M:%S"),
+                end_time=session_record["session"]["last_waypoint_time"].strftime(
+                    "%Y-%m-%dT%H:%M:%S"
+                ),
+                timezone=timezone,
+                total_elapsed_time=session_record["session"]["total_elapsed_time"],
+                total_timer_time=total_timer_time,
+                city=session_record["session"]["city"],
+                town=session_record["session"]["town"],
+                country=session_record["session"]["country"],
+                elevation_gain=session_record["session"]["ele_gain"],
+                elevation_loss=session_record["session"]["ele_loss"],
+                pace=pace,
+                average_speed=session_record["session"]["avg_speed"],
+                max_speed=session_record["session"]["max_speed"],
+                average_power=round(avg_power) if avg_power else None,
+                max_power=round(max_power) if max_power else None,
+                normalized_power=round(np_power) if np_power else None,
+                average_hr=session_record["session"]["avg_hr"],
+                max_hr=session_record["session"]["max_hr"],
+                average_cad=session_record["session"]["avg_cadence"],
+                max_cad=session_record["session"]["max_cadence"],
+                workout_feeling=session_record["session"]["workout_feeling"],
+                workout_rpe=session_record["session"]["workout_rpe"],
+                calories=session_record["session"]["calories"],
+                gear_id=gear_id,
+                strava_gear_id=None,
+                strava_activity_id=None,
+                garminconnect_activity_id=garmin_activity_id,
+                garminconnect_gear_id=(
+                    garminconnect_gear[0]["uuid"] if garminconnect_gear else None
+                ),
+                tracker_manufacturer=session_record["file_id"].get(
+                    "manufacturer", None
+                ),
+                tracker_model=str(session_record["file_id"].get("product", None)),
+                **privacy_kwargs,
+            )
+
+            waypoints = {
                 "ele_waypoints": session_record["ele_waypoints"],
-                "is_power_set": session_record["is_power_set"],
                 "power_waypoints": session_record["power_waypoints"],
-                "is_heart_rate_set": session_record["is_heart_rate_set"],
                 "hr_waypoints": session_record["hr_waypoints"],
-                "is_velocity_set": session_record["is_velocity_set"],
                 "vel_waypoints": session_record["vel_waypoints"],
                 "pace_waypoints": session_record["pace_waypoints"],
-                "is_cadence_set": session_record["is_cadence_set"],
                 "cad_waypoints": session_record["cad_waypoints"],
-                "is_lat_lon_set": session_record["is_lat_lon_set"],
                 "lat_lon_waypoints": session_record["lat_lon_waypoints"],
-                "laps": session_record["laps"],
+            }
+            extras = {
                 "sets": session_record["sets"],
                 "workout_steps": session_record["workout_steps"],
             }
+            parsed_activity = activity_file_import_utils.build_activity_file_payload(
+                activity,
+                waypoints,
+                session_record["laps"],
+                extras,
+            )
 
             activities.append(parsed_activity)
 
