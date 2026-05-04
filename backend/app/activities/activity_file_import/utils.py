@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TypedDict
 
 from geopy.distance import geodesic
@@ -382,11 +382,6 @@ def generate_activity_laps(
     return laps
 
 
-# ---------------------------------------------------------------------------
-# Phase 7 placeholder: FIT session stream filtering
-# ---------------------------------------------------------------------------
-
-
 def filter_streams_by_time_range(
     streams: dict[str, list[dict]],
     start_time: datetime,
@@ -394,17 +389,40 @@ def filter_streams_by_time_range(
 ) -> dict[str, list[dict]]:
     """Filter all waypoint streams to a time range.
 
+    Handles both tz-naive and tz-aware ``start_time`` / ``end_time``.
+    Waypoint ``'time'`` values are parsed as ISO 8601 strings and treated
+    as UTC when no timezone info is present.
+
     Args:
         streams: Dict keyed by stream name mapping to lists of waypoint
             dicts, each containing a ``'time'`` key.
-        start_time: Inclusive lower bound.
-        end_time: Inclusive upper bound.
+        start_time: Inclusive lower bound (tz-aware or tz-naive UTC).
+        end_time: Inclusive upper bound (tz-aware or tz-naive UTC).
 
     Returns:
         New dict with the same keys, each stream filtered to the given
         time range.
     """
-    raise NotImplementedError("Implemented in Phase 7")
+    # Normalise bounds to UTC-aware for consistent comparisons.
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=timezone.utc)
+
+    def _parse_wp_time(time_str: str) -> datetime:
+        dt = datetime.strptime(time_str, _DT_FMT)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    return {
+        key: [
+            wp
+            for wp in waypoints
+            if start_time <= _parse_wp_time(wp["time"]) <= end_time
+        ]
+        for key, waypoints in streams.items()
+    }
 
 
 # ---------------------------------------------------------------------------

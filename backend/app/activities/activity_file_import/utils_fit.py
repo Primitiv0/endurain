@@ -252,12 +252,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
 
     sessions_records = []
 
-    def _parse_wp_time(time_str: str) -> datetime:
-        """Parse a waypoint time string into a UTC-aware datetime."""
-        dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
-        return dt.replace(tzinfo=timezone.utc)
-
-    # Convert session times to datetime objects for easier comparison
+        # Convert session times to datetime objects for easier comparison
     for i, session in enumerate(sessions):
         # Use the time as is if it’s already a datetime object; otherwise, parse it
         start_time = session["first_waypoint_time"]
@@ -311,120 +306,88 @@ def split_records_by_activity(parsed_data: dict) -> dict:
             "file_id": parsed_data["file_id"],
         }
 
-        # Only parse arrays if the respective flag is set
+        # Build the streams dict for streams that are flagged as set,
+        # then filter all of them in one call.
+        raw_streams: dict[str, list[dict]] = {}
         if is_lat_lon_set:
-            activity_waypoints[i]["lat_lon_waypoints"] = [
-                wp
-                for wp in lat_lon_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
+            raw_streams["lat_lon_waypoints"] = lat_lon_waypoints
+        if is_elevation_set:
+            raw_streams["ele_waypoints"] = ele_waypoints
+        if is_heart_rate_set:
+            raw_streams["hr_waypoints"] = hr_waypoints
+        if is_cadence_set:
+            raw_streams["cad_waypoints"] = cad_waypoints
+        if is_power_set:
+            raw_streams["power_waypoints"] = power_waypoints
+        if is_velocity_set:
+            raw_streams["vel_waypoints"] = vel_waypoints
+            raw_streams["pace_waypoints"] = pace_waypoints
+
+        filtered = activity_file_import_utils.filter_streams_by_time_range(
+            raw_streams, start_time, end_time
+        )
+
+        if is_lat_lon_set:
+            activity_waypoints[i]["lat_lon_waypoints"] = filtered["lat_lon_waypoints"]
             # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["lat_lon_waypoints"]:
-                parsed_session["lat_lon_waypoints"] = activity_waypoints[i][
-                    "lat_lon_waypoints"
-                ]
+            if filtered["lat_lon_waypoints"]:
+                parsed_session["lat_lon_waypoints"] = filtered["lat_lon_waypoints"]
                 parsed_session["is_lat_lon_set"] = True
 
-                # If initial latitude and longitude are not set, set them to the first waypoint's coordinates
+                # If initial latitude and longitude are not set, set them
+                # to the first waypoint's coordinates
                 if (
                     parsed_session["session"]["initial_latitude"] is None
                     or parsed_session["session"]["initial_longitude"] is None
                 ):
-                    # Set initial latitude and longitude to the first waypoint's coordinates
-                    parsed_session["session"]["initial_latitude"] = activity_waypoints[
-                        i
-                    ]["lat_lon_waypoints"][0]["lat"]
-                    parsed_session["session"]["initial_longitude"] = activity_waypoints[
-                        i
-                    ]["lat_lon_waypoints"][0]["lon"]
+                    parsed_session["session"]["initial_latitude"] = (
+                        filtered["lat_lon_waypoints"][0]["lat"]
+                    )
+                    parsed_session["session"]["initial_longitude"] = (
+                        filtered["lat_lon_waypoints"][0]["lon"]
+                    )
 
-                # Use geocoding API to get city, town, and country based on coordinates
+                # Use geocoding API to get city, town, and country
                 location_data = activities_utils.location_based_on_coordinates(
                     session["initial_latitude"], session["initial_longitude"]
                 )
-
-                # Extract city, town, and country from location data
                 if location_data:
                     parsed_session["session"]["city"] = location_data["city"]
                     parsed_session["session"]["town"] = location_data["town"]
                     parsed_session["session"]["country"] = location_data["country"]
 
         if is_elevation_set:
-            activity_waypoints[i]["ele_waypoints"] = [
-                wp
-                for wp in ele_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
-            # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["ele_waypoints"]:
-                parsed_session["ele_waypoints"] = activity_waypoints[i]["ele_waypoints"]
+            activity_waypoints[i]["ele_waypoints"] = filtered["ele_waypoints"]
+            if filtered["ele_waypoints"]:
+                parsed_session["ele_waypoints"] = filtered["ele_waypoints"]
                 parsed_session["is_elevation_set"] = True
+
         if is_heart_rate_set:
-            activity_waypoints[i]["hr_waypoints"] = [
-                wp
-                for wp in hr_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
-            # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["hr_waypoints"]:
-                parsed_session["hr_waypoints"] = activity_waypoints[i]["hr_waypoints"]
+            activity_waypoints[i]["hr_waypoints"] = filtered["hr_waypoints"]
+            if filtered["hr_waypoints"]:
+                parsed_session["hr_waypoints"] = filtered["hr_waypoints"]
                 parsed_session["is_heart_rate_set"] = True
+
         if is_cadence_set:
-            activity_waypoints[i]["cad_waypoints"] = [
-                wp
-                for wp in cad_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
-            # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["cad_waypoints"]:
-                parsed_session["cad_waypoints"] = activity_waypoints[i]["cad_waypoints"]
+            activity_waypoints[i]["cad_waypoints"] = filtered["cad_waypoints"]
+            if filtered["cad_waypoints"]:
+                parsed_session["cad_waypoints"] = filtered["cad_waypoints"]
                 parsed_session["is_cadence_set"] = True
+
         if is_power_set:
-            activity_waypoints[i]["power_waypoints"] = [
-                wp
-                for wp in power_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
-            # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["power_waypoints"]:
-                parsed_session["power_waypoints"] = activity_waypoints[i][
-                    "power_waypoints"
-                ]
+            activity_waypoints[i]["power_waypoints"] = filtered["power_waypoints"]
+            if filtered["power_waypoints"]:
+                parsed_session["power_waypoints"] = filtered["power_waypoints"]
                 parsed_session["is_power_set"] = True
+
         if is_velocity_set:
-            activity_waypoints[i]["vel_waypoints"] = [
-                wp
-                for wp in vel_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
-            # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["vel_waypoints"]:
-                parsed_session["vel_waypoints"] = activity_waypoints[i]["vel_waypoints"]
+            activity_waypoints[i]["vel_waypoints"] = filtered["vel_waypoints"]
+            if filtered["vel_waypoints"]:
+                parsed_session["vel_waypoints"] = filtered["vel_waypoints"]
                 parsed_session["is_velocity_set"] = True
-            activity_waypoints[i]["pace_waypoints"] = [
-                wp
-                for wp in pace_waypoints
-                if start_time
-                <= _parse_wp_time(wp["time"])
-                <= end_time
-            ]
-            # If there are waypoints, set the parsed session's waypoints and flag
-            if activity_waypoints[i]["pace_waypoints"]:
-                parsed_session["pace_waypoints"] = activity_waypoints[i][
-                    "pace_waypoints"
-                ]
+            activity_waypoints[i]["pace_waypoints"] = filtered["pace_waypoints"]
+            if filtered["pace_waypoints"]:
+                parsed_session["pace_waypoints"] = filtered["pace_waypoints"]
                 parsed_session["is_velocity_set"] = True
 
         # Append the parsed session to the sessions list
