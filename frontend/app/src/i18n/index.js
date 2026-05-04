@@ -65,6 +65,8 @@ const componentPaths = {
   // Notifications components
   adminNewSignUpApprovalRequestNotificationComponent:
     'components/notifications/adminNewSignUpApprovalRequestNotificationComponent.json',
+  garminTokenExpiredNotificationComponent:
+    'components/notifications/garminTokenExpiredNotificationComponent.json',
   navbarNotificationsComponent: 'components/notifications/navbarNotificationsComponent.json',
   newAcceptedRequestNotificationComponent:
     'components/notifications/newAcceptedRequestNotificationComponent.json',

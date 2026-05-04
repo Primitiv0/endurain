@@ -313,3 +313,42 @@ async def create_admin_new_sign_up_approval_request_notification(
             status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
             detail="Internal Server Error",
         ) from err
+
+
+async def create_garmin_token_expired_notification(
+    user_id: int,
+    websocket_manager: websocket_manager.WebSocketManager,
+) -> None:
+    """
+    Notify user that their Garmin Connect tokens expired and their account was unlinked.
+
+    Args:
+        user_id: The user ID to notify.
+        websocket_manager: WebSocket manager instance.
+
+    Returns:
+        None.
+    """
+    with SessionLocal() as db:
+        try:
+            await _create_and_notify(
+                notifications_schema.NotificationCreate(
+                    user_id=user_id,
+                    type=(
+                        notifications_constants.NotificationType.GARMIN_TOKEN_EXPIRED
+                    ),
+                    options={},
+                ),
+                "GARMIN_TOKEN_EXPIRED_NOTIFICATION",
+                user_id,
+                websocket_manager,
+                db,
+            )
+        except HTTPException as http_err:
+            raise http_err
+        except Exception as err:
+            core_logger.print_to_log(
+                f"Error in create_garmin_token_expired_notification: {err}",
+                "error",
+                exc=err,
+            )

@@ -107,9 +107,9 @@ async def _retrieve_recent_strava_activities() -> None:
     await strava_activity_utils.retrieve_strava_users_activities_for_days(1, True)
 
 
-def _retrieve_recent_garmin_health() -> None:
+async def _retrieve_recent_garmin_health() -> None:
     """Backfill the last day of Garmin Connect health stats."""
-    garmin_health_utils.retrieve_garminconnect_users_health_for_days(1)
+    await garmin_health_utils.retrieve_garminconnect_users_health_for_days(1)
 
 
 def _purge_expired_tokens() -> None:
@@ -196,7 +196,7 @@ async def startup_event(fastapi_app: FastAPI) -> None:
     core_logger.print_to_log_and_console(
         "Retrieving last day health stats from Garmin Connect on startup"
     )
-    _safe_run("retrieve_recent_garmin_health", _retrieve_recent_garmin_health)
+    await _safe_run_async("retrieve_recent_garmin_health", _retrieve_recent_garmin_health)
 
     core_logger.print_to_log_and_console(
         "Purging expired tokens (password reset, sign-up, OAuth state, IdP link)"

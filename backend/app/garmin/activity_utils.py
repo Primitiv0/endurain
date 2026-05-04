@@ -16,6 +16,9 @@ import activities.activity.utils as activities_utils
 import activities.activity.crud as activities_crud
 
 import users.users.crud as users_crud
+import users.users_integrations.crud as user_integrations_crud
+
+import notifications.utils as notifications_utils
 
 import websocket.manager as websocket_manager
 
@@ -39,6 +42,17 @@ async def fetch_and_process_activities_by_dates(
             str(start_date.date()),
             str(end_date.date()),
         )
+    except garminconnect.GarminConnectAuthenticationError as err:
+        core_logger.print_to_log(
+            f"Garmin Connect token expired for user {user_id}. Unlinking account. User must re-link: {err}",
+            "error",
+            exc=err,
+        )
+        user_integrations_crud.unlink_garminconnect_account(user_id, db)
+        await notifications_utils.create_garmin_token_expired_notification(
+            user_id, ws_manager
+        )
+        return None
     except Exception as err:
         core_logger.print_to_log(
             f"Error fetching activities for user {user_id} between {start_date.date()} and {end_date.date()}: {err}",

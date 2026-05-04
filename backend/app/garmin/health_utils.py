@@ -19,6 +19,11 @@ import health.health_sleep.crud as health_sleep_crud
 import health.health_sleep.schema as health_sleep_schema
 
 import users.users.crud as users_crud
+import users.users_integrations.crud as user_integrations_crud
+
+import notifications.utils as notifications_utils
+
+import websocket.manager as websocket_manager_module
 
 from core.database import SessionLocal
 
@@ -35,6 +40,8 @@ def fetch_and_process_bc_by_dates(
         garmin_bc = garminconnect_client.get_body_composition(
             str(start_date.date()), str(end_date.date())
         )
+    except garminconnect.GarminConnectAuthenticationError:
+        raise
     except Exception as err:
         # Log an informational event if no body composition were found
         core_logger.print_to_log(
@@ -124,6 +131,8 @@ def fetch_and_process_ds_by_dates(
         garmin_ds = garminconnect_client.get_daily_steps(
             str(start_date.date()), str(end_date.date())
         )
+    except garminconnect.GarminConnectAuthenticationError:
+        raise
     except Exception as err:
         # Log an informational event if no daily steps were found
         core_logger.print_to_log(
@@ -219,6 +228,8 @@ def fetch_and_process_sleep_by_dates(
 
         try:
             garmin_sleep = garminconnect_client.get_sleep_data(date_string)
+        except garminconnect.GarminConnectAuthenticationError:
+            raise
         except Exception as err:
             core_logger.print_to_log(
                 f"Error fetching sleep data for user "
@@ -487,7 +498,9 @@ def fetch_and_process_sleep_by_dates(
     return count_processed
 
 
-def retrieve_garminconnect_users_health_for_days(days: int):
+async def retrieve_garminconnect_users_health_for_days(days: int):
+    ws_manager = websocket_manager_module.get_websocket_manager()
+
     # Create a new database session using context manager
     with SessionLocal() as db:
         try:
@@ -501,10 +514,11 @@ def retrieve_garminconnect_users_health_for_days(days: int):
             for user in users:
                 try:
                     # Get the user's Garmin Connect body composition data
-                    get_user_garminconnect_health_by_dates(
+                    await get_user_garminconnect_health_by_dates(
                         calculated_start_date,
                         calculated_end_date,
                         user.id,
+                        ws_manager,
                     )
                 except Exception as err:
                     core_logger.print_to_log(
@@ -520,8 +534,11 @@ def retrieve_garminconnect_users_health_for_days(days: int):
             )
 
 
-def get_user_garminconnect_health_by_dates(
-    start_date: datetime, end_date: datetime, user_id: int
+async def get_user_garminconnect_health_by_dates(
+    start_date: datetime,
+    end_date: datetime,
+    user_id: int,
+    ws_manager: websocket_manager_module.WebSocketManager,
 ):
     # Create a new database session using context manager
     with SessionLocal() as db:
@@ -568,6 +585,16 @@ def get_user_garminconnect_health_by_dates(
             )
             core_logger.print_to_log(
                 f"User {user_id}: {num_garminconnect_sleep_processed} Garmin Connect sleep data processed"
+            )
+        except garminconnect.GarminConnectAuthenticationError as err:
+            core_logger.print_to_log(
+                f"Garmin Connect token expired for user {user_id}. Unlinking account. User must re-link: {err}",
+                "error",
+                exc=err,
+            )
+            user_integrations_crud.unlink_garminconnect_account(user_id, db)
+            await notifications_utils.create_garmin_token_expired_notification(
+                user_id, ws_manager
             )
         except Exception as err:
             core_logger.print_to_log(

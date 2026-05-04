@@ -62,6 +62,12 @@
             v-else-if="notification.type === 101"
             @notificationRead="markNotificationAsRead"
           />
+          <GarminTokenExpiredNotificationComponent
+            :notification="notification"
+            :showDropdown="showDropdown"
+            v-else-if="notification.type === 21"
+            @notificationRead="markNotificationAsRead"
+          />
         </li>
         <li v-if="totalPages > 1 && totalPages > pageNumber">
           <a class="dropdown-item" @click="setPageNumber">Load more...</a>
@@ -96,6 +102,7 @@ import NewAcceptedRequestNotificationComponent from '@/components/Notifications/
 import NewActivityNotificationComponent from '@/components/Notifications/NewActivityNotificationComponent.vue'
 import NewActivityDuplicateStartTimeNotificationComponent from '@/components/Notifications/NewActivityDuplicateStartTimeNotificationComponent.vue'
 import NewFollowerRequestNotificationComponent from '@/components/Notifications/NewFollowerRequestNotificationComponent.vue'
+import GarminTokenExpiredNotificationComponent from '@/components/Notifications/GarminTokenExpiredNotificationComponent.vue'
 import NoItemsFoundComponents from '@/components/GeneralComponents/NoItemsFoundComponents.vue'
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 
@@ -251,7 +258,8 @@ onMounted(async () => {
             data.message === 'NEW_DUPLICATE_ACTIVITY_START_TIME_NOTIFICATION' ||
             data.message === 'NEW_FOLLOWER_REQUEST_NOTIFICATION' ||
             data.message === 'NEW_FOLLOWER_REQUEST_ACCEPTED_NOTIFICATION' ||
-            data.message === 'ADMIN_NEW_SIGN_UP_APPROVAL_REQUEST_NOTIFICATION')
+            data.message === 'ADMIN_NEW_SIGN_UP_APPROVAL_REQUEST_NOTIFICATION' ||
+            data.message === 'GARMIN_TOKEN_EXPIRED_NOTIFICATION')
         ) {
           await fetchNotificationById(data.notification_id)
         }
