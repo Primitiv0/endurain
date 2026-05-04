@@ -41,9 +41,7 @@ def _parse_lap_power(
     if not power_waypoints:
         return None, None, None
 
-    avg_pw, max_pw = activities_utils.calculate_avg_and_max(power_waypoints, "power")
-    norm_pw = activities_utils.calculate_np(power_waypoints)
-    return avg_pw, max_pw, norm_pw
+    return activity_file_import_utils.calculate_power_metrics(power_waypoints)
 
 
 def _parse_laps(
@@ -391,10 +389,9 @@ def parse_tcx_file(
             )
 
         if power_wp:
-            avg_power, max_power = activities_utils.calculate_avg_and_max(
-                power_wp, "power"
+            avg_power, max_power, norm_power = (
+                activity_file_import_utils.calculate_power_metrics(power_wp)
             )
-            norm_power = activities_utils.calculate_np(power_wp)
 
         activity = _build_activity(
             tcx_file=tcx_file,

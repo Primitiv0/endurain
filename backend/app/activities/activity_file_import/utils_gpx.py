@@ -435,15 +435,12 @@ def _compute_derived_metrics(
         )
 
     if state["power_waypoints"]:
-        state["avg_power"], state["max_power"] = (
-            activities_utils.calculate_avg_and_max(
-                state["power_waypoints"], "power",
-            )
-        )
-        state["normalized_power"] = (
-            activities_utils.calculate_np(
-                state["power_waypoints"],
-            )
+        (
+            state["avg_power"],
+            state["max_power"],
+            state["normalized_power"],
+        ) = activity_file_import_utils.calculate_power_metrics(
+            state["power_waypoints"]
         )
 
     activity_type = state["activity_type"]

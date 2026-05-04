@@ -466,11 +466,6 @@ def resolve_timezone_from_lat_lon(
     return tz if tz is not None else fallback_tz
 
 
-# ---------------------------------------------------------------------------
-# Phase 9 placeholder: power summary helper
-# ---------------------------------------------------------------------------
-
-
 def calculate_power_metrics(
     power_waypoints: list[dict],
 ) -> tuple[float | None, float | None, float | None]:
@@ -478,11 +473,14 @@ def calculate_power_metrics(
 
     Args:
         power_waypoints: List of waypoint dicts each containing a
-            ``'power'`` key with a numeric value.
+            ``'power'`` key with a numeric value.  Must be non-empty.
 
     Returns:
         Tuple of ``(avg_power, max_power, normalized_power)``.  Any
-        value may be ``None`` if the stream is empty or contains no
-        valid readings.
+        value may be ``None`` if the stream contains no valid readings.
     """
-    raise NotImplementedError("Implemented in Phase 9")
+    avg_power, max_power = activities_utils.calculate_avg_and_max(
+        power_waypoints, "power"
+    )
+    normalized_power = activities_utils.calculate_np(power_waypoints)
+    return avg_power, max_power, normalized_power

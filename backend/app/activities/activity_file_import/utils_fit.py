@@ -112,18 +112,20 @@ def create_activity_objects(
 
             avg_power = session_record["session"]["avg_power"]
             max_power = session_record["session"]["max_power"]
-            if avg_power is None:
-                if session_record["is_power_set"]:
-                    avg_power, max_power = activities_utils.calculate_avg_and_max(
-                        session_record["power_waypoints"], "power"
-                    )
-
             np_power = session_record["session"]["np"]
-            if np_power is None:
-                if session_record["is_power_set"]:
-                    np_power = activities_utils.calculate_np(
+            if session_record["is_power_set"] and (
+                avg_power is None or np_power is None
+            ):
+                calc_avg, calc_max, calc_np = (
+                    activity_file_import_utils.calculate_power_metrics(
                         session_record["power_waypoints"]
                     )
+                )
+                if avg_power is None:
+                    avg_power = calc_avg
+                    max_power = calc_max
+                if np_power is None:
+                    np_power = calc_np
 
             privacy_kwargs = (
                 activity_file_import_utils.build_activity_privacy_kwargs(
