@@ -5,7 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TypedDict
 
+from geopy.distance import geodesic
+
 import activities.activity.schema as activities_schema
+import activities.activity.utils as activities_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
 import users.users_privacy_settings.utils as users_privacy_settings_utils
 
@@ -107,62 +110,276 @@ def build_activity_file_payload(
     return payload
 
 
-# ---------------------------------------------------------------------------
-# Phase 6 placeholder: lap generation helpers
-# ---------------------------------------------------------------------------
-
-
 class LapMetrics(TypedDict):
-    """Aggregated metrics for a single activity lap."""
+    """Typed dictionary for a single lap's metrics.
+
+    Attributes:
+        start_time: ISO timestamp of lap start.
+        start_position_lat: Latitude of lap start.
+        start_position_long: Longitude of lap start.
+        end_position_lat: Latitude of lap end.
+        end_position_long: Longitude of lap end.
+        total_elapsed_time: Elapsed seconds.
+        total_timer_time: Timer seconds.
+        total_distance: Distance in metres.
+        avg_heart_rate: Average HR in bpm.
+        max_heart_rate: Maximum HR in bpm.
+        avg_cadence: Average cadence.
+        max_cadence: Maximum cadence.
+        avg_power: Average power in watts.
+        max_power: Maximum power in watts.
+        total_ascent: Total ascent in metres.
+        total_descent: Total descent in metres.
+        normalized_power: Normalized power.
+        enhanced_avg_pace: Average pace (min/km).
+        enhanced_avg_speed: Average speed (m/s).
+        enhanced_max_pace: Maximum pace (min/km).
+        enhanced_max_speed: Maximum speed (m/s).
+    """
 
     start_time: str
-    end_time: str
-    distance: float | None
-    avg_hr: float | None
-    max_hr: float | None
-    avg_cadence: float | None
-    avg_power: float | None
-    max_power: float | None
-    normalized_power: float | None
-    avg_speed: float | None
-    max_speed: float | None
-    avg_pace: float | None
+    start_position_lat: float | None
+    start_position_long: float | None
+    end_position_lat: float | None
+    end_position_long: float | None
+    total_elapsed_time: float
+    total_timer_time: float
+    total_distance: float
+    avg_heart_rate: int | None
+    max_heart_rate: int | None
+    avg_cadence: int | None
+    max_cadence: int | None
+    avg_power: int | None
+    max_power: int | None
+    total_ascent: int | None
+    total_descent: int | None
+    normalized_power: int | None
+    enhanced_avg_pace: float | None
+    enhanced_avg_speed: float | None
+    enhanced_max_pace: float | None
+    enhanced_max_speed: float | None
 
 
 def filter_waypoints_by_time_range(
     waypoints: list[dict],
-    start_time: datetime,
-    end_time: datetime,
+    start_time: str,
+    end_time: str,
 ) -> list[dict]:
     """Return waypoints whose time falls within [start_time, end_time].
 
     Args:
         waypoints: List of waypoint dicts each containing a ``'time'``
-            key with an ISO 8601 string or datetime value.
-        start_time: Inclusive lower bound.
-        end_time: Inclusive upper bound.
+            key with an ISO 8601 string.
+        start_time: ISO 8601 start time string (inclusive).
+        end_time: ISO 8601 end time string (inclusive).
 
     Returns:
         Filtered list of waypoint dicts.
     """
-    raise NotImplementedError("Implemented in Phase 6")
+    start_dt = datetime.strptime(start_time, _DT_FMT)
+    end_dt = datetime.strptime(end_time, _DT_FMT)
+    return [
+        wp
+        for wp in waypoints
+        if start_dt <= datetime.strptime(wp["time"], _DT_FMT) <= end_dt
+    ]
+
+
+def _compute_lap_metrics(
+    start_time: str,
+    end_time: str,
+    start_point: dict,
+    end_point: dict,
+    total_distance: float,
+    ele_waypoints: list[dict],
+    power_waypoints: list[dict],
+    hr_waypoints: list[dict],
+    cad_waypoints: list[dict],
+    vel_waypoints: list[dict],
+) -> LapMetrics:
+    """Compute metrics for a single activity lap.
+
+    Args:
+        start_time: ISO timestamp of lap start.
+        end_time: ISO timestamp of lap end.
+        start_point: Lat/lon dict of lap start.
+        end_point: Lat/lon dict of lap end.
+        total_distance: Lap distance in km.
+        ele_waypoints: Full elevation stream.
+        power_waypoints: Full power stream.
+        hr_waypoints: Full HR stream.
+        cad_waypoints: Full cadence stream.
+        vel_waypoints: Full velocity stream.
+
+    Returns:
+        Dict with all computed lap metrics.
+    """
+    lap_ele = filter_waypoints_by_time_range(
+        ele_waypoints,
+        start_time,
+        end_time,
+    )
+    lap_power = filter_waypoints_by_time_range(
+        power_waypoints,
+        start_time,
+        end_time,
+    )
+    lap_hr = filter_waypoints_by_time_range(
+        hr_waypoints,
+        start_time,
+        end_time,
+    )
+    lap_cad = filter_waypoints_by_time_range(
+        cad_waypoints,
+        start_time,
+        end_time,
+    )
+    lap_vel = filter_waypoints_by_time_range(
+        vel_waypoints,
+        start_time,
+        end_time,
+    )
+
+    ele_gain, ele_loss = None, None
+    if lap_ele:
+        ele_gain, ele_loss = activities_utils.compute_elevation_gain_and_loss(
+            elevations=lap_ele,
+        )
+
+    avg_hr, max_hr = None, None
+    if lap_hr:
+        avg_hr, max_hr = activities_utils.calculate_avg_and_max(
+            lap_hr,
+            "hr",
+        )
+
+    avg_cad, max_cad = None, None
+    if lap_cad:
+        avg_cad, max_cad = activities_utils.calculate_avg_and_max(
+            lap_cad,
+            "cad",
+        )
+
+    avg_speed, max_speed = None, None
+    if lap_vel:
+        avg_speed, max_speed = activities_utils.calculate_avg_and_max(
+            lap_vel,
+            "vel",
+        )
+
+    avg_power, max_power, norm_power = None, None, None
+    if lap_power:
+        avg_power, max_power = activities_utils.calculate_avg_and_max(
+            lap_power,
+            "power",
+        )
+        norm_power = activities_utils.calculate_np(lap_power)
+
+    elapsed = (
+        datetime.strptime(end_time, _DT_FMT) - datetime.strptime(start_time, _DT_FMT)
+    ).total_seconds()
+
+    return {
+        "start_time": start_time,
+        "start_position_lat": start_point["lat"],
+        "start_position_long": start_point["lon"],
+        "end_position_lat": end_point["lat"],
+        "end_position_long": end_point["lon"],
+        "total_elapsed_time": elapsed,
+        "total_timer_time": elapsed,
+        "total_distance": total_distance * 1000,
+        "avg_heart_rate": round(avg_hr) if avg_hr else None,
+        "max_heart_rate": round(max_hr) if max_hr else None,
+        "avg_cadence": round(avg_cad) if avg_cad else None,
+        "max_cadence": round(max_cad) if max_cad else None,
+        "avg_power": round(avg_power) if avg_power else None,
+        "max_power": round(max_power) if max_power else None,
+        "total_ascent": round(ele_gain) if ele_gain else None,
+        "total_descent": round(ele_loss) if ele_loss else None,
+        "normalized_power": round(norm_power) if norm_power else None,
+        "enhanced_avg_pace": 1 / avg_speed if avg_speed else None,
+        "enhanced_avg_speed": avg_speed,
+        "enhanced_max_pace": 1 / max_speed if max_speed else None,
+        "enhanced_max_speed": max_speed,
+    }
 
 
 def generate_activity_laps(
-    lap_data: list[dict],
-    waypoints: dict[str, list[dict]],
-) -> list[dict]:
-    """Generate lap metric dicts from lap boundaries and waypoint streams.
+    lat_lon_waypoints: list[dict],
+    ele_waypoints: list[dict],
+    power_waypoints: list[dict],
+    hr_waypoints: list[dict],
+    cad_waypoints: list[dict],
+    vel_waypoints: list[dict],
+    distance_per_lap_km: float = 1.0,
+) -> list[LapMetrics]:
+    """Split waypoints into distance-based laps and compute metrics.
 
     Args:
-        lap_data: List of raw lap dicts with at least ``'start_time'``
-            and ``'end_time'`` keys.
-        waypoints: Dict of stream lists (same keys as ``STREAM_KEYS``).
+        lat_lon_waypoints: List of lat/lon dicts.
+        ele_waypoints: List of elevation dicts.
+        power_waypoints: List of power dicts.
+        hr_waypoints: List of heart rate dicts.
+        cad_waypoints: List of cadence dicts.
+        vel_waypoints: List of velocity dicts.
+        distance_per_lap_km: Km per lap (default 1.0).
 
     Returns:
-        List of ``LapMetrics``-shaped dicts with aggregated metrics.
+        List of lap dicts with computed metrics.
     """
-    raise NotImplementedError("Implemented in Phase 6")
+    laps: list[LapMetrics] = []
+    current_lap_distance = 0.0
+    lap_start = None
+
+    for i in range(1, len(lat_lon_waypoints)):
+        prev_point = lat_lon_waypoints[i - 1]
+        current_point = lat_lon_waypoints[i]
+
+        segment_distance = geodesic(
+            (prev_point["lat"], prev_point["lon"]),
+            (current_point["lat"], current_point["lon"]),
+        ).kilometers
+
+        current_lap_distance += segment_distance
+
+        if lap_start is None:
+            lap_start = prev_point
+
+        if current_lap_distance >= distance_per_lap_km:
+            laps.append(
+                _compute_lap_metrics(
+                    start_time=lap_start["time"],
+                    end_time=current_point["time"],
+                    start_point=lap_start,
+                    end_point=current_point,
+                    total_distance=current_lap_distance,
+                    ele_waypoints=ele_waypoints,
+                    power_waypoints=power_waypoints,
+                    hr_waypoints=hr_waypoints,
+                    cad_waypoints=cad_waypoints,
+                    vel_waypoints=vel_waypoints,
+                )
+            )
+            lap_start = current_point
+            current_lap_distance = 0.0
+
+    if lap_start is not None and current_lap_distance > 0:
+        laps.append(
+            _compute_lap_metrics(
+                start_time=lap_start["time"],
+                end_time=lat_lon_waypoints[-1]["time"],
+                start_point=lap_start,
+                end_point=lat_lon_waypoints[-1],
+                total_distance=current_lap_distance,
+                ele_waypoints=ele_waypoints,
+                power_waypoints=power_waypoints,
+                hr_waypoints=hr_waypoints,
+                cad_waypoints=cad_waypoints,
+                vel_waypoints=vel_waypoints,
+            )
+        )
+
+    return laps
 
 
 # ---------------------------------------------------------------------------
