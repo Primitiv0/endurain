@@ -8,7 +8,6 @@ import gpxpy
 import gpxpy.gpx
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from timezonefinder import TimezoneFinder
 
 import activities.activity.utils as activities_utils
 import activities.activity.schema as activities_schema
@@ -268,12 +267,9 @@ def _process_trackpoint(
         state["first_waypoint_time"] = time
 
     if not state["location_resolved"]:
-        location_data = (
-            activities_utils
-            .location_based_on_coordinates(
-                latitude,
-                longitude,
-            )
+        location_data = activity_file_import_utils.resolve_location(
+            latitude,
+            longitude,
         )
         if location_data:
             state["city"] = location_data["city"]
@@ -373,7 +369,6 @@ def _compute_derived_metrics(
     state: dict,
     user_id: int,
     db: Session,
-    tf: TimezoneFinder,
 ) -> None:
     """
     Compute derived activity metrics and update state.
@@ -382,7 +377,6 @@ def _compute_derived_metrics(
         state: Mutable parse state dict.
         user_id: ID of the user.
         db: SQLAlchemy database session.
-        tf: Initialized TimezoneFinder instance.
 
     Returns:
         None
@@ -459,9 +453,12 @@ def _compute_derived_metrics(
         _ACTIVITY_TYPE_TREADMILL,
     ):
         if state["is_lat_lon_set"]:
-            state["timezone"] = tf.timezone_at(
-                lat=lat_lon[0]["lat"],
-                lng=lat_lon[0]["lon"],
+            state["timezone"] = (
+                activity_file_import_utils.resolve_timezone_from_lat_lon(
+                    lat_lon[0]["lat"],
+                    lat_lon[0]["lon"],
+                    state["timezone"],
+                )
             )
 
 
@@ -601,7 +598,6 @@ def parse_gpx_file(
         HTTPException: 500 if the file cannot be read.
     """
     try:
-        tf = TimezoneFinder()
         state = _init_parsing_state(
             activity_name_input,
             core_config.settings.TZ,
@@ -659,7 +655,7 @@ def parse_gpx_file(
             )
 
         _compute_derived_metrics(
-            state, user_id, db, tf
+            state, user_id, db
         )
 
         activity = _build_activity_schema(

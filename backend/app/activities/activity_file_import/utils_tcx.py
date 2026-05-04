@@ -5,7 +5,6 @@ from typing import Any
 import tcxreader
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from timezonefinder import TimezoneFinder
 
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
@@ -344,9 +343,7 @@ def parse_tcx_file(
         tcx_file = tcxreader.TCXReader().read(file)
         trackpoints = tcx_file.trackpoints_to_dict()
 
-        tf = TimezoneFinder()
         timezone = core_config.settings.TZ
-
         pace: float | None = None
         city: str | None = None
         town: str | None = None
@@ -377,7 +374,7 @@ def parse_tcx_file(
                 trackpoints[-1]["time"],
             )
 
-            location_data = activities_utils.location_based_on_coordinates(
+            location_data = activity_file_import_utils.resolve_location(
                 trackpoints[0]["latitude"],
                 trackpoints[0]["longitude"],
             )
@@ -387,9 +384,10 @@ def parse_tcx_file(
                 town = location_data["town"]
                 country = location_data["country"]
 
-            timezone = tf.timezone_at(
-                lat=trackpoints[0]["latitude"],
-                lng=trackpoints[0]["longitude"],
+            timezone = activity_file_import_utils.resolve_timezone_from_lat_lon(
+                trackpoints[0]["latitude"],
+                trackpoints[0]["longitude"],
+                timezone,
             )
 
         if power_wp:

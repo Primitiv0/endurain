@@ -4,7 +4,6 @@ from enum import Enum
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
-from timezonefinder import TimezoneFinder
 from zoneinfo import ZoneInfo, available_timezones
 
 import activities.activity.utils as activities_utils
@@ -39,8 +38,6 @@ def create_activity_objects(
     db: Session = None,
 ) -> list:
     try:
-        # Create an instance of TimezoneFinder
-        tf = TimezoneFinder()
         timezone = core_config.settings.TZ
 
         # Define variables
@@ -99,9 +96,12 @@ def create_activity_objects(
 
             if activity_type != 3 and activity_type != 7:
                 if session_record["is_lat_lon_set"]:
-                    timezone = tf.timezone_at(
-                        lat=session_record["lat_lon_waypoints"][0]["lat"],
-                        lng=session_record["lat_lon_waypoints"][0]["lon"],
+                    timezone = (
+                        activity_file_import_utils.resolve_timezone_from_lat_lon(
+                            session_record["lat_lon_waypoints"][0]["lat"],
+                            session_record["lat_lon_waypoints"][0]["lon"],
+                            timezone,
+                        )
                     )
                 else:
                     if session_record["time_offset"]:
@@ -348,7 +348,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                     )
 
                 # Use geocoding API to get city, town, and country
-                location_data = activities_utils.location_based_on_coordinates(
+                location_data = activity_file_import_utils.resolve_location(
                     session["initial_latitude"], session["initial_longitude"]
                 )
                 if location_data:
@@ -501,7 +501,7 @@ def parse_fit_file(
                         ):
                             # Use geocoding API to get city, town, and country based on coordinates
                             location_data = (
-                                activities_utils.location_based_on_coordinates(
+                                activity_file_import_utils.resolve_location(
                                     initial_latitude, initial_longitude
                                 )
                             )

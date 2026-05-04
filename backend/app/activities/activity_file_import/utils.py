@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import TypedDict
 
 from geopy.distance import geodesic
+from timezonefinder import TimezoneFinder
 
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
@@ -425,16 +426,13 @@ def filter_streams_by_time_range(
     }
 
 
-# ---------------------------------------------------------------------------
-# Phase 8 placeholders: location / timezone resolution
-# ---------------------------------------------------------------------------
-
-
 def resolve_location(
     latitude: float,
     longitude: float,
 ) -> dict[str, str] | None:
     """Get city, town, and country via geocoding.
+
+    Delegates to ``activities.activity.utils.location_based_on_coordinates``.
 
     Args:
         latitude: WGS-84 latitude in decimal degrees.
@@ -444,7 +442,7 @@ def resolve_location(
         Dict with keys ``'city'``, ``'town'``, ``'country'``, or
         ``None`` on geocoding error.
     """
-    raise NotImplementedError("Implemented in Phase 8")
+    return activities_utils.location_based_on_coordinates(latitude, longitude)
 
 
 def resolve_timezone_from_lat_lon(
@@ -463,7 +461,9 @@ def resolve_timezone_from_lat_lon(
     Returns:
         IANA timezone string (e.g. ``'Europe/Lisbon'``).
     """
-    raise NotImplementedError("Implemented in Phase 8")
+    tf = TimezoneFinder()
+    tz = tf.timezone_at(lat=latitude, lng=longitude)
+    return tz if tz is not None else fallback_tz
 
 
 # ---------------------------------------------------------------------------
