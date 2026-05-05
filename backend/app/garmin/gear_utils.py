@@ -143,8 +143,7 @@ def get_user_gear(user_id: int):
 
         # Create a Garmin Connect client with the user's access token
         garminconnect_client = garmin_utils.login_garminconnect_using_tokens(
-            user_integrations.garminconnect_oauth1,
-            user_integrations.garminconnect_oauth2,
+            user_integrations.garminconnect_token,
         )
 
         # Set the user's gear to sync to True

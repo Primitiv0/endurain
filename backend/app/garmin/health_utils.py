@@ -559,8 +559,7 @@ async def get_user_garminconnect_health_by_dates(
 
             # Create a Garmin Connect client with the user's access token
             garminconnect_client = garmin_utils.login_garminconnect_using_tokens(
-                user_integrations.garminconnect_oauth1,
-                user_integrations.garminconnect_oauth2,
+                user_integrations.garminconnect_token,
             )
 
             # Fetch Garmin Connect body composition for the specified date range

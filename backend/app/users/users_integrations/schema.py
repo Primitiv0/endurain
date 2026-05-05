@@ -24,10 +24,7 @@ class UsersIntegrationsBase(BaseModel):
         strava_refresh_token: Encrypted Strava refresh token.
         strava_token_expires_at: Strava token expiration time.
         strava_sync_gear: Enable Strava gear synchronization.
-        garminconnect_oauth1: Garmin Connect OAuth1 token
-            data.
-        garminconnect_oauth2: Garmin Connect OAuth2 token
-            data.
+        garminconnect_token: Garmin Connect token data.
         garminconnect_sync_gear: Enable Garmin Connect gear
             synchronization.
     """
@@ -68,11 +65,8 @@ class UsersIntegrationsBase(BaseModel):
     strava_sync_gear: StrictBool = Field(
         default=False, description="Whether Strava gear is to be synced"
     )
-    garminconnect_oauth1: dict[str, Any] | None = Field(
-        default=None, description="Garmin OAuth1 token"
-    )
-    garminconnect_oauth2: dict[str, Any] | None = Field(
-        default=None, description="Garmin OAuth2 token"
+    garminconnect_token: dict[str, Any] | None = Field(
+        default=None, description="Garmin Connect token"
     )
     garminconnect_sync_gear: StrictBool = Field(
         default=False,

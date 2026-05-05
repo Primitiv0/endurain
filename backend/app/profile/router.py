@@ -148,7 +148,7 @@ async def read_users_me(
         update={
             "is_strava_linked": (1 if user_integrations.strava_token else 0),
             "is_garminconnect_linked": (
-                1 if user_integrations.garminconnect_oauth1 else 0
+                1 if user_integrations.garminconnect_token else 0
             ),
             "default_activity_visibility": (
                 user_privacy_settings.default_activity_visibility
