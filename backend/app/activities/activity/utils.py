@@ -1948,13 +1948,26 @@ def generate_missing_activity_thumbnails() -> None:
         None — errors are logged per-activity; execution continues.
     """
     with core_database.SessionLocal() as db:
+        activities_with_thumbnail = activities_crud.get_activities_with_thumbnail(
+            db
+        )
+        for activity in activities_with_thumbnail:
+            thumb_path = Path(activity.map_thumbnail_path)
+            if not thumb_path.is_file():
+                activities_crud.set_activity_thumbnail_path(activity.id, None, db)
+                core_logger.print_to_log(
+                    f"Thumbnail scheduler: missing file for activity "
+                    f"{activity.id}, cleared thumbnail path in DB",
+                    "info",
+                )
+
         activities_without_thumbnail = activities_crud.get_activities_without_thumbnail(
             db
         )
 
         if not activities_without_thumbnail:
             core_logger.print_to_log(
-                "Thumbnail scheduler: no activities without " "thumbnail found",
+                "Thumbnail scheduler: no activities without thumbnail found",
                 "debug",
             )
             return

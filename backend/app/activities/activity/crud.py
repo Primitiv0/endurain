@@ -1380,6 +1380,32 @@ def clear_all_activity_thumbnail_paths(db: Session) -> None:
         )
 
 
+def get_activities_with_thumbnail(
+    db: Session,
+) -> list[activities_models.Activity]:
+    """Return activities that have a map thumbnail.
+
+    Args:
+        db: Database session.
+
+    Returns:
+        ORM rows with ``map_thumbnail_path`` set, or
+        an empty list on error.
+    """
+    try:
+        stmt = select(activities_models.Activity).where(
+            activities_models.Activity.map_thumbnail_path.isnot(None)
+        )
+        return list(db.execute(stmt).scalars().all())
+    except SQLAlchemyError as err:
+        core_logger.print_to_log(
+            f"Error in get_activities_with_thumbnail: {err}",
+            "error",
+            exc=err,
+        )
+        return []
+
+
 def get_activities_without_thumbnail(
     db: Session,
 ) -> list[activities_models.Activity]:
