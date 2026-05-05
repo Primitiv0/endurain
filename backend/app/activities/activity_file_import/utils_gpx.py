@@ -1,5 +1,6 @@
 """Utilities for parsing GPX files into activity data."""
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from math import isfinite
 from pathlib import Path
@@ -35,8 +36,69 @@ _DT_FMT = "%Y-%m-%dT%H:%M:%S"
 _ACTIVITY_TYPE_POOL_SWIM = 3
 _ACTIVITY_TYPE_TREADMILL = 7
 
+# Inclusive plausible elevation range in meters. Values outside this range
+# (or non-finite) are dropped to guard against sentinel/garbage readings.
 _ELEVATION_MIN = -9999.99
 _ELEVATION_MAX = 9999.99
+
+
+@dataclass
+class ParseState:
+    """
+    Mutable state accumulated while parsing a GPX file.
+
+    Attributes are grouped into activity metadata, aggregate metrics,
+    waypoint streams, segment-local cursors, and stream-presence flags.
+    """
+
+    timezone: str
+    activity_name: str = "Workout"
+    activity_type: str | int = "Workout"
+    activity_description: str | None = None
+    calories: int | None = None
+    distance: float = 0.0
+    avg_hr: float | None = None
+    max_hr: float | None = None
+    avg_cadence: float | None = None
+    max_cadence: float | None = None
+    avg_power: float | None = None
+    max_power: float | None = None
+    normalized_power: float | None = None
+    avg_speed: float | None = None
+    max_speed: float | None = None
+    ele_gain: float | None = None
+    ele_loss: float | None = None
+    pace: float = 0
+    first_waypoint_time: datetime | None = None
+    last_waypoint_time: datetime | None = None
+    location_resolved: bool = False
+    gear_id: int | None = None
+    city: str | None = None
+    town: str | None = None
+    country: str | None = None
+    lat_lon_waypoints: list[dict] = field(default_factory=list)
+    ele_waypoints: list[dict] = field(default_factory=list)
+    hr_waypoints: list[dict] = field(default_factory=list)
+    cad_waypoints: list[dict] = field(default_factory=list)
+    power_waypoints: list[dict] = field(default_factory=list)
+    vel_waypoints: list[dict] = field(default_factory=list)
+    pace_waypoints: list[dict] = field(default_factory=list)
+    prev_latitude: float | None = None
+    prev_longitude: float | None = None
+    prev_waypoint_time: datetime | None = None
+    lat_lon_segments: list[list[dict]] = field(default_factory=list)
+    is_lat_lon_set: bool = False
+    is_elevation_set: bool = False
+    is_power_set: bool = False
+    is_heart_rate_set: bool = False
+    is_cadence_set: bool = False
+    is_velocity_set: bool = False
+
+    def reset_segment(self) -> None:
+        """Clear cursors that must not carry across GPX segments."""
+        self.prev_latitude = None
+        self.prev_longitude = None
+        self.prev_waypoint_time = None
 
 
 class ParsedGpxData(TypedDict):
@@ -137,7 +199,7 @@ def _sanitize_elevation(elevation: float | None) -> float | None:
     if elevation is None or not isfinite(elevation):
         return None
 
-    if _ELEVATION_MIN < elevation < _ELEVATION_MAX:
+    if _ELEVATION_MIN <= elevation <= _ELEVATION_MAX:
         return elevation
 
     return None
@@ -183,6 +245,9 @@ def _extract_track_calories(
     """
     Extract total calories from track-level extensions.
 
+    Sums every ``Calories`` element found beneath the track's extension
+    blocks so files with multiple extension containers aggregate correctly.
+
     Args:
         track: GPX track with optional extension elements.
 
@@ -192,18 +257,23 @@ def _extract_track_calories(
     if not track.extensions:
         return None
 
+    total: int | None = None
     for extension in track.extensions:
         for element in extension.iter():
-            if _extension_local_name(element.tag) == "calories":
-                return _safe_optional_int(element.text)
+            if _extension_local_name(element.tag) != "calories":
+                continue
+            value = _safe_optional_int(element.text)
+            if value is None:
+                continue
+            total = (total or 0) + value
 
-    return None
+    return total
 
 
 def _init_parsing_state(
     activity_name_input: str | None,
     timezone: str,
-) -> dict:
+) -> ParseState:
     """
     Initialize mutable state for a GPX parse run.
 
@@ -212,60 +282,18 @@ def _init_parsing_state(
         timezone: Default timezone string.
 
     Returns:
-        Dict with all tracking fields at default values.
+        ParseState with all tracking fields at default values.
     """
-    return {
-        "activity_type": "Workout",
-        "calories": None,
-        "distance": 0,
-        "avg_hr": None,
-        "max_hr": None,
-        "avg_cadence": None,
-        "max_cadence": None,
-        "first_waypoint_time": None,
-        "last_waypoint_time": None,
-        "avg_power": None,
-        "max_power": None,
-        "ele_gain": None,
-        "ele_loss": None,
-        "normalized_power": None,
-        "avg_speed": None,
-        "max_speed": None,
-        "activity_name": (
-            activity_name_input or "Workout"
-        ),
-        "activity_description": None,
-        "location_resolved": False,
-        "gear_id": None,
-        "city": None,
-        "town": None,
-        "country": None,
-        "pace": 0,
-        "timezone": timezone,
-        "lat_lon_waypoints": [],
-        "ele_waypoints": [],
-        "hr_waypoints": [],
-        "cad_waypoints": [],
-        "power_waypoints": [],
-        "vel_waypoints": [],
-        "pace_waypoints": [],
-        "prev_latitude": None,
-        "prev_longitude": None,
-        "prev_waypoint_time": None,
-        "lat_lon_segments": [],
-        "is_lat_lon_set": False,
-        "is_elevation_set": False,
-        "is_power_set": False,
-        "is_heart_rate_set": False,
-        "is_cadence_set": False,
-        "is_velocity_set": False,
-    }
+    return ParseState(
+        timezone=timezone,
+        activity_name=activity_name_input or "Workout",
+    )
 
 
 def _process_track_metadata(
     track: gpxpy.gpx.GPXTrack,
     gpx: gpxpy.gpx.GPX,
-    state: dict,
+    state: ParseState,
 ) -> None:
     """
     Extract track-level metadata into parsing state.
@@ -273,49 +301,32 @@ def _process_track_metadata(
     Args:
         track: GPX track object.
         gpx: Root GPX object.
-        state: Mutable parse state dict.
+        state: Mutable parse state.
 
     Returns:
         None
     """
-    state["activity_name"] = (
-        track.name or gpx.name or "Workout"
-    )
-    state["activity_description"] = (
+    state.activity_name = track.name or gpx.name or "Workout"
+    state.activity_description = (
         track.description or gpx.description or None
     )
-    state["activity_type"] = track.type or "Workout"
+    state.activity_type = track.type or "Workout"
 
     calories = _extract_track_calories(track)
     if calories is not None:
-        state["calories"] = (state["calories"] or 0) + calories
-
-
-def _reset_segment_state(state: dict) -> None:
-    """
-    Reset state that must not carry across GPX segments.
-
-    Args:
-        state: Mutable parse state dict.
-
-    Returns:
-        None.
-    """
-    state["prev_latitude"] = None
-    state["prev_longitude"] = None
-    state["prev_waypoint_time"] = None
+        state.calories = (state.calories or 0) + calories
 
 
 def _process_trackpoint(
     point: gpxpy.gpx.GPXTrackPoint,
-    state: dict,
+    state: ParseState,
 ) -> None:
     """
     Process a single trackpoint and update parsing state.
 
     Args:
         point: GPX trackpoint to process.
-        state: Mutable parse state dict.
+        state: Mutable parse state.
 
     Returns:
         None
@@ -330,125 +341,95 @@ def _process_trackpoint(
         return
 
     if (
-        state["prev_latitude"] is not None
-        and state["prev_longitude"] is not None
+        state.prev_latitude is not None
+        and state.prev_longitude is not None
     ):
-        state["distance"] += geodesic(
-            (
-                state["prev_latitude"],
-                state["prev_longitude"],
-            ),
+        state.distance += geodesic(
+            (state.prev_latitude, state.prev_longitude),
             (latitude, longitude),
         ).meters
 
     if elevation is not None:
-        state["is_elevation_set"] = True
+        state.is_elevation_set = True
 
-    if state["first_waypoint_time"] is None:
-        state["first_waypoint_time"] = time
+    if state.first_waypoint_time is None:
+        state.first_waypoint_time = time
 
-    if not state["location_resolved"]:
+    if not state.location_resolved:
         location_data = activity_file_import_utils.resolve_location(
             latitude,
             longitude,
         )
         if location_data:
-            state["city"] = location_data["city"]
-            state["town"] = location_data["town"]
-            state["country"] = (
-                location_data["country"]
-            )
-            state["location_resolved"] = True
+            state.city = location_data["city"]
+            state.town = location_data["town"]
+            state.country = location_data["country"]
+            state.location_resolved = True
 
-    heart_rate, cadence, power = (
-        _extract_extension_data(point)
-    )
+    heart_rate, cadence, power = _extract_extension_data(point)
 
     if heart_rate != 0:
-        state["is_heart_rate_set"] = True
+        state.is_heart_rate_set = True
     if cadence != 0:
-        state["is_cadence_set"] = True
+        state.is_cadence_set = True
     if power != 0:
-        state["is_power_set"] = True
+        state.is_power_set = True
     else:
         power = None
 
-    instant_speed = (
-        activities_utils.calculate_instant_speed(
-            state["prev_waypoint_time"],
-            time,
-            latitude,
-            longitude,
-            state["prev_latitude"],
-            state["prev_longitude"],
-        )
+    instant_speed = activities_utils.calculate_instant_speed(
+        state.prev_waypoint_time,
+        time,
+        latitude,
+        longitude,
+        state.prev_latitude,
+        state.prev_longitude,
     )
 
     instant_pace = 0
     if instant_speed > 0:
         instant_pace = 1 / instant_speed
-        state["is_velocity_set"] = True
+        state.is_velocity_set = True
 
     timestamp = time.strftime(_DT_FMT)
 
-    if (
-        latitude is not None
-        and longitude is not None
-    ):
-        state["lat_lon_waypoints"].append(
+    if latitude is not None and longitude is not None:
+        state.lat_lon_waypoints.append(
             {
                 "time": timestamp,
                 "lat": latitude,
                 "lon": longitude,
             }
         )
-        state["is_lat_lon_set"] = True
+        state.is_lat_lon_set = True
 
     activities_utils.append_if_not_none(
-        state["ele_waypoints"],
-        timestamp,
-        elevation,
-        "ele",
+        state.ele_waypoints, timestamp, elevation, "ele",
     )
     activities_utils.append_if_not_none(
-        state["hr_waypoints"],
-        timestamp,
-        heart_rate,
-        "hr",
+        state.hr_waypoints, timestamp, heart_rate, "hr",
     )
     activities_utils.append_if_not_none(
-        state["cad_waypoints"],
-        timestamp,
-        cadence,
-        "cad",
+        state.cad_waypoints, timestamp, cadence, "cad",
     )
     activities_utils.append_if_not_none(
-        state["power_waypoints"],
-        timestamp,
-        power,
-        "power",
+        state.power_waypoints, timestamp, power, "power",
     )
     activities_utils.append_if_not_none(
-        state["vel_waypoints"],
-        timestamp,
-        instant_speed,
-        "vel",
+        state.vel_waypoints, timestamp, instant_speed, "vel",
     )
     activities_utils.append_if_not_none(
-        state["pace_waypoints"],
-        timestamp,
-        instant_pace,
-        "pace",
+        state.pace_waypoints, timestamp, instant_pace, "pace",
     )
 
-    state["prev_latitude"] = latitude
-    state["prev_longitude"] = longitude
-    state["prev_waypoint_time"] = time
-    state["last_waypoint_time"] = time
+    state.prev_latitude = latitude
+    state.prev_longitude = longitude
+    state.prev_waypoint_time = time
+    state.last_waypoint_time = time
 
 
 def _compute_derived_metrics(
-    state: dict,
+    state: ParseState,
     user_id: int,
     db: Session,
 ) -> None:
@@ -456,93 +437,82 @@ def _compute_derived_metrics(
     Compute derived activity metrics and update state.
 
     Args:
-        state: Mutable parse state dict.
+        state: Mutable parse state.
         user_id: ID of the user.
         db: SQLAlchemy database session.
 
     Returns:
         None
     """
-    if state["ele_waypoints"]:
-        gain, loss = (
-            activities_utils
-            .compute_elevation_gain_and_loss(
-                elevations=state["ele_waypoints"],
-            )
+    if state.ele_waypoints:
+        gain, loss = activities_utils.compute_elevation_gain_and_loss(
+            elevations=state.ele_waypoints,
         )
-        state["ele_gain"] = gain
-        state["ele_loss"] = loss
+        state.ele_gain = gain
+        state.ele_loss = loss
 
-    state["pace"] = activities_utils.calculate_pace(
-        state["distance"],
-        state["first_waypoint_time"],
-        state["last_waypoint_time"],
+    state.pace = activities_utils.calculate_pace(
+        state.distance,
+        state.first_waypoint_time,
+        state.last_waypoint_time,
     )
 
-    state["activity_type"] = (
-        activities_utils.define_activity_type(
-            state["activity_type"],
-        )
+    state.activity_type = activities_utils.define_activity_type(
+        state.activity_type,
     )
 
-    state["gear_id"] = (
-        user_default_gear_utils
-        .get_user_default_gear_by_activity_type(
+    state.gear_id = (
+        user_default_gear_utils.get_user_default_gear_by_activity_type(
             user_id,
-            state["activity_type"],
+            state.activity_type,
             db,
         )
     )
 
-    if state["hr_waypoints"]:
-        state["avg_hr"], state["max_hr"] = (
+    if state.hr_waypoints:
+        state.avg_hr, state.max_hr = activities_utils.calculate_avg_and_max(
+            state.hr_waypoints, "hr",
+        )
+
+    if state.cad_waypoints:
+        state.avg_cadence, state.max_cadence = (
             activities_utils.calculate_avg_and_max(
-                state["hr_waypoints"], "hr",
+                state.cad_waypoints, "cad",
             )
         )
 
-    if state["cad_waypoints"]:
-        (
-            state["avg_cadence"],
-            state["max_cadence"],
-        ) = activities_utils.calculate_avg_and_max(
-            state["cad_waypoints"], "cad",
-        )
-
-    if state["vel_waypoints"]:
-        state["avg_speed"], state["max_speed"] = (
+    if state.vel_waypoints:
+        state.avg_speed, state.max_speed = (
             activities_utils.calculate_avg_and_max(
-                state["vel_waypoints"], "vel",
+                state.vel_waypoints, "vel",
             )
         )
 
-    if state["power_waypoints"]:
+    if state.power_waypoints:
         (
-            state["avg_power"],
-            state["max_power"],
-            state["normalized_power"],
+            state.avg_power,
+            state.max_power,
+            state.normalized_power,
         ) = activity_file_import_utils.calculate_power_metrics(
-            state["power_waypoints"]
+            state.power_waypoints
         )
 
-    activity_type = state["activity_type"]
-    lat_lon = state["lat_lon_waypoints"]
-    if activity_type not in (
+    if state.activity_type not in (
         _ACTIVITY_TYPE_POOL_SWIM,
         _ACTIVITY_TYPE_TREADMILL,
     ):
-        if state["is_lat_lon_set"]:
-            state["timezone"] = (
+        if state.is_lat_lon_set:
+            state.timezone = (
                 activity_file_import_utils.resolve_timezone_from_lat_lon(
-                    lat_lon[0]["lat"],
-                    lat_lon[0]["lon"],
-                    state["timezone"],
+                    state.lat_lon_waypoints[0]["lat"],
+                    state.lat_lon_waypoints[0]["lon"],
+                    state.timezone,
                 )
             )
 
 
 def _build_activity_schema(
-    state: dict,
+    state: ParseState,
     user_id: int,
     user_privacy_settings: (
         users_privacy_settings_models.UsersPrivacySettings
@@ -552,7 +522,7 @@ def _build_activity_schema(
     Build an Activity Pydantic schema from parsed state.
 
     Args:
-        state: Parsed GPX state dict.
+        state: Parsed GPX state.
         user_id: ID of the user.
         user_privacy_settings: ORM privacy settings object.
 
@@ -563,83 +533,50 @@ def _build_activity_schema(
         user_privacy_settings
     )
     elapsed = (
-        state["last_waypoint_time"]
-        - state["first_waypoint_time"]
+        state.last_waypoint_time - state.first_waypoint_time
     ).total_seconds()
     return activities_schema.Activity(
         user_id=user_id,
-        name=state["activity_name"],
-        description=state["activity_description"],
-        distance=(
-            round(state["distance"])
-            if state["distance"]
-            else 0
-        ),
-        activity_type=state["activity_type"],
-        start_time=(
-            state["first_waypoint_time"]
-            .strftime(_DT_FMT)
-        ),
-        end_time=(
-            state["last_waypoint_time"]
-            .strftime(_DT_FMT)
-        ),
-        timezone=state["timezone"],
+        name=state.activity_name,
+        description=state.activity_description,
+        distance=round(state.distance) if state.distance else 0,
+        activity_type=state.activity_type,
+        start_time=state.first_waypoint_time.strftime(_DT_FMT),
+        end_time=state.last_waypoint_time.strftime(_DT_FMT),
+        timezone=state.timezone,
         total_elapsed_time=elapsed,
         total_timer_time=elapsed,
-        city=state["city"],
-        town=state["town"],
-        country=state["country"],
+        city=state.city,
+        town=state.town,
+        country=state.country,
         elevation_gain=(
-            round(state["ele_gain"])
-            if state["ele_gain"]
-            else None
+            round(state.ele_gain) if state.ele_gain else None
         ),
         elevation_loss=(
-            round(state["ele_loss"])
-            if state["ele_loss"]
-            else None
+            round(state.ele_loss) if state.ele_loss else None
         ),
-        pace=state["pace"],
-        average_speed=state["avg_speed"],
-        max_speed=state["max_speed"],
+        pace=state.pace,
+        average_speed=state.avg_speed,
+        max_speed=state.max_speed,
         average_power=(
-            round(state["avg_power"])
-            if state["avg_power"]
-            else None
+            round(state.avg_power) if state.avg_power else None
         ),
-        max_power=(
-            round(state["max_power"])
-            if state["max_power"]
-            else None
-        ),
+        max_power=round(state.max_power) if state.max_power else None,
         normalized_power=(
-            round(state["normalized_power"])
-            if state["normalized_power"]
+            round(state.normalized_power)
+            if state.normalized_power
             else None
         ),
-        average_hr=(
-            round(state["avg_hr"])
-            if state["avg_hr"]
-            else None
-        ),
-        max_hr=(
-            round(state["max_hr"])
-            if state["max_hr"]
-            else None
-        ),
+        average_hr=round(state.avg_hr) if state.avg_hr else None,
+        max_hr=round(state.max_hr) if state.max_hr else None,
         average_cad=(
-            round(state["avg_cadence"])
-            if state["avg_cadence"]
-            else None
+            round(state.avg_cadence) if state.avg_cadence else None
         ),
         max_cad=(
-            round(state["max_cadence"])
-            if state["max_cadence"]
-            else None
+            round(state.max_cadence) if state.max_cadence else None
         ),
-        calories=state["calories"],
-        gear_id=state["gear_id"],
+        calories=state.calories,
+        gear_id=state.gear_id,
         strava_gear_id=None,
         strava_activity_id=None,
         garminconnect_activity_id=None,
@@ -708,33 +645,27 @@ def parse_gpx_file(
                             status.HTTP_400_BAD_REQUEST
                         ),
                         detail=(
-                            "Invalid GPX file -  no segments found in the GPX "
-                            "file"
+                            "Invalid GPX file - no segments found in the "
+                            "GPX file"
                         ),
                     )
 
                 for segment in track.segments:
-                    _reset_segment_state(state)
-                    segment_start = len(
-                        state["lat_lon_waypoints"]
-                    )
+                    state.reset_segment()
+                    segment_start = len(state.lat_lon_waypoints)
 
                     for point in segment.points:
-                        _process_trackpoint(
-                            point, state
-                        )
+                        _process_trackpoint(point, state)
 
-                    segment_waypoints = state["lat_lon_waypoints"][
+                    segment_waypoints = state.lat_lon_waypoints[
                         segment_start:
                     ]
                     if len(segment_waypoints) >= 2:
-                        state["lat_lon_segments"].append(
-                            segment_waypoints
-                        )
+                        state.lat_lon_segments.append(segment_waypoints)
 
         if (
-            state["first_waypoint_time"] is None
-            or state["last_waypoint_time"] is None
+            state.first_waypoint_time is None
+            or state.last_waypoint_time is None
         ):
             raise HTTPException(
                 status_code=(
@@ -746,7 +677,7 @@ def parse_gpx_file(
                 ),
             )
 
-        if not state["lat_lon_segments"]:
+        if not state.lat_lon_segments:
             raise HTTPException(
                 status_code=(
                     status.HTTP_400_BAD_REQUEST
@@ -766,26 +697,26 @@ def parse_gpx_file(
         )
 
         laps = []
-        for segment_waypoints in state["lat_lon_segments"]:
+        for segment_waypoints in state.lat_lon_segments:
             laps.extend(
                 generate_activity_laps(
                     segment_waypoints,
-                    state["ele_waypoints"],
-                    state["power_waypoints"],
-                    state["hr_waypoints"],
-                    state["cad_waypoints"],
-                    state["vel_waypoints"],
+                    state.ele_waypoints,
+                    state.power_waypoints,
+                    state.hr_waypoints,
+                    state.cad_waypoints,
+                    state.vel_waypoints,
                 )
             )
 
         waypoints = {
-            "ele_waypoints": state["ele_waypoints"],
-            "power_waypoints": state["power_waypoints"],
-            "hr_waypoints": state["hr_waypoints"],
-            "vel_waypoints": state["vel_waypoints"],
-            "pace_waypoints": state["pace_waypoints"],
-            "cad_waypoints": state["cad_waypoints"],
-            "lat_lon_waypoints": state["lat_lon_waypoints"],
+            "ele_waypoints": state.ele_waypoints,
+            "power_waypoints": state.power_waypoints,
+            "hr_waypoints": state.hr_waypoints,
+            "vel_waypoints": state.vel_waypoints,
+            "pace_waypoints": state.pace_waypoints,
+            "cad_waypoints": state.cad_waypoints,
+            "lat_lon_waypoints": state.lat_lon_waypoints,
         }
         return ParsedGpxData(
             **activity_file_import_utils.build_activity_file_payload(
