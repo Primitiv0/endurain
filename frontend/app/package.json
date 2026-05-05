@@ -54,7 +54,7 @@
     "jsdom": "^29.0.2",
     "npm-run-all2": "^8.0.4",
     "typescript": "^6.0.3",
-    "vite": "^7.1.12",
+    "vite": "^8.0.10",
     "vite-plugin-pwa": "^1.0.0",
     "vitest": "^4.0.5",
     "vue-eslint-parser": "^10.2.0",
