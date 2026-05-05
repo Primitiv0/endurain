@@ -1605,34 +1605,23 @@ def calculate_instant_speed(
         Instantaneous speed in m/s, or 0 when the time delta is
         non-positive or ``prev_time`` is missing.
     """
-    # Convert the time strings to datetime objects
-    time_calc = datetime.fromisoformat(waypoint_time.strftime("%Y-%m-%dT%H:%M:%S"))
-
-    # If prev_time is None, return a default value
-    if prev_time is None:
+    if (
+        prev_time is None
+        or prev_latitude is None
+        or prev_longitude is None
+    ):
         return 0
 
-    # Convert the time strings to datetime objects
-    prev_time_calc = datetime.fromisoformat(prev_time.strftime("%Y-%m-%dT%H:%M:%S"))
+    time_difference = (waypoint_time - prev_time).total_seconds()
 
-    # Calculate the time difference in seconds
-    time_difference = (time_calc - prev_time_calc).total_seconds()
+    if time_difference <= 0:
+        return 0
 
-    # If the time difference is positive, calculate the instant speed
-    if time_difference > 0:
-        # Calculate the distance in meters
-        distance = geodesic(
-            (prev_latitude, prev_longitude), (latitude, longitude)
-        ).meters
-
-        # Calculate the instant speed in m/s
-        instant_speed = distance / time_difference
-    else:
-        # If the time difference is not positive, return a default value
-        instant_speed = 0
-
-    # Return the instant speed
-    return instant_speed
+    distance = geodesic(
+        (prev_latitude, prev_longitude),
+        (latitude, longitude),
+    ).meters
+    return distance / time_difference
 
 
 def compute_elevation_gain_and_loss(

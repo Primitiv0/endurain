@@ -1,6 +1,7 @@
 """Utilities for parsing GPX files into activity data."""
 
 from datetime import datetime
+from math import isfinite
 from pathlib import Path
 from typing import TypedDict
 
@@ -29,20 +30,13 @@ from activities.activity_file_import.utils import (
 # ISO 8601 datetime format used throughout this module
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
 
-# Garmin TrackPointExtension XML namespace paths
-_HR_NS = (
-    ".//{http://www.garmin.com/xmlschemas"
-    "/TrackPointExtension/v1}hr"
-)
-_CAD_NS = (
-    ".//{http://www.garmin.com/xmlschemas"
-    "/TrackPointExtension/v1}cad"
-)
-
 # Activity type IDs that do not use GPS-based timezone
 # detection (e.g. indoor/pool activities)
 _ACTIVITY_TYPE_POOL_SWIM = 3
 _ACTIVITY_TYPE_TREADMILL = 7
+
+_ELEVATION_MIN = -9999.99
+_ELEVATION_MAX = 9999.99
 
 
 class ParsedGpxData(TypedDict):
@@ -84,6 +78,71 @@ class ParsedGpxData(TypedDict):
     laps: list[LapMetrics]
 
 
+def _extension_local_name(tag: str) -> str:
+    """
+    Return a lowercase XML local name from a namespaced tag.
+
+    Args:
+        tag: ElementTree tag in plain, prefixed, or Clark notation.
+
+    Returns:
+        Lowercase local tag name.
+    """
+    return tag.rsplit("}", maxsplit=1)[-1].rsplit(":", maxsplit=1)[-1].lower()
+
+
+def _safe_optional_int(text: str | None) -> int | None:
+    """
+    Convert extension text to an integer if possible.
+
+    Args:
+        text: Raw extension text.
+
+    Returns:
+        Parsed integer, or None when the text is empty or invalid.
+    """
+    if text is None:
+        return None
+
+    try:
+        return int(float(text.strip()))
+    except ValueError:
+        return None
+
+
+def _safe_int(text: str | None) -> int:
+    """
+    Convert extension text to an integer if possible.
+
+    Args:
+        text: Raw extension text.
+
+    Returns:
+        Parsed integer, or 0 when the text is empty or invalid.
+    """
+    value = _safe_optional_int(text)
+    return value if value is not None else 0
+
+
+def _sanitize_elevation(elevation: float | None) -> float | None:
+    """
+    Return elevation only when it is finite and plausible.
+
+    Args:
+        elevation: Raw elevation value from a GPX trackpoint.
+
+    Returns:
+        Elevation in meters, or None when missing or invalid.
+    """
+    if elevation is None or not isfinite(elevation):
+        return None
+
+    if _ELEVATION_MIN < elevation < _ELEVATION_MAX:
+        return elevation
+
+    return None
+
+
 def _extract_extension_data(
     point: gpxpy.gpx.GPXTrackPoint,
 ) -> tuple[int, int, int]:
@@ -104,42 +163,41 @@ def _extract_extension_data(
         return heart_rate, cadence, power
 
     for extension in point.extensions:
-        tag = extension.tag
-        if tag.endswith("TrackPointExtension"):
-            hr_el = extension.find(_HR_NS)
-            if hr_el is not None and hr_el.text:
-                heart_rate = int(hr_el.text)
-            cad_el = extension.find(_CAD_NS)
-            if cad_el is not None and cad_el.text:
-                cadence = int(cad_el.text)
-            # OpenTracks fallback
-            if hr_el is None and cad_el is None:
-                for child in extension:
-                    if (
-                        child.tag.endswith("hr")
-                        and child.text
-                    ):
-                        heart_rate = int(child.text)
-                    elif (
-                        child.tag.endswith("cad")
-                        and child.text
-                    ):
-                        cadence = int(child.text)
-        elif tag.endswith("power"):
-            power = (
-                int(extension.text)
-                if extension.text
-                else 0
-            )
-        elif tag.endswith("heartrate"):
-            # Tissot smartwatch and similar devices
-            heart_rate = (
-                int(extension.text)
-                if extension.text
-                else 0
-            )
+        for element in extension.iter():
+            tag = _extension_local_name(element.tag)
+            value = _safe_int(element.text)
+
+            if tag in ("hr", "heartrate", "heart_rate"):
+                heart_rate = value
+            elif tag in ("cad", "cadence"):
+                cadence = value
+            elif tag == "power":
+                power = value
 
     return heart_rate, cadence, power
+
+
+def _extract_track_calories(
+    track: gpxpy.gpx.GPXTrack,
+) -> int | None:
+    """
+    Extract total calories from track-level extensions.
+
+    Args:
+        track: GPX track with optional extension elements.
+
+    Returns:
+        Calories as an integer, or None when absent or invalid.
+    """
+    if not track.extensions:
+        return None
+
+    for extension in track.extensions:
+        for element in extension.iter():
+            if _extension_local_name(element.tag) == "calories":
+                return _safe_optional_int(element.text)
+
+    return None
 
 
 def _init_parsing_state(
@@ -193,6 +251,8 @@ def _init_parsing_state(
         "pace_waypoints": [],
         "prev_latitude": None,
         "prev_longitude": None,
+        "prev_waypoint_time": None,
+        "lat_lon_segments": [],
         "is_lat_lon_set": False,
         "is_elevation_set": False,
         "is_power_set": False,
@@ -226,6 +286,25 @@ def _process_track_metadata(
     )
     state["activity_type"] = track.type or "Workout"
 
+    calories = _extract_track_calories(track)
+    if calories is not None:
+        state["calories"] = (state["calories"] or 0) + calories
+
+
+def _reset_segment_state(state: dict) -> None:
+    """
+    Reset state that must not carry across GPX segments.
+
+    Args:
+        state: Mutable parse state dict.
+
+    Returns:
+        None.
+    """
+    state["prev_latitude"] = None
+    state["prev_longitude"] = None
+    state["prev_waypoint_time"] = None
+
 
 def _process_trackpoint(
     point: gpxpy.gpx.GPXTrackPoint,
@@ -243,7 +322,7 @@ def _process_trackpoint(
     """
     latitude = point.latitude
     longitude = point.longitude
-    elevation = point.elevation
+    elevation = _sanitize_elevation(point.elevation)
     time = point.time
 
     # Skip trackpoints without time (OsmAnd exports)
@@ -262,7 +341,7 @@ def _process_trackpoint(
             (latitude, longitude),
         ).meters
 
-    if elevation != 0:
+    if elevation is not None:
         state["is_elevation_set"] = True
 
     if state["first_waypoint_time"] is None:
@@ -296,7 +375,7 @@ def _process_trackpoint(
 
     instant_speed = (
         activities_utils.calculate_instant_speed(
-            state["last_waypoint_time"],
+            state["prev_waypoint_time"],
             time,
             latitude,
             longitude,
@@ -364,6 +443,7 @@ def _process_trackpoint(
 
     state["prev_latitude"] = latitude
     state["prev_longitude"] = longitude
+    state["prev_waypoint_time"] = time
     state["last_waypoint_time"] = time
 
 
@@ -634,9 +714,22 @@ def parse_gpx_file(
                     )
 
                 for segment in track.segments:
+                    _reset_segment_state(state)
+                    segment_start = len(
+                        state["lat_lon_waypoints"]
+                    )
+
                     for point in segment.points:
                         _process_trackpoint(
                             point, state
+                        )
+
+                    segment_waypoints = state["lat_lon_waypoints"][
+                        segment_start:
+                    ]
+                    if len(segment_waypoints) >= 2:
+                        state["lat_lon_segments"].append(
+                            segment_waypoints
                         )
 
         if (
@@ -653,6 +746,17 @@ def parse_gpx_file(
                 ),
             )
 
+        if not state["lat_lon_segments"]:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_400_BAD_REQUEST
+                ),
+                detail=(
+                    "Invalid GPX file - no valid segments with at least two "
+                    "timed GPS trackpoints found"
+                ),
+            )
+
         _compute_derived_metrics(
             state, user_id, db
         )
@@ -661,14 +765,18 @@ def parse_gpx_file(
             state, user_id, user_privacy_settings
         )
 
-        laps = generate_activity_laps(
-            state["lat_lon_waypoints"],
-            state["ele_waypoints"],
-            state["power_waypoints"],
-            state["hr_waypoints"],
-            state["cad_waypoints"],
-            state["vel_waypoints"],
-        )
+        laps = []
+        for segment_waypoints in state["lat_lon_segments"]:
+            laps.extend(
+                generate_activity_laps(
+                    segment_waypoints,
+                    state["ele_waypoints"],
+                    state["power_waypoints"],
+                    state["hr_waypoints"],
+                    state["cad_waypoints"],
+                    state["vel_waypoints"],
+                )
+            )
 
         waypoints = {
             "ele_waypoints": state["ele_waypoints"],
