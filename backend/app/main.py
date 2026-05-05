@@ -38,7 +38,7 @@ import server_settings.utils as server_settings_utils
 import server_settings.schema as server_settings_schema
 
 from core.routes import router as api_router
-from core.database import SessionLocal
+from core.database import SessionLocal, engine as core_db_engine
 
 # Silence stravalib token warnings as early as
 # possible: this env var is consulted at import time by
@@ -219,9 +219,19 @@ async def startup_event(fastapi_app: FastAPI) -> None:
 
 
 def shutdown_event() -> None:
-    """Stop the background scheduler on shutdown."""
+    """Stop the background scheduler and release DB resources on shutdown."""
     core_logger.print_to_log_and_console("Backend shutdown event")
     core_scheduler.stop_scheduler()
+    
+    # Dispose the SQLAlchemy engine so all pooled
+    # psycopg connections are closed deterministically.
+    try:
+        core_db_engine.dispose()
+    except Exception as err:
+        core_logger.print_to_log_and_console(
+            f"Error disposing database engine on shutdown: {type(err).__name__}",
+            "error",
+        )
 
 
 @asynccontextmanager
