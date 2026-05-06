@@ -973,6 +973,31 @@ def _save_upload_to_disk(file: UploadFile, destination: str) -> None:
             save_file.write(chunk)
 
 
+def _cleanup_upload_artifacts(file_paths: list[str]) -> None:
+    """Remove files created during failed activity uploads.
+
+    Args:
+        file_paths: Files to remove if they still exist.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    for file_path in file_paths:
+        try:
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except OSError as err:
+            core_logger.print_to_log(
+                "Failed to cleanup upload artifact "
+                f"{file_path}: {err}",
+                "warning",
+                exc=err,
+            )
+
+
 async def parse_and_store_activity_from_uploaded_file(
     token_user_id: int,
     file: UploadFile,
@@ -1011,6 +1036,7 @@ async def parse_and_store_activity_from_uploaded_file(
 
     # Sanitize the filename to prevent directory traversal
     file_path = _safe_upload_path(upload_dir, file.filename)
+    upload_artifacts: list[str] = []
 
     # Validate the extension before touching disk
     _, file_extension = os.path.splitext(file_path)
@@ -1030,15 +1056,24 @@ async def parse_and_store_activity_from_uploaded_file(
         # Stream the upload to disk in a worker thread to
         # avoid blocking the event loop on large files.
         await run_in_threadpool(_save_upload_to_disk, file, file_path)
+        upload_artifacts.append(file_path)
 
         # Validate file content matches the declared extension to
         # block disguised payloads (OWASP A04 unrestricted upload).
         _validate_file_signature(file_path, file_extension)
 
         if file_extension.lower() == ".gz":
+            original_file_path = file_path
             file_path, file_extension = await run_in_threadpool(
                 handle_gzipped_file,
                 file_path,
+            )
+            upload_artifacts.append(file_path)
+            upload_artifacts.append(
+                os.path.join(
+                    core_config.FILES_PROCESSED_DIR,
+                    os.path.basename(original_file_path),
+                )
             )
             # Re-validate after decompression so the inner payload
             # still matches one of the supported activity formats.
@@ -1141,6 +1176,9 @@ async def parse_and_store_activity_from_uploaded_file(
         else:
             return None
     except HTTPException:
+        await run_in_threadpool(
+            _cleanup_upload_artifacts, upload_artifacts
+        )
         raise
     except (
         OSError,
@@ -1158,6 +1196,9 @@ async def parse_and_store_activity_from_uploaded_file(
             f"Error in parse_and_store_activity_from_uploaded_file - {str(err)}",
             "error",
             exc=err,
+        )
+        await run_in_threadpool(
+            _cleanup_upload_artifacts, upload_artifacts
         )
         # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
