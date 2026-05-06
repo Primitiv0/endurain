@@ -1,12 +1,14 @@
-from pydantic import BaseModel
+"""Pydantic schemas for activity media."""
+
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 
 class ActivityMedia(BaseModel):
-    id: int | None = None
-    activity_id: int
-    media_path: str
-    media_type: int
+    """Activity media payload (photo/video attached to an activity)."""
 
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    id: StrictInt | None = None
+    activity_id: StrictInt = Field(ge=1)
+    media_path: str = Field(min_length=1, max_length=250)
+    media_type: StrictInt = Field(ge=1, le=1)

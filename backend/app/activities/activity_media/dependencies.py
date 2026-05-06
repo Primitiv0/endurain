@@ -1,18 +1,21 @@
+"""
+Media ID validation dependency.
+
+This module provides validation dependencies for activity media
+endpoints to ensure media IDs are valid before processing.
+"""
+
 import core.dependencies as core_dependencies
 
 
-def validate_media_id(media_id: int):
+def validate_media_id(media_id: int) -> None:
     """
-    Validates the provided media ID.
-
-    This function ensures that the given media ID is greater than or equal to 0.
-    If the validation fails, an exception is raised with the specified error message.
+    Validate that media_id is a non-negative integer.
 
     Args:
-        media_id (int): The ID of the media to validate.
+        media_id: The activity media ID to validate.
 
     Raises:
-        ValueError: If the media ID is less than 0.
+        HTTPException: If media_id is less than 0.
     """
-    # Check if id higher than 0
     core_dependencies.validate_id(id=media_id, min=0, message="Invalid media ID")
