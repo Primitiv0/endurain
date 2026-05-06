@@ -1174,6 +1174,9 @@ async def parse_and_store_activity_from_uploaded_file(
             # Return the created activity
             return created_activities
         else:
+            await run_in_threadpool(
+                _cleanup_upload_artifacts, upload_artifacts
+            )
             return None
     except HTTPException:
         await run_in_threadpool(
