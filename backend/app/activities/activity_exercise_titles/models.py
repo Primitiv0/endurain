@@ -19,14 +19,12 @@ class ActivityExerciseTitles(Base):
 
     __tablename__ = "activity_exercise_titles"
 
-    id: Mapped[int] = mapped_column(
-        Integer, primary_key=True, autoincrement=True
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     exercise_category: Mapped[int] = mapped_column(
-        Integer, nullable=False, comment="Exercise category"
+        nullable=False, comment="Exercise category"
     )
     exercise_name: Mapped[int] = mapped_column(
-        Integer, nullable=False, comment="Exercise name ID"
+        nullable=False, comment="Exercise name ID"
     )
     wkt_step_name: Mapped[str] = mapped_column(
         String(length=250),
