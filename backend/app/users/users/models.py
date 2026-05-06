@@ -1,11 +1,37 @@
 """User database models."""
 
 from datetime import date as date_type
+from typing import TYPE_CHECKING
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
 import followers.models as followers_models
+
+if TYPE_CHECKING:
+    from activities.activity.models import Activity
+    from auth.mfa_backup_codes.models import MFABackupCode
+    from auth.oauth_state.models import OAuthState
+    from followers.models import Follower
+    from gears.gear.models import Gear
+    from gears.gear_components.models import GearComponents
+    from health.health_fasting.models import HealthFasting
+    from health.health_poop.models import HealthPoop
+    from health.health_sleep.models import HealthSleep
+    from health.health_steps.models import HealthSteps
+    from health.health_targets.models import HealthTargets
+    from health.health_water.models import HealthWater
+    from health.health_weight.models import HealthWeight
+    from notifications.models import Notification
+    from password_reset_tokens.models import PasswordResetToken
+    from sign_up_tokens.models import SignUpToken
+    from users.users_api_keys.models import UsersApiKeys
+    from users.users_default_gear.models import UsersDefaultGear
+    from users.users_goals.models import UsersGoal
+    from users.users_identity_providers.models import UsersIdentityProvider
+    from users.users_integrations.models import UsersIntegrations
+    from users.users_privacy_settings.models import UsersPrivacySettings
+    from users.users_sessions.models import UsersSessions
 
 
 class Users(Base):
@@ -186,126 +212,101 @@ class Users(Base):
     )
 
     # Relationships
-    # TODO: Change to Mapped["ModelName"] when all modules use mapped
-    users_sessions = relationship(
-        "UsersSessions",
+    users_sessions: Mapped[list["UsersSessions"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    password_reset_tokens = relationship(
-        "PasswordResetToken",
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    sign_up_tokens = relationship(
-        "SignUpToken",
+    sign_up_tokens: Mapped[list["SignUpToken"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    users_integrations = relationship(
-        "UsersIntegrations",
+    users_integrations: Mapped[list["UsersIntegrations"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    users_default_gear = relationship(
-        "UsersDefaultGear",
+    users_default_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    users_privacy_settings = relationship(
-        "UsersPrivacySettings",
+    users_privacy_settings: Mapped[list["UsersPrivacySettings"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    gear = relationship(
-        "Gear",
+    gear: Mapped[list["Gear"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    gear_components = relationship(
-        "GearComponents",
+    gear_components: Mapped[list["GearComponents"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    activities = relationship(
-        "Activity",
+    activities: Mapped[list["Activity"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    followers = relationship(
-        "Follower",
+    followers: Mapped[list["Follower"]] = relationship(
         back_populates="following",
         cascade="all, delete-orphan",
         foreign_keys=[followers_models.Follower.following_id],
     )
-    following = relationship(
-        "Follower",
+    following: Mapped[list["Follower"]] = relationship(
         back_populates="follower",
         cascade="all, delete-orphan",
         foreign_keys=[followers_models.Follower.follower_id],
     )
-    health_sleep = relationship(
-        "HealthSleep",
+    health_sleep: Mapped[list["HealthSleep"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    health_weight = relationship(
-        "HealthWeight",
+    health_weight: Mapped[list["HealthWeight"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    health_steps = relationship(
-        "HealthSteps",
+    health_steps: Mapped[list["HealthSteps"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    health_targets = relationship(
-        "HealthTargets",
+    health_targets: Mapped[list["HealthTargets"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    health_fasting = relationship(
-        "HealthFasting",
+    health_fasting: Mapped[list["HealthFasting"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    health_water = relationship(
-        "HealthWater",
+    health_water: Mapped[list["HealthWater"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    health_poop = relationship(
-        "HealthPoop",
+    health_poop: Mapped[list["HealthPoop"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    notifications = relationship(
-        "Notification",
+    notifications: Mapped[list["Notification"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    goals = relationship(
-        "UsersGoal",
+    goals: Mapped[list["UsersGoal"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    user_identity_providers = relationship(
-        "UsersIdentityProvider",
+    user_identity_providers: Mapped[list["UsersIdentityProvider"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    oauth_states = relationship(
-        "OAuthState",
+    oauth_states: Mapped[list["OAuthState"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    mfa_backup_codes = relationship(
-        "MFABackupCode",
+    mfa_backup_codes: Mapped[list["MFABackupCode"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    users_api_keys = relationship(
-        "UsersApiKeys",
+    users_api_keys: Mapped[list["UsersApiKeys"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )

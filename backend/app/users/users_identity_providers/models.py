@@ -1,10 +1,15 @@
 """User identity provider database models."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from core.database import Base
+
+if TYPE_CHECKING:
+    from auth.identity_providers.models import IdentityProvider
+    from users.users.models import Users
 
 
 class UsersIdentityProvider(Base):
@@ -77,10 +82,7 @@ class UsersIdentityProvider(Base):
     )
 
     # Relationships
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="user_identity_providers")
-    # TODO: Change to Mapped["IdentityProvider"] when all modules use mapped
-    identity_providers = relationship(
-        "IdentityProvider",
+    users: Mapped["Users"] = relationship(back_populates="user_identity_providers")
+    identity_providers: Mapped["IdentityProvider"] = relationship(
         back_populates="user_identity_providers",
     )

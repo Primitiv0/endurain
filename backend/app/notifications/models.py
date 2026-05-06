@@ -2,12 +2,16 @@
 
 from datetime import datetime
 from typing import Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class Notification(Base):
@@ -58,6 +62,4 @@ class Notification(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use
-    # mapped
-    users = relationship("Users", back_populates="notifications")
+    users: Mapped["Users"] = relationship(back_populates="notifications")

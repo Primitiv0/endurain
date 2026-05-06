@@ -1,5 +1,7 @@
 """ORM models for activity stream data."""
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, JSON
 from sqlalchemy.orm import (
     Mapped,
@@ -8,6 +10,9 @@ from sqlalchemy.orm import (
 )
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from activities.activity.models import Activity
 
 
 class ActivityStreams(Base):
@@ -61,9 +66,6 @@ class ActivityStreams(Base):
     )
 
     # Define a relationship to the Activity model
-    # TODO: Change to Mapped["Activity"] when all
-    # modules use mapped
-    activity = relationship(
-        "Activity",
+    activity: Mapped["Activity"] = relationship(
         back_populates="activities_streams",
     )

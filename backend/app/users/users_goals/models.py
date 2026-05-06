@@ -1,8 +1,13 @@
 """User fitness goals database models."""
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class UsersGoal(Base):
@@ -73,5 +78,4 @@ class UsersGoal(Base):
     )
 
     # Relationship to User
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="goals")
+    users: Mapped["Users"] = relationship(back_populates="goals")

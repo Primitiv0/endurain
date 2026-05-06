@@ -1,9 +1,17 @@
 """User session database models."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from auth.oauth_state.models import OAuthState
+    from users.users.models import Users
+    from users.users_sessions.rotated_refresh_tokens.models import (
+        RotatedRefreshToken,
+    )
 
 
 class UsersSessions(Base):
@@ -139,17 +147,15 @@ class UsersSessions(Base):
     )
 
     # Relationship to Users model
-    # TODO: Change to Mapped["Users"] when all modules use mapped
-    users = relationship("Users", back_populates="users_sessions")
+    users: Mapped["Users"] = relationship(back_populates="users_sessions")
 
     # Relationship to OAuthState model
-    # TODO: Change to Mapped["OAuthState"] when all modules use mapped
-    oauth_state = relationship("OAuthState", back_populates="users_sessions")
+    oauth_state: Mapped["OAuthState | None"] = relationship(
+        back_populates="users_sessions"
+    )
 
     # Relationship to RotatedRefreshToken model
-    # TODO: Change to Mapped["RotatedRefreshToken"] when all modules use mapped
-    rotated_refresh_tokens = relationship(
-        "RotatedRefreshToken",
+    rotated_refresh_tokens: Mapped[list["RotatedRefreshToken"]] = relationship(
         back_populates="users_session",
         cascade="all, delete-orphan",
     )

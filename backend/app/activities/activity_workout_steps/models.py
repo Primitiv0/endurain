@@ -1,11 +1,15 @@
 """Activity workout steps models."""
 
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from activities.activity.models import Activity
 
 
 class ActivityWorkoutSteps(Base):
@@ -128,9 +132,6 @@ class ActivityWorkoutSteps(Base):
     )
 
     # Define a relationship to the Activity model
-    # TODO: Change to Mapped["Activity"] when all
-    # modules use mapped
-    activity = relationship(
-        "Activity",
+    activity: Mapped["Activity"] = relationship(
         back_populates="activity_workout_steps",
     )

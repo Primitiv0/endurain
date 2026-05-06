@@ -6,9 +6,13 @@ including timing, duration, type, and status information.
 """
 
 from datetime import date as date_type, datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class HealthFasting(Base):
@@ -82,5 +86,4 @@ class HealthFasting(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="health_fasting")
+    users: Mapped["Users"] = relationship(back_populates="health_fasting")

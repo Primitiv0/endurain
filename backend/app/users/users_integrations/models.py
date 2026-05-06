@@ -1,9 +1,13 @@
 """User integrations database models."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class UsersIntegrations(Base):
@@ -97,5 +101,4 @@ class UsersIntegrations(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="users_integrations")
+    users: Mapped["Users"] = relationship(back_populates="users_integrations")

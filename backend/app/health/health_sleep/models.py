@@ -1,8 +1,12 @@
 from datetime import date as date_type, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class HealthSleep(Base):
@@ -241,5 +245,4 @@ class HealthSleep(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="health_sleep")
+    users: Mapped["Users"] = relationship(back_populates="health_sleep")

@@ -1,9 +1,13 @@
 """Rotated refresh token database models for reuse detection."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users_sessions.models import UsersSessions
 
 
 class RotatedRefreshToken(Base):
@@ -55,8 +59,6 @@ class RotatedRefreshToken(Base):
     )
 
     # Relationship to UsersSessions model
-    # TODO: Change to Mapped["UsersSessions"] when all modules use mapped
-    users_session = relationship(
-        "UsersSessions",
+    users_session: Mapped["UsersSessions"] = relationship(
         back_populates="rotated_refresh_tokens",
     )

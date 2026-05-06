@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -14,6 +15,17 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from activities.activity_laps.models import ActivityLaps
+    from activities.activity_media.models import ActivityMedia
+    from activities.activity_sets.models import ActivitySets
+    from activities.activity_streams.models import ActivityStreams
+    from activities.activity_workout_steps.models import (
+        ActivityWorkoutSteps,
+    )
+    from gears.gear.models import Gear
+    from users.users.models import Users
 
 
 class Activity(Base):
@@ -354,41 +366,41 @@ class Activity(Base):
     )
 
     # Define a relationship to the Users model
-    users: Mapped["Users"] = relationship(  # type: ignore[name-defined]
+    users: Mapped["Users"] = relationship(
         back_populates="activities",
     )
 
     # Define a relationship to the Gear model
-    gear: Mapped["Gear | None"] = relationship(  # type: ignore[name-defined]
+    gear: Mapped["Gear | None"] = relationship(
         back_populates="activities",
     )
 
     # Establish a one-to-many relationship with 'activity_laps'
-    activity_laps: Mapped[list["ActivityLaps"]] = relationship(  # type: ignore[name-defined]
+    activity_laps: Mapped[list["ActivityLaps"]] = relationship(
         back_populates="activity",
         cascade="all, delete-orphan",
     )
 
     # Establish a one-to-many relationship with 'activity_sets'
-    activity_sets: Mapped[list["ActivitySets"]] = relationship(  # type: ignore[name-defined]
+    activity_sets: Mapped[list["ActivitySets"]] = relationship(
         back_populates="activity",
         cascade="all, delete-orphan",
     )
 
     # Establish a one-to-many relationship with 'activities_streams'
-    activities_streams: Mapped[list["ActivityStreams"]] = relationship(  # type: ignore[name-defined]
+    activities_streams: Mapped[list["ActivityStreams"]] = relationship(
         back_populates="activity",
         cascade="all, delete-orphan",
     )
 
     # Establish a one-to-many relationship with 'activity_workout_steps'
-    activity_workout_steps: Mapped[list["ActivityWorkoutSteps"]] = relationship(  # type: ignore[name-defined]
+    activity_workout_steps: Mapped[list["ActivityWorkoutSteps"]] = relationship(
         back_populates="activity",
         cascade="all, delete-orphan",
     )
 
     # Establish a one-to-many relationship with 'activity_media'
-    activity_media: Mapped[list["ActivityMedia"]] = relationship(  # type: ignore[name-defined]
+    activity_media: Mapped[list["ActivityMedia"]] = relationship(
         back_populates="activity",
         cascade="all, delete-orphan",
     )

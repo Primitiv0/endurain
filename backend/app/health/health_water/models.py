@@ -7,9 +7,13 @@ water intake data, including consumption amount and data source.
 
 from datetime import date as date_type
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class HealthWater(Base):
@@ -60,5 +64,4 @@ class HealthWater(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="health_water")
+    users: Mapped["Users"] = relationship(back_populates="health_water")

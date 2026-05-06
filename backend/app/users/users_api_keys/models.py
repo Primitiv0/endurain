@@ -1,9 +1,13 @@
 """User API key database models."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class UsersApiKeys(Base):
@@ -88,5 +92,4 @@ class UsersApiKeys(Base):
     )
 
     # Relationship to Users model
-    # TODO: Change to Mapped["Users"] when all modules use mapped
-    users = relationship("Users", back_populates="users_api_keys")
+    users: Mapped["Users"] = relationship(back_populates="users_api_keys")

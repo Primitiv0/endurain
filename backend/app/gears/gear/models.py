@@ -2,12 +2,19 @@
 
 from datetime import datetime as datetime_type
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from activities.activity.models import Activity
+    from gears.gear_components.models import GearComponents
+    from users.users.models import Users
+    from users.users_default_gear.models import UsersDefaultGear
 
 
 class Gear(Base):
@@ -130,93 +137,73 @@ class Gear(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["Users"] when all modules use mapped
-    users = relationship("Users", back_populates="gear")
+    users: Mapped["Users"] = relationship(back_populates="gear")
     # Establish a one-to-many relationship with 'activities'
-    # TODO: Change to Mapped["Activity"] when all modules use mapped
-    activities = relationship("Activity", back_populates="gear")
+    activities: Mapped[list["Activity"]] = relationship(back_populates="gear")
     # Establish a one-to-many relationship with 'gear_components'
-    # TODO: Change to Mapped["GearComponents"] when all modules use mapped
-    gear_components = relationship(
-        "GearComponents",
+    gear_components: Mapped[list["GearComponents"]] = relationship(
         back_populates="gear",
         cascade="all, delete-orphan",
         foreign_keys="[GearComponents.gear_id]",
     )
     # Establish a one-to-many relationship with 'users_default_gear'
-    # TODO: Change to Mapped["UsersDefaultGear"] when all modules use mapped
-    users_default_run_gear = relationship(
-        "UsersDefaultGear",
+    users_default_run_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="run_gear",
         foreign_keys="[UsersDefaultGear.run_gear_id]",
     )
-    users_default_trail_run_gear = relationship(
-        "UsersDefaultGear",
+    users_default_trail_run_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="trail_run_gear",
         foreign_keys="[UsersDefaultGear.trail_run_gear_id]",
     )
-    users_default_virtual_run_gear = relationship(
-        "UsersDefaultGear",
+    users_default_virtual_run_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="virtual_run_gear",
         foreign_keys="[UsersDefaultGear.virtual_run_gear_id]",
     )
-    users_default_ride_gear = relationship(
-        "UsersDefaultGear",
+    users_default_ride_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="ride_gear",
         foreign_keys="[UsersDefaultGear.ride_gear_id]",
     )
-    users_default_gravel_ride_gear = relationship(
-        "UsersDefaultGear",
+    users_default_gravel_ride_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="gravel_ride_gear",
         foreign_keys="[UsersDefaultGear.gravel_ride_gear_id]",
     )
-    users_default_mtb_ride_gear = relationship(
-        "UsersDefaultGear",
+    users_default_mtb_ride_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="mtb_ride_gear",
         foreign_keys="[UsersDefaultGear.mtb_ride_gear_id]",
     )
-    users_default_virtual_ride_gear = relationship(
-        "UsersDefaultGear",
+    users_default_virtual_ride_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="virtual_ride_gear",
         foreign_keys="[UsersDefaultGear.virtual_ride_gear_id]",
     )
-    users_default_ows_gear = relationship(
-        "UsersDefaultGear",
+    users_default_ows_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="ows_gear",
         foreign_keys="[UsersDefaultGear.ows_gear_id]",
     )
-    users_default_walk_gear = relationship(
-        "UsersDefaultGear",
+    users_default_walk_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="walk_gear",
         foreign_keys="[UsersDefaultGear.walk_gear_id]",
     )
-    users_default_hike_gear = relationship(
-        "UsersDefaultGear",
+    users_default_hike_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="hike_gear",
         foreign_keys="[UsersDefaultGear.hike_gear_id]",
     )
-    users_default_tennis_gear = relationship(
-        "UsersDefaultGear",
+    users_default_tennis_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="tennis_gear",
         foreign_keys="[UsersDefaultGear.tennis_gear_id]",
     )
-    users_default_alpine_ski_gear = relationship(
-        "UsersDefaultGear",
+    users_default_alpine_ski_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="alpine_ski_gear",
         foreign_keys="[UsersDefaultGear.alpine_ski_gear_id]",
     )
-    users_default_nordic_ski_gear = relationship(
-        "UsersDefaultGear",
+    users_default_nordic_ski_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="nordic_ski_gear",
         foreign_keys="[UsersDefaultGear.nordic_ski_gear_id]",
     )
-    users_default_snowboard_gear = relationship(
-        "UsersDefaultGear",
+    users_default_snowboard_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="snowboard_gear",
         foreign_keys="[UsersDefaultGear.snowboard_gear_id]",
     )
-    users_default_windsurf_gear = relationship(
-        "UsersDefaultGear",
+    users_default_windsurf_gear: Mapped[list["UsersDefaultGear"]] = relationship(
         back_populates="windsurf_gear",
         foreign_keys="[UsersDefaultGear.windsurf_gear_id]",
     )

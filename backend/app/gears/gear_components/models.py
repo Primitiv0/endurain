@@ -2,6 +2,7 @@
 
 from datetime import datetime as datetime_type
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     DateTime,
@@ -17,6 +18,10 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql import func
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from gears.gear.models import Gear
+    from users.users.models import Users
 
 
 class GearComponents(Base):
@@ -129,15 +134,9 @@ class GearComponents(Base):
         )
     )
 
-    # TODO: Change to Mapped["Users"] when all
-    # modules use mapped
-    users = relationship(
-        "Users",
+    users: Mapped["Users"] = relationship(
         back_populates="gear_components",
     )
-    # TODO: Change to Mapped["Gear"] when all
-    # modules use mapped
-    gear = relationship(
-        "Gear",
+    gear: Mapped["Gear"] = relationship(
         back_populates="gear_components",
     )
