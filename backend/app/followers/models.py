@@ -36,9 +36,9 @@ class Follower(Base):
 
     # Define a relationship to the Users model
     follower: Mapped["Users"] = relationship(
-        "Users", foreign_keys=[follower_id], back_populates="followers"
+        foreign_keys=[follower_id], back_populates="followers"
     )
     # Define a relationship to the Users model
     following: Mapped["Users"] = relationship(
-        "Users", foreign_keys=[following_id], back_populates="following"
+        foreign_keys=[following_id], back_populates="following"
     )

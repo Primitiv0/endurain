@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
@@ -85,7 +85,6 @@ class UsersApiKeys(Base):
         comment="Key creation timestamp",
     )
     is_active: Mapped[bool] = mapped_column(
-        Boolean,
         default=True,
         nullable=False,
         comment=("Whether the key is active. False = revoked " "(soft delete)"),

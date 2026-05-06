@@ -196,5 +196,5 @@ class ActivityLaps(Base):
 
     # Define a relationship to the Activity model
     activity: Mapped["Activity"] = relationship(
-        "Activity", back_populates="activity_laps"
+        back_populates="activity_laps"
     )
