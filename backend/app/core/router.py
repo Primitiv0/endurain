@@ -1,4 +1,8 @@
+"""Core metadata and static fallback routes."""
+
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict
 
 import core.config as core_config
 import core.utils as core_utils
@@ -7,31 +11,67 @@ import core.utils as core_utils
 router = APIRouter()
 
 
+class LicenseInfo(BaseModel):
+    """
+    API license metadata.
+
+    Attributes:
+        name: License display name.
+        identifier: SPDX license identifier.
+        url: Public license URL.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    identifier: str
+    url: str
+
+
+class AboutResponse(BaseModel):
+    """
+    API metadata returned by the about endpoint.
+
+    Attributes:
+        name: API display name.
+        version: API version string.
+        license: License metadata.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    version: str
+    license: LicenseInfo
+
+
 @router.get(
     core_config.ROOT_PATH + "/about",
+    response_model=AboutResponse,
+    status_code=status.HTTP_200_OK,
 )
-async def about():
+async def about() -> AboutResponse:
     """
     Returns metadata information about the Endurain API.
 
     Returns:
-        dict: A dictionary containing the API name, version, and license details.
+        API name, version, and license details.
     """
-    return {
-        "name": "Endurain API",
-        "version": core_config.API_VERSION,
-        "license": {
-            "name": core_config.LICENSE_NAME,
-            "identifier": core_config.LICENSE_IDENTIFIER,
-            "url": core_config.LICENSE_URL,
-        },
-    }
+    return AboutResponse(
+        name="Endurain API",
+        version=core_config.API_VERSION,
+        license=LicenseInfo(
+            name=core_config.LICENSE_NAME,
+            identifier=core_config.LICENSE_IDENTIFIER,
+            url=core_config.LICENSE_URL,
+        ),
+    )
 
 
-@router.get("/user_images/{user_img}")
+@router.get("/user_images/{user_img}", response_class=FileResponse)
 def user_img_return(
     user_img: str,
-):
+) -> FileResponse:
     """
     Retrieves the file path for a user's image.
 
@@ -42,25 +82,23 @@ def user_img_return(
         str: The file path to the user's image.
 
     Raises:
-        HTTPException: If the image path cannot be found, raises a 404 error.
+        HTTPException: If the image path cannot be found.
     """
     path = core_utils.return_user_img_path(user_img)
 
-    # If the path is None, raise a 404 error
     if path is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User image not found",
         )
 
-    # Return the user image path
     return path
 
 
-@router.get("/server_images/{server_img}")
+@router.get("/server_images/{server_img}", response_class=FileResponse)
 def server_img_return(
     server_img: str,
-):
+) -> FileResponse:
     """
     Retrieves the file path for a given server image.
 
@@ -71,26 +109,23 @@ def server_img_return(
         str: The file path to the server image.
 
     Raises:
-        HTTPException: If the server image path cannot be found, raises a 404 error.
+        HTTPException: If the server image path cannot be found.
     """
-    # Get the server image path
     path = core_utils.return_server_img_path(server_img)
 
-    # If the path is None, raise a 404 error
     if path is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Server image not found",
         )
 
-    # Return the server image path
     return path
 
 
-@router.get("/activity_media/{media}")
+@router.get("/activity_media/{media}", response_class=FileResponse)
 def activity_media_return(
     media: str,
-):
+) -> FileResponse:
     """
     Retrieves the server path for a given activity media file.
 
@@ -101,26 +136,23 @@ def activity_media_return(
         str: The server path to the activity media file.
 
     Raises:
-        HTTPException: If the media file is not found, raises a 404 error.
+        HTTPException: If the media file is not found.
     """
-    # Get the server image path
     path = core_utils.return_activity_media_path(media)
 
-    # If the path is None, raise a 404 error
     if path is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Activity media not found",
         )
 
-    # Return the activity media path
     return path
 
 
-@router.get("/activity_thumbnails/{thumbnail}")
+@router.get("/activity_thumbnails/{thumbnail}", response_class=FileResponse)
 def activity_thumbnail_return(
     thumbnail: str,
-):
+) -> FileResponse:
     """
     Retrieves the server path for a given activity thumbnail.
 
@@ -131,28 +163,29 @@ def activity_thumbnail_return(
         str: The server path to the activity thumbnail.
 
     Raises:
-        HTTPException: If the thumbnail is not found, raises a 404 error.
+        HTTPException: If the thumbnail is not found.
     """
-    # Get the server image path
     path = core_utils.return_activity_thumbnail_path(thumbnail)
 
-    # If the path is None, raise a 404 error
     if path is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Activity thumbnail not found",
         )
 
-    # Return the activity thumbnail path
     return path
 
 
-@router.get("/{path:path}", include_in_schema=False)
+@router.get(
+    "/{path:path}",
+    include_in_schema=False,
+    response_class=FileResponse,
+)
 def frontend_not_found(
     path: str,
-):
+) -> FileResponse:
     """
-    Handles requests for frontend resources and returns the appropriate index file.
+    Return the requested frontend asset or app index.
 
     Args:
         path (str): The requested resource path.

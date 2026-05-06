@@ -17,6 +17,7 @@ import json
 import logging
 import sys
 from datetime import UTC, datetime
+from typing import Any
 
 import core.config as core_config
 import core.middleware_request_id as core_middleware_request_id
@@ -185,11 +186,41 @@ def _build_handler(log_level: int) -> logging.Handler:
         handler: logging.Handler = logging.StreamHandler(sys.stdout)
         handler.setFormatter(JsonFormatter())
     else:
-        handler = logging.FileHandler(f"{core_config.settings.LOGS_DIR}/app.log")
+        log_path = f"{core_config.settings.LOGS_DIR}/app.log"
+        handler = logging.FileHandler(log_path)
         handler.setFormatter(_DevFormatter())
     handler.setLevel(log_level)
     handler.addFilter(RequestIdFilter())
     return handler
+
+
+def _replace_handlers(
+    loggers: tuple[logging.Logger, ...],
+    handler: logging.Handler,
+) -> None:
+    """
+    Replace handlers on a set of related loggers.
+
+    Args:
+        loggers: Loggers that should share one handler.
+        handler: Handler to attach to every logger.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    old_handlers: set[logging.Handler] = set()
+    for logger in loggers:
+        old_handlers.update(logger.handlers)
+        for old_handler in list(logger.handlers):
+            logger.removeHandler(old_handler)
+        logger.addHandler(handler)
+        logger.propagate = False
+
+    for old_handler in old_handlers:
+        old_handler.close()
 
 
 def setup_main_logger():
@@ -216,23 +247,23 @@ def setup_main_logger():
     }
 
     # Get log level from config, default to WARNING if invalid
-    log_level = log_level_map.get(core_config.settings.LOG_LEVEL.lower(), logging.WARNING)
+    log_level = log_level_map.get(
+        core_config.settings.LOG_LEVEL.lower(),
+        logging.WARNING,
+    )
 
     main_logger = logging.getLogger("main_logger")
-    main_logger.setLevel(log_level)
+    alembic_logger = logging.getLogger("alembic")
+    scheduler_logger = logging.getLogger("apscheduler")
+
+    for logger in (main_logger, alembic_logger, scheduler_logger):
+        logger.setLevel(log_level)
 
     handler = _build_handler(log_level)
-    main_logger.addHandler(handler)
-
-    # Attach the same handler to Alembic's logger
-    alembic_logger = logging.getLogger("alembic")
-    alembic_logger.setLevel(log_level)
-    alembic_logger.addHandler(handler)
-
-    # Attach the same handler to scheduler's logger
-    scheduler_logger = logging.getLogger("apscheduler")
-    scheduler_logger.setLevel(log_level)
-    scheduler_logger.addHandler(handler)
+    _replace_handlers(
+        (main_logger, alembic_logger, scheduler_logger),
+        handler,
+    )
 
     return main_logger
 
@@ -253,8 +284,11 @@ def get_main_logger():
 
 
 def print_to_log(
-    message: str, log_level: str = "info", exc: Exception | None = None, context=None
-):
+    message: str,
+    log_level: str = "info",
+    exc: Exception | None = None,
+    context: dict[str, Any] | None = None,
+) -> None:
     """
     Logs a message at the specified log level using the main logger.
 

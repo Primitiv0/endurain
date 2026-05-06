@@ -1,4 +1,7 @@
-# from apscheduler.schedulers.background import BackgroundScheduler
+"""Background scheduler setup for recurring maintenance jobs."""
+
+from collections.abc import Callable, Sequence
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import activities.activity.utils as activities_utils
@@ -15,20 +18,32 @@ import sign_up_tokens.utils as sign_up_tokens_utils
 
 import users.users_sessions.utils as users_session_utils
 
-import users.users_sessions.rotated_refresh_tokens.utils as users_session_rotated_tokens_utils
+from users.users_sessions.rotated_refresh_tokens import (
+    utils as rotated_tokens_utils,
+)
 
 import auth.oauth_state.utils as oauth_state_utils
 import auth.schema as auth_schema
 
 import core.logger as core_logger
 
-# scheduler = BackgroundScheduler()
 scheduler = AsyncIOScheduler()
 
 
-def start_scheduler():
+def start_scheduler() -> None:
+    """
+    Start the scheduler and register recurring jobs.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
     if not scheduler.running:
-        # Start the scheduler
         scheduler.start()
 
     add_scheduler_job(
@@ -96,7 +111,7 @@ def start_scheduler():
     )
 
     add_scheduler_job(
-        users_session_rotated_tokens_utils.cleanup_expired_rotated_tokens,
+        rotated_tokens_utils.cleanup_expired_rotated_tokens,
         "interval",
         1,
         [],
@@ -120,17 +135,78 @@ def start_scheduler():
     )
 
 
-def add_scheduler_job(func, interval, minutes, args, description):
+def _scheduler_job_id(description: str) -> str:
+    """
+    Build a stable scheduler job ID from its description.
+
+    Args:
+        description: Human-readable job description.
+
+    Returns:
+        Stable APScheduler job identifier.
+
+    Raises:
+        None.
+    """
+    return "endurain_" + "_".join(description.lower().split())
+
+
+def add_scheduler_job(
+    func: Callable[..., object],
+    interval: str,
+    minutes: int,
+    args: Sequence[object],
+    description: str,
+) -> None:
+    """
+    Register or replace a recurring scheduler job.
+
+    Args:
+        func: Callable to execute.
+        interval: APScheduler trigger name.
+        minutes: Interval length in minutes.
+        args: Positional arguments passed to func.
+        description: Human-readable job description.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
     try:
         core_logger.print_to_log(
             f"Added scheduler job to {description} every {minutes} minutes"
         )
-        scheduler.add_job(func, interval, minutes=minutes, args=args)
-    except Exception as e:
+        scheduler.add_job(
+            func,
+            interval,
+            minutes=minutes,
+            args=list(args),
+            id=_scheduler_job_id(description),
+            replace_existing=True,
+        )
+    except Exception as err:
         core_logger.print_to_log(
-            f"Failed to add scheduler job to {description}: {str(e)}", "error"
+            "Failed to add scheduler job to "
+            f"{description}: {type(err).__name__}",
+            "error",
+            exc=err,
         )
 
 
-def stop_scheduler():
-    scheduler.shutdown()
+def stop_scheduler() -> None:
+    """
+    Stop the scheduler if it is running.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    if scheduler.running:
+        scheduler.shutdown(wait=False)

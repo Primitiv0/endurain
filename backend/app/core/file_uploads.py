@@ -2,6 +2,7 @@
 
 import os
 import glob
+from pathlib import Path
 
 import aiofiles
 import aiofiles.os
@@ -12,15 +13,69 @@ from safeuploads.exceptions import FileValidationError
 import core.logger as core_logger
 
 
-async def save_file(file: UploadFile | bytes, upload_dir: str, filename: str) -> str:
-    file_path = None
-    try:
+def _resolve_upload_path(upload_dir: str, filename: str) -> Path:
+    """
+    Resolve an upload filename inside the target directory.
 
+    Args:
+        upload_dir: Trusted upload directory.
+        filename: Caller-provided filename.
+
+    Returns:
+        Resolved path inside the upload directory.
+
+    Raises:
+        HTTPException: If the filename is empty or unsafe.
+    """
+    candidate_name = Path(filename)
+    if not filename or candidate_name.is_absolute():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+    if candidate_name.name != filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
+    upload_root = Path(upload_dir).resolve()
+    file_path = (upload_root / filename).resolve()
+    try:
+        file_path.relative_to(upload_root)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        ) from err
+    return file_path
+
+
+async def save_file(
+    file: UploadFile | bytes,
+    upload_dir: str,
+    filename: str,
+) -> str:
+    """
+    Save uploaded bytes to a validated destination path.
+
+    Args:
+        file: Uploaded FastAPI file or raw bytes.
+        upload_dir: Trusted upload directory.
+        filename: Filename to write within upload_dir.
+
+    Returns:
+        Full filesystem path where the file was saved.
+
+    Raises:
+        HTTPException: 400 for unsafe names, 500 for write failures.
+    """
+    file_path: Path | None = None
+    try:
         # Ensure upload directory exists
         await aiofiles.os.makedirs(upload_dir, exist_ok=True)
 
-        # Build full file path
-        file_path = os.path.join(upload_dir, filename)
+        file_path = _resolve_upload_path(upload_dir, filename)
 
         # Save file asynchronously
         if isinstance(file, bytes):
@@ -30,12 +85,20 @@ async def save_file(file: UploadFile | bytes, upload_dir: str, filename: str) ->
         async with aiofiles.open(file_path, "wb") as save_file:
             await save_file.write(content)
 
-        core_logger.print_to_log(f"File saved successfully: {file_path}", "debug")
+        core_logger.print_to_log(
+            f"File saved successfully: {file_path}",
+            "debug",
+        )
 
-        return file_path
+        return str(file_path)
+    except HTTPException:
+        raise
     except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(f"Error in save_file: {err}", "error", exc=err)
+        core_logger.print_to_log(
+            f"Error in save_file: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
 
         # Remove the file if it was created
         if file_path and await aiofiles.os.path.exists(file_path):
@@ -85,7 +148,10 @@ async def save_image_file_and_validate_it(
     except FileValidationError as err:
         # Log the exception
         core_logger.print_to_log(
-            f"Error in save_image_file_and_validate_it: {err}", "error", exc=err
+            "Error in save_image_file_and_validate_it: "
+            f"{type(err).__name__}",
+            "error",
+            exc=err,
         )
 
         raise HTTPException(

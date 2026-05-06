@@ -105,13 +105,12 @@ class TestCSRFMiddlewareWebClients:
             - POST without X-CSRF-Token header returns 403
             - Error message indicates CSRF token is required
         """
-        with pytest.raises(Exception) as exc_info:
-            client.post(
-                "/api/v1/test/post",
-                headers={"X-Client-Type": "web"}
-            )
-        assert "403" in str(exc_info.value)
-        assert "CSRF token required" in str(exc_info.value)
+        response = client.post(
+            "/api/v1/test/post",
+            headers={"X-Client-Type": "web"},
+        )
+        assert response.status_code == 403
+        assert response.json() == {"detail": "CSRF token required"}
 
     def test_post_with_csrf_success(self, client):
         """
@@ -188,7 +187,7 @@ class TestCSRFMiddlewareWebClients:
 
 class TestCSRFMiddlewareMobileClients:
     """
-    Tests for CSRF middleware behavior with mobile clients (no X-Client-Type or non-web).
+    Tests for CSRF middleware behavior with non-web clients.
     """
 
     def test_post_without_client_type_success(self, client):
@@ -236,7 +235,7 @@ class TestCSRFMiddlewareMobileClients:
 
 class TestCSRFMiddlewareExemptPaths:
     """
-    Tests for CSRF middleware exempt paths (authentication endpoints, public routes).
+    Tests for CSRF middleware exempt paths.
     """
 
     def test_login_exempt_no_csrf_required(self, client):
@@ -323,7 +322,9 @@ class TestCSRFMiddlewareInMemoryModel:
                     "X-CSRF-Token": token
                 }
             )
-            assert response.status_code == 200, f"Failed for token format: {token}"
+            assert response.status_code == 200, (
+                f"Failed for token format: {token}"
+            )
 
 
 class TestCSRFMiddlewareSameSiteCookie:
@@ -365,13 +366,13 @@ class TestCSRFMiddlewareSameSiteCookie:
             - Cookie-based CSRF (old model) is not checked
         """
         # Request with CSRF cookie but no header - should fail
-        with pytest.raises(Exception) as exc_info:
-            client.post(
-                "/api/v1/test/post",
-                headers={"X-Client-Type": "web"},
-                cookies={"csrf_token": "cookie-csrf-token"}
-            )
-        assert "403" in str(exc_info.value)
+        response = client.post(
+            "/api/v1/test/post",
+            headers={"X-Client-Type": "web"},
+            cookies={"csrf_token": "cookie-csrf-token"},
+        )
+        assert response.status_code == 403
+        assert response.json() == {"detail": "CSRF token required"}
 
         # Request with both cookie and header - header wins
         response = client.post(

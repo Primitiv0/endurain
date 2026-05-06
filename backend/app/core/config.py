@@ -79,9 +79,7 @@ class Settings(BaseSettings):
     # JSON. Without this pydantic-settings would attempt
     # ``json.loads`` first and raise on plain strings.
     ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = set()
-    TRUSTED_PROXIES: Annotated[list[str], NoDecode] = (
-        ["*"] if ENVIRONMENT == "development" else []
-    )
+    TRUSTED_PROXIES: Annotated[list[str], NoDecode] = []
 
     # --- Filesystem layout ---
     FRONTEND_DIR: str = "/app/frontend/dist"
@@ -165,10 +163,8 @@ class Settings(BaseSettings):
     @classmethod
     def _parse_trusted_proxies(cls, v):
         """Accept comma-separated env value or already-parsed iterable."""
-        # If no explicit env var, let field default take precedence
         if v is None or v == "":
-            # Only default to ["*"] in development
-            return ["*"] if settings.ENVIRONMENT == "development" else []
+            return []
         if isinstance(v, str):
             return [ip.strip() for ip in v.split(",") if ip.strip()]
         return v
@@ -201,7 +197,15 @@ class Settings(BaseSettings):
         if not self.ACTIVITY_MEDIA_DIR:
             self.ACTIVITY_MEDIA_DIR = f"{self.DATA_DIR}/activity_media"
         if not self.ACTIVITY_THUMBNAILS_DIR:
-            self.ACTIVITY_THUMBNAILS_DIR = f"{self.DATA_DIR}/activity_thumbnails"
+            self.ACTIVITY_THUMBNAILS_DIR = (
+                f"{self.DATA_DIR}/activity_thumbnails"
+            )
+        if (
+            not self.TRUSTED_PROXIES
+            and self.ENVIRONMENT == "development"
+            and "TRUSTED_PROXIES" not in os.environ
+        ):
+            self.TRUSTED_PROXIES = ["*"]
         return self
 
 
@@ -218,17 +222,24 @@ FILES_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{FILES_BULK_IMPORT_DIR}/import_errors"
 STRAVA_BULK_IMPORT_DIR = f"{settings.FILES_DIR}/strava_import"
 STRAVA_BULK_IMPORT_ACTIVITIES_DIR = f"{STRAVA_BULK_IMPORT_DIR}/activities"
 STRAVA_BULK_IMPORT_MEDIA_DIR = f"{STRAVA_BULK_IMPORT_DIR}/media"
-STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{STRAVA_BULK_IMPORT_DIR}/import_errors"
+STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR = (
+    f"{STRAVA_BULK_IMPORT_DIR}/import_errors"
+)
 
 REVERSE_GEO_MIN_INTERVAL = (
-    1.0 / settings.REVERSE_GEO_RATE_LIMIT if settings.REVERSE_GEO_RATE_LIMIT > 0 else 0
+    1.0 / settings.REVERSE_GEO_RATE_LIMIT
+    if settings.REVERSE_GEO_RATE_LIMIT > 0
+    else 0
 )
 REVERSE_GEO_LOCK = threading.Lock()
 REVERSE_GEO_LAST_CALL = 0.0
 
 
 # Secret loading and environment validation
-def read_secret(env_var_name: str, default_value: str | None = None) -> str | None:
+def read_secret(
+    env_var_name: str,
+    default_value: str | None = None,
+) -> str | None:
     """
     Read secret from environment variable or file.
 
@@ -268,27 +279,34 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
                 core_logger.print_to_log_and_console(
                     f"Secret file not found for {file_env_var}", "error"
                 )
-                raise EnvironmentError(f"Secret file not found for {file_env_var}")
+                raise EnvironmentError(
+                    f"Secret file not found for {file_env_var}"
+                )
 
             if not file_path.is_file():
                 core_logger.print_to_log_and_console(
                     f"Secret path is not a file for {file_env_var}", "error"
                 )
-                raise EnvironmentError(f"Secret path is not a file for {file_env_var}")
+                raise EnvironmentError(
+                    f"Secret path is not a file for {file_env_var}"
+                )
 
             # Security: Check file permissions (should not be world-readable)
             file_stat = file_path.stat()
             if file_stat.st_mode & stat.S_IROTH:
                 core_logger.print_to_log_and_console(
-                    f"Secret file is world-readable for {file_env_var}", "warning"
+                    f"Secret file is world-readable for {file_env_var}",
+                    "warning",
                 )
 
-            # Security: Limit file size to prevent memory exhaustion (max 64KB for secrets)
+            # Security: limit file size to prevent memory exhaustion.
             if file_stat.st_size > 65536:  # 64KB
                 core_logger.print_to_log_and_console(
                     f"Secret file too large for {file_env_var}", "error"
                 )
-                raise EnvironmentError(f"Secret file too large for {file_env_var}")
+                raise EnvironmentError(
+                    f"Secret file too large for {file_env_var}"
+                )
 
             # Read the secret file
             with file_path.open("r", encoding="utf-8") as secret_file:
@@ -296,7 +314,8 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
 
                 if content:
                     core_logger.print_to_log_and_console(
-                        f"Successfully loaded secret from file for {env_var_name}",
+                        "Successfully loaded secret from file for "
+                        f"{env_var_name}",
                         "debug",
                     )
                     return content
@@ -308,7 +327,8 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
         except (OSError, IOError, UnicodeDecodeError) as e:
             # Log error without exposing file path details
             core_logger.print_to_log_and_console(
-                f"Error reading secret file for {file_env_var}: {type(e).__name__}",
+                "Error reading secret file for "
+                f"{file_env_var}: {type(e).__name__}",
                 "error",
             )
             raise EnvironmentError(
@@ -316,7 +336,8 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
             ) from e
         except Exception as e:
             core_logger.print_to_log_and_console(
-                f"Unexpected error reading secret for {file_env_var}: {type(e).__name__}",
+                "Unexpected error reading secret for "
+                f"{file_env_var}: {type(e).__name__}",
                 "error",
             )
             raise EnvironmentError(
@@ -348,7 +369,7 @@ def _is_safe_path(file_path: Path) -> bool:
             "/secrets/",  # Custom secrets directory
         ]
 
-        # For development, also allow relative paths in current working directory
+        # For development, also allow paths in the working directory.
         if settings.ENVIRONMENT == "development":
             cwd = Path.cwd()
             try:
@@ -375,7 +396,10 @@ def validate_fernet_key(fernet_key: str | None) -> bool:
         True if key is valid, False otherwise.
     """
     if not fernet_key:
-        core_logger.print_to_log_and_console("FERNET_KEY is not set or empty", "error")
+        core_logger.print_to_log_and_console(
+            "FERNET_KEY is not set or empty",
+            "error",
+        )
         return False
 
     try:
@@ -387,14 +411,18 @@ def validate_fernet_key(fernet_key: str | None) -> bool:
             "FERNET_KEY validation successful", "debug"
         )
         return True
-    except ValueError as e:
+    except ValueError as err:
         core_logger.print_to_log_and_console(
-            f"FERNET_KEY validation failed: Invalid key format - {str(e)}", "error"
+            "FERNET_KEY validation failed: Invalid key format "
+            f"({type(err).__name__})",
+            "error",
         )
         return False
-    except Exception as e:
+    except Exception as err:
         core_logger.print_to_log_and_console(
-            f"FERNET_KEY validation failed: Unexpected error - {str(e)}", "error"
+            "FERNET_KEY validation failed: Unexpected error "
+            f"({type(err).__name__})",
+            "error",
         )
         return False
 
@@ -413,8 +441,10 @@ def validate_log_level(log_level: str) -> bool:
     if log_level.lower() in valid_levels:
         return True
     else:
+        allowed_values = ", ".join(sorted(valid_levels))
         core_logger.print_to_log_and_console(
-            f"Log level '{log_level}' is invalid. Must be one of: {', '.join(valid_levels)}",
+            f"Log level '{log_level}' is invalid. "
+            f"Must be one of: {allowed_values}",
             "error",
         )
         return False
@@ -441,42 +471,49 @@ def check_required_env_vars():
         value = read_secret(var) if var == "SMTP_PASSWORD" else os.getenv(var)
         if not value:
             core_logger.print_to_log_and_console(
-                f"Email not configured (missing: {var}). Password reset feature will not work.",
+                f"Email not configured (missing: {var}). "
+                "Password reset feature will not work.",
                 "info",
             )
 
-    # Check secret variables - either direct env var or _FILE variant must be present
+    # Check secret variables. Direct env var or _FILE must be present.
     for var in secret_vars:
         file_var = f"{var}_FILE"
         if var not in os.environ and file_var not in os.environ:
+            message = (
+                f"Missing required environment variable: {var} "
+                f"(or {file_var} for Docker secrets)"
+            )
             core_logger.print_to_log_and_console(
-                f"Missing required environment variable: {var} (or {file_var} for Docker secrets)",
+                message,
                 "error",
             )
-            raise EnvironmentError(
-                f"Missing required environment variable: {var} (or {file_var} for Docker secrets)"
-            )
+            raise EnvironmentError(message)
 
     # Check non-secret required variables
     for var in required_env_vars:
         if var not in os.environ:
+            message = f"Missing required environment variable: {var}"
             core_logger.print_to_log_and_console(
-                f"Missing required environment variable: {var}", "error"
+                message,
+                "error",
             )
-            raise EnvironmentError(f"Missing required environment variable: {var}")
+            raise EnvironmentError(message)
 
     # Validate FERNET_KEY if it's available
     fernet_key = read_secret("FERNET_KEY")
     if fernet_key:
         is_valid = validate_fernet_key(fernet_key)
         if not is_valid:
+            message = (
+                "FERNET_KEY validation failed. Please check the key "
+                "format and regenerate if necessary."
+            )
             core_logger.print_to_log_and_console(
-                "FERNET_KEY validation failed. Please check the key format and regenerate if necessary.",
+                message,
                 "warning",
             )
-            raise ValueError(
-                "FERNET_KEY validation failed. Please check the key format and regenerate if necessary."
-            )
+            raise ValueError(message)
 
     validate_log_level(settings.LOG_LEVEL)
 
@@ -502,11 +539,13 @@ def check_required_dirs():
     ]
 
     for required_dir in required_dirs:
-        if not os.path.exists(required_dir):
-            os.mkdir(required_dir)
-        elif not os.path.isdir(required_dir):
+        required_path = Path(required_dir)
+        if not required_path.exists():
+            required_path.mkdir(parents=True)
+        elif not required_path.is_dir():
             core_logger.print_to_log_and_console(
-                f"Required directory is not a directory: {required_dir}", "error"
+                f"Required directory is not a directory: {required_dir}",
+                "error",
             )
             raise EnvironmentError(
                 f"Required directory is not a directory: {required_dir}"

@@ -5,7 +5,8 @@ LINK_COLOR_PRIMARY = "#0d6efd"  # blue  – password reset
 LINK_COLOR_SUCCESS = "#198754"  # green – sign-up flows
 
 _LOGO_URL = (
-    "https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.png"
+    "https://codeberg.org/endurain-project/endurain/raw/branch/master/"
+    "frontend/app/public/logo/logo.png"
 )
 
 
@@ -36,10 +37,22 @@ def html_header(title: str, heading: str) -> str:
     <title>{title}</title>
 </head>
 
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
-    <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
+<body
+    style="font-family: Arial, sans-serif; line-height: 1.6;
+    color: #333; max-width: 600px; margin: 0 auto; padding: 20px;
+    background-color: #f4f4f4;"
+>
+    <div
+        style="background-color: #ffffff; padding: 30px;
+        border-radius: 10px; box-shadow: 0 2px 10px
+        rgba(0, 0, 0, 0.1);"
+    >
         <div style="text-align: center; margin-bottom: 30px;">
-            <div style="font-size: 34px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <div
+                style="font-size: 34px; font-weight: bold;
+                margin-bottom: 10px; display: flex; align-items: center;
+                justify-content: center; gap: 10px;"
+            >
                 <img src="{_LOGO_URL}"
                     alt="Endurain logo" style="height: 32px; width: auto;">
                 <span>Endurain</span>
@@ -79,11 +92,24 @@ def html_footer(
     return f"""
         </div>
 
-        <div style="text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+        <div
+            style="text-align: center; font-size: 12px; color: #666;
+            margin-top: 30px; padding-top: 20px;
+            border-top: 1px solid #eee;"
+        >
             <p>Best regards,<br>{sign_off}</p>
-            <p>Visit Endurain at: <a style="color: {link_color};" href="{frontend_host}">{frontend_host}</a> -
-                Source code at: <a style="color: {link_color};"
-                    href="https://codeberg.org/endurain-project/endurain">Codeberg</a></p>
+            <p>
+                Visit Endurain at:
+                <a style="color: {link_color};" href="{frontend_host}">
+                    {frontend_host}
+                </a> - Source code at:
+                <a
+                    style="color: {link_color};"
+                    href="https://codeberg.org/endurain-project/endurain"
+                >
+                    Codeberg
+                </a>
+            </p>
         </div>
     </div>
 </body>

@@ -13,6 +13,7 @@ can read it without an explicit parameter.
 
 import re
 import uuid
+from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -52,7 +53,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self,
         request: Request,
-        call_next,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """
         Set the request ID and forward the request.
@@ -70,8 +71,10 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         else:
             rid = str(uuid.uuid4())
 
-        request_id_ctx.set(rid)
-
-        response = await call_next(request)
-        response.headers[_REQUEST_ID_HEADER] = rid
-        return response
+        token = request_id_ctx.set(rid)
+        try:
+            response = await call_next(request)
+            response.headers[_REQUEST_ID_HEADER] = rid
+            return response
+        finally:
+            request_id_ctx.reset(token)

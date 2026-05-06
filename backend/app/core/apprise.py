@@ -9,7 +9,6 @@ the underlying transport.
 import hashlib
 import secrets
 from functools import lru_cache
-from typing import Optional
 from urllib.parse import urlencode
 
 import apprise
@@ -49,7 +48,9 @@ class AppriseService:
         # Password is intentionally not stored on the
         # Settings object; it is loaded from env or a
         # Docker secret file via ``read_secret``.
-        self.smtp_password: Optional[str] = core_config.read_secret("SMTP_PASSWORD")
+        self.smtp_password: str | None = core_config.read_secret(
+            "SMTP_PASSWORD"
+        )
         # Public attribute consumed by email-body templates
         # (e.g. ``{email_service.frontend_host}/login``).
         self.frontend_host: str = s.ENDURAIN_HOST
@@ -92,8 +93,8 @@ class AppriseService:
         self,
         to_emails: list[str],
         subject: str,
-        html_content: Optional[str] = None,
-        text_content: Optional[str] = None,
+        html_content: str | None = None,
+        text_content: str | None = None,
     ) -> bool:
         """Send a transactional email to one or more recipients.
 
@@ -114,7 +115,10 @@ class AppriseService:
             True on successful delivery, False otherwise.
         """
         if not to_emails:
-            core_logger.print_to_log("send_email called with no recipients", "warning")
+            core_logger.print_to_log(
+                "send_email called with no recipients",
+                "warning",
+            )
             return False
         if not self.is_smtp_configured():
             core_logger.print_to_log(

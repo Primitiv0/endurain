@@ -1,14 +1,21 @@
 import os
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+
+from alembic import command
+from alembic.config import Config
+
+# Silence stravalib token warnings as early as
+# possible: this env var is consulted at import time by
+# stravalib, so it must be set before any module that
+# transitively imports it runs.
+os.environ["SILENCE_TOKEN_WARNINGS"] = "TRUE"
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-
-from alembic.config import Config
-from alembic import command
 
 import core.logger as core_logger
 import core.config as core_config
@@ -37,17 +44,19 @@ import activities.activity.utils as activities_utils
 import server_settings.utils as server_settings_utils
 import server_settings.schema as server_settings_schema
 
-from core.routes import router as api_router
 from core.database import SessionLocal, engine as core_db_engine
-
-# Silence stravalib token warnings as early as
-# possible: this env var is consulted at import time by
-# stravalib, so it must be set before any module that
-# transitively imports it runs.
-os.environ["SILENCE_TOKEN_WARNINGS"] = "TRUE"
+from core.routes import router as api_router
 
 
-def _safe_run(label: str, func, *args, **kwargs):
+_DEPLOYED_ENVIRONMENTS = {"production", "demo"}
+
+
+def _safe_run[T, **P](
+    label: str,
+    func: Callable[P, T],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> T | None:
     """Invoke a startup task, isolating its failure.
 
     Logs the exception type (not the raw message, to
@@ -66,7 +75,12 @@ def _safe_run(label: str, func, *args, **kwargs):
         return None
 
 
-async def _safe_run_async(label: str, coro_func, *args, **kwargs):
+async def _safe_run_async[T, **P](
+    label: str,
+    coro_func: Callable[P, Awaitable[T]],
+    *args: P.args,
+    **kwargs: P.kwargs,
+) -> T | None:
     """Async variant of :func:`_safe_run`."""
     try:
         return await coro_func(*args, **kwargs)
@@ -99,12 +113,18 @@ def _refresh_strava_tokens() -> None:
 
 async def _retrieve_recent_garmin_activities() -> None:
     """Backfill the last day of Garmin Connect activities."""
-    await garmin_activity_utils.retrieve_garminconnect_users_activities_for_days(1)
+    await (
+        garmin_activity_utils
+        .retrieve_garminconnect_users_activities_for_days(1)
+    )
 
 
 async def _retrieve_recent_strava_activities() -> None:
     """Backfill the last day of Strava activities."""
-    await strava_activity_utils.retrieve_strava_users_activities_for_days(1, True)
+    await strava_activity_utils.retrieve_strava_users_activities_for_days(
+        1,
+        True,
+    )
 
 
 async def _retrieve_recent_garmin_health() -> None:
@@ -137,8 +157,9 @@ def _init_allowed_tile_domains(fastapi_app: FastAPI) -> None:
             fastapi_app.state.allowed_tile_domains = (
                 server_settings_utils.get_allowed_tile_domains(db)
             )
+            allowed_tile_domains = fastapi_app.state.allowed_tile_domains
             core_logger.print_to_log_and_console(
-                f"Allowed tile domains: {fastapi_app.state.allowed_tile_domains}"
+                f"Allowed tile domains: {allowed_tile_domains}"
             )
         except Exception as err:
             core_logger.print_to_log(
@@ -196,10 +217,14 @@ async def startup_event(fastapi_app: FastAPI) -> None:
     core_logger.print_to_log_and_console(
         "Retrieving last day health stats from Garmin Connect on startup"
     )
-    await _safe_run_async("retrieve_recent_garmin_health", _retrieve_recent_garmin_health)
+    await _safe_run_async(
+        "retrieve_recent_garmin_health",
+        _retrieve_recent_garmin_health,
+    )
 
     core_logger.print_to_log_and_console(
-        "Purging expired tokens (password reset, sign-up, OAuth state, IdP link)"
+        "Purging expired tokens "
+        "(password reset, sign-up, OAuth state, IdP link)"
     )
     _safe_run("purge_expired_tokens", _purge_expired_tokens)
 
@@ -222,20 +247,22 @@ def shutdown_event() -> None:
     """Stop the background scheduler and release DB resources on shutdown."""
     core_logger.print_to_log_and_console("Backend shutdown event")
     core_scheduler.stop_scheduler()
-    
+
     # Dispose the SQLAlchemy engine so all pooled
     # psycopg connections are closed deterministically.
     try:
         core_db_engine.dispose()
     except Exception as err:
         core_logger.print_to_log_and_console(
-            f"Error disposing database engine on shutdown: {type(err).__name__}",
+            "Error disposing database engine on shutdown: "
+            f"{type(err).__name__}",
             "error",
         )
 
 
 @asynccontextmanager
-async def lifespan(fastapi_app: FastAPI):
+async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
+    """Manage application startup and shutdown."""
     await startup_event(fastapi_app)
     try:
         yield
@@ -260,11 +287,16 @@ def create_app() -> FastAPI:
     core_config.check_required_dirs()
     core_logger.setup_main_logger()
 
+    is_development = core_config.settings.ENVIRONMENT == "development"
+    is_deployed = core_config.settings.ENVIRONMENT in _DEPLOYED_ENVIRONMENTS
+    docs_url = f"{core_config.ROOT_PATH}/docs" if is_development else None
+    redoc_url = f"{core_config.ROOT_PATH}/redoc" if is_development else None
+
     # Define the FastAPI object
     fastapi_app = FastAPI(
         lifespan=lifespan,
-        docs_url=core_config.ROOT_PATH + "/docs" if core_config.settings.ENVIRONMENT == "development" else None,
-        redoc_url=core_config.ROOT_PATH + "/redoc" if core_config.settings.ENVIRONMENT == "development" else None,
+        docs_url=docs_url,
+        redoc_url=redoc_url,
         title="Endurain",
         summary="Endurain API for the Endurain app",
         version=core_config.API_VERSION,
@@ -282,16 +314,15 @@ def create_app() -> FastAPI:
         session_cookie="endurain_session",
         max_age=3600,  # 1 hour session timeout
         same_site="lax",
-        https_only=(
-            core_config.settings.ENVIRONMENT == "production" or core_config.settings.ENVIRONMENT == "demo"
-        ),
+        https_only=is_deployed,
     )
 
     # Add CORS middleware to allow requests from the frontend
-    if core_config.settings.ENVIRONMENT == "development":
+    if is_development:
         cors_allow_origins: list[str] = [
             "http://localhost:8080",
             "http://localhost:5173",
+            "http://localhost:5174",
             core_config.settings.ENDURAIN_HOST,
         ]
     else:
@@ -334,10 +365,8 @@ def create_app() -> FastAPI:
         core_middleware_request_id.RequestIdMiddleware,
     )
 
-    # Router files
-    fastapi_app.include_router(api_router)
-
-    # Add a route to serve the user images
+    # Static mounts must be registered before the
+    # catch-all frontend route included by api_router.
     fastapi_app.mount(
         f"/{core_config.USER_IMAGES_DIR}",
         StaticFiles(directory=core_config.USER_IMAGES_DIR),
@@ -358,6 +387,9 @@ def create_app() -> FastAPI:
         StaticFiles(directory=core_config.settings.ACTIVITY_THUMBNAILS_DIR),
         name="activity_thumbnails",
     )
+
+    # Router files
+    fastapi_app.include_router(api_router)
 
     # Setup tracing once the app and its routes are
     # registered so instrumentation can wrap them.

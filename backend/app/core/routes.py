@@ -1,23 +1,37 @@
+"""Aggregate application routers under the API root."""
+
 from fastapi import APIRouter, Depends, Security
 
 # Alphabetized router imports
 import activities.activity.router as activities_router
 import activities.activity.public_router as activities_public_router
-import activities.activity_exercise_titles.router as activity_exercise_titles_router
-import activities.activity_exercise_titles.public_router as activity_exercise_titles_public_router
+from activities.activity_exercise_titles import (
+    public_router as activity_exercise_titles_public_router,
+)
+from activities.activity_exercise_titles import (
+    router as activity_exercise_titles_router,
+)
 import activities.activity_laps.router as activity_laps_router
 import activities.activity_laps.public_router as activity_laps_public_router
 import activities.activity_media.router as activity_media_router
 import activities.activity_sets.router as activity_sets_router
 import activities.activity_sets.public_router as activity_sets_public_router
 import activities.activity_streams.router as activity_streams_router
-import activities.activity_streams.public_router as activity_streams_public_router
+from activities.activity_streams import (
+    public_router as activity_streams_public_router,
+)
 import activities.activity_summaries.router as activity_summaries_router
-import activities.activity_workout_steps.router as activity_workout_steps_router
-import activities.activity_workout_steps.public_router as activity_workout_steps_public_router
+from activities.activity_workout_steps import (
+    public_router as activity_workout_steps_public_router,
+)
+from activities.activity_workout_steps import (
+    router as activity_workout_steps_router,
+)
 import auth.router as auth_router
 import auth.identity_providers.router as identity_providers_router
-import auth.identity_providers.public_router as identity_providers_public_router
+from auth.identity_providers import (
+    public_router as identity_providers_public_router,
+)
 import auth.security as auth_security
 import core.config as core_config
 import core.router as core_router

@@ -1,63 +1,45 @@
-from fastapi import Request, HTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
+"""HTTP middleware for security headers and CSRF checks."""
 
+from collections.abc import Awaitable, Callable
+
+from fastapi import Request, status
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+from starlette.types import ASGIApp
+
+import core.config as core_config
 import server_settings.schema as server_settings_schema
+
+_DEPLOYED_ENVIRONMENTS = {"production", "demo"}
+_CSRF_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """
-    Middleware to add security headers to all HTTP responses.
+    Add browser security headers to HTTP responses.
 
-    This middleware adds essential security headers to protect against common web vulnerabilities:
-    - XSS (Cross-Site Scripting)
-    - Clickjacking
-    - MIME sniffing attacks
-    - Information leakage through referrer
-    - Unauthorized feature access
-
-    Headers added:
-        X-Content-Type-Options: nosniff
-            Prevents MIME sniffing attacks by forcing browsers to respect declared content types.
-
-        X-Frame-Options: DENY
-            Prevents clickjacking attacks by disallowing the page to be embedded in iframes.
-
-        X-XSS-Protection: 1; mode=block
-            Enables browser's XSS filter and blocks page rendering if XSS attack detected.
-            (Legacy header but still supported by older browsers)
-
-        Referrer-Policy: strict-origin-when-cross-origin
-            Controls how much referrer information is sent with requests:
-            - Same origin: full URL
-            - Cross origin: only origin (no path/query)
-            - HTTPS to HTTP: no referrer
-
-        Permissions-Policy: geolocation=(), microphone=(), camera=()
-            Disables unnecessary browser features to reduce attack surface.
-            Prevents unauthorized access to sensitive device APIs.
-
-        Content-Security-Policy: default-src 'self'; img-src 'self' data: <dynamic-tile-domains>; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'
-            Restricts resources to same origin by default (API responses).
-            Allows inline base64 images (data: URIs) and map tiles from configured tile servers.
-            Tile domains are dynamically loaded from app.state.allowed_tile_domains (updated on startup and settings changes).
-            Allows inline styles and scripts required by frontend libraries.
-            For frontend serving, this would need customization.
-
-    Note:
-        These headers are applied globally to all responses.
-        Individual endpoints can override headers if needed via response objects.
+    Attributes:
+        None.
     """
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         """
-        Process request and add security headers to response.
+        Add security headers to the downstream response.
 
         Args:
-            request: The incoming HTTP request
-            call_next: The next middleware or endpoint handler
+            request: Incoming HTTP request.
+            call_next: Next ASGI handler in the chain.
 
         Returns:
-            Response with security headers added
+            Response with security headers applied.
+
+        Raises:
+            Exception: Propagates downstream request errors.
         """
         response = await call_next(request)
 
@@ -67,8 +49,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
 
-        # XSS protection (legacy but still useful for older browsers)
-        response.headers["X-XSS-Protection"] = "1; mode=block"
+        # Disable legacy browser XSS auditors; CSP is the modern control.
+        response.headers["X-XSS-Protection"] = "0"
 
         # Control referrer information leakage
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -78,11 +60,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "geolocation=(), microphone=(), camera=()"
         )
 
-        # Content Security Policy for API responses
-        # Note: Only add CSP for HTML responses to avoid affecting JSON API responses
+        if core_config.settings.ENVIRONMENT in _DEPLOYED_ENVIRONMENTS:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+
+        # Only HTML receives CSP to avoid surprising JSON API clients.
         content_type = response.headers.get("content-type", "")
         if "text/html" in content_type:
-            # Get allowed tile domains from app state (initialized on startup, updated on settings change)
             allowed_tile_domains = getattr(
                 request.app.state,
                 "allowed_tile_domains",
@@ -92,17 +77,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                f"img-src 'self' data: {tile_domains_str} https://fastapi.tiangolo.com; "
+                f"img-src 'self' data: {tile_domains_str} "
+                "https://fastapi.tiangolo.com; "
                 "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
                 "connect-src 'self' https://cdn.jsdelivr.net; "
                 "media-src 'self' data:"
             )
-            # TODO: Serve Swagger UI locally to reduce security risks introduced by allowing CDN resources.
-            # Currently allowing cdn.jsdelivr.net and fastapi.tiangolo.com for Swagger UI functionality.
-            # See documentation for implementing local Swagger UI serving.
 
-        # Remove server version header for security through obscurity
         if "Server" in response.headers:
             del response.headers["Server"]
 
@@ -111,54 +93,47 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class CSRFMiddleware(BaseHTTPMiddleware):
     """
-    Middleware for CSRF protection in FastAPI applications.
-
-    This middleware checks for a valid CSRF token in requests from web clients to prevent cross-site request forgery attacks.
-    It exempts specific API paths from CSRF checks and only enforces validation for POST, PUT, DELETE, and PATCH requests.
+    Require CSRF headers for browser state-changing requests.
 
     Attributes:
-        exempt_paths (list): List of URL paths that are exempt from CSRF protection.
-
-    Methods:
-        dispatch(request, call_next):
-            Processes incoming requests, enforcing CSRF checks for web clients on non-exempt paths and applicable HTTP methods.
-            Raises HTTPException with status code 403 if CSRF token is missing or invalid.
+        exempt_paths: Exact paths skipped by CSRF checks.
+        exempt_path_prefixes: Path prefixes skipped by CSRF checks.
     """
 
-    def __init__(self, app):
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         # Define paths that don't need CSRF protection
         self.exempt_paths = [
             "/api/v1/auth/login",
             "/api/v1/auth/mfa/verify",
-            "/api/v1/auth/refresh",  # Bootstrap pattern: first refresh has no CSRF
+            "/api/v1/auth/refresh",
             "/api/v1/password-reset/request",
             "/api/v1/password-reset/confirm",
             "/api/v1/sign-up/request",
             "/api/v1/sign-up/confirm",
         ]
-        # Define path prefixes that don't need CSRF protection (for dynamic routes)
         self.exempt_path_prefixes = [
             "/api/v1/public/idp/session/",
         ]
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         """
-        Middleware method to enforce CSRF protection for web clients.
+        Enforce CSRF header presence for web clients.
 
         Args:
-            request (Request): The incoming HTTP request.
-            call_next (Callable): The next middleware or endpoint handler.
+            request: Incoming HTTP request.
+            call_next: Next ASGI handler in the chain.
 
         Returns:
-            Response: The HTTP response after CSRF validation.
+            Response from the downstream handler, or a 403
+            response when CSRF validation fails.
 
-        Behavior:
-            - Skips CSRF checks for non-web clients (determined by "X-Client-Type" header).
-            - Skips CSRF checks for exempt paths.
-            - For web clients and non-exempt paths, validates CSRF token for POST, PUT, DELETE, and PATCH requests:
-                - Requires "X-CSRF-Token" header.
-                - Raises HTTPException 403 if token is missing.
+        Raises:
+            Exception: Propagates downstream request errors.
         """
         # Get client type from header
         client_type = request.headers.get("X-Client-Type")
@@ -176,12 +151,14 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             if request.url.path.startswith(prefix):
                 return await call_next(request)
 
-        # Check for CSRF token in POST, PUT, DELETE, and PATCH requests
-        if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+        if request.method in _CSRF_METHODS:
             csrf_header = request.headers.get("X-CSRF-Token")
 
             if not csrf_header:
-                raise HTTPException(status_code=403, detail="CSRF token required")
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={"detail": "CSRF token required"},
+                )
 
         response = await call_next(request)
         return response
