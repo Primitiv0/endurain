@@ -1,6 +1,8 @@
 """Activity laps schemas."""
 
 from datetime import datetime
+from decimal import Decimal
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -10,9 +12,33 @@ from pydantic import (
     StrictInt,
     StrictStr,
     field_serializer,
+    field_validator,
 )
 
 import core.timezone as core_timezone
+
+
+_FLOAT_FIELDS: tuple[str, ...] = (
+    "start_position_lat",
+    "start_position_long",
+    "end_position_lat",
+    "end_position_long",
+    "total_elapsed_time",
+    "total_timer_time",
+    "total_distance",
+    "avg_vertical_oscillation",
+    "avg_stance_time",
+    "avg_fractional_cadence",
+    "max_fractional_cadence",
+    "enhanced_avg_pace",
+    "enhanced_avg_speed",
+    "enhanced_max_pace",
+    "enhanced_max_speed",
+    "enhanced_min_altitude",
+    "enhanced_max_altitude",
+    "avg_vertical_ratio",
+    "avg_step_length",
+)
 
 
 class ActivityLapsBase(BaseModel):
@@ -82,26 +108,16 @@ class ActivityLapsBase(BaseModel):
     sub_sport: StrictStr | None = None
     normalized_power: StrictInt | None = None
     total_work: StrictInt | None = None
-    avg_vertical_oscillation: (
-        StrictFloat | None
-    ) = None
+    avg_vertical_oscillation: StrictFloat | None = None
     avg_stance_time: StrictFloat | None = None
-    avg_fractional_cadence: (
-        StrictFloat | None
-    ) = None
-    max_fractional_cadence: (
-        StrictFloat | None
-    ) = None
+    avg_fractional_cadence: StrictFloat | None = None
+    max_fractional_cadence: StrictFloat | None = None
     enhanced_avg_pace: StrictFloat | None = None
     enhanced_avg_speed: StrictFloat | None = None
     enhanced_max_pace: StrictFloat | None = None
     enhanced_max_speed: StrictFloat | None = None
-    enhanced_min_altitude: (
-        StrictFloat | None
-    ) = None
-    enhanced_max_altitude: (
-        StrictFloat | None
-    ) = None
+    enhanced_min_altitude: StrictFloat | None = None
+    enhanced_max_altitude: StrictFloat | None = None
     avg_vertical_ratio: StrictFloat | None = None
     avg_step_length: StrictFloat | None = None
 
@@ -109,6 +125,27 @@ class ActivityLapsBase(BaseModel):
         extra="forbid",
         validate_assignment=True,
     )
+
+    @field_validator(*_FLOAT_FIELDS, mode="before")
+    @classmethod
+    def _coerce_decimal_to_float(cls, value: Any) -> Any:
+        """
+        Coerce ``Decimal`` values from the ORM to ``float``.
+
+        SQLAlchemy returns ``Decimal`` for ``DECIMAL`` columns, but the
+        public contract for these fields is ``float``. ``StrictFloat``
+        rejects ``Decimal`` outright, so convert at the boundary.
+
+        Args:
+            value: Raw value coming from the ORM or API payload.
+
+        Returns:
+            ``float`` if a ``Decimal`` was provided, otherwise the value
+            unchanged.
+        """
+        if isinstance(value, Decimal):
+            return float(value)
+        return value
 
 
 class ActivityLapsRead(ActivityLapsBase):
@@ -126,9 +163,7 @@ class ActivityLapsRead(ActivityLapsBase):
     id: StrictInt
     activity_id: StrictInt
     start_time: datetime  # type: ignore[assignment]
-    timezone: StrictStr | None = Field(
-        default=None, exclude=True
-    )
+    timezone: StrictStr | None = Field(default=None, exclude=True)
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -137,9 +172,7 @@ class ActivityLapsRead(ActivityLapsBase):
     )
 
     @field_serializer("start_time")
-    def serialize_start_time(
-        self, value: datetime
-    ) -> str:
+    def serialize_start_time(self, value: datetime) -> str:
         """
         Format start_time with activity timezone.
 
@@ -149,6 +182,4 @@ class ActivityLapsRead(ActivityLapsBase):
         Returns:
             Formatted datetime string.
         """
-        return core_timezone.format_aware_datetime(
-            value, self.timezone
-        )
+        return core_timezone.format_aware_datetime(value, self.timezone)

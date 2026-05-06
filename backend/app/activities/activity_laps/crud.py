@@ -1,6 +1,5 @@
 """Activity laps CRUD operations."""
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +12,46 @@ import activities.activity_laps.schema as activity_laps_schema
 import server_settings.utils as server_settings_utils
 
 import core.decorators as core_decorators
+
+
+_LAP_COLUMNS: tuple[str, ...] = (
+    "start_time",
+    "start_position_lat",
+    "start_position_long",
+    "end_position_lat",
+    "end_position_long",
+    "total_elapsed_time",
+    "total_timer_time",
+    "total_distance",
+    "total_cycles",
+    "total_calories",
+    "avg_heart_rate",
+    "max_heart_rate",
+    "avg_cadence",
+    "max_cadence",
+    "avg_power",
+    "max_power",
+    "total_ascent",
+    "total_descent",
+    "intensity",
+    "lap_trigger",
+    "sport",
+    "sub_sport",
+    "normalized_power",
+    "total_work",
+    "avg_vertical_oscillation",
+    "avg_stance_time",
+    "avg_fractional_cadence",
+    "max_fractional_cadence",
+    "enhanced_avg_pace",
+    "enhanced_avg_speed",
+    "enhanced_max_pace",
+    "enhanced_max_speed",
+    "enhanced_min_altitude",
+    "enhanced_max_altitude",
+    "avg_vertical_ratio",
+    "avg_step_length",
+)
 
 
 def _to_read_schema(
@@ -95,7 +134,7 @@ def get_activities_laps(
     activity_ids: list[int],
     token_user_id: int,
     db: Session,
-    activities: list[
+    prefetched_activities: list[
         activity_models.Activity
     ] | None = None,
 ) -> list[activity_laps_schema.ActivityLapsRead]:
@@ -106,7 +145,9 @@ def get_activities_laps(
         activity_ids: List of activity IDs.
         token_user_id: The authenticated user ID.
         db: Database session.
-        activities: Optional pre-fetched activities.
+        prefetched_activities: Optional pre-fetched
+            activities (avoids a re-query when the
+            caller already has them in scope).
 
     Returns:
         List of ActivityLapsRead schemas.
@@ -117,7 +158,8 @@ def get_activities_laps(
     if not activity_ids:
         return []
 
-    if not activities:
+    activities_list = prefetched_activities
+    if not activities_list:
         stmt = (
             select(activity_models.Activity)
             .where(
@@ -126,19 +168,19 @@ def get_activities_laps(
                 )
             )
         )
-        activities = db.scalars(stmt).all()
+        activities_list = db.scalars(stmt).all()
 
-    if not activities:
+    if not activities_list:
         return []
 
     activity_map = {
         activity.id: activity
-        for activity in activities
+        for activity in activities_list
     }
 
     allowed_ids = [
         activity.id
-        for activity in activities
+        for activity in activities_list
         if activity.user_id == token_user_id
     ]
 
@@ -245,55 +287,13 @@ def create_activity_laps(
     Raises:
         HTTPException: If database error occurs.
     """
-    laps = []
-
-    for lap in activity_laps:
-        db_lap = activity_laps_models.ActivityLaps(
+    laps = [
+        activity_laps_models.ActivityLaps(
             activity_id=activity_id,
-            **{
-                key: lap.get(key)
-                for key in [
-                    "start_time",
-                    "start_position_lat",
-                    "start_position_long",
-                    "end_position_lat",
-                    "end_position_long",
-                    "total_elapsed_time",
-                    "total_timer_time",
-                    "total_distance",
-                    "total_cycles",
-                    "total_calories",
-                    "avg_heart_rate",
-                    "max_heart_rate",
-                    "avg_cadence",
-                    "max_cadence",
-                    "avg_power",
-                    "max_power",
-                    "total_ascent",
-                    "total_descent",
-                    "intensity",
-                    "lap_trigger",
-                    "sport",
-                    "sub_sport",
-                    "normalized_power",
-                    "total_work",
-                    "avg_vertical_oscillation",
-                    "avg_stance_time",
-                    "avg_fractional_cadence",
-                    "max_fractional_cadence",
-                    "enhanced_avg_pace",
-                    "enhanced_avg_speed",
-                    "enhanced_max_pace",
-                    "enhanced_max_speed",
-                    "enhanced_min_altitude",
-                    "enhanced_max_altitude",
-                    "avg_vertical_ratio",
-                    "avg_step_length",
-                ]
-            },
+            **{key: lap.get(key) for key in _LAP_COLUMNS},
         )
-
-        laps.append(db_lap)
+        for lap in activity_laps
+    ]
 
     db.add_all(laps)
     db.commit()
