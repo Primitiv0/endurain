@@ -1,10 +1,13 @@
-import logging
+"""CRUD operations for follower relationships."""
 
 from fastapi import HTTPException, status
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import followers.models as followers_models
 
+import core.decorators as core_decorators
 import core.logger as core_logger
 
 import notifications.utils as notifications_utils
@@ -12,152 +15,175 @@ import notifications.utils as notifications_utils
 import websocket.manager as websocket_manager
 
 
-def get_all_followers_by_user_id(user_id: int, db: Session):
-    try:
-        # Get the followers by user ID from the database
-        followers = (
-            db.query(followers_models.Follower)
-            .filter(followers_models.Follower.follower_id == user_id)
-            .all()
-        )
+@core_decorators.handle_db_errors
+def get_all_followers_by_user_id(
+    user_id: int, db: Session
+) -> list[followers_models.Follower]:
+    """
+    Retrieve all follower records where the user is being followed.
 
-        # Check if followers is None and return None if it is
-        if followers is None:
-            return None
+    Args:
+        user_id: ID of the user whose followers to retrieve.
+        db: Database session.
 
-        # Return the followers
-        return followers
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_all_followers_by_user_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Returns:
+        List of Follower records (empty list if none).
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(followers_models.Follower).where(
+        followers_models.Follower.following_id == user_id
+    )
+    return list(db.scalars(stmt).all())
 
 
-def get_accepted_followers_by_user_id(user_id: int, db: Session):
-    try:
-        # Get the followers by user ID from the database
-        followers = (
-            db.query(followers_models.Follower)
-            .filter(
-                (followers_models.Follower.follower_id == user_id)
-                & (followers_models.Follower.is_accepted)
-            )
-            .all()
-        )
+@core_decorators.handle_db_errors
+def get_accepted_followers_by_user_id(
+    user_id: int, db: Session
+) -> list[followers_models.Follower]:
+    """
+    Retrieve accepted follower records where the user is being followed.
 
-        # Check if followers is None and return None if it is
-        if followers is None:
-            return None
+    Args:
+        user_id: ID of the user whose accepted followers to retrieve.
+        db: Database session.
 
-        # Return the followers
-        return followers
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_accepted_followers_by_user_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Returns:
+        List of accepted Follower records (empty list if none).
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(followers_models.Follower).where(
+        followers_models.Follower.following_id == user_id,
+        followers_models.Follower.is_accepted.is_(True),
+    )
+    return list(db.scalars(stmt).all())
 
 
-def get_all_following_by_user_id(user_id: int, db: Session):
-    try:
-        # Get the followers by user ID from the database
-        followings = (
-            db.query(followers_models.Follower)
-            .filter(followers_models.Follower.following_id == user_id)
-            .all()
-        )
+@core_decorators.handle_db_errors
+def get_all_following_by_user_id(
+    user_id: int, db: Session
+) -> list[followers_models.Follower]:
+    """
+    Retrieve all follow records where the user is the follower.
 
-        # Check if followers is None and return None if it is
-        if followings is None:
-            return None
+    Args:
+        user_id: ID of the user whose following list to retrieve.
+        db: Database session.
 
-        # Return the followers
-        return followings
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_all_following_by_user_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Returns:
+        List of Follower records (empty list if none).
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(followers_models.Follower).where(
+        followers_models.Follower.follower_id == user_id
+    )
+    return list(db.scalars(stmt).all())
 
 
-def get_accepted_following_by_user_id(user_id: int, db: Session):
-    try:
-        # Get the followers by user ID from the database
-        followings = (
-            db.query(followers_models.Follower)
-            .filter(
-                (followers_models.Follower.following_id == user_id)
-                & (followers_models.Follower.is_accepted)
-            )
-            .all()
-        )
+@core_decorators.handle_db_errors
+def get_accepted_following_by_user_id(
+    user_id: int, db: Session
+) -> list[followers_models.Follower]:
+    """
+    Retrieve accepted follow records where the user is the follower.
 
-        # Check if followers is None and return None if it is
-        if followings is None:
-            return None
+    Args:
+        user_id: ID of the user whose accepted following list to retrieve.
+        db: Database session.
 
-        # Return the followers
-        return followings
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_accepted_following_by_user_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Returns:
+        List of accepted Follower records (empty list if none).
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(followers_models.Follower).where(
+        followers_models.Follower.follower_id == user_id,
+        followers_models.Follower.is_accepted.is_(True),
+    )
+    return list(db.scalars(stmt).all())
 
 
+@core_decorators.handle_db_errors
+def count_followers_by_user_id(
+    user_id: int, db: Session, *, accepted_only: bool = False
+) -> int:
+    """
+    Count followers for a user without loading the full rowset.
+
+    Args:
+        user_id: ID of the user whose followers to count.
+        db: Database session.
+        accepted_only: If True, count only accepted relationships.
+
+    Returns:
+        Number of follower records.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(func.count()).select_from(followers_models.Follower).where(
+        followers_models.Follower.following_id == user_id
+    )
+    if accepted_only:
+        stmt = stmt.where(followers_models.Follower.is_accepted.is_(True))
+    return db.scalar(stmt) or 0
+
+
+@core_decorators.handle_db_errors
+def count_following_by_user_id(
+    user_id: int, db: Session, *, accepted_only: bool = False
+) -> int:
+    """
+    Count users a given user is following without loading the rowset.
+
+    Args:
+        user_id: ID of the user whose following list to count.
+        db: Database session.
+        accepted_only: If True, count only accepted relationships.
+
+    Returns:
+        Number of follow records.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(func.count()).select_from(followers_models.Follower).where(
+        followers_models.Follower.follower_id == user_id
+    )
+    if accepted_only:
+        stmt = stmt.where(followers_models.Follower.is_accepted.is_(True))
+    return db.scalar(stmt) or 0
+
+
+@core_decorators.handle_db_errors
 def get_follower_for_user_id_and_target_user_id(
     user_id: int, target_user_id: int, db: Session
-):
-    try:
-        # Get the follower by user ID and target user ID from the database
-        follower = (
-            db.query(followers_models.Follower)
-            .filter(
-                (followers_models.Follower.follower_id == user_id)
-                & (followers_models.Follower.following_id == target_user_id)
-            )
-            .first()
-        )
+) -> followers_models.Follower | None:
+    """
+    Retrieve a single follow relationship between two users.
 
-        # Check if follower is None and return None if it is
-        if follower is None:
-            return None
+    Args:
+        user_id: ID of the follower user.
+        target_user_id: ID of the user being followed.
+        db: Database session.
 
-        # Return the follower
-        return follower
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_follower_for_user_id_and_target_user_id: {err}",
-            "error",
-            exc=err,
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Returns:
+        Follower record if found, otherwise None.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(followers_models.Follower).where(
+        followers_models.Follower.follower_id == user_id,
+        followers_models.Follower.following_id == target_user_id,
+    )
+    return db.scalars(stmt).first()
 
 
 async def create_follower(
@@ -165,35 +191,80 @@ async def create_follower(
     target_user_id: int,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-):
-    try:
-        # Create a new follow relationship
-        new_follow = followers_models.Follower(
-            follower_id=user_id, following_id=target_user_id, is_accepted=False
+) -> followers_models.Follower:
+    """
+    Create a new follow request between two users.
+
+    Args:
+        user_id: ID of the follower user.
+        target_user_id: ID of the user being followed.
+        websocket_manager: WebSocket manager for live notifications.
+        db: Database session.
+
+    Returns:
+        The newly created Follower record.
+
+    Raises:
+        HTTPException: 400 if attempting to follow self, 409 if relationship
+            already exists, 500 on database errors.
+    """
+    # Prevent self-follow which would otherwise pollute counts and
+    # notifications.
+    if user_id == target_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot follow yourself",
         )
 
-        # Add the new follow relationship to the database
+    # Pre-check to return a clean 409 instead of a 500 from a unique
+    # constraint violation.
+    existing = get_follower_for_user_id_and_target_user_id(
+        user_id, target_user_id, db
+    )
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Follow relationship already exists",
+        )
+
+    new_follow = followers_models.Follower(
+        follower_id=user_id,
+        following_id=target_user_id,
+        is_accepted=False,
+    )
+
+    try:
         db.add(new_follow)
         db.commit()
-
-        await notifications_utils.create_new_follower_request_notification(
-            user_id, target_user_id, websocket_manager, db
-        )
-
-        # Return the gear
-        return new_follow
-    except Exception as err:
-        # Rollback the transaction
+        db.refresh(new_follow)
+    except IntegrityError as err:
         db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(f"Error in create_follower: {err}", "error", exc=err)
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
+        core_logger.print_to_log(
+            f"Integrity error in create_follower: {type(err).__name__}",
+            "warning",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Follow relationship already exists",
+        ) from err
+    except SQLAlchemyError as err:
+        db.rollback()
+        core_logger.print_to_log(
+            f"Database error in create_follower: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
+            detail="Database error occurred",
         ) from err
+
+    await notifications_utils.create_new_follower_request_notification(
+        user_id, target_user_id, websocket_manager, db
+    )
+
+    return new_follow
 
 
 async def accept_follower(
@@ -201,83 +272,88 @@ async def accept_follower(
     target_user_id: int,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-):
-    try:
-        # Get the follower record
-        accept_follow = (
-            db.query(followers_models.Follower)
-            .filter(
-                (followers_models.Follower.follower_id == target_user_id)
-                & (followers_models.Follower.following_id == user_id)
-                & (followers_models.Follower.is_accepted == False)
-            )
-            .first()
-        )
+) -> None:
+    """
+    Accept a pending follow request from another user.
 
-        # check if accept_follow is None and raise an HTTPException if it is
+    Args:
+        user_id: ID of the user accepting the request (the followed user).
+        target_user_id: ID of the user whose follow request is accepted.
+        websocket_manager: WebSocket manager for live notifications.
+        db: Database session.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: 404 if no pending request exists, 500 on database
+            errors.
+    """
+    stmt = select(followers_models.Follower).where(
+        followers_models.Follower.follower_id == target_user_id,
+        followers_models.Follower.following_id == user_id,
+        followers_models.Follower.is_accepted.is_(False),
+    )
+
+    try:
+        accept_follow = db.scalars(stmt).first()
         if accept_follow is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Follower record not found",
             )
 
-        # Accept the follow request by changing the "is_accepted" column to True
         accept_follow.is_accepted = True
-
-        # Commit the transaction
         db.commit()
-
-        await notifications_utils.create_accepted_follower_request_notification(
-            user_id, target_user_id, websocket_manager, db
-        )
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
-        # Rollback the transaction
+        db.refresh(accept_follow)
+    except HTTPException:
+        raise
+    except SQLAlchemyError as err:
         db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(f"Error in accept_follower: {err}", "error", exc=err)
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
+        core_logger.print_to_log(
+            f"Database error in accept_follower: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
+            detail="Database error occurred",
         ) from err
 
+    await notifications_utils.create_accepted_follower_request_notification(
+        user_id, target_user_id, websocket_manager, db
+    )
 
-def delete_follower(user_id: int, target_user_id: int, db: Session):
-    try:
-        # Delete the follower record
-        num_deleted = (
-            db.query(followers_models.Follower)
-            .filter(
-                (followers_models.Follower.follower_id == user_id)
-                & (followers_models.Follower.following_id == target_user_id)
-            )
-            .delete()
+
+@core_decorators.handle_db_errors
+def delete_follower(user_id: int, target_user_id: int, db: Session) -> None:
+    """
+    Delete a follow relationship between two users.
+
+    Args:
+        user_id: ID of the follower user.
+        target_user_id: ID of the user being followed.
+        db: Database session.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: 404 if no matching follower record exists, 500 on
+            database errors.
+    """
+    stmt = delete(followers_models.Follower).where(
+        followers_models.Follower.follower_id == user_id,
+        followers_models.Follower.following_id == target_user_id,
+    )
+    result = db.execute(stmt)
+
+    if result.rowcount == 0:
+        # Roll back so the no-op transaction does not stay open.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Follower record not found",
         )
 
-        # Check if the user was found and deleted
-        if num_deleted == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Follower record not found",
-            )
-
-        # Commit the transaction
-        db.commit()
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(f"Error in delete_follower: {err}", "error", exc=err)
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    db.commit()
