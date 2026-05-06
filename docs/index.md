@@ -91,7 +91,12 @@ Please visit the [ROADMAP.md file on Codeberg](https://codeberg.org/endurain-pro
 
 A huge thank you to the project sponsors! Your support helps keep this project going.
 
-Support Endurain's development on [Codeberg](https://codeberg.org/endurain-project).
+Support Endurain's development on:
+
+- [Buy Me a Coffee](https://buymeacoffee.com/endurain)
+- [liberapay](https://liberapay.com/endurain/)
+- [Patreon](https://patreon.com/u84745218)
+- [GitHub Sponsors using archived repo](https://github.com/endurain-project/endurain)
 
 ## Contributing
 
