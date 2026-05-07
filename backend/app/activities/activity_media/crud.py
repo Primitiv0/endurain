@@ -1,7 +1,5 @@
 """CRUD operations for activity media records."""
 
-import os
-
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -14,6 +12,7 @@ import activities.activity_media.schema as activity_media_schema
 
 import core.config as core_config
 import core.decorators as core_decorators
+import core.file_uploads as core_file_uploads
 import core.logger as core_logger
 
 
@@ -297,19 +296,13 @@ def delete_activity_media(
     # Best-effort filesystem cleanup, confined to ACTIVITY_MEDIA_DIR.
     if media_path:
         try:
-            media_dir = os.path.realpath(
-                core_config.settings.ACTIVITY_MEDIA_DIR
+            core_file_uploads.safe_remove_within(
+                media_path,
+                base_dir=core_config.settings.ACTIVITY_MEDIA_DIR,
             )
-            target = os.path.realpath(media_path)
-            if (
-                target.startswith(media_dir + os.sep)
-                and os.path.isfile(target)
-            ):
-                os.remove(target)
-        except OSError as fs_err:
+        except HTTPException as fs_err:
             core_logger.print_to_log(
-                "Failed to remove activity media file for id "
-                f"{activity_media_id}: {type(fs_err).__name__}",
-                "error",
-                exc=fs_err,
+                "Refused to remove activity media outside media dir "
+                f"for id {activity_media_id}: {fs_err.detail}",
+                "warning",
             )

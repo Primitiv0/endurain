@@ -22,6 +22,7 @@ backend/tests/*/*/*/__pycache__/
 backend/tests/*/*/*/*/__pycache__/
 
 # Tests
+.coverage
 backend/.coverage
 backend/htmlcov/
 backend/coverage.xml

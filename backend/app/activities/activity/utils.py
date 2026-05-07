@@ -493,7 +493,7 @@ def handle_gzipped_file(
                             pass
                         raise HTTPException(
                             status_code=(
-                                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                                status.HTTP_413_CONTENT_TOO_LARGE
                             ),
                             detail=(
                                 "Decompressed file exceeds maximum "
@@ -785,8 +785,11 @@ async def parse_and_store_activity_from_file(
                     # Deal with Strava bulk import media.
                     # Note - even multi-activity .fit files are good with this code, as there should only be a single imported activity per file in the Strava activities file directory.
                     if strava_activities:
-                        strava_bulk_import_utils.import_media_from_strava_bulk_export(
-                            strava_activities, created_activity, file_base_name, db
+                        await strava_bulk_import_utils.import_media_from_strava_bulk_export(
+                            strava_activities,
+                            created_activity,
+                            file_base_name,
+                            db,
                         )
 
                     core_logger.print_to_log_and_console(
@@ -1111,33 +1114,23 @@ async def parse_and_store_activity_from_uploaded_file(
 def move_file(new_dir: str, new_filename: str, file_path: str) -> None:
     """Move ``file_path`` into ``new_dir`` as ``new_filename``.
 
+    Thin compatibility wrapper around
+    :func:`core.file_uploads.move_within`. New code should call
+    ``move_within`` directly so callers benefit from path
+    containment without an intermediate hop.
+
     Args:
         new_dir: Destination directory (created if missing).
         new_filename: Final filename inside ``new_dir``.
         file_path: Source path to move.
 
     Raises:
-        HTTPException: 500 when the move fails.
+        HTTPException: 400 for unsafe filename / containment
+            violations, 500 for I/O failures.
     """
-    try:
-        # Ensure the new directory exists
-        os.makedirs(new_dir, exist_ok=True)
-
-        # Define the new file path
-        new_file_path = os.path.join(new_dir, new_filename)
-
-        # Move the file
-        shutil.move(file_path, new_file_path)
-    except (OSError, shutil.Error) as err:
-        # Log the exception with full detail and return a generic
-        # error message to the caller (no internal path disclosure).
-        core_logger.print_to_log(
-            f"Error in move_file - {err}", "error", exc=err
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    core_file_uploads.move_within(
+        file_path, new_dir, filename=new_filename
+    )
 
 
 def parse_file(

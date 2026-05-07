@@ -1,11 +1,11 @@
 import os
-import csv
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from stravalib.client import Client
 
 import core.config as core_config
 import core.logger as core_logger
+import core.text_imports as core_text_imports
 
 import strava.utils as strava_utils
 import strava.athlete_utils as strava_athlete_utils
@@ -217,22 +217,20 @@ def iterate_over_bikes_csv() -> dict:
             core_logger.print_to_log_and_console(
                 f"{bikes_file_name} exists in the {bulk_import_dir} directory. Starting to process file."
             )
-            with open(bikes_file_path, "r", encoding="utf-8") as bike_file:
-                bikes_csv = csv.DictReader(bike_file)
-                for row in bikes_csv:
-                    if (
-                        ("Bike Name" not in row)
-                        or ("Bike Brand" not in row)
-                        or ("Bike Model" not in row)
-                    ):
-                        core_logger.print_to_log_and_console(
-                            f"Aborting bikes import: Proper headers not found in {bikes_file_name}.  File should have 'Bike Name', 'Bike Brand', and 'Bike Model'."
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                            detail="Invalid file. Proper headers not found in Strava bikes CSV file.",
-                        )
-                    bikes_dict[row["Bike Name"]] = row
+            for row in core_text_imports.read_bounded_csv(bikes_file_path):
+                if (
+                    ("Bike Name" not in row)
+                    or ("Bike Brand" not in row)
+                    or ("Bike Model" not in row)
+                ):
+                    core_logger.print_to_log_and_console(
+                        f"Aborting bikes import: Proper headers not found in {bikes_file_name}.  File should have 'Bike Name', 'Bike Brand', and 'Bike Model'."
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_424_FAILED_DEPENDENCY,
+                        detail="Invalid file. Proper headers not found in Strava bikes CSV file.",
+                    )
+                bikes_dict[row["Bike Name"]] = row
             core_logger.print_to_log_and_console(
                 f"Strava bike gear csv file parsed and gear dictionary created. File was {len(bikes_dict)} rows long, ignoring header row."
             )
@@ -283,22 +281,20 @@ def iterate_over_shoes_csv() -> list:
             core_logger.print_to_log_and_console(
                 f"{shoesfilename} exists in the {bulk_import_dir} directory. Starting to process file."
             )
-            with open(shoes_file_path, "r", encoding="utf-8") as shoe_file:
-                shoes_csv = csv.DictReader(shoe_file)
-                for row in shoes_csv:
-                    if (
-                        ("Shoe Name" not in row)
-                        or ("Shoe Brand" not in row)
-                        or ("Shoe Model" not in row)
-                    ):
-                        core_logger.print_to_log_and_console(
-                            f"Aborting shoes import: Proper headers not found in {shoesfilename}. File should have 'Shoe Name', 'Shoe Brand', and 'Shoe Model'."
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                            detail="Invalid file. Proper headers not found in Strava shoes CSV file.",
-                        )
-                    shoes_list.append(row)
+            for row in core_text_imports.read_bounded_csv(shoes_file_path):
+                if (
+                    ("Shoe Name" not in row)
+                    or ("Shoe Brand" not in row)
+                    or ("Shoe Model" not in row)
+                ):
+                    core_logger.print_to_log_and_console(
+                        f"Aborting shoes import: Proper headers not found in {shoesfilename}. File should have 'Shoe Name', 'Shoe Brand', and 'Shoe Model'."
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_424_FAILED_DEPENDENCY,
+                        detail="Invalid file. Proper headers not found in Strava shoes CSV file.",
+                    )
+                shoes_list.append(row)
             core_logger.print_to_log_and_console(
                 f"Strava {shoesfilename} file parsed and gear dictionary created. File was {len(shoes_list)} rows long, ignoring header row."
             )

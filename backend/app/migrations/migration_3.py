@@ -5,10 +5,10 @@ Processes every existing activity from FIT/GPX files or Strava and populates
 the laps, workout steps, and sets tables.
 """
 
+import asyncio
 import os
 import glob
 import fitdecode
-import zipfile
 from pytz import UTC
 
 from sqlalchemy.orm import Session
@@ -39,6 +39,7 @@ import strava.activity_utils as strava_activity_utils
 
 import core.logger as core_logger
 import core.config as core_config
+import core.file_uploads as file_uploads
 
 import activities.activity_file_import.utils_fit as fit_utils
 import activities.activity_file_import.utils_gpx as gpx_utils
@@ -233,48 +234,64 @@ def get_fit_file_from_garminconnect(
         dl_fmt=garminconnect_client.ActivityDownloadFormat.ORIGINAL,
     )
 
-    # Save the zip file
+    # Persist + extract through the unified pipeline. Migrations are
+    # synchronous, so we drive the async helpers via a single
+    # ``asyncio.run`` over both calls — one event-loop setup per
+    # archive instead of two.
     gc_id = str(activity.garminconnect_activity_id)
-    output_file = f"{core_config.settings.FILES_DIR}/{gc_id}.zip"
+    zip_filename = f"{gc_id}.zip"
+    files_dir = core_config.settings.FILES_DIR
+    fallback_path = os.path.join(
+        core_config.FILES_PROCESSED_DIR, f"{activity.id}.fit"
+    )
 
-    # Write the ZIP data to the output file
-    with open(output_file, "wb") as fb:
-        fb.write(zip_data)
+    async def _save_and_extract() -> tuple[str, list]:
+        saved = await file_uploads.save_validated_bytes(
+            zip_data,
+            kind=file_uploads.UploadKind.ZIP,
+            upload_dir=files_dir,
+            filename=zip_filename,
+        )
+        try:
+            paths = await file_uploads.extract_validated_zip(
+                saved,
+                dest_dir=files_dir,
+                per_entry_kind=file_uploads.UploadKind.ACTIVITY,
+            )
+        except BaseException:
+            file_uploads.safe_remove_within(saved, base_dir=files_dir)
+            raise
+        return saved, paths
 
-    # Array to store the names of extracted files
-    extracted_files = []
-
-    # Open the ZIP file
-    with zipfile.ZipFile(output_file, "r") as zip_ref:
-        # Extract all contents to the specified directory
-        zip_ref.extractall(core_config.settings.FILES_DIR)
-        # Populate the array with file names
-        extracted_files = zip_ref.namelist()
-
-    # Remove the zip file
     try:
-        os.remove(output_file)
-    except OSError as err:
+        output_file, extracted_paths = asyncio.run(_save_and_extract())
+    except Exception as err:
         core_logger.print_to_log_and_console(
-            f"Error removing file {output_file}: {err}",
+            f"Migration 3 - Garmin ZIP handling failed for activity "
+            f"{activity.id}: {type(err).__name__}",
             "error",
             exc=err,
         )
+        return fallback_path
+
+    file_uploads.safe_remove_within(output_file, base_dir=files_dir)
 
     try:
         # Define the directory where the processed files will be stored
-        files_dir = core_config.settings.FILES_DIR
         processed_dir = core_config.FILES_PROCESSED_DIR
 
-        for file in extracted_files:
-            _, file_extension = os.path.splitext(f"{files_dir}/{file}")
+        for extracted_path in extracted_paths:
+            file_extension = os.path.splitext(extracted_path.name)[1]
 
             # Define new file path with activity ID as filename
             new_file_name = f"{activity.id}{file_extension}"
 
             # Move the file to the processed directory
-            activities_utils.move_file(
-                processed_dir, new_file_name, f"{files_dir}/{file}"
+            file_uploads.move_within(
+                extracted_path,
+                processed_dir,
+                filename=new_file_name,
+                src_base_dir=files_dir,
             )
     except Exception as err:
         core_logger.print_to_log_and_console(

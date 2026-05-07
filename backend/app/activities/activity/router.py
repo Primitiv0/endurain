@@ -1039,19 +1039,18 @@ async def delete_activity(
         # Define the search pattern using the file ID (e.g., '1.*')
         pattern = f"{core_config.FILES_PROCESSED_DIR}/{activity_id}.*"
         for file in glob.glob(pattern):
+            # Path-bounded removal — refuses to delete anything that
+            # resolves outside FILES_PROCESSED_DIR (defense in depth
+            # against crafted activity IDs or symlinks).
             try:
-                os.remove(file)
-            except FileNotFoundError as fnf_err:
-                core_logger.print_to_log(
-                    f"File not found {file}: {fnf_err}",
-                    "error",
-                    exc=fnf_err,
+                core_file_uploads.safe_remove_within(
+                    file, base_dir=core_config.FILES_PROCESSED_DIR
                 )
-            except OSError as fs_err:
+            except HTTPException as fs_err:
                 core_logger.print_to_log(
-                    f"Error deleting file {file}: {fs_err}",
-                    "error",
-                    exc=fs_err,
+                    f"Refused to delete file outside processed dir "
+                    f"{file}: {fs_err.detail}",
+                    "warning",
                 )
 
     await run_in_threadpool(_cleanup_files)
