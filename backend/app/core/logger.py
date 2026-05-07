@@ -255,13 +255,28 @@ def setup_main_logger():
     main_logger = logging.getLogger("main_logger")
     alembic_logger = logging.getLogger("alembic")
     scheduler_logger = logging.getLogger("apscheduler")
+    # Structured upload-audit events emitted by safeuploads.
+    # Attaching it here ensures correlation IDs and validation
+    # outcomes flow through the same handler/format pipeline
+    # as the rest of the backend logs.
+    safeuploads_audit_logger = logging.getLogger("safeuploads.audit")
 
-    for logger in (main_logger, alembic_logger, scheduler_logger):
+    for logger in (
+        main_logger,
+        alembic_logger,
+        scheduler_logger,
+        safeuploads_audit_logger,
+    ):
         logger.setLevel(log_level)
 
     handler = _build_handler(log_level)
     _replace_handlers(
-        (main_logger, alembic_logger, scheduler_logger),
+        (
+            main_logger,
+            alembic_logger,
+            scheduler_logger,
+            safeuploads_audit_logger,
+        ),
         handler,
     )
 

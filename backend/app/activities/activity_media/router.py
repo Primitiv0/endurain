@@ -145,8 +145,11 @@ async def upload_media(
     new_file_name = _build_safe_media_filename(activity_id, file.filename)
 
     # SafeUploads validates magic number and size before writing to disk.
-    file_path = await core_file_uploads.save_image_file_and_validate_it(
-        file, core_config.settings.ACTIVITY_MEDIA_DIR, new_file_name
+    file_path = await core_file_uploads.save_validated_upload(
+        file,
+        kind=core_file_uploads.UploadKind.IMAGE,
+        upload_dir=core_config.settings.ACTIVITY_MEDIA_DIR,
+        filename=new_file_name,
     )
 
     try:

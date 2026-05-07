@@ -17,6 +17,7 @@ import core.database as core_database
 import core.dependencies as core_dependencies
 import core.logger as core_logger
 import core.config as core_config
+import core.file_uploads as core_file_uploads
 import gears.gear.crud as gears_crud
 import gears.gear.dependencies as gears_dependencies
 import auth.security as auth_security
@@ -844,9 +845,17 @@ async def create_activity_with_bulk_import(
 
             if os.path.isfile(file_path):
                 try:
-                    activities_utils._validate_file_signature(
+                    # Choose validator kind based on extension; the
+                    # supported-format check above guarantees one
+                    # of the four kinds below.
+                    validate_kind = (
+                        core_file_uploads.UploadKind.GZIP
+                        if file_extension == ".gz"
+                        else core_file_uploads.UploadKind.ACTIVITY
+                    )
+                    await core_file_uploads.validate_local_file(
                         file_path,
-                        file_extension,
+                        kind=validate_kind,
                     )
                 except HTTPException as err:
                     core_logger.print_to_log_and_console(

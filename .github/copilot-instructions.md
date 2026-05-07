@@ -20,6 +20,7 @@ Always reference these instructions first and fallback to search or bash command
 - Do not alter port numbers, environment variables, or framework versions unless explicitly instructed.
 - Prefer using existing patterns, utilities, and files rather than creating new ones.
 - Use the timing benchmarks in this document to evaluate build success or performance anomalies.
+- **File uploads:** All `UploadFile` handling MUST go through `backend/app/core/file_uploads.py`. Use `save_validated_upload(file, kind=UploadKind.X, upload_dir=..., filename=...)` for any new endpoint that persists an upload, and `validate_upload(file, kind=...)` when the file is consumed in memory only. Do **not** instantiate `safeuploads.FileValidator` outside that module, do **not** join user-supplied filenames into filesystem paths, and use server-generated filenames (UUID/hash/fixed name) for the destination.
 - **Documentation files:** When creating new development documentation files (e.g., `BACKEND_AUTH_DEVELOPMENT_LOG.md`, `OBSERVABILITY_STRATEGY.md`), store them in the `devdocs/` folder. This folder is gitignored and used for local development documentation that should not be committed to the repository.
 - **Development/helper scripts:** When creating new development/helper scripts, store them in the `devscripts/` folder. This folder is gitignored and used for local development scripts that should not be committed to the repository.
 - **Do ONLY what is explicitly requested** - do not add extra documentation, summaries, or "helpful" files unless specifically asked.

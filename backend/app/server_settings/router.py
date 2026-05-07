@@ -182,8 +182,11 @@ async def upload_login_photo(
         Full file path where file was saved.
     """
     # Save file using centralized file upload handler
-    await core_file_uploads.save_image_file_and_validate_it(
-        file, core_config.SERVER_IMAGES_DIR, "login.png"
+    await core_file_uploads.save_validated_upload(
+        file,
+        kind=core_file_uploads.UploadKind.IMAGE,
+        upload_dir=core_config.SERVER_IMAGES_DIR,
+        filename="login.png",
     )
 
     server_settings_crud.update_server_settings_login_photo_set(True, db)

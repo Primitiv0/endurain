@@ -166,6 +166,11 @@ def create_user_default_data(user_id: int, db: Session) -> None:
     user_default_gear_crud.create_user_default_gear(user_id, db)
 
 
+_ALLOWED_USER_IMAGE_EXTENSIONS: frozenset[str] = frozenset(
+    {".png", ".jpg", ".jpeg", ".webp"}
+)
+
+
 async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> str:
     """
     Save user image file with security validation and update DB.
@@ -182,8 +187,8 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
         Path to saved image file.
 
     Raises:
-        HTTPException: 400 if filename missing, 500 if upload
-            fails.
+        HTTPException: 400 if filename or extension is invalid,
+            413 if too large, 500 if upload fails.
     """
     if not file.filename:
         raise HTTPException(
@@ -191,13 +196,25 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
             detail="Filename is required",
         )
 
-    # Get file extension and build filename
+    # Defense-in-depth allow-list on the user-supplied extension.
+    # SafeUploads still validates the magic number afterwards, so a
+    # mismatched signature is rejected even if the extension passes.
     _, file_extension = os.path.splitext(file.filename)
+    file_extension = file_extension.lower()
+    if file_extension not in _ALLOWED_USER_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported user image file type",
+        )
+
     filename = f"{user_id}{file_extension}"
 
     # Save file using centralized file upload handler
-    await core_file_uploads.save_image_file_and_validate_it(
-        file, core_config.USER_IMAGES_DIR, filename
+    await core_file_uploads.save_validated_upload(
+        file,
+        kind=core_file_uploads.UploadKind.IMAGE,
+        upload_dir=core_config.USER_IMAGES_DIR,
+        filename=filename,
     )
 
     # Update user photo path in database

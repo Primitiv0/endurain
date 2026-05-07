@@ -25,9 +25,6 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from safeuploads import FileValidator, FileSecurityConfig, SecurityLimits
-from safeuploads.exceptions import FileValidationError
-
 import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.utils as users_utils
@@ -66,21 +63,12 @@ import core.database as core_database
 import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 import core.config as core_config
+import core.file_uploads as core_file_uploads
 
 import websocket.manager as websocket_manager
 
 # Define the API router
 router = APIRouter()
-
-custom_limits = SecurityLimits(
-    max_uncompressed_size=2 * 1024 * 1024 * 1024,
-    max_number_files_same_type=2000,
-)
-custom_config = FileSecurityConfig()
-custom_config.limits = custom_limits
-
-# Initialize the file validator
-file_validator = FileValidator(config=custom_config)
 
 
 @router.get("", status_code=status.HTTP_200_OK, response_model=users_schema.UsersMe)
@@ -594,13 +582,10 @@ async def import_profile_data(
     Raises:
         HTTPException: If validation or import fails.
     """
-    # Comprehensive security validation
-    try:
-        await file_validator.validate_zip_file(file)
-    except FileValidationError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)
-        ) from err
+    # Comprehensive security validation via the unified pipeline.
+    await core_file_uploads.validate_upload(
+        file, kind=core_file_uploads.UploadKind.ZIP
+    )
 
     try:
         # Read the ZIP file data

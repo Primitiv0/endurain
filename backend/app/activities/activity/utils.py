@@ -5,6 +5,7 @@ import gzip
 import os
 import shutil
 import asyncio
+import uuid
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -60,6 +61,7 @@ import core.logger as core_logger
 import core.config as core_config
 import core.cryptography as core_cryptography
 import core.database as core_database
+import core.file_uploads as core_file_uploads
 import core.sanitization as core_sanitization
 import core.timezone as core_timezone
 
@@ -479,11 +481,11 @@ def handle_gzipped_file(
             ) as temp_file:
                 temp_file_path = temp_file.name
                 while True:
-                    chunk = gzipped_file.read(_UPLOAD_CHUNK_BYTES)
+                    chunk = gzipped_file.read(_DECOMPRESS_CHUNK_BYTES)
                     if not chunk:
                         break
                     bytes_written += len(chunk)
-                    if bytes_written > _MAX_UPLOAD_BYTES:
+                    if bytes_written > _MAX_DECOMPRESSED_ACTIVITY_BYTES:
                         temp_file.close()
                         try:
                             os.remove(temp_file_path)
@@ -581,7 +583,16 @@ async def parse_and_store_activity_from_file(
                 ),
             )
 
-        _validate_file_signature(file_path, file_extension)
+        # Defense-in-depth signature check on files queued for
+        # processing (Garmin / Strava import paths).
+        await core_file_uploads.validate_local_file(
+            file_path,
+            kind=(
+                core_file_uploads.UploadKind.GZIP
+                if file_extension == ".gz"
+                else core_file_uploads.UploadKind.ACTIVITY
+            ),
+        )
 
         # Get pathless file name with extension, as this is the dictionary key for Strava's bulk import activities dictionary.
         _, file_base_name = os.path.split(file_path)
@@ -604,7 +615,10 @@ async def parse_and_store_activity_from_file(
                         "Decompressed file extension is not supported"
                     ),
                 )
-            _validate_file_signature(file_path, file_extension)
+            await core_file_uploads.validate_local_file(
+                file_path,
+                kind=core_file_uploads.UploadKind.ACTIVITY,
+            )
 
         # Open the file and process it
         with open(file_path, "rb"):
@@ -831,146 +845,14 @@ async def parse_and_store_activity_from_file(
         return None
 
 
-# Maximum size accepted for an uploaded activity file.
-# 200 MiB is enough for very large multi-day .fit files while
-# still capping memory consumption per upload.
-_MAX_UPLOAD_BYTES = 200 * 1024 * 1024
-# Chunk size used when streaming uploads to disk
-_UPLOAD_CHUNK_BYTES = 1024 * 1024
-
-
-def _safe_upload_path(upload_dir: str, raw_filename: str) -> str:
-    """Return a sanitized absolute path inside ``upload_dir``.
-
-    Rejects path traversal attempts and any filename that does
-    not resolve underneath ``upload_dir``.
-
-    Args:
-        upload_dir: Directory where uploads should be stored.
-        raw_filename: User-supplied filename.
-
-    Returns:
-        Absolute, real path safe for writing.
-
-    Raises:
-        HTTPException: 400 when the filename is empty or
-            attempts to escape ``upload_dir``.
-    """
-    safe_name = os.path.basename(raw_filename or "")
-    if not safe_name or safe_name in (".", ".."):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid filename",
-        )
-    upload_root = os.path.realpath(upload_dir)
-    candidate = os.path.realpath(os.path.join(upload_root, safe_name))
-    if (
-        candidate != upload_root
-        and not candidate.startswith(upload_root + os.sep)
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid filename",
-        )
-    return candidate
-
-
-def _validate_file_signature(file_path: str, file_extension: str) -> None:
-    """Validate a file's content matches its declared extension.
-
-    Reads the leading bytes from ``file_path`` and rejects content
-    that does not match the expected magic-number / shape for the
-    declared extension. This stops attackers from uploading
-    arbitrary content (shell scripts, archives, polyglots, etc.)
-    disguised with a permitted extension (OWASP A04).
-
-    Args:
-        file_path: Absolute path to the saved upload.
-        file_extension: Lower-case extension including the leading
-            dot (``.gpx``, ``.tcx``, ``.fit``, ``.gz``).
-
-    Raises:
-        HTTPException: 400 when the content does not match the
-            declared extension.
-    """
-    ext = file_extension.lower()
-    try:
-        with open(file_path, "rb") as fh:
-            head = fh.read(512)
-    except OSError as err:
-        core_logger.print_to_log(
-            f"_validate_file_signature read failed: {err}",
-            "error",
-            exc=err,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid file content",
-        ) from err
-
-    if not head:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Empty file",
-        )
-
-    valid = False
-    if ext == ".gz":
-        # RFC 1952 gzip magic number
-        valid = head[:2] == b"\x1f\x8b"
-    elif ext == ".fit":
-        # FIT files start with a 12 or 14 byte header; bytes 8..12
-        # contain the literal ASCII data type identifier '.FIT'.
-        valid = len(head) >= 12 and head[8:12] == b".FIT"
-    elif ext in (".gpx", ".tcx"):
-        # XML-based formats; allow optional UTF-8 BOM and whitespace.
-        sniff = head.lstrip(b"\xef\xbb\xbf").lstrip()
-        lower = sniff[:512].lower()
-        if not (sniff.startswith(b"<?xml") or sniff.startswith(b"<")):
-            valid = False
-        elif ext == ".gpx":
-            valid = b"<gpx" in lower
-        else:  # .tcx
-            valid = b"trainingcenterdatabase" in lower
-
-    if not valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File content does not match declared extension",
-        )
-
-
-def _save_upload_to_disk(file: UploadFile, destination: str) -> None:
-    """Stream an UploadFile to disk in fixed-size chunks.
-
-    Args:
-        file: Incoming FastAPI UploadFile.
-        destination: Absolute path to write to.
-
-    Raises:
-        HTTPException: 413 when the upload exceeds the
-            configured maximum size.
-    """
-    bytes_written = 0
-    with open(destination, "wb") as save_file:
-        while True:
-            chunk = file.file.read(_UPLOAD_CHUNK_BYTES)
-            if not chunk:
-                break
-            bytes_written += len(chunk)
-            if bytes_written > _MAX_UPLOAD_BYTES:
-                save_file.close()
-                try:
-                    os.remove(destination)
-                except OSError:
-                    pass
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=(
-                        "Uploaded file exceeds maximum allowed size"
-                    ),
-                )
-            save_file.write(chunk)
+# Maximum size accepted when decompressing a gzipped activity
+# upload. Mirrors core_file_uploads' activity cap; safeuploads
+# enforces the same limit on the wrapping ``.gz`` upload before we
+# get here, but we re-cap defensively while expanding the inner
+# payload (decompression-bomb defense in depth).
+_MAX_DECOMPRESSED_ACTIVITY_BYTES = 200 * 1024 * 1024
+# Chunk size used while streaming decompressed bytes to disk.
+_DECOMPRESS_CHUNK_BYTES = 1024 * 1024
 
 
 def _cleanup_upload_artifacts(file_paths: list[str]) -> None:
@@ -1030,16 +912,10 @@ async def parse_and_store_activity_from_uploaded_file(
             detail="Filename is required",
         )
 
-    # Ensure the 'files' directory exists
-    upload_dir = core_config.settings.FILES_DIR
-    os.makedirs(upload_dir, exist_ok=True)
-
-    # Sanitize the filename to prevent directory traversal
-    file_path = _safe_upload_path(upload_dir, file.filename)
-    upload_artifacts: list[str] = []
-
-    # Validate the extension before touching disk
-    _, file_extension = os.path.splitext(file_path)
+    # Pre-check the extension so we can short-circuit with a
+    # human-friendly 406 before invoking the validator (which would
+    # otherwise raise a generic ExtensionSecurityError -> 400).
+    _, file_extension = os.path.splitext(file.filename)
     if (
         file_extension.lower()
         not in core_config.SUPPORTED_FILE_FORMATS
@@ -1052,15 +928,31 @@ async def parse_and_store_activity_from_uploaded_file(
             ),
         )
 
-    try:
-        # Stream the upload to disk in a worker thread to
-        # avoid blocking the event loop on large files.
-        await run_in_threadpool(_save_upload_to_disk, file, file_path)
-        upload_artifacts.append(file_path)
+    upload_dir = core_config.settings.FILES_DIR
+    upload_kind = (
+        core_file_uploads.UploadKind.GZIP
+        if file_extension.lower() == ".gz"
+        else core_file_uploads.UploadKind.ACTIVITY
+    )
+    # Server-generated filename to defeat path traversal and
+    # collisions; the upload is renamed to ``{ids}{ext}`` after a
+    # successful parse via ``move_file`` below.
+    storage_name = f"{uuid.uuid4().hex}{file_extension.lower()}"
+    upload_artifacts: list[str] = []
 
-        # Validate file content matches the declared extension to
-        # block disguised payloads (OWASP A04 unrestricted upload).
-        _validate_file_signature(file_path, file_extension)
+    try:
+        # Validate (signature/size/MIME via safeuploads) and stream
+        # the upload to disk in one unified step. The streaming
+        # writer enforces the activity/gzip byte cap and writes via
+        # a ``.part``-then-rename for atomicity.
+        file_path = await core_file_uploads.save_validated_upload(
+            file,
+            kind=upload_kind,
+            upload_dir=upload_dir,
+            filename=storage_name,
+            stream=True,
+        )
+        upload_artifacts.append(file_path)
 
         if file_extension.lower() == ".gz":
             original_file_path = file_path
@@ -1088,7 +980,13 @@ async def parse_and_store_activity_from_uploaded_file(
                         "Decompressed file extension is not supported"
                     ),
                 )
-            _validate_file_signature(file_path, file_extension)
+            # Defense in depth: signature-check the inner payload
+            # via the same safeuploads validator used for direct
+            # activity uploads.
+            await core_file_uploads.validate_local_file(
+                file_path,
+                kind=core_file_uploads.UploadKind.ACTIVITY,
+            )
 
         user = users_crud.get_user_by_id(token_user_id, db)
         if user is None:
