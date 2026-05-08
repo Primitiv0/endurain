@@ -1,6 +1,15 @@
-from pydantic import BaseModel, Field
+"""Pydantic schemas for OAuth state create/read operations."""
+
 from datetime import datetime
-from typing import Optional
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+)
 
 
 class OAuthStateCreate(BaseModel):
@@ -11,36 +20,40 @@ class OAuthStateCreate(BaseModel):
     data needed to create a new OAuth state in database.
     """
 
-    id: str = Field(
+    id: StrictStr = Field(
         ...,
         min_length=32,
         max_length=64,
         description="State parameter (secrets.token_urlsafe(32))",
     )
-    idp_id: int | None = Field(
+    idp_id: StrictInt | None = Field(
         None, description="Identity provider ID (may be null if mobile logic)"
     )
-    code_challenge: Optional[str] = Field(
+    code_challenge: StrictStr | None = Field(
         None,
         min_length=43,
         max_length=128,
         description="PKCE challenge (required for mobile)",
     )
-    code_challenge_method: Optional[str] = Field(
+    code_challenge_method: StrictStr | None = Field(
         None, pattern="^S256$", description="PKCE method (only S256 supported)"
     )
-    nonce: str = Field(..., min_length=32, max_length=64, description="OIDC nonce")
-    redirect_path: Optional[str] = Field(
+    nonce: StrictStr = Field(
+        ..., min_length=32, max_length=64, description="OIDC nonce"
+    )
+    redirect_path: StrictStr | None = Field(
         None, max_length=500, description="Frontend path after login"
     )
-    client_type: str = Field(
+    client_type: StrictStr = Field(
         ..., pattern="^(web|mobile)$", description="Client type: web or mobile"
     )
-    ip_address: Optional[str] = Field(
+    ip_address: StrictStr | None = Field(
         None, max_length=45, description="Client IP address"
     )
     expires_at: datetime = Field(..., description="Expiry timestamp")
-    user_id: Optional[int] = Field(None, description="User ID (for link mode)")
+    user_id: StrictInt | None = Field(
+        None, description="User ID (for link mode)"
+    )
 
 
 class OAuthStateRead(BaseModel):
@@ -50,20 +63,23 @@ class OAuthStateRead(BaseModel):
     Returned when querying OAuth state from database.
     """
 
-    id: str = Field(..., description="State ID")
-    idp_id: int | None = Field(
+    model_config = ConfigDict(from_attributes=True)
+
+    id: StrictStr = Field(..., description="State ID")
+    idp_id: StrictInt | None = Field(
         None, description="Identity provider ID (may be null if mobile logic)"
     )
-    code_challenge: Optional[str] = Field(None, description="PKCE challenge")
-    code_challenge_method: Optional[str] = Field(None, description="PKCE method")
-    nonce: str = Field(..., description="OIDC nonce")
-    redirect_path: Optional[str] = Field(None, description="Frontend redirect path")
-    client_type: str = Field(..., description="Client type")
-    ip_address: Optional[str] = Field(None, description="Client IP")
+    code_challenge: StrictStr | None = Field(None, description="PKCE challenge")
+    code_challenge_method: StrictStr | None = Field(
+        None, description="PKCE method"
+    )
+    nonce: StrictStr = Field(..., description="OIDC nonce")
+    redirect_path: StrictStr | None = Field(
+        None, description="Frontend redirect path"
+    )
+    client_type: StrictStr = Field(..., description="Client type")
+    ip_address: StrictStr | None = Field(None, description="Client IP")
     created_at: datetime = Field(..., description="Creation timestamp")
     expires_at: datetime = Field(..., description="Expiry timestamp")
-    used: bool = Field(..., description="Whether state has been used")
-    user_id: Optional[int] = Field(None, description="User ID if link mode")
-
-    class Config:
-        from_attributes = True
+    used: StrictBool = Field(..., description="Whether state has been used")
+    user_id: StrictInt | None = Field(None, description="User ID if link mode")

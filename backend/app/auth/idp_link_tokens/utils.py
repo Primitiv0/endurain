@@ -1,3 +1,5 @@
+"""Utility helpers for IdP link token generation and cleanup."""
+
 import secrets
 from datetime import datetime, timedelta, timezone
 

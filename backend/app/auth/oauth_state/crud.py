@@ -1,106 +1,103 @@
+"""CRUD operations for OAuth state (PKCE, nonce, replay prevention)."""
+
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import delete as sa_delete, select, update as sa_update
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
 
 import auth.oauth_state.models as oauth_state_models
 import users.users_sessions.models as users_session_models
 
+import core.decorators as core_decorators
 import core.logger as core_logger
 
 
+@core_decorators.handle_db_errors
 def get_oauth_state_by_id_and_not_used(
     state_id: str, db: Session
 ) -> oauth_state_models.OAuthState | None:
-    """
-    Get OAuth state by ID, validate not expired/used.
+    """Retrieve an OAuth state by ID, validating it is not expired or used.
 
     Args:
-        db: Database session.
         state_id: The state parameter to lookup.
+        db: SQLAlchemy database session.
 
     Returns:
-        oauth_state_models.OAuthState if valid and not expired, else None.
+        The matching OAuthState if valid (not expired and unused),
+        None otherwise.
+
+    Raises:
+        HTTPException: 500 error if database query fails.
     """
-    oauth_state = (
-        db.query(oauth_state_models.OAuthState)
-        .filter(oauth_state_models.OAuthState.id == state_id)
-        .first()
+    stmt = select(oauth_state_models.OAuthState).where(
+        oauth_state_models.OAuthState.id == state_id,
+        oauth_state_models.OAuthState.used.is_(False),
+        oauth_state_models.OAuthState.expires_at
+        > datetime.now(timezone.utc),
     )
+    oauth_state = db.execute(stmt).scalar_one_or_none()
 
     if not oauth_state:
-        core_logger.print_to_log(f"OAuth state not found: {state_id[:8]}...", "warning")
-        return None
-
-    # Check expiry (TIMESTAMPTZ columns return aware datetimes)
-    if datetime.now(timezone.utc) > oauth_state.expires_at:
-        core_logger.print_to_log(f"OAuth state expired: {state_id[:8]}...", "warning")
-        return None
-
-    # Check if already used
-    if oauth_state.used:
         core_logger.print_to_log(
-            f"OAuth state already used (replay attempt?): " f"{state_id[:8]}...",
-            "warning",
+            f"OAuth state invalid or expired: {state_id[:8]}...", "warning"
         )
-        return None
 
     return oauth_state
 
 
+@core_decorators.handle_db_errors
 def get_oauth_state_by_id(
     state_id: str, db: Session
 ) -> oauth_state_models.OAuthState | None:
-    """
-    Get OAuth state by ID.
+    """Retrieve an OAuth state by ID without validity checks.
 
     Args:
-        db: Database session.
         state_id: The state parameter to lookup.
+        db: SQLAlchemy database session.
 
     Returns:
-        oauth_state_models.OAuthState if found, else None.
+        The matching OAuthState if found, None otherwise.
+
+    Raises:
+        HTTPException: 500 error if database query fails.
     """
-    return (
-        db.query(oauth_state_models.OAuthState)
-        .filter(oauth_state_models.OAuthState.id == state_id)
-        .first()
+    stmt = select(oauth_state_models.OAuthState).where(
+        oauth_state_models.OAuthState.id == state_id
     )
+    return db.execute(stmt).scalar_one_or_none()
 
 
+@core_decorators.handle_db_errors
 def get_oauth_state_by_session_id(
-    db: Session,
-    session_id: str,
+    session_id: str, db: Session
 ) -> oauth_state_models.OAuthState | None:
-    """
-    Lookup OAuth state via session relationship.
+    """Retrieve an OAuth state via the session relationship.
 
-    Used during token exchange to retrieve stored PKCE
-    challenge and other OAuth metadata.
+    Used during token exchange to retrieve stored PKCE challenge
+    and other OAuth metadata linked to a user session.
 
     Args:
-        db: Database session.
         session_id: The session ID to lookup.
+        db: SQLAlchemy database session.
 
     Returns:
-        oauth_state_models.OAuthState if found and linked, else None.
-    """
-    session = (
-        db.query(users_session_models.UsersSessions)
-        .filter(users_session_models.UsersSessions.id == session_id)
-        .first()
-    )
+        The linked OAuthState if found, None otherwise.
 
-    if not session:
+    Raises:
+        HTTPException: 500 error if database query fails.
+    """
+    stmt = select(users_session_models.UsersSessions).where(
+        users_session_models.UsersSessions.id == session_id
+    )
+    session = db.execute(stmt).scalar_one_or_none()
+
+    if not session or not session.oauth_state_id:
         return None
 
-    return (
-        get_oauth_state_by_id(session.oauth_state_id, db)
-        if session.oauth_state_id
-        else None
-    )
+    return get_oauth_state_by_id(session.oauth_state_id, db)
 
 
+@core_decorators.handle_db_errors
 def create_oauth_state(
     db: Session,
     state_id: str,
@@ -113,23 +110,25 @@ def create_oauth_state(
     code_challenge_method: str | None = None,
     user_id: int | None = None,
 ) -> oauth_state_models.OAuthState:
-    """
-    Create new OAuth state with 10-minute expiry.
+    """Create and persist a new OAuth state with a 10-minute expiry.
 
     Args:
-        db: Database session.
+        db: SQLAlchemy database session.
         state_id: The state parameter (secrets.token_urlsafe(32)).
-        idp_id: Identity provider ID (may be null if mobile logic).
         nonce: OIDC nonce for ID token validation.
         client_type: Client type (web or mobile).
         ip_address: Client IP address for validation.
+        idp_id: Identity provider ID (may be null if mobile logic).
         redirect_path: Frontend path after login.
         code_challenge: PKCE challenge (required for mobile).
         code_challenge_method: PKCE method (S256).
         user_id: User ID for link mode.
 
     Returns:
-        Created oauth_state_models.OAuthState object.
+        The persisted OAuthState instance.
+
+    Raises:
+        HTTPException: 500 error if database operation fails.
     """
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
@@ -160,102 +159,97 @@ def create_oauth_state(
     return oauth_state
 
 
-def mark_oauth_state_used(
-    db: Session,
-    state_id: str,
-) -> oauth_state_models.OAuthState | None:
-    """
-    Atomically mark OAuth state as used (prevents replay).
+@core_decorators.handle_db_errors
+def mark_oauth_state_used(state_id: str, db: Session) -> bool:
+    """Atomically mark an unused, unexpired OAuth state as used.
+
+    Performs a single conditional UPDATE so concurrent attempts to
+    consume the same state cannot both succeed (replay protection).
 
     Args:
-        db: Database session.
-        state_id: The state parameter to mark.
+        state_id: The state parameter to mark as used.
+        db: SQLAlchemy database session.
 
     Returns:
-        Updated oauth_state_models.OAuthState if successful, else None.
+        True if exactly one row was claimed, False if the state was
+        missing, expired, or already consumed.
 
     Raises:
-        Does not raise. Returns None if state not found.
+        HTTPException: 500 error if database operation fails.
     """
-    oauth_state = (
-        db.query(oauth_state_models.OAuthState)
-        .filter(oauth_state_models.OAuthState.id == state_id)
-        .first()
-    )
-
-    if not oauth_state:
-        core_logger.print_to_log(
-            f"Cannot mark OAuth state used: not found " f"{state_id[:8]}...", "warning"
+    stmt = (
+        sa_update(oauth_state_models.OAuthState)
+        .where(
+            oauth_state_models.OAuthState.id == state_id,
+            oauth_state_models.OAuthState.used.is_(False),
+            oauth_state_models.OAuthState.expires_at
+            > datetime.now(timezone.utc),
         )
-        return None
-
-    # Mark as used atomically
-    oauth_state.used = True
+        .values(used=True)
+    )
+    result = db.execute(stmt)
     db.commit()
-    db.refresh(oauth_state)
 
-    core_logger.print_to_log(f"OAuth state marked as used: {state_id[:8]}...", "debug")
+    claimed = result.rowcount == 1
+    if claimed:
+        core_logger.print_to_log(
+            f"OAuth state marked as used: {state_id[:8]}...", "debug"
+        )
+    else:
+        core_logger.print_to_log(
+            f"Cannot mark OAuth state used (missing/expired/replay): "
+            f"{state_id[:8]}...",
+            "warning",
+        )
+    return claimed
 
-    return oauth_state
 
-
+@core_decorators.handle_db_errors
 def delete_oauth_state(oauth_state_id: str, db: Session) -> int:
-    """
-    Delete OAuth state for a specific OAuth state ID.
+    """Delete a single OAuth state by ID.
 
     Args:
-        oauth_state_id: The OAuth state ID to delete tokens for.
-        db: Database session.
+        oauth_state_id: The OAuth state ID to delete.
+        db: SQLAlchemy database session.
+
+    Returns:
+        Number of OAuth states deleted (0 or 1).
+
+    Raises:
+        HTTPException: 500 error if database operation fails.
+    """
+    stmt = sa_delete(oauth_state_models.OAuthState).where(
+        oauth_state_models.OAuthState.id == oauth_state_id
+    )
+    result = db.execute(stmt)
+    db.commit()
+    return result.rowcount
+
+
+@core_decorators.handle_db_errors
+def delete_expired_oauth_states(db: Session) -> int:
+    """Delete OAuth states past their expiry timestamp.
+
+    Should be called every 5 minutes via background task.
+
+    Args:
+        db: SQLAlchemy database session.
 
     Returns:
         Number of OAuth states deleted.
 
     Raises:
-        HTTPException: If an error occurs during deletion (500).
+        HTTPException: 500 error if database operation fails.
     """
-    try:
-        num_deleted = (
-            db.query(oauth_state_models.OAuthState)
-            .filter(oauth_state_models.OAuthState.id == oauth_state_id)
-            .delete()
-        )
-
-        db.commit()
-        return num_deleted
-    except Exception as err:
-        db.rollback()
-        core_logger.print_to_log(
-            f"Error in delete_oauth_state: {err}", "error", exc=err
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete OAuth state",
-        ) from err
-
-
-def delete_expired_oauth_states(db: Session) -> int:
-    """
-    Delete OAuth states older than 10 minutes.
-
-    Should be called every 5 minutes via background task.
-
-    Args:
-        db: Database session.
-
-    Returns:
-        Number of states deleted.
-    """
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
-
-    result = (
-        db.query(oauth_state_models.OAuthState)
-        .filter(oauth_state_models.OAuthState.expires_at < cutoff)
-        .delete(synchronize_session=False)
+    stmt = sa_delete(oauth_state_models.OAuthState).where(
+        oauth_state_models.OAuthState.expires_at < datetime.now(timezone.utc)
     )
-
+    result = db.execute(stmt)
     db.commit()
 
-    if result > 0:
-        core_logger.print_to_log(f"Deleted {result} expired OAuth states", "debug")
-
-    return result
+    deleted_count = result.rowcount
+    if deleted_count > 0:
+        core_logger.print_to_log(
+            f"Deleted {deleted_count} expired OAuth state(s)", "debug"
+        )
+    return deleted_count

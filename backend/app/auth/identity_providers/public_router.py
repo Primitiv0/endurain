@@ -251,7 +251,7 @@ async def handle_callback(
             )
 
         # Mark state as used atomically (prevents replay attacks)
-        oauth_state_crud.mark_oauth_state_used(db, state)
+        oauth_state_crud.mark_oauth_state_used(state, db)
 
         core_logger.print_to_log(
             f"OAuth callback received for state {state[:8]}... (client_type={oauth_state.client_type})",

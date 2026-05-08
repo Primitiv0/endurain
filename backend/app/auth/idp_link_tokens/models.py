@@ -1,8 +1,17 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+"""SQLAlchemy ORM models for IdP link tokens."""
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from auth.identity_providers.models import IdentityProvider
+    from users.users.models import Users
 
 
 class IdpLinkToken(Base):
@@ -21,62 +30,61 @@ class IdpLinkToken(Base):
         expires_at: Hard expiry at 60 seconds from creation.
         used: Single-use flag to prevent replay attacks.
         ip_address: Client IP address for optional validation.
-        user: Relationship to Users model.
+        users: Relationship to Users model.
         identity_provider: Relationship to IdentityProvider model.
     """
 
     __tablename__ = "idp_link_tokens"
 
-    id = Column(
+    id: Mapped[str] = mapped_column(
         String(64),
         primary_key=True,
         index=True,
         comment="One-time link token (secrets.token_urlsafe(32))",
     )
 
-    user_id = Column(
-        Integer,
+    user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="User ID linking the identity provider",
     )
 
-    idp_id = Column(
-        Integer,
+    idp_id: Mapped[int] = mapped_column(
         ForeignKey("identity_providers.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="Identity provider ID being linked",
     )
 
-    created_at = Column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
         comment="Token creation timestamp",
     )
 
-    expires_at = Column(
+    expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         index=True,
         comment="Token expiry at 60 seconds (cleanup marker)",
     )
 
-    used = Column(
-        Boolean,
+    used: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
         comment="Single-use flag (False - unused, True - used)",
     )
 
-    ip_address = Column(
+    ip_address: Mapped[str | None] = mapped_column(
         String(45),
         nullable=True,
         comment="Client IP address (IPv6 max length)",
     )
 
     # Relationships
-    users = relationship("Users", foreign_keys=[user_id])
-    identity_provider = relationship("IdentityProvider", foreign_keys=[idp_id])
+    users: Mapped["Users"] = relationship(foreign_keys=[user_id])
+    identity_provider: Mapped["IdentityProvider"] = relationship(
+        foreign_keys=[idp_id]
+    )

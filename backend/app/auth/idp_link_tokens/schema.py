@@ -1,23 +1,52 @@
-from pydantic import BaseModel, ConfigDict, Field
+"""Pydantic schemas for IdP link tokens."""
+
 from datetime import datetime
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+)
 
 
 class IdpLinkTokenCreate(BaseModel):
     """Schema for creating an IdP link token."""
 
-    id: str = Field(..., description="Random token ID")
-    user_id: int = Field(..., description="User ID linking the IdP")
-    idp_id: int = Field(..., description="Identity provider ID being linked")
+    id: StrictStr = Field(
+        ...,
+        min_length=32,
+        max_length=64,
+        description="Random token ID",
+    )
+    user_id: StrictInt = Field(
+        ...,
+        gt=0,
+        description="User ID linking the IdP",
+    )
+    idp_id: StrictInt = Field(
+        ...,
+        gt=0,
+        description="Identity provider ID being linked",
+    )
     created_at: datetime = Field(..., description="Token creation timestamp")
     expires_at: datetime = Field(..., description="Token expiration timestamp")
-    used: bool = Field(default=False, description="Token usage flag")
-    ip_address: str | None = Field(None, description="Client IP address")
+    used: StrictBool = Field(default=False, description="Token usage flag")
+    ip_address: StrictStr | None = Field(
+        None,
+        max_length=45,
+        description="Client IP address",
+    )
+
+    model_config = ConfigDict(strict=True)
 
 
 class IdpLinkTokenResponse(BaseModel):
     """Schema for IdP link token response."""
 
-    token: str = Field(..., description="One-time link token")
+    token: StrictStr = Field(..., description="One-time link token")
     expires_at: datetime = Field(..., description="Token expiration timestamp")
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, strict=True)
