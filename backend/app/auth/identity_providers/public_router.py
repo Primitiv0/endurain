@@ -1,3 +1,5 @@
+"""Public (unauthenticated) HTTP routes for identity provider SSO flows."""
+
 from typing import Annotated, List
 from datetime import datetime, timezone, timedelta
 import secrets
@@ -481,8 +483,11 @@ async def exchange_tokens_for_session(
         # Update session with the actual hashed refresh token
         # Note: csrf_token_hash is NOT stored here (OAuth 2.1 bootstrap pattern).
         # The first /refresh call after page reload establishes the CSRF binding.
-        session_obj.refresh_token = password_hasher.hash_password(refresh_token)
-        db.commit()
+        users_session_crud.set_session_refresh_token_hash(
+            session_id,
+            password_hasher.hash_password(refresh_token),
+            db,
+        )
 
         # Determine client_type from the exchange request headers.
         # The stored oauth_state.client_type is unreliable for system

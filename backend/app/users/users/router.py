@@ -1,6 +1,5 @@
 """User management router for authenticated operations."""
 
-import os
 from typing import Annotated, Callable
 
 from fastapi import APIRouter, Depends, UploadFile, Security, status, Query
@@ -20,8 +19,6 @@ import auth.password_hasher as auth_password_hasher
 import core.apprise as core_apprise
 import core.database as core_database
 import core.dependencies as core_dependencies
-import core.file_uploads as core_file_uploads
-import core.config as core_config
 
 # Define the API router
 router = APIRouter()

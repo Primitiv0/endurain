@@ -1,41 +1,44 @@
-import random
-import json
+"""Service layer for identity provider OAuth2/OIDC flows."""
+
 import base64
-from enum import Enum
-from typing import Dict, Any
+import json
+import secrets as secrets_module
 from datetime import datetime, timedelta, timezone
+from enum import Enum
+from typing import Any
+
 import httpx
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, Request
 from authlib.integrations.httpx_client import AsyncOAuth2Client
+from fastapi import HTTPException, Request, status
 from joserfc import jwt
-from joserfc.jwk import RSAKey, ECKey, OctKey
 from joserfc.errors import (
     BadSignatureError,
     ExpiredTokenError,
     InvalidClaimError,
-    MissingClaimError,
     InvalidPayloadError,
+    MissingClaimError,
 )
+from joserfc.jwk import ECKey, OctKey, RSAKey
+from sqlalchemy.orm import Session
 
+import auth.identity_providers.crud as idp_crud
+import auth.identity_providers.models as idp_models
+import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.models as oauth_state_models
+import auth.password_hasher as auth_password_hasher
 import core.config as core_config
 import core.cryptography as core_cryptography
 import core.logger as core_logger
 import core.network as core_network
-import auth.identity_providers.models as idp_models
-import auth.identity_providers.crud as idp_crud
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
 import users.users.crud as users_crud
-import users.users.schema as users_schema
 import users.users.models as users_models
+import users.users.schema as users_schema
 import users.users.utils as users_utils
 import users.users_identity_providers.crud as user_idp_crud
 import users.users_identity_providers.models as user_idp_models
 import users.users_identity_providers.utils as user_idp_utils
-import auth.password_hasher as auth_password_hasher
-import auth.oauth_state.models as oauth_state_models
-import auth.oauth_state.crud as oauth_state_crud
-import server_settings.schema as server_settings_schema
-import server_settings.utils as server_settings_utils
 
 
 # Constants for token rotation policy
@@ -67,11 +70,42 @@ class IdentityProviderService:
         Initializes the service with in-memory caches for discovery data and their expiry times,
         sets the cache time-to-live (TTL) to 1 hour, and prepares an optional asynchronous HTTP client.
         """
-        self._discovery_cache: Dict[int, Dict[str, Any]] = {}
-        self._cache_expiry: Dict[int, datetime] = {}
-        self._jwks_cache: Dict[str, Dict[str, Any]] = {}  # Cache JWKS by issuer URL
+        self._discovery_cache: dict[int, dict[str, Any]] = {}
+        self._cache_expiry: dict[int, datetime] = {}
+        self._jwks_cache: dict[str, dict[str, Any]] = {}  # Cache JWKS by issuer URL
         self._cache_ttl = timedelta(hours=1)
         self._http_client: httpx.AsyncClient | None = None
+
+    def _prune_expired_caches(self) -> None:
+        """
+        Evict expired entries from the discovery and JWKS caches.
+
+        Both caches are keyed by admin-controlled values (IdP id /
+        JWKS URI), so growth is bounded in practice. Pruning on every
+        write keeps memory usage proportional to the number of
+        currently-active providers rather than to lifetime churn.
+        """
+        now = datetime.now(timezone.utc)
+
+        # Discovery cache uses a parallel _cache_expiry map
+        expired_idp_ids = [
+            idp_id
+            for idp_id, expires_at in self._cache_expiry.items()
+            if expires_at <= now
+        ]
+        for idp_id in expired_idp_ids:
+            self._discovery_cache.pop(idp_id, None)
+            self._cache_expiry.pop(idp_id, None)
+
+        # JWKS cache stores cached_at inline
+        expired_jwks_uris = [
+            uri
+            for uri, entry in self._jwks_cache.items()
+            if (entry.get("cached_at") is None)
+            or (now - entry["cached_at"]) >= self._cache_ttl
+        ]
+        for uri in expired_jwks_uris:
+            self._jwks_cache.pop(uri, None)
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         """
@@ -95,7 +129,7 @@ class IdentityProviderService:
             )
         return self._http_client
 
-    async def _fetch_jwks(self, jwks_uri: str) -> Dict[str, Any]:
+    async def _fetch_jwks(self, jwks_uri: str) -> dict[str, Any]:
         """
         Fetches the JSON Web Key Set (JWKS) from the identity provider.
 
@@ -168,6 +202,7 @@ class IdentityProviderService:
 
             # Cache the JWKS with timestamp
             self._jwks_cache[jwks_uri] = {"jwks": jwks, "cached_at": now}
+            self._prune_expired_caches()
 
             core_logger.print_to_log(
                 f"Successfully fetched and cached JWKS from {jwks_uri} "
@@ -223,7 +258,7 @@ class IdentityProviderService:
         expected_issuer: str,
         expected_audience: str,
         expected_nonce: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Verifies the ID token's signature and claims using JWKS from the identity provider.
 
@@ -444,7 +479,7 @@ class IdentityProviderService:
 
     async def get_oidc_configuration(
         self, idp: idp_models.IdentityProvider
-    ) -> Dict[str, Any] | None:
+    ) -> dict[str, Any] | None:
         """
         Retrieves the OpenID Connect (OIDC) discovery configuration for a given identity provider.
         This method attempts to fetch the OIDC configuration from the provider's well-known discovery endpoint.
@@ -454,7 +489,7 @@ class IdentityProviderService:
         Args:
             idp (idp_models.IdentityProvider): The identity provider instance containing the issuer URL and unique ID.
         Returns:
-            Dict[str, Any] | None: The OIDC discovery configuration as a dictionary if successful, or None if fetching fails
+            dict[str, Any] | None: The OIDC discovery configuration as a dictionary if successful, or None if fetching fails
             or the issuer URL is not provided.
         Raises:
             Does not raise exceptions directly; logs errors and returns None on failure.
@@ -486,6 +521,7 @@ class IdentityProviderService:
             # Cache the configuration
             self._discovery_cache[idp.id] = config
             self._cache_expiry[idp.id] = datetime.now(timezone.utc) + self._cache_ttl
+            self._prune_expired_caches()
 
             return config
         except httpx.HTTPStatusError as err:
@@ -881,7 +917,7 @@ class IdentityProviderService:
         password_hasher: auth_password_hasher.PasswordHasher,
         db: Session,
         oauth_state: oauth_state_models.OAuthState,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Handle the OAuth2/OIDC callback from an identity provider.
         This method processes the authorization code received from an identity provider,
@@ -899,7 +935,7 @@ class IdentityProviderService:
             oauth_state (oauth_state_models.OAuthState): Database OAuth state object.
 
         Returns:
-            Dict[str, Any]: A dictionary containing:
+            dict[str, Any]: A dictionary containing:
                 - user: The authenticated or linked user object
                 - token_data: OAuth2 token response (access_token, refresh_token, etc.)
                 - userinfo: User information claims from the identity provider
@@ -1162,14 +1198,14 @@ class IdentityProviderService:
 
     async def _get_userinfo(
         self,
-        token_response: Dict[str, Any],
+        token_response: dict[str, Any],
         userinfo_endpoint: str | None,
         client: AsyncOAuth2Client,
         jwks_uri: str | None,
         expected_issuer: str | None,
         expected_audience: str,
         expected_nonce: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Retrieve user information from an identity provider using the provided token response.
 
@@ -1184,7 +1220,7 @@ class IdentityProviderService:
         - This replaces the insecure manual base64 decode previously used
 
         Args:
-            token_response (Dict[str, Any]): The OAuth2 token response containing access and/or ID tokens.
+            token_response (dict[str, Any]): The OAuth2 token response containing access and/or ID tokens.
             userinfo_endpoint (str | None): The endpoint URL to fetch user information, if available.
             client (AsyncOAuth2Client): The asynchronous OAuth2 client used to make HTTP requests.
             jwks_uri (str | None): The JWKS endpoint URL for verifying ID token signatures.
@@ -1193,7 +1229,7 @@ class IdentityProviderService:
             expected_nonce (str | None): Expected nonce value from session (optional, but recommended).
 
         Returns:
-            Dict[str, Any]: The user information claims retrieved from the identity provider.
+            dict[str, Any]: The user information claims retrieved from the identity provider.
 
         Raises:
             HTTPException: If user information cannot be retrieved from either the userinfo endpoint or the ID token,
@@ -1315,7 +1351,7 @@ class IdentityProviderService:
         self,
         user_id: int,
         idp_id: int,
-        token_response: Dict[str, Any],
+        token_response: dict[str, Any],
         db: Session,
     ) -> None:
         """
@@ -1328,7 +1364,7 @@ class IdentityProviderService:
         Args:
             user_id (int): The ID of the authenticated user.
             idp_id (int): The ID of the identity provider.
-            token_response (Dict[str, Any]): The OAuth token response from the IdP containing
+            token_response (dict[str, Any]): The OAuth token response from the IdP containing
                 access_token, refresh_token (optional), and expires_in.
             db (Session): The database session for storing tokens.
 
@@ -1403,8 +1439,8 @@ class IdentityProviderService:
             # User will need to re-auth when session expires, but that's acceptable
 
     def _map_user_claims(
-        self, idp: idp_models.IdentityProvider, claims: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, idp: idp_models.IdentityProvider, claims: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Maps user claims from an identity provider to a standardized user dictionary.
 
@@ -1414,10 +1450,10 @@ class IdentityProviderService:
 
         Args:
             idp (idp_models.IdentityProvider): The identity provider instance containing optional custom user mapping.
-            claims (Dict[str, Any]): The dictionary of claims received from the identity provider.
+            claims (dict[str, Any]): The dictionary of claims received from the identity provider.
 
         Returns:
-            Dict[str, Any]: A dictionary mapping standard user fields to their corresponding claim values.
+            dict[str, Any]: A dictionary mapping standard user fields to their corresponding claim values.
         """
         # Default mapping
         default_mapping = {
@@ -1444,7 +1480,7 @@ class IdentityProviderService:
         self,
         idp: idp_models.IdentityProvider,
         subject: str,
-        userinfo: Dict[str, Any],
+        userinfo: dict[str, Any],
         password_hasher: auth_password_hasher.PasswordHasher,
         db: Session,
     ) -> users_models.Users:
@@ -1524,7 +1560,7 @@ class IdentityProviderService:
         self,
         idp: idp_models.IdentityProvider,
         subject: str,
-        mapped_data: Dict[str, Any],
+        mapped_data: dict[str, Any],
         password_hasher: auth_password_hasher.PasswordHasher,
         db: Session,
     ) -> users_models.Users:
@@ -1556,7 +1592,8 @@ class IdentityProviderService:
         base_username = mapped_data.get("username", f"user_{subject[:8]}")
         username = base_username
         while users_crud.get_user_by_username(username, db):
-            username = f"{base_username}_{str(random.randint(100000, 999999))}"
+            # secrets.randbelow is a CSPRNG; generate a 6-digit suffix
+            username = f"{base_username}_{secrets_module.randbelow(900000) + 100000}"
 
         # Create user signup schema
         user_signup = users_schema.UsersSignup(
@@ -1599,7 +1636,7 @@ class IdentityProviderService:
         self,
         user: users_models.Users,
         idp: idp_models.IdentityProvider,
-        userinfo: Dict[str, Any],
+        userinfo: dict[str, Any],
         db: Session,
     ) -> users_models.Users:
         """
@@ -1669,7 +1706,7 @@ class IdentityProviderService:
         user_id: int,
         idp_id: int,
         db: Session,
-    ) -> Dict[str, Any] | None:
+    ) -> dict[str, Any] | None:
         """
         Attempt to refresh a user's IdP session using stored refresh token.
 

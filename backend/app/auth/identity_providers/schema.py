@@ -1,7 +1,19 @@
-from pydantic import BaseModel, Field, field_validator, field_serializer, ConfigDict
-from typing import Dict, Any
-from datetime import datetime
+"""Pydantic schemas for the identity providers module."""
+
 import re
+from datetime import datetime
+from typing import Any
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    field_serializer,
+    field_validator,
+)
 
 import core.cryptography as core_cryptography
 
@@ -32,43 +44,51 @@ class IdentityProviderBase(BaseModel):
         - provider_type: Ensures the provider type is one of the allowed values.
     """
 
-    name: str = Field(
+    name: StrictStr = Field(
         ..., max_length=100, min_length=1, description="Display name of the IdP"
     )
-    slug: str = Field(
+    slug: StrictStr = Field(
         ..., max_length=50, min_length=1, description="URL-safe identifier"
     )
-    provider_type: str = Field(
+    provider_type: StrictStr = Field(
         default="oidc", description="Provider type: oidc, oauth2, or saml"
     )
-    enabled: bool = Field(default=False, description="Whether this provider is enabled")
-    issuer_url: str | None = Field(
-        None, max_length=500, description="OIDC issuer/discovery URL"
+    enabled: StrictBool = Field(
+        default=False, description="Whether this provider is enabled"
     )
-    authorization_endpoint: str | None = Field(
-        None, max_length=500, description="OAuth2/OIDC authorization endpoint"
+    issuer_url: StrictStr | None = Field(
+        default=None, max_length=500, description="OIDC issuer/discovery URL"
     )
-    token_endpoint: str | None = Field(
-        None, max_length=500, description="OAuth2/OIDC token endpoint"
+    authorization_endpoint: StrictStr | None = Field(
+        default=None, max_length=500, description="OAuth2/OIDC authorization endpoint"
     )
-    userinfo_endpoint: str | None = Field(
-        None, max_length=500, description="OIDC userinfo endpoint"
+    token_endpoint: StrictStr | None = Field(
+        default=None, max_length=500, description="OAuth2/OIDC token endpoint"
     )
-    jwks_uri: str | None = Field(None, max_length=500, description="OIDC JWKS URI")
-    scopes: str = Field(
-        default="openid profile email", max_length=500, description="OAuth2/OIDC scopes"
+    userinfo_endpoint: StrictStr | None = Field(
+        default=None, max_length=500, description="OIDC userinfo endpoint"
     )
-    icon: str | None = Field(None, max_length=100, description="Icon name or URL")
-    auto_create_users: bool = Field(
+    jwks_uri: StrictStr | None = Field(
+        default=None, max_length=500, description="OIDC JWKS URI"
+    )
+    scopes: StrictStr = Field(
+        default="openid profile email",
+        max_length=500,
+        description="OAuth2/OIDC scopes",
+    )
+    icon: StrictStr | None = Field(
+        default=None, max_length=100, description="Icon name or URL"
+    )
+    auto_create_users: StrictBool = Field(
         default=True, description="Auto-create users on first login"
     )
-    sync_user_info: bool = Field(
+    sync_user_info: StrictBool = Field(
         default=True, description="Sync user info on each login"
     )
-    user_mapping: Dict[str, Any] | None = Field(
-        None, description="Claims mapping configuration"
+    user_mapping: dict[str, Any] | None = Field(
+        default=None, description="Claims mapping configuration"
     )
-    client_id: str | None = Field(None, min_length=1, max_length=512)
+    client_id: StrictStr | None = Field(default=None, min_length=1, max_length=512)
 
     @field_validator("slug")
     @classmethod
@@ -123,7 +143,7 @@ class IdentityProviderCreate(IdentityProviderBase):
         client_secret (str): OAuth2/OIDC client secret. Must be between 1 and 512 characters.
     """
 
-    client_secret: str = Field(
+    client_secret: StrictStr = Field(
         ..., min_length=1, max_length=512, description="OAuth2/OIDC client secret"
     )
 
@@ -139,7 +159,9 @@ class IdentityProviderUpdate(IdentityProviderBase):
         client_secret (str | None): The client secret for the provider (1-512 characters).
     """
 
-    client_secret: str | None = Field(None, min_length=1, max_length=512)
+    client_secret: StrictStr | None = Field(
+        default=None, min_length=1, max_length=512
+    )
 
 
 class IdentityProvider(IdentityProviderBase):
@@ -165,7 +187,7 @@ class IdentityProvider(IdentityProviderBase):
                 IdentityProvider: The instance with the decrypted `client_id`.
     """
 
-    id: int
+    id: StrictInt
     created_at: datetime
     updated_at: datetime
 
@@ -195,10 +217,10 @@ class IdentityProviderPublic(BaseModel):
         model_config (dict): Pydantic model configuration to allow population from ORM attributes.
     """
 
-    id: int
-    name: str
-    slug: str
-    icon: str | None = None
+    id: StrictInt
+    name: StrictStr
+    slug: StrictStr
+    icon: StrictStr | None = None
 
     model_config = ConfigDict(
         from_attributes=True, extra="forbid", validate_assignment=True
@@ -221,18 +243,18 @@ class IdentityProviderTemplate(BaseModel):
         configuration_notes (str | None): Setup instructions for this identity provider.
     """
 
-    template_id: str = Field(
+    template_id: StrictStr = Field(
         ..., description="Template identifier (e.g., 'keycloak', 'authentik')"
     )
-    name: str
-    provider_type: str
-    issuer_url: str | None = None
-    scopes: str
-    icon: str | None = None
-    user_mapping: Dict[str, Any] | None = None
-    description: str = Field(..., description="Description of this template")
-    configuration_notes: str | None = Field(
-        None, description="Setup instructions for this IdP"
+    name: StrictStr
+    provider_type: StrictStr
+    issuer_url: StrictStr | None = None
+    scopes: StrictStr
+    icon: StrictStr | None = None
+    user_mapping: dict[str, Any] | None = None
+    description: StrictStr = Field(..., description="Description of this template")
+    configuration_notes: StrictStr | None = Field(
+        default=None, description="Setup instructions for this IdP"
     )
 
 
@@ -249,7 +271,7 @@ class TokenExchangeRequest(BaseModel):
             Must hash to the code_challenge stored in OAuth state.
     """
 
-    code_verifier: str = Field(
+    code_verifier: StrictStr = Field(
         ...,
         min_length=43,
         max_length=128,
@@ -295,16 +317,18 @@ class TokenExchangeResponse(BaseModel):
         token_type (str): Token type, always "Bearer".
     """
 
-    session_id: str = Field(..., description="Session identifier")
-    access_token: str = Field(..., description="JWT access token")
-    refresh_token: str | None = Field(
+    session_id: StrictStr = Field(..., description="Session identifier")
+    access_token: StrictStr = Field(..., description="JWT access token")
+    refresh_token: StrictStr | None = Field(
         default=None, description="JWT refresh token (mobile only)"
     )
-    csrf_token: str | None = Field(
+    csrf_token: StrictStr | None = Field(
         default=None, description="CSRF protection token (web only)"
     )
-    expires_in: int = Field(default=900, description="Access token lifetime in seconds")
-    refresh_token_expires_in: int = Field(
+    expires_in: StrictInt = Field(
+        default=900, description="Access token lifetime in seconds"
+    )
+    refresh_token_expires_in: StrictInt = Field(
         default=604800, description="Refresh token lifetime in seconds"
     )
-    token_type: str = Field(default="Bearer", description="Token type")
+    token_type: StrictStr = Field(default="Bearer", description="Token type")

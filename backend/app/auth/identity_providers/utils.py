@@ -1,20 +1,19 @@
-"""Identity Provider utility functions and templates"""
+"""Utility helpers and pre-configured templates for identity providers."""
 
+import base64
+import hashlib
 import hmac
 import re
-import hashlib
-import base64
 from typing import Any
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
-
-import users.users_identity_providers.crud as user_idp_crud
-
 import core.config as core_config
 import core.logger as core_logger
+import users.users_identity_providers.crud as user_idp_crud
 
 
 def validate_redirect_url(redirect: str | None) -> None:

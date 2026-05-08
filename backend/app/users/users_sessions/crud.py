@@ -173,6 +173,43 @@ def create_session(
 
 
 @core_decorators.handle_db_errors
+def set_session_refresh_token_hash(
+    session_id: str, hashed_refresh_token: str, db: Session
+) -> users_session_models.UsersSessions:
+    """
+    Persist a hashed refresh token on a session.
+
+    Used by the SSO token-exchange flow to record the freshly minted
+    refresh token (already hashed) on the session row.
+
+    Args:
+        session_id: The unique identifier of the session.
+        hashed_refresh_token: The hashed refresh token to store.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The updated session object.
+
+    Raises:
+        HTTPException: If session not found (404) or database error
+            occurs (500).
+    """
+    db_session = get_session_by_id(session_id, db)
+
+    if not db_session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+
+    db_session.refresh_token = hashed_refresh_token
+    db.commit()
+    db.refresh(db_session)
+
+    return db_session
+
+
+@core_decorators.handle_db_errors
 def mark_tokens_exchanged(session_id: str, db: Session) -> None:
     """
     Mark tokens as exchanged and clear OAuth state.
