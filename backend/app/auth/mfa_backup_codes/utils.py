@@ -1,36 +1,32 @@
+"""Utility helpers for MFA backup codes."""
+
 import secrets
-import string
-
-from datetime import datetime, timezone
-
-import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
-
-import auth.password_hasher as auth_password_hasher
 
 from sqlalchemy.orm import Session
 
+import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
+import auth.password_hasher as auth_password_hasher
+
+# Backup-code alphabet: uppercase ASCII + digits with visually ambiguous
+# characters removed (0, O, 1, I) to reduce user transcription errors.
+_BACKUP_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+_BACKUP_CODE_LENGTH = 8
+
 
 def generate_backup_code() -> str:
-    """
-    Generate a cryptographically secure 8-character backup code.
+    """Generate a cryptographically secure 8-character backup code.
 
-    Format: XXXX-XXXX (uppercase alphanumeric, no ambiguous chars)
-    Excludes: 0, O, 1, I, l (to prevent confusion)
-    Entropy: ~40 bits per code (8 chars from 32-char alphabet)
+    Format: ``XXXX-XXXX`` (uppercase alphanumeric, no ambiguous chars).
+    Excludes ``0``, ``O``, ``1``, ``I`` to prevent transcription confusion.
+    Provides ~40 bits of entropy per code (8 chars from a 32-char alphabet).
 
     Returns:
-        str: Formatted backup code (e.g., "A3K9-7BDF")
+        Formatted backup code, e.g. ``"A3K9-7BDF"``.
     """
-    alphabet = string.ascii_uppercase + string.digits
-    # Remove ambiguous characters
-    alphabet = (
-        alphabet.replace("0", "").replace("O", "").replace("1", "").replace("I", "")
+    code = "".join(
+        secrets.choice(_BACKUP_CODE_ALPHABET)
+        for _ in range(_BACKUP_CODE_LENGTH)
     )
-
-    # Generate 8 random characters
-    code = "".join(secrets.choice(alphabet) for _ in range(8))
-
-    # Format as XXXX-XXXX
     return f"{code[:4]}-{code[4:]}"
 
 
@@ -40,30 +36,34 @@ def verify_and_consume_backup_code(
     password_hasher: auth_password_hasher.PasswordHasher,
     db: Session,
 ) -> bool:
-    """
-    Verify and consume a backup code for MFA authentication.
+    """Verify and consume a backup code for MFA authentication.
+
+    Iterates over the user's unused backup codes and verifies the supplied
+    code against each stored hash. On the first match the code is marked as
+    consumed via ``mark_backup_code_as_used``.
 
     Args:
-        user_id: User ID to verify backup code for.
-        code: Backup code to verify (format: XXXX-XXXX).
-        password_hasher: Password hasher for verification.
+        user_id: User ID to verify the backup code for.
+        code: Plaintext backup code submitted by the user (``XXXX-XXXX``).
+        password_hasher: Hasher used to verify the code against stored hashes.
         db: Database session.
 
     Returns:
-        True if code is valid and consumed, False otherwise.
+        ``True`` if the code matched an unused backup code and was consumed,
+        ``False`` otherwise.
     """
     # Get all unused codes for this user
-    unused_codes = mfa_backup_codes_crud.get_user_unused_backup_codes(user_id, db)
+    unused_codes = mfa_backup_codes_crud.get_user_unused_backup_codes(
+        user_id, db
+    )
 
     # Try each unused code (constant-time for each)
     for unused_code in unused_codes:
         if password_hasher.verify(code, unused_code.code_hash):
-            # Valid code found - mark as used
+            # Valid code found - mark as used (by primary key)
             mfa_backup_codes_crud.mark_backup_code_as_used(
-                unused_code.code_hash, user_id, db
+                unused_code.id, user_id, db
             )
-
-            # Return success
             return True
 
     # No matching code found
