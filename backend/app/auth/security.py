@@ -1,6 +1,15 @@
+"""Authentication dependencies and helpers for the auth module.
+
+Provides FastAPI dependencies that resolve and validate JWT access/refresh
+tokens (cookie or Authorization header), enforce OAuth2 scopes, accept API
+keys as an alternative credential, and validate WebSocket access tokens.
+Defines :class:`AuthContext`, the unified credential representation passed
+to endpoints that accept either auth method.
+"""
+
 import hmac
 from dataclasses import dataclass
-from typing import Annotated, Union
+from typing import Annotated
 from datetime import datetime, timezone
 from fastapi import (
     Depends,
@@ -17,6 +26,7 @@ from fastapi.security import (
     APIKeyHeader,
     APIKeyCookie,
 )
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import auth.constants as auth_constants
@@ -79,8 +89,8 @@ cookie_refresh_token_scheme = APIKeyCookie(
 
 
 def get_token(
-    non_cookie_token: Annotated[Union[str, None], Depends(oauth2_scheme)],
-    cookie_token: Union[str, None],
+    non_cookie_token: Annotated[str | None, Depends(oauth2_scheme)],
+    cookie_token: str | None,
     client_type: str,
     token_type: str,
 ) -> str | None:
@@ -137,7 +147,7 @@ def get_token(
 
 ## ACCESS TOKEN VALIDATION
 def get_access_token(
-    access_token: Annotated[Union[str, None], Depends(oauth2_scheme)],
+    access_token: Annotated[str | None, Depends(oauth2_scheme)],
     client_type: str = Depends(header_client_type_scheme),
 ) -> str | None:
     """
@@ -157,14 +167,14 @@ def get_access_token(
 
 
 def get_access_token_for_browser_redirect(
-    access_token: Annotated[Union[str, None], Depends(oauth2_scheme)],
+    access_token: Annotated[str | None, Depends(oauth2_scheme)],
     client_type: str | None = Depends(header_client_type_scheme_optional),
 ) -> str | None:
     """
     Retrieve the access token for browser redirect scenarios.
 
     Args:
-        access_token (Union[str, None]): The access token from the Authorization header
+        access_token (str | None): The access token from the Authorization header
             or query parameter, extracted via OAuth2 scheme dependency.
         client_type (str | None, optional): The type of client making the request
             (e.g., "web", "mobile"). Defaults to "web" if not provided, as browser
@@ -189,6 +199,37 @@ def get_access_token_for_browser_redirect(
     )
 
 
+def _validate_access_token_impl(
+    access_token: str,
+    token_manager: auth_token_manager.TokenManager,
+) -> None:
+    """Shared implementation for access-token validation.
+
+    Args:
+        access_token: The access token to validate.
+        token_manager: The configured token manager.
+
+    Raises:
+        HTTPException: If the token is missing claims, expired, or otherwise
+            invalid. Unexpected exceptions are not caught here so the global
+            error handler can record them.
+    """
+    try:
+        token_manager.validate_token_expiration(
+            access_token,
+            auth_token_manager.TokenType.ACCESS,
+        )
+    except HTTPException as http_err:
+        log_level = "debug" if "expired" in http_err.detail.lower() else "error"
+        core_logger.print_to_log(
+            f"Access token validation failed: {http_err.detail}",
+            log_level,
+            exc=http_err,
+            context={"access_token": "[REDACTED]"},
+        )
+        raise
+
+
 def validate_access_token(
     access_token: Annotated[str, Depends(get_access_token)],
     token_manager: Annotated[
@@ -196,96 +237,62 @@ def validate_access_token(
         Depends(auth_token_manager.get_token_manager),
     ],
 ) -> None:
-    """
-    Validates the provided access token for expiration.
-
-    This function checks whether the given access token is still valid by verifying its expiration.
-    If the token is expired or invalid, an HTTPException is raised and the error is logged.
-    Any unexpected errors during validation are also logged and result in a 500 Internal Server Error.
+    """FastAPI dependency that validates the access token from the
+    Authorization header.
 
     Args:
         access_token (str): The access token to be validated.
         token_manager (auth_token_manager.TokenManager): The token manager instance used for validation.
 
     Raises:
-        HTTPException: If the token is expired, invalid, or an unexpected error occurs during validation.
+        HTTPException: If the token is expired or invalid.
     """
-    try:
-        # Validate the token expiration and type
-        token_manager.validate_token_expiration(
-            access_token,
-            auth_token_manager.TokenType.ACCESS,
-        )
-    except HTTPException as http_err:
-        log_level = "debug" if "expired" in http_err.detail.lower() else "error"
-        core_logger.print_to_log(
-            f"Access token validation failed: {http_err.detail}",
-            log_level,
-            exc=http_err,
-            context={"access_token": "[REDACTED]"},
-        )
-        raise
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Unexpected error during access token validation: {err}",
-            "error",
-            exc=err,
-            context={"access_token": "[REDACTED]"},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during access token validation.",
-        ) from err
+    _validate_access_token_impl(access_token, token_manager)
 
 
 def validate_access_token_for_browser_redirect(
-    # access_token: Annotated[str, Depends(get_access_token_from_cookies)]
     access_token: Annotated[str, Depends(get_access_token_for_browser_redirect)],
     token_manager: Annotated[
         auth_token_manager.TokenManager,
         Depends(auth_token_manager.get_token_manager),
     ],
 ) -> None:
-    """
-    Validates the provided access token for expiration for browser redirects.
-
-    This function checks whether the given access token is still valid by verifying its expiration.
-    If the token is expired or invalid, an HTTPException is raised and the error is logged.
-    Any unexpected errors during validation are also logged and result in a 500 Internal Server Error.
+    """FastAPI dependency that validates the access token for browser-redirect
+    flows where ``X-Client-Type`` may be absent.
 
     Args:
         access_token (str): The access token to be validated.
         token_manager (auth_token_manager.TokenManager): The token manager instance used for validation.
 
     Raises:
-        HTTPException: If the token is expired, invalid, or an unexpected error occurs during validation.
+        HTTPException: If the token is expired or invalid.
     """
-    try:
-        # Validate the token expiration and type
-        token_manager.validate_token_expiration(
-            access_token,
-            auth_token_manager.TokenType.ACCESS,
-        )
-    except HTTPException as http_err:
-        log_level = "debug" if "expired" in http_err.detail.lower() else "error"
-        core_logger.print_to_log(
-            f"Access token validation failed: {http_err.detail}",
-            log_level,
-            exc=http_err,
-            context={"access_token": "[REDACTED]"},
-        )
-        raise
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Unexpected error during access token validation: {err}",
-            "error",
-            exc=err,
-            context={"access_token": "[REDACTED]"},
-        )
+    _validate_access_token_impl(access_token, token_manager)
+
+
+def _get_sub_from_access_token_impl(
+    access_token: str,
+    token_manager: auth_token_manager.TokenManager,
+) -> int:
+    """Shared implementation that extracts the integer ``sub`` claim.
+
+    Args:
+        access_token: The access token to read.
+        token_manager: The configured token manager.
+
+    Returns:
+        The user ID encoded in the token's ``sub`` claim.
+
+    Raises:
+        HTTPException: 401 if the claim is missing or not an integer.
+    """
+    sub = token_manager.get_token_claim(access_token, "sub")
+    if not isinstance(sub, int):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during access token validation.",
-        ) from err
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: 'sub' claim must be an integer",
+        )
+    return sub
 
 
 def get_sub_from_access_token(
@@ -306,16 +313,9 @@ def get_sub_from_access_token(
         int: The user ID associated with the access token.
 
     Raises:
-        Exception: If the token is invalid or the 'sub' claim is missing.
+        HTTPException: If the token is invalid or the 'sub' claim is missing.
     """
-    # Return the user ID associated with the token
-    sub = token_manager.get_token_claim(access_token, "sub")
-    if not isinstance(sub, int):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: 'sub' claim must be an integer",
-        )
-    return sub
+    return _get_sub_from_access_token_impl(access_token, token_manager)
 
 
 def get_sub_from_access_token_for_browser_redirect(
@@ -336,15 +336,9 @@ def get_sub_from_access_token_for_browser_redirect(
         int: The user ID associated with the access token.
 
     Raises:
-        Exception: If the token is invalid or the 'sub' claim is missing.
+        HTTPException: If the token is invalid or the 'sub' claim is missing.
     """
-    sub = token_manager.get_token_claim(access_token, "sub")
-    if not isinstance(sub, int):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: 'sub' claim must be an integer",
-        )
-    return sub
+    return _get_sub_from_access_token_impl(access_token, token_manager)
 
 
 def get_sid_from_access_token(
@@ -395,8 +389,8 @@ def get_and_return_access_token(
 
 ## REFRESH TOKEN VALIDATION
 def get_refresh_token(
-    non_cookie_refresh_token: Annotated[Union[str, None], Depends(oauth2_scheme)],
-    cookie_refresh_token: Union[str, None] = Depends(cookie_refresh_token_scheme),
+    non_cookie_refresh_token: Annotated[str | None, Depends(oauth2_scheme)],
+    cookie_refresh_token: str | None = Depends(cookie_refresh_token_scheme),
     client_type: str = Depends(header_client_type_scheme),
 ) -> str | None:
     """
@@ -453,17 +447,6 @@ def validate_refresh_token(
             context={"refresh_token": "[REDACTED]"},
         )
         raise
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Unexpected error during refresh token validation: {err}",
-            "error",
-            exc=err,
-            context={"refresh_token": "[REDACTED]"},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during refresh token validation.",
-        ) from err
 
 
 def get_sub_from_refresh_token(
@@ -542,6 +525,44 @@ def get_and_return_refresh_token(
     return refresh_token
 
 
+def _check_scopes_impl(
+    access_token: str,
+    token_manager: auth_token_manager.TokenManager,
+    security_scopes: SecurityScopes,
+) -> None:
+    """Shared implementation for scope enforcement.
+
+    Args:
+        access_token: The access token to inspect.
+        token_manager: The configured token manager.
+        security_scopes: Required scopes for the protected endpoint.
+
+    Raises:
+        HTTPException: 403 if the ``scope`` claim is malformed or any
+            required scope is missing.
+    """
+    scope = token_manager.get_token_claim(access_token, "scope")
+
+    if not isinstance(scope, list):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized Access - Invalid scope format",
+            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
+        )
+
+    missing_scopes = set(security_scopes.scopes) - set(scope)
+    if missing_scopes:
+        core_logger.print_to_log(
+            f"Scope validation failed: missing {missing_scopes}",
+            "error",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Unauthorized Access - Missing permissions: {missing_scopes}",
+            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
+        )
+
+
 def check_scopes(
     access_token: Annotated[str, Depends(get_access_token)],
     token_manager: Annotated[
@@ -560,55 +581,10 @@ def check_scopes(
         security_scopes (SecurityScopes): Required scopes for the endpoint.
 
     Raises:
-        HTTPException: If any required scope is missing, raises 403 Forbidden
-            with details.
-        HTTPException: If an unexpected error occurs during scope validation,
-            raises 500 Internal Server Error.
-
-    Logs:
-        Errors and exceptions are logged using core_logger for debugging and
-            auditing purposes.
+        HTTPException: 403 if any required scope is missing or scope is
+            malformed.
     """
-    # Get the scope from the token
-    scope = token_manager.get_token_claim(access_token, "scope")
-
-    # Ensure the scope is a list
-    if not isinstance(scope, list):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized Access - Invalid scope format",
-            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
-        )
-
-    try:
-        # Use set operations to find missing scope
-        missing_scopes = set(security_scopes.scopes) - set(scope)
-        if missing_scopes:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Unauthorized Access - Missing permissions: {missing_scopes}",
-                headers={
-                    "WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'
-                },
-            )
-    except HTTPException as http_err:
-        core_logger.print_to_log(
-            f"Scope validation failed: {http_err}",
-            "error",
-            exc=http_err,
-        )
-        raise http_err
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Unexpected error during scope validation: {err}",
-            "error",
-            exc=err,
-            context={"scope": scope, "required_scope": security_scopes.scopes},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during scope validation.",
-        ) from err
+    _check_scopes_impl(access_token, token_manager, security_scopes)
 
 
 def check_scopes_for_browser_redirect(
@@ -630,55 +606,10 @@ def check_scopes_for_browser_redirect(
         security_scopes (SecurityScopes): Required scopes for the endpoint.
 
     Raises:
-        HTTPException: If any required scope is missing, raises 403 Forbidden
-            with details.
-        HTTPException: If an unexpected error occurs during scope validation,
-            raises 500 Internal Server Error.
-
-    Logs:
-        Errors and exceptions are logged using core_logger for debugging and
-            auditing purposes.
+        HTTPException: 403 if any required scope is missing or scope is
+            malformed.
     """
-    # Get the scope from the token
-    scope = token_manager.get_token_claim(access_token, "scope")
-
-    # Ensure the scope is a list
-    if not isinstance(scope, list):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized Access - Invalid scope format",
-            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
-        )
-
-    try:
-        # Use set operations to find missing scope
-        missing_scopes = set(security_scopes.scopes) - set(scope)
-        if missing_scopes:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Unauthorized Access - Missing permissions: {missing_scopes}",
-                headers={
-                    "WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'
-                },
-            )
-    except HTTPException as http_err:
-        core_logger.print_to_log(
-            f"Scope validation failed: {http_err}",
-            "error",
-            exc=http_err,
-        )
-        raise http_err
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Unexpected error during scope validation: {err}",
-            "error",
-            exc=err,
-            context={"scope": scope, "required_scope": security_scopes.scopes},
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An unexpected error occurred during scope validation.",
-        ) from err
+    _check_scopes_impl(access_token, token_manager, security_scopes)
 
 
 ## API KEY + UNIFIED AUTH
@@ -746,7 +677,7 @@ async def validate_api_key(
     # request if this errors)
     try:
         users_api_keys_crud.update_last_used(db_key.id, db)
-    except Exception as err:
+    except SQLAlchemyError as err:
         core_logger.print_to_log(
             f"Failed to update last_used_at for API key {db_key.id}: {err}",
             "warning",
@@ -783,9 +714,9 @@ async def validate_access_token_or_api_key(
         Session,
         Depends(core_database.get_db),
     ],
-    access_token: Union[str, None] = Depends(oauth2_scheme),
-    api_key_header: Union[str, None] = Depends(header_api_key_scheme),
-    api_key_query: Union[str, None] = Query(None, alias="api_key"),
+    access_token: str | None = Depends(oauth2_scheme),
+    api_key_header: str | None = Depends(header_api_key_scheme),
+    api_key_query: str | None = Query(None, alias="api_key"),
 ) -> "AuthContext":
     """
     Accept either a JWT bearer token or an API key.
@@ -957,8 +888,8 @@ async def validate_websocket_access_token(
             )
 
         return int(token_user_id)
-    except WebSocketException as ws_err:
-        raise ws_err
+    except WebSocketException:
+        raise
     except HTTPException as http_err:
         core_logger.print_to_log(
             f"WebSocket token validation failed: {http_err.detail}",
@@ -969,13 +900,3 @@ async def validate_websocket_access_token(
             code=status.WS_1008_POLICY_VIOLATION,
             reason="Invalid or expired token",
         ) from http_err
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Unexpected error during WebSocket token validation: {err}",
-            "error",
-            exc=err,
-        )
-        raise WebSocketException(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="Token validation failed",
-        ) from err

@@ -1,7 +1,11 @@
-import os
+"""Authentication utilities for the auth router.
+
+Provides credential verification, JWT/CSRF token creation, and the
+``complete_login`` / ``create_mobile_pkce_session_response`` helpers used by
+both password and PKCE login flows.
+"""
 
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
 from fastapi import (
     HTTPException,
     status,
@@ -87,7 +91,7 @@ def create_tokens(
     user: users_schema.UsersRead,
     token_manager: auth_token_manager.TokenManager,
     session_id: str | None = None,
-) -> Tuple[str, datetime, str, datetime, str, str]:
+) -> tuple[str, datetime, str, datetime, str, str]:
     """
     Generates session tokens for a user, including access token, refresh token, and CSRF token.
 
@@ -97,7 +101,7 @@ def create_tokens(
         session_id (str | None, optional): An optional session ID. If not provided, a new unique session ID is generated.
 
     Returns:
-        Tuple[str, datetime, str, datetime, str, str]:
+        tuple[str, datetime, str, datetime, str, str]:
             A tuple containing:
                 - session_id (str): The session identifier.
                 - access_token_exp (datetime): Expiration datetime of the access token.

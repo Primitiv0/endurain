@@ -1,4 +1,10 @@
-from typing import Tuple
+"""Password hashing, verification, and policy enforcement.
+
+Defines :class:`PasswordHasher` (Argon2-first with bcrypt fallback for legacy
+hashes), :class:`PasswordPolicyError`, and the singleton accessor used as a
+FastAPI dependency.
+"""
+
 from collections.abc import Iterable
 import string
 import secrets
@@ -134,7 +140,7 @@ class PasswordHasher:
 
     def verify_and_update(
         self, plain_password: str, hashed_password: str
-    ) -> Tuple[bool, str | None]:
+    ) -> tuple[bool, str | None]:
         """
         Verifies a plain password against a hashed password and updates the hash if necessary.
 
@@ -143,7 +149,7 @@ class PasswordHasher:
             hashed_password (str): The hashed password to verify against.
 
         Returns:
-            Tuple[bool, str | None]: A tuple where the first element is a boolean indicating
+            tuple[bool, str | None]: A tuple where the first element is a boolean indicating
             whether the password is correct, and the second element is the updated hash if
             the hash algorithm has changed or None otherwise.
         """

@@ -1,6 +1,6 @@
-import os
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Callable
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -42,7 +42,15 @@ import core.rate_limit as core_rate_limit
 router = APIRouter()
 
 
-@router.post("/login")
+@router.post(
+    "/login",
+    response_model=(
+        auth_schema.MFARequiredResponse
+        | auth_schema.MobileSessionResponse
+        | auth_schema.TokenResponseWeb
+        | auth_schema.TokenResponseMobile
+    ),
+)
 @core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def login_for_access_token(
     response: Response,
@@ -186,7 +194,14 @@ async def login_for_access_token(
     )
 
 
-@router.post("/mfa/verify")
+@router.post(
+    "/mfa/verify",
+    response_model=(
+        auth_schema.MobileSessionResponse
+        | auth_schema.TokenResponseWeb
+        | auth_schema.TokenResponseMobile
+    ),
+)
 @core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def verify_mfa_and_login(
     response: Response,
@@ -327,7 +342,12 @@ async def verify_mfa_and_login(
     )
 
 
-@router.post("/refresh")
+@router.post(
+    "/refresh",
+    response_model=(
+        auth_schema.TokenResponseWeb | auth_schema.TokenResponseMobile
+    ),
+)
 @core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def refresh_token(
     response: Response,
@@ -567,7 +587,7 @@ async def refresh_token(
         }
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=auth_schema.LogoutResponse)
 @core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def logout(
     response: Response,

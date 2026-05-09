@@ -1,3 +1,11 @@
+"""Authentication constants.
+
+Centralizes JWT configuration (algorithm, secret, token lifetimes), session
+timeout settings, and the OAuth2 scope tuples consumed by ``security.py`` and
+``token_manager.py``. All values are ``Final`` and validated at import time
+so misconfiguration fails fast at startup.
+"""
+
 import os
 from typing import Final
 

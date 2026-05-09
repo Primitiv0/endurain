@@ -1,5 +1,15 @@
+"""Pydantic schemas and in-memory stores for the authentication module.
+
+Defines request/response models used by the auth router as well as the
+``PendingMFALogin`` and ``FailedLoginAttempts`` singletons that implement
+per-username progressive lockout for login and MFA verification.
+"""
+
 from datetime import datetime, timedelta, timezone
-from pydantic import BaseModel, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
+
 import core.logger as core_logger
 
 
@@ -8,12 +18,14 @@ class LoginRequest(BaseModel):
     Schema for login requests containing username and password.
 
     Attributes:
-        username (str): The username of the user. Must be between 1 and 250 characters.
-        password (str): The user's password. Must be at least 8 characters long.
+        username: The username of the user. Must be between 1 and 250 characters.
+        password: The user's password. Must be at least 8 characters long.
     """
 
-    username: str = Field(..., min_length=1, max_length=250)
-    password: str = Field(..., min_length=8)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    username: StrictStr = Field(..., min_length=1, max_length=250)
+    password: StrictStr = Field(..., min_length=8)
 
 
 class MFALoginRequest(BaseModel):
@@ -26,8 +38,10 @@ class MFALoginRequest(BaseModel):
             (XXXX-XXXX format).
     """
 
-    username: str = Field(..., min_length=1, max_length=250)
-    mfa_code: str = Field(
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    username: StrictStr = Field(..., min_length=1, max_length=250)
+    mfa_code: StrictStr = Field(
         ...,
         pattern=r"^(\d{6}|[A-Z0-9]{4}-[A-Z0-9]{4})$",
     )
@@ -38,14 +52,16 @@ class MFARequiredResponse(BaseModel):
     Represents a response indicating that Multi-Factor Authentication (MFA) is required.
 
     Attributes:
-        mfa_required (bool): Indicates whether MFA is required. Defaults to True.
-        username (str): The username for which MFA is required.
-        message (str): A message describing the requirement. Defaults to "MFA verification required".
+        mfa_required: Indicates whether MFA is required. Defaults to True.
+        username: The username for which MFA is required.
+        message: A message describing the requirement.
     """
 
-    mfa_required: bool = True
-    username: str
-    message: str = "MFA verification required"
+    model_config = ConfigDict(extra="forbid")
+
+    mfa_required: StrictBool = True
+    username: StrictStr
+    message: StrictStr = "MFA verification required"
 
 
 class MobileSessionResponse(BaseModel):
@@ -57,17 +73,84 @@ class MobileSessionResponse(BaseModel):
     a session_id is returned for secure token exchange via POST /session/{session_id}/tokens.
 
     Attributes:
-        session_id (str): Session identifier for token exchange. Client must send this
+        session_id: Session identifier for token exchange. Client must send this
             with the code_verifier to obtain access and refresh tokens.
-        mfa_required (bool): Whether MFA is required. Defaults to False.
-        message (str): Instructions for the client on next steps.
+        mfa_required: Whether MFA is required. Defaults to False.
+        message: Instructions for the client on next steps.
     """
 
-    session_id: str
-    mfa_required: bool = False
-    message: str = (
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: StrictStr
+    mfa_required: StrictBool = False
+    message: StrictStr = (
         "Complete authentication by exchanging tokens at /session/{session_id}/tokens"
     )
+
+
+class TokenResponseWeb(BaseModel):
+    """
+    Token response payload for web clients.
+
+    Refresh token is delivered out-of-band as an httpOnly cookie; only the
+    access token and CSRF token are returned in the body for in-memory storage.
+
+    Attributes:
+        session_id: Session identifier.
+        access_token: Bearer access token.
+        csrf_token: CSRF token bound to the session.
+        token_type: Always ``"bearer"``.
+        expires_in: Seconds until the access token expires (RFC 6749 §5.1).
+        refresh_token_expires_in: Seconds until the refresh token expires.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: StrictStr
+    access_token: StrictStr
+    csrf_token: StrictStr
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: StrictInt
+    refresh_token_expires_in: StrictInt
+
+
+class TokenResponseMobile(BaseModel):
+    """
+    Token response payload for mobile clients.
+
+    All tokens are returned in the JSON body for storage on the secure
+    platform keystore.
+
+    Attributes:
+        session_id: Session identifier.
+        access_token: Bearer access token.
+        refresh_token: Refresh token.
+        token_type: Always ``"bearer"``.
+        expires_in: Seconds until the access token expires (RFC 6749 §5.1).
+        refresh_token_expires_in: Seconds until the refresh token expires.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    session_id: StrictStr
+    access_token: StrictStr
+    refresh_token: StrictStr
+    token_type: Literal["bearer"] = "bearer"
+    expires_in: StrictInt
+    refresh_token_expires_in: StrictInt
+
+
+class LogoutResponse(BaseModel):
+    """
+    Response payload returned by the logout endpoint.
+
+    Attributes:
+        message: Human-readable confirmation message.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    message: StrictStr
 
 
 class PendingMFALogin:

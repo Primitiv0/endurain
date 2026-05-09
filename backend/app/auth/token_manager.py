@@ -1,3 +1,9 @@
+"""JWT token issuance and validation for the authentication module.
+
+Defines :class:`TokenType`, :class:`TokenManager` (issue/decode/validate JWTs
+and mint CSRF tokens) and a singleton accessor used as a FastAPI dependency.
+"""
+
 import secrets
 import uuid
 
@@ -7,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, status
 from joserfc import jwt
+from joserfc.jwt import Token
 from joserfc.errors import (
     InvalidPayloadError,
     MissingClaimError,
@@ -14,6 +21,7 @@ from joserfc.errors import (
     InvalidTokenError,
     InsecureClaimError,
     InvalidClaimError,
+    DecodeError,
 )
 from joserfc.jwk import OctKey
 
@@ -105,28 +113,20 @@ class TokenManager:
                 detail=f"Claim '{claim}' is missing in the token.",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from err
-        except Exception as err:
-            core_logger.print_to_log(
-                f"Error retrieving claim '{claim}' from token: {err}",
-                "error",
-                exc=err,
-                context={"token": "[REDACTED]"},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Unable to retrieve claim '{claim}' from token.",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from err
+        except HTTPException:
+            # decode_token already raised a properly-formed 401; re-raise as-is.
+            raise
 
-    def decode_token(self, token: str) -> dict:
+    def decode_token(self, token: str) -> Token:
         """
-        Decodes a JWT token and returns its payload as a dictionary.
+        Decodes a JWT token and returns the parsed Token object.
 
         Args:
             token (str): The JWT token to decode.
 
         Returns:
-            dict: The decoded payload from the token.
+            joserfc.jwt.Token: The decoded token (use ``.claims`` to access
+                payload claims).
 
         Raises:
             HTTPException: If the token cannot be decoded, raises an HTTP 401
@@ -134,7 +134,7 @@ class TokenManager:
         """
         try:
             # Decode the token and return the payload
-            return jwt.decode(token, OctKey.import_key(self.secret_key))
+            return jwt.decode(token, self._key)
         except InvalidPayloadError as payload_err:
             core_logger.print_to_log(
                 f"Invalid token payload: {payload_err}",
@@ -147,18 +147,18 @@ class TokenManager:
                 detail="Invalid token payload",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from payload_err
-        except Exception as err:
+        except DecodeError as decode_err:
             core_logger.print_to_log(
-                f"Error decoding token: {err}",
+                f"Error decoding token: {decode_err}",
                 "error",
-                exc=err,
+                exc=decode_err,
                 context={"token": "[REDACTED]"},
             )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Unable to decode token",
                 headers={"WWW-Authenticate": "Bearer"},
-            ) from err
+            ) from decode_err
 
     def validate_token_expiration(
         self,
@@ -266,18 +266,9 @@ class TokenManager:
                 detail="Token has invalid claims.",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from claims_err
-        except Exception as err:
-            core_logger.print_to_log(
-                f"Error validating token expiration: {err}",
-                "error",
-                exc=err,
-                context={"token": "[REDACTED]"},
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token is expired or invalid.",
-                headers={"WWW-Authenticate": "Bearer"},
-            ) from err
+        except HTTPException:
+            # decode_token already raised a properly-formed 401; re-raise as-is.
+            raise
 
     def create_token(
         self,
@@ -336,7 +327,7 @@ class TokenManager:
         encoded_token = jwt.encode(
             {"alg": self.algorithm},
             scope_dict.copy(),
-            OctKey.import_key(self.secret_key),
+            self._key,
         )
 
         # Return the expiration and the encoded token
