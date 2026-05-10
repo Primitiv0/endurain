@@ -5,8 +5,30 @@
       <UsersPasswordRequirementsComponent />
 
       <form @submit.prevent="submitChangeUserPasswordForm">
+        <!-- current password field -->
+        <label for="validationCurrentPassword"
+          ><b>* {{ $t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel') }}</b></label
+        >
+        <div class="position-relative">
+          <input
+            :type="showCurrentPassword ? 'text' : 'password'"
+            class="form-control"
+            id="validationCurrentPassword"
+            :placeholder="$t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+            v-model="currentPassword"
+            required
+          />
+          <button
+            type="button"
+            class="btn position-absolute top-50 end-0 translate-middle-y"
+            @click="toggleCurrentPasswordVisibility"
+          >
+            <font-awesome-icon :icon="showCurrentPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']" />
+          </button>
+        </div>
+
         <!-- password fields -->
-        <label for="validationNewPassword"
+        <label class="mt-1" for="validationNewPassword"
           ><b>* {{ $t('settingsSecurityZone.changeUserPasswordPasswordLabel') }}</b></label
         >
         <div class="position-relative">
@@ -87,12 +109,28 @@
           {{ $t('settingsSecurityZone.changeUserPasswordPasswordsDoNotMatchFeedbackLabel') }}
         </div>
 
+        <!-- MFA code field (shown when MFA is enabled) -->
+        <div v-if="mfaEnabled">
+          <label class="mt-1" for="validationMfaCode"
+            ><b>{{ $t('settingsSecurityZone.changeUserPasswordMfaCodeLabel') }}</b></label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="validationMfaCode"
+            :placeholder="$t('settingsSecurityZone.changeUserPasswordMfaCodeLabel')"
+            v-model="mfaCode"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+          />
+        </div>
+
         <p>* {{ $t('generalItems.requiredField') }}</p>
 
         <button
           type="submit"
           class="btn btn-success"
-          :disabled="!isNewPasswordValid || !isNewPasswordRepeatValid || !isPasswordMatch"
+          :disabled="!currentPassword || !newPassword || !newPasswordRepeat || !isNewPasswordValid || !isNewPasswordRepeatValid || !isPasswordMatch || (mfaEnabled && !mfaCode)"
           name="editUserPassword"
         >
           {{ $t('settingsSecurityZone.subtitleChangePassword') }}
@@ -144,7 +182,8 @@
             <button
               type="button"
               class="btn btn-primary"
-              @click="regenerateBackupCodes"
+              data-bs-toggle="modal"
+              data-bs-target="#mfaRegenerateBackupCodesModal"
               :disabled="regenerateBackupCodesLoading"
             >
               <span
@@ -180,6 +219,8 @@
         :secretLabel="t('settingsSecurityZone.mfaSecretLabel')"
         :verificationCodeLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
         :verificationCodePlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :currentPasswordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        :requirePassword="authStore.user.has_local_password === true"
         :requiredFieldText="t('generalItems.requiredField')"
         :cancelButtonText="t('generalItems.cancel')"
         actionButtonType="success"
@@ -189,14 +230,43 @@
       />
 
       <!-- MFA Disable Modal -->
-      <ModalComponentNumberInput
+      <ModalComponentPasswordAndStringInput
+        ref="mfaDisableModalRef"
         modalId="mfaDisableModal"
         :title="t('settingsSecurityZone.mfaDisableModalTitle')"
-        :numberFieldLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
-        :numberDefaultValue="null"
-        :actionButtonType="`danger`"
+        :description="t('settingsSecurityZone.mfaDisableConfirmation')"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="danger"
         :actionButtonText="t('settingsSecurityZone.disableMFAButton')"
-        @numberToEmitAction="disableMFA"
+        :isLoading="mfaDisableLoading"
+        @submitAction="disableMFA"
+      />
+
+      <!-- MFA Regenerate Backup Codes Modal -->
+      <ModalComponentPasswordAndStringInput
+        ref="mfaRegenerateModalRef"
+        modalId="mfaRegenerateBackupCodesModal"
+        :title="t('settingsSecurityZone.regenerateBackupCodesButton')"
+        :description="t('settingsSecurityZone.regenerateBackupCodesConfirmation')"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="primary"
+        :actionButtonText="t('settingsSecurityZone.regenerateBackupCodesButton')"
+        :isLoading="regenerateBackupCodesLoading"
+        @submitAction="regenerateBackupCodes"
       />
 
       <!-- MFA Backup Codes Modal -->
@@ -320,6 +390,11 @@
         :namePlaceholder="t('settingsSecurityZone.apiKeyNamePlaceholder')"
         :scopesLabel="t('settingsSecurityZone.apiKeyScopesSelectLabel')"
         :expiryLabel="t('settingsSecurityZone.apiKeyExpiryOptionalLabel')"
+        :currentPasswordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        :mfaCodeLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :mfaCodeHint="t('loginView.mfaCodeHint')"
+        :requirePassword="authStore.user.has_local_password === true"
+        :mfaEnabled="mfaEnabled"
         :requiredFieldText="t('generalItems.requiredField')"
         :cancelButtonText="t('generalItems.cancel')"
         :actionButtonText="t('settingsSecurityZone.apiKeyCreateButton')"
@@ -357,8 +432,8 @@ import { identityProviders } from '@/services/identityProvidersService'
 import { push } from 'notivue'
 // Importing the components
 import UsersPasswordRequirementsComponent from '@/components/Settings/SettingsUsersZone/UsersPasswordRequirementsComponent.vue'
-import ModalComponentNumberInput from '@/components/Modals/ModalComponentNumberInput.vue'
 import ModalComponentMFASetup from '@/components/Modals/ModalComponentMFASetup.vue'
+import ModalComponentPasswordAndStringInput from '@/components/Modals/ModalComponentPasswordAndStringInput.vue'
 import ModalComponentMFABackupCodes from '@/components/Modals/ModalComponentMFABackupCodes.vue'
 import UserIdentityProviderListComponent from '@/components/Settings/SettingsUsersZone/UserIdentityProviderListComponent.vue'
 // Importing validation utilities
@@ -378,8 +453,10 @@ const { t } = useI18n()
 const route = useRoute()
 const authStore = useAuthStore()
 const serverSettingsStore = useServerSettingsStore()
+const currentPassword = ref('')
 const newPassword = ref('')
 const newPasswordRepeat = ref('')
+const mfaCode = ref('')
 const passwordType = serverSettingsStore.serverSettings.password_type
 const passMinLength =
   authStore.user.access_type === 'admin'
@@ -407,12 +484,15 @@ const mfaDisableLoading = ref(false)
 const qrCodeData = ref('')
 const mfaSecret = ref('')
 const mfaSetupModalRef = ref(null)
+const mfaDisableModalRef = ref(null)
+const mfaRegenerateModalRef = ref(null)
 const mfaBackupCodesModalRef = ref(null)
 const backupCodes = ref([])
 const backupCodeStatus = ref(null)
 const backupCodeStatusLoading = ref(false)
 const regenerateBackupCodesLoading = ref(false)
 
+const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showNewPasswordRepeat = ref(false)
 
@@ -431,6 +511,11 @@ const apiKeyCreateLoading = ref(false)
 const apiKeyCreateModalRef = ref(null)
 const apiKeyRevealModalRef = ref(null)
 
+// Toggle visibility for current password
+const toggleCurrentPasswordVisibility = () => {
+  showCurrentPassword.value = !showCurrentPassword.value
+}
+
 // Toggle visibility for new password
 const toggleNewPasswordVisibility = () => {
   showNewPassword.value = !showNewPassword.value
@@ -446,7 +531,9 @@ async function submitChangeUserPasswordForm() {
     if (isNewPasswordValid.value && isNewPasswordRepeatValid.value && isPasswordMatch.value) {
       // Create the data object to send to the service.
       const data = {
-        password: newPassword.value
+        current_password: currentPassword.value,
+        password: newPassword.value,
+        ...(mfaCode.value ? { mfa_code: mfaCode.value } : {})
       }
 
       // Call the service to edit the user password.
@@ -455,8 +542,10 @@ async function submitChangeUserPasswordForm() {
       // Show the success alert.
       push.success(t('settingsSecurityZone.userChangePasswordSuccessMessage'))
       // Clear the form fields.
+      currentPassword.value = ''
       newPassword.value = ''
       newPasswordRepeat.value = ''
+      mfaCode.value = ''
     }
   } catch (error) {
     // If there is an error, show the error alert.
@@ -507,10 +596,10 @@ async function setupMFA() {
   }
 }
 
-async function enableMFA(verificationCode) {
+async function enableMFA({ mfa_code, current_password }) {
   try {
     mfaEnableLoading.value = true
-    const response = await profile.enableMFA({ mfa_code: verificationCode })
+    const response = await profile.enableMFA({ mfa_code, current_password })
     mfaEnabled.value = true
     mfaSetupModalRef.value?.hide()
     qrCodeData.value = ''
@@ -529,14 +618,18 @@ async function enableMFA(verificationCode) {
   }
 }
 
-async function disableMFA(mfaCode) {
-  if (!mfaCode) return
+async function disableMFA({ password, stringValue }) {
+  if (!password || !stringValue) return
 
   try {
     mfaDisableLoading.value = true
-    await profile.disableMFA({ mfa_code: mfaCode.toString() })
+    await profile.disableMFA({
+      current_password: password,
+      mfa_code: stringValue.toString()
+    })
     mfaEnabled.value = false
     backupCodeStatus.value = null
+    mfaDisableModalRef.value?.hide()
     push.success(t('settingsSecurityZone.mfaDisabledSuccess'))
   } catch (error) {
     push.error(`${t('settingsSecurityZone.errorDisableMFA')} - ${error}`)
@@ -558,10 +651,17 @@ async function loadBackupCodeStatus() {
   }
 }
 
-async function regenerateBackupCodes() {
+async function regenerateBackupCodes({ password, stringValue }) {
+  if (!password || !stringValue) return
+
   try {
     regenerateBackupCodesLoading.value = true
-    const response = await profile.regenerateBackupCodes()
+    const response = await profile.regenerateBackupCodes({
+      current_password: password,
+      mfa_code: stringValue.toString()
+    })
+
+    mfaRegenerateModalRef.value?.hide()
 
     if (response.codes && response.codes.length > 0) {
       backupCodes.value = response.codes

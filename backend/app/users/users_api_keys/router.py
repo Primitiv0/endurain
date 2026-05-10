@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 import auth.security as auth_security
+import auth.password_hasher as auth_password_hasher
 
 import users.users_api_keys.crud as users_api_keys_crud
 import users.users_api_keys.schema as users_api_keys_schema
 import users.users_api_keys.utils as users_api_keys_utils
 import users.users.crud as users_crud
+import users.users.utils as users_utils
 
 import core.database as core_database
 
@@ -57,6 +59,10 @@ async def create_user_api_key(
         int,
         Depends(auth_security.get_sub_from_access_token),
     ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
+    ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> users_api_keys_schema.UsersApiKeyCreated:
     """
@@ -66,15 +72,23 @@ async def create_user_api_key(
     cannot be retrieved again. Requested scopes must be
     a subset of the user's own permissions.
 
+    Step-up verification is required (current password,
+    plus MFA code when MFA is enabled). API keys grant
+    persistent, long-lived access — a stolen access
+    token alone must not be sufficient to mint one.
+
     Args:
-        data: Key creation data (name, scopes, expiry).
+        data: Key creation data (name, scopes, expiry,
+            step-up credentials).
         token_user_id: User ID from access token.
+        password_hasher: Password hasher dependency.
         db: Database session dependency.
 
     Returns:
         Created API key including the raw key string.
 
     Raises:
+        HTTPException: 401 if step-up verification fails.
         HTTPException: 400 if scopes exceed the user's
             own permissions.
         HTTPException: 404 if the user is not found.
@@ -85,6 +99,14 @@ async def create_user_api_key(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        data.current_password,
+        data.mfa_code,
+        password_hasher,
+        db,
+    )
 
     try:
         users_api_keys_utils.validate_api_key_scopes(data.scopes, db_user.access_type)

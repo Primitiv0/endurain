@@ -276,6 +276,11 @@ def _get_sub_from_access_token_impl(
 ) -> int:
     """Shared implementation that extracts the integer ``sub`` claim.
 
+    Defence-in-depth: validates token type and expiration before
+    returning any claim. Without this, callers that use this
+    helper as their sole auth dependency would accept refresh
+    tokens or expired access tokens as credentials.
+
     Args:
         access_token: The access token to read.
         token_manager: The configured token manager.
@@ -284,8 +289,10 @@ def _get_sub_from_access_token_impl(
         The user ID encoded in the token's ``sub`` claim.
 
     Raises:
-        HTTPException: 401 if the claim is missing or not an integer.
+        HTTPException: 401 if the token is expired, of the wrong
+            type, or the claim is missing or not an integer.
     """
+    _validate_access_token_impl(access_token, token_manager)
     sub = token_manager.get_token_claim(access_token, "sub")
     if not isinstance(sub, int):
         raise HTTPException(
@@ -351,6 +358,10 @@ def get_sid_from_access_token(
     """
     Retrieves the session ID ('sid') from the provided access token.
 
+    Defence-in-depth: validates token type and expiration before
+    returning the claim, so callers cannot accidentally accept
+    refresh tokens or expired access tokens.
+
     Args:
         access_token (str): The access token from which to extract the session ID.
         token_manager (auth_token_manager.TokenManager): The token manager used to validate and extract claims from the token.
@@ -359,8 +370,10 @@ def get_sid_from_access_token(
         int: The session ID ('sid') associated with the access token.
 
     Raises:
-        Exception: If the token is invalid or the 'sid' claim is not present.
+        HTTPException: 401 if the token is expired, of the wrong
+            type, or the 'sid' claim is missing or malformed.
     """
+    _validate_access_token_impl(access_token, token_manager)
     # Return the session ID associated with the token
     sid = token_manager.get_token_claim(access_token, "sid")
     if not isinstance(sid, str):
@@ -532,15 +545,24 @@ def _check_scopes_impl(
 ) -> None:
     """Shared implementation for scope enforcement.
 
+    Defence-in-depth: validates token type and expiration before
+    inspecting scopes. Without this, refresh tokens (which carry
+    the same ``scope`` claim) would satisfy scope-gated routes,
+    and expired access tokens would still authorise requests on
+    routers that omit an explicit ``validate_access_token``
+    dependency.
+
     Args:
         access_token: The access token to inspect.
         token_manager: The configured token manager.
         security_scopes: Required scopes for the protected endpoint.
 
     Raises:
-        HTTPException: 403 if the ``scope`` claim is malformed or any
+        HTTPException: 401 if the token is expired or of the wrong
+            type. 403 if the ``scope`` claim is malformed or any
             required scope is missing.
     """
+    _validate_access_token_impl(access_token, token_manager)
     scope = token_manager.get_token_claim(access_token, "scope")
 
     if not isinstance(scope, list):

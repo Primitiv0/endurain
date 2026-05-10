@@ -264,18 +264,25 @@ def enable_user_mfa(
     return backup_codes
 
 
-def disable_user_mfa(user_id: int, mfa_code: str, db: Session) -> None:
+def disable_user_mfa(user_id: int, db: Session) -> None:
     """
-    Disable MFA for user after verification.
+    Clear MFA state for user.
+
+    This helper does NOT verify any MFA code itself — callers
+    are responsible for proving identity (e.g. via
+    :func:`users.users.utils.verify_step_up_credentials`, which
+    accepts both TOTP and backup codes for parity with login).
+    Performing the check here as well would either double-charge
+    a backup code or, worse, reject a backup code that step-up
+    just accepted.
 
     Args:
         user_id: User ID to disable MFA for.
-        mfa_code: MFA code to verify.
         db: Database session.
 
     Raises:
-        HTTPException: If user not found, MFA not enabled, code
-            invalid, or decryption fails.
+        HTTPException: 404 if the user is not found, 400 if MFA
+            is not currently enabled.
     """
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
@@ -287,22 +294,6 @@ def disable_user_mfa(user_id: int, mfa_code: str, db: Session) -> None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="MFA is not enabled for this user",
-        )
-
-    # Decrypt the secret
-    secret = core_cryptography.decrypt_token_fernet(user.mfa_secret)
-
-    # Check if decryption was successful
-    if not secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to decrypt MFA secret",
-        )
-
-    # Verify the MFA code
-    if not verify_totp(secret, mfa_code):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code"
         )
 
     # Disable MFA for user

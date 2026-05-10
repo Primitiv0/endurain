@@ -264,7 +264,7 @@ def create_mobile_pkce_session_response(
 
     Similar to SSO flow, but for password authentication.
     Returns session_id instead of tokens—tokens obtained via
-    POST /session/{session_id}/tokens with code_verifier.
+    POST /public/idp/session/{session_id}/tokens with code_verifier.
 
     Args:
         response: FastAPI response object
@@ -285,7 +285,7 @@ def create_mobile_pkce_session_response(
         - Mobile-only: Web clients use complete_login() with httpOnly cookies
         - Session created without tokens (pending exchange)
         - OAuth state record stores PKCE challenge
-        - Client must POST to /session/{session_id}/tokens with code_verifier
+        - Client must POST to /public/idp/session/{session_id}/tokens
         - Reuses existing token exchange endpoint from SSO flow
     """
     # Validate PKCE challenge format
@@ -331,5 +331,8 @@ def create_mobile_pkce_session_response(
     return auth_schema.MobileSessionResponse(
         session_id=session_id,
         mfa_required=False,
-        message="Complete authentication by exchanging tokens at /session/{session_id}/tokens",
+        message=(
+            "Complete authentication by exchanging tokens at "
+            "/public/idp/session/{session_id}/tokens"
+        ),
     )

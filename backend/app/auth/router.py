@@ -97,7 +97,8 @@ async def login_for_access_token(
     PKCE Support (Mobile):
     - Mobile clients can optionally provide code_challenge and code_challenge_method
     - For mobile clients with PKCE parameters, tokens are not returned directly
-    - Instead, a session_id is returned for secure token exchange via /session/{session_id}/tokens
+        - Instead, a session_id is returned for secure token exchange via
+            /public/idp/session/{session_id}/tokens
 
     Args:
         response: The HTTP response object
@@ -177,7 +178,7 @@ async def login_for_access_token(
     # Mobile clients with PKCE use secure token exchange flow
     # Web clients don't need PKCE - they have httpOnly cookies and same-origin protection
     if client_type == "mobile" and code_challenge and code_challenge_method:
-        # Use PKCE exchange flow - tokens obtained via /session/{session_id}/tokens
+        # Use PKCE exchange flow through the public IdP token exchange endpoint
         return auth_utils.create_mobile_pkce_session_response(
             response,
             request,
@@ -239,7 +240,8 @@ async def verify_mfa_and_login(
     PKCE Support (Mobile):
     - Mobile clients can optionally provide code_challenge and code_challenge_method
     - For mobile clients with PKCE parameters, tokens are not returned directly
-    - Instead, a session_id is returned for secure token exchange via /session/{session_id}/tokens
+        - Instead, a session_id is returned for secure token exchange via
+            /public/idp/session/{session_id}/tokens
 
     Args:
         response: The HTTP response object
@@ -325,7 +327,7 @@ async def verify_mfa_and_login(
     # Mobile clients with PKCE use secure token exchange flow
     # Web clients don't need PKCE - they have httpOnly cookies and same-origin protection
     if client_type == "mobile" and code_challenge and code_challenge_method:
-        # Use PKCE exchange flow - tokens obtained via /session/{session_id}/tokens
+        # Use PKCE exchange flow through the public IdP token exchange endpoint
         return auth_utils.create_mobile_pkce_session_response(
             response,
             request,

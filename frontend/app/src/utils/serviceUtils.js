@@ -79,6 +79,21 @@ async function fetchWithRetry(url, options, responseType = 'json') {
       if (url === 'mfa/verify' && error.message.includes('Invalid MFA code')) {
         throw error
       }
+      if (url === 'profile/password') {
+        throw error
+      }
+      if (url === 'profile/mfa/disable') {
+        throw error
+      }
+      if (url === 'profile/mfa/backup-codes') {
+        throw error
+      }
+      if (url === 'profile/mfa/enable') {
+        throw error
+      }
+      if (url === 'profile/api_keys') {
+        throw error
+      }
       try {
         // Use auth store's refreshAccessToken which updates tokens in memory
         const authStore = useAuthStore()

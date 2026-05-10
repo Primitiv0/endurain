@@ -1,8 +1,10 @@
 {
   "subtitleChangePassword": "Change password",
   "changeUserPasswordBodyLabel": "Change password for user ",
+  "changeUserPasswordCurrentPasswordLabel": "Current password",
   "changeUserPasswordPasswordLabel": "New password",
   "changeUserPasswordPasswordConfirmationLabel": "Confirm new password",
+  "changeUserPasswordMfaCodeLabel": "MFA code",
   "changeUserPasswordFeedbackLabel": "Password does not meet requirements",
   "changeUserPasswordPasswordsDoNotMatchFeedbackLabel": "Passwords do not match",
   "subtitleMFA": "Multi-Factor Authentication (MFA)",
@@ -34,6 +36,7 @@
   "backupCodesClose": "Close",
   "backupCodesRemaining": "{remaining} of {total} backup codes remaining",
   "regenerateBackupCodesButton": "Regenerate Backup Codes",
+  "regenerateBackupCodesConfirmation": "Regenerating will invalidate all existing backup codes. Save the new ones immediately.",
   "successRegenerateBackupCodes": "Backup codes regenerated successfully",
   "errorRegenerateBackupCodes": "Error regenerating backup codes",
   "errorLoadBackupCodeStatus": "Error loading backup code status",

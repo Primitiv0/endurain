@@ -366,12 +366,13 @@ async def exchange_tokens_for_session(
     db: Annotated[Session, Depends(core_database.get_db)],
 ):
     """
-    Exchange PKCE code_verifier for JWT tokens (mobile SSO flow).
+    Exchange a PKCE code verifier for JWT tokens.
 
-    After OAuth callback completes and creates a session, mobile clients must
+    After OAuth callback or password PKCE login creates a session, clients
     call this endpoint to prove they possess the code_verifier (PKCE) and
-    receive the actual JWT tokens. This prevents token leakage through browser
-    redirects and ensures only the legitimate client can access the tokens.
+    receive the actual JWT tokens. This prevents token leakage through
+    browser redirects and ensures only the legitimate client can access the
+    tokens.
 
     Security Features:
     - PKCE verification (SHA256 hash of verifier must match challenge)
@@ -424,10 +425,14 @@ async def exchange_tokens_for_session(
             )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not created via mobile SSO flow",
+                detail="Session not eligible for PKCE token exchange",
             )
 
-        # Check if tokens have already been exchanged (prevent replay)
+        # Check if tokens have already been exchanged (prevent replay).
+        # This is a fast-path informational check; the authoritative
+        # protection is the atomic conditional UPDATE below, which
+        # closes a TOCTOU race that two concurrent exchanges with the
+        # same code_verifier would otherwise win.
         if session_obj.tokens_exchanged:
             core_logger.print_to_log(
                 f"Token exchange replay attempt for session {session_id[:8]}...",
@@ -480,14 +485,38 @@ async def exchange_tokens_for_session(
             (refresh_token_exp - datetime.now(timezone.utc)).total_seconds()
         )
 
-        # Update session with the actual hashed refresh token
-        # Note: csrf_token_hash is NOT stored here (OAuth 2.1 bootstrap pattern).
-        # The first /refresh call after page reload establishes the CSRF binding.
-        users_session_crud.set_session_refresh_token_hash(
+        # Capture the stored client_type from the OAuth state BEFORE
+        # claiming the session — claim_session_for_token_exchange
+        # deletes the OAuth state row as part of its cleanup, after
+        # which any attribute access on ``oauth_state`` would trigger
+        # a lazy reload and raise ObjectDeletedError.
+        stored_client_type = oauth_state.client_type
+
+        # Update session with the actual hashed refresh token AND
+        # mark tokens as exchanged in a single atomic conditional
+        # UPDATE. This closes the check-then-act race where two
+        # concurrent exchanges with the correct verifier could both
+        # pass the ``tokens_exchanged`` guard, both mint refresh
+        # tokens, and the second overwrite the first — handing the
+        # second caller a working refresh token while invalidating
+        # the first.
+        # Note: csrf_token_hash is NOT stored here (OAuth 2.1
+        # bootstrap pattern). The first /refresh call after page
+        # reload establishes the CSRF binding.
+        claimed = users_session_crud.claim_session_for_token_exchange(
             session_id,
             password_hasher.hash_password(refresh_token),
             db,
         )
+        if not claimed:
+            core_logger.print_to_log(
+                f"Token exchange lost race for session {session_id[:8]}...",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tokens already exchanged for this session",
+            )
 
         # Determine client_type from the exchange request headers.
         # The stored oauth_state.client_type is unreliable for system
@@ -496,7 +525,7 @@ async def exchange_tokens_for_session(
         # the actual token-exchange call — which *is* made by the
         # native app and will carry X-Client-Type: mobile.
         client_type = request.headers.get(
-            "X-Client-Type", oauth_state.client_type or "web"
+            "X-Client-Type", stored_client_type or "web"
         )
         if client_type not in ("web", "mobile"):
             client_type = "web"
@@ -515,8 +544,10 @@ async def exchange_tokens_for_session(
                 samesite="strict",
             )
 
-        # Mark tokens as exchanged to prevent replay attacks
-        users_session_crud.mark_tokens_exchanged(session_id, db)
+        # Note: tokens_exchanged was flipped atomically together
+        # with the refresh-token hash above, so no second write is
+        # needed here. The atomic claim also detached the OAuth
+        # state row for cleanup.
 
         core_logger.print_to_log(
             f"Token exchange successful for session {session_id[:8]}... (user={user.username}, client_type={client_type})",

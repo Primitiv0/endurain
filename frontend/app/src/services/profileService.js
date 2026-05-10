@@ -65,8 +65,8 @@ export const profile = {
   getBackupCodeStatus() {
     return fetchGetRequest('profile/mfa/backup-codes/status')
   },
-  regenerateBackupCodes() {
-    return fetchPostRequest('profile/mfa/backup-codes', {})
+  regenerateBackupCodes(data) {
+    return fetchPostRequest('profile/mfa/backup-codes', data)
   },
   getMyIdentityProviders() {
     return fetchGetRequest('profile/idp')

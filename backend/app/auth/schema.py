@@ -70,7 +70,8 @@ class MobileSessionResponse(BaseModel):
 
     This response is returned when a mobile client authenticates using the PKCE
     (Proof Key for Exchange) secure pattern. Instead of returning tokens directly,
-    a session_id is returned for secure token exchange via POST /session/{session_id}/tokens.
+    a session_id is returned for secure token exchange via
+    POST /public/idp/session/{session_id}/tokens.
 
     Attributes:
         session_id: Session identifier for token exchange. Client must send this
@@ -84,7 +85,8 @@ class MobileSessionResponse(BaseModel):
     session_id: StrictStr
     mfa_required: StrictBool = False
     message: StrictStr = (
-        "Complete authentication by exchanging tokens at /session/{session_id}/tokens"
+        "Complete authentication by exchanging tokens at "
+        "/public/idp/session/{session_id}/tokens"
     )
 
 

@@ -559,8 +559,20 @@ class ImportService:
             extension = photo_path.split(".")[-1]
             user_profile["photo_path"] = f"data/user_images/{self.user_id}.{extension}"
 
-        user = users_schema.UsersRead(**user_profile)
-        await users_crud.edit_user(self.user_id, user, self.db)
+        # Strict allow-list before persistence: profile import is a
+        # self-service operation and MUST NOT be a back door for
+        # privilege escalation. Even if the source ZIP was crafted
+        # to set ``access_type``, ``active``, ``mfa_enabled``,
+        # ``mfa_secret``, ``email_verified``, or
+        # ``pending_admin_approval``, those fields are dropped here
+        # before reaching the database.
+        sanitized = {
+            key: value
+            for key, value in user_profile.items()
+            if key in users_crud.PROFILE_SELF_SERVICE_FIELDS
+        }
+        profile_payload = users_schema.ProfileUpdate.model_validate(sanitized)
+        await users_crud.edit_profile_user(self.user_id, profile_payload, self.db)
         self.counts["user"] += 1
 
         # Import user-related settings

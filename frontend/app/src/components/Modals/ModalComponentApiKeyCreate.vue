@@ -73,6 +73,51 @@
               />
             </div>
 
+            <!-- Current password (step-up verification) -->
+            <div v-if="requirePassword" class="mb-3">
+              <label :for="`${modalId}CurrentPassword`" class="form-label">
+                <b>* {{ currentPasswordLabel }}</b>
+              </label>
+              <div class="position-relative">
+                <input
+                  :id="`${modalId}CurrentPassword`"
+                  v-model="form.current_password"
+                  :type="showPassword ? 'text' : 'password'"
+                  class="form-control"
+                  :placeholder="currentPasswordLabel"
+                  autocomplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  class="btn position-absolute top-50 end-0 translate-middle-y"
+                  @click="togglePasswordVisibility"
+                  :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                >
+                  <font-awesome-icon
+                    :icon="showPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <!-- MFA code (step-up verification, when MFA is enabled) -->
+            <div v-if="mfaEnabled" class="mb-3">
+              <label :for="`${modalId}MfaCode`" class="form-label">
+                <b>* {{ mfaCodeLabel }}</b>
+              </label>
+              <input
+                :id="`${modalId}MfaCode`"
+                v-model="form.mfa_code"
+                type="text"
+                class="form-control"
+                :placeholder="mfaCodeLabel"
+                autocomplete="one-time-code"
+                required
+              />
+              <small v-if="mfaCodeHint" class="form-text text-muted">{{ mfaCodeHint }}</small>
+            </div>
+
             <p>* {{ requiredFieldText }}</p>
           </div>
           <div class="modal-footer">
@@ -129,6 +174,26 @@ const props = defineProps({
     type: String,
     required: true
   },
+  currentPasswordLabel: {
+    type: String,
+    default: ''
+  },
+  mfaCodeLabel: {
+    type: String,
+    default: ''
+  },
+  mfaCodeHint: {
+    type: String,
+    default: ''
+  },
+  requirePassword: {
+    type: Boolean,
+    default: true
+  },
+  mfaEnabled: {
+    type: Boolean,
+    default: false
+  },
   requiredFieldText: {
     type: String,
     required: true
@@ -148,7 +213,13 @@ const props = defineProps({
 })
 
 const emit = defineEmits<{
-  submitAction: [{ name: string; scopes: string[]; expires_at: string | null }]
+  submitAction: [{
+    name: string
+    scopes: string[]
+    expires_at: string | null
+    current_password: string | null
+    mfa_code: string | null
+  }]
 }>()
 
 const { initializeModal, showModal, hideModal, disposeModal } = useBootstrapModal()
@@ -160,8 +231,16 @@ const availableScopes = [{ value: 'activities:upload' }]
 const form = ref({
   name: '',
   scopes: [] as string[],
-  expires_at: ''
+  expires_at: '',
+  current_password: '',
+  mfa_code: ''
 })
+
+const showPassword = ref(false)
+
+const togglePasswordVisibility = (): void => {
+  showPassword.value = !showPassword.value
+}
 
 const minDate = computed(() => {
   const tomorrow = new Date()
@@ -170,7 +249,11 @@ const minDate = computed(() => {
 })
 
 const isFormValid = computed(() => {
-  return form.value.name.trim().length > 0 && form.value.scopes.length > 0
+  if (form.value.name.trim().length === 0) return false
+  if (form.value.scopes.length === 0) return false
+  if (props.requirePassword && form.value.current_password.length === 0) return false
+  if (props.mfaEnabled && form.value.mfa_code.length === 0) return false
+  return true
 })
 
 /**
@@ -179,7 +262,14 @@ const isFormValid = computed(() => {
  * @returns void
  */
 const resetForm = (): void => {
-  form.value = { name: '', scopes: [], expires_at: '' }
+  form.value = {
+    name: '',
+    scopes: [],
+    expires_at: '',
+    current_password: '',
+    mfa_code: ''
+  }
+  showPassword.value = false
 }
 
 /**
@@ -210,7 +300,9 @@ const handleSubmit = (): void => {
   emit('submitAction', {
     name: form.value.name.trim(),
     scopes: form.value.scopes,
-    expires_at: form.value.expires_at || null
+    expires_at: form.value.expires_at || null,
+    current_password: props.requirePassword ? form.value.current_password : null,
+    mfa_code: props.mfaEnabled ? form.value.mfa_code : null
   })
 }
 

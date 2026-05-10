@@ -17,11 +17,20 @@ class UsersApiKeyCreate(BaseModel):
     """
     Schema for creating a new API key.
 
+    API-key creation is a sensitive, persistent grant of
+    account access — it must be gated by step-up
+    verification. The caller MUST supply ``current_password``,
+    and an MFA code when MFA is enabled on the account.
+
     Attributes:
         name: User-friendly label for the key.
         scopes: List of scope strings to grant.
         expires_at: Optional expiration datetime.
             None means the key never expires.
+        current_password: Caller's existing password
+            (step-up verification).
+        mfa_code: TOTP or backup code, required when MFA
+            is enabled on the account.
     """
 
     name: StrictStr = Field(
@@ -40,6 +49,17 @@ class UsersApiKeyCreate(BaseModel):
         description=(
             "Optional expiration datetime. " "None means the key never expires."
         ),
+    )
+    current_password: StrictStr = Field(
+        ...,
+        min_length=1,
+        max_length=250,
+        description="Current password (step-up verification)",
+    )
+    mfa_code: StrictStr | None = Field(
+        default=None,
+        max_length=32,
+        description="TOTP or backup code, required when MFA is enabled",
     )
 
     @field_validator("scopes")

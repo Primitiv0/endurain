@@ -398,7 +398,7 @@ async def approve_user(
 async def edit_user_password(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
-    user_attributes: users_schema.UsersEditPassword,
+    user_attributes: users_schema.UsersAdminEditPassword,
     _check_scope: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["users:write"])
     ],

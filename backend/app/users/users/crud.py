@@ -392,6 +392,15 @@ async def edit_user(
     """
     Update an existing user's information.
 
+    Note:
+        This dynamic-assignment helper is intended for **admin**
+        endpoints that legitimately need to set fields like
+        ``access_type``, ``active``, or ``pending_admin_approval``.
+        Self-service profile updates MUST NOT call this — use
+        :func:`edit_profile_user` instead, which enforces an
+        explicit allow-list and prevents privilege escalation
+        through mass assignment.
+
     Args:
         user_id: ID of user to update.
         user: User data to update with.
@@ -444,6 +453,115 @@ async def edit_user(
         db.rollback()
 
         # Raise an HTTPException with a 409 Conflict status code
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=("Duplicate entry error. Check if email and username are unique"),
+        ) from integrity_error
+
+
+# Allow-list of fields a user is permitted to change on their own
+# account via the self-service profile endpoint. Any field not in
+# this set is silently dropped before persistence to prevent
+# privilege escalation through mass assignment (e.g. setting
+# ``access_type`` to ``admin`` on the caller's own row).
+PROFILE_SELF_SERVICE_FIELDS: frozenset[str] = frozenset(
+    {
+        "name",
+        "username",
+        "email",
+        "city",
+        "birthdate",
+        "preferred_language",
+        "gender",
+        "units",
+        "height",
+        "max_heart_rate",
+        "first_day_of_week",
+        "currency",
+        "photo_path",
+    }
+)
+
+
+@core_decorators.handle_db_errors
+async def edit_profile_user(
+    user_id: int,
+    profile: users_schema.ProfileUpdate,
+    db: Session,
+) -> users_models.Users:
+    """
+    Apply a self-service profile update with strict allow-listing.
+
+    Only fields enumerated in :data:`PROFILE_SELF_SERVICE_FIELDS`
+    are persisted. Administrative attributes such as
+    ``access_type``, ``active``, ``mfa_enabled``, ``mfa_secret``,
+    ``email_verified``, and ``pending_admin_approval`` are NEVER
+    written from this path — even if a malicious payload smuggles
+    them through validation, they cannot reach the database here.
+
+    Args:
+        user_id: ID of the authenticated user invoking the update.
+        profile: Validated self-service profile payload.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The updated SQLAlchemy ``Users`` row.
+
+    Raises:
+        HTTPException: 404 if the user does not exist, 409 on
+            email/username uniqueness conflict, 500 on DB errors.
+    """
+    try:
+        db_user = users_utils.get_user_by_id_or_404(user_id, db)
+
+        height_before = db_user.height
+        previous_photo_path = db_user.photo_path
+
+        # exclude_unset means only fields the caller actually sent
+        # are considered. The intersection with the allow-list is
+        # the second line of defence.
+        provided = profile.model_dump(exclude_unset=True)
+        updates = {k: v for k, v in provided.items() if k in PROFILE_SELF_SERVICE_FIELDS}
+
+        if "username" in updates and isinstance(updates["username"], str):
+            updates["username"] = updates["username"].lower()
+        if "email" in updates and isinstance(updates["email"], str):
+            updates["email"] = updates["email"].lower()
+
+        # Constrain photo_path to the user's own image directory to
+        # prevent path-traversal or pointing at another user's
+        # photo via the profile update.
+        if "photo_path" in updates:
+            new_path = updates["photo_path"]
+            if new_path is not None and not new_path.startswith(
+                f"data/user_images/{user_id}."
+            ):
+                # Silently drop a tampered path rather than 400 —
+                # the legitimate upload flow sets this correctly.
+                updates.pop("photo_path")
+
+        # If the photo_path is being cleared or replaced, delete
+        # the on-disk file (matches legacy edit_user behaviour).
+        photo_changed = (
+            "photo_path" in updates and updates["photo_path"] != previous_photo_path
+        )
+        if photo_changed and previous_photo_path:
+            await users_utils.delete_user_photo_filesystem(db_user.id)
+
+        for key, value in updates.items():
+            setattr(db_user, key, value)
+
+        db.commit()
+        db.refresh(db_user)
+
+        if "height" in updates and height_before != db_user.height:
+            health_weight_utils.calculate_bmi_all_user_entries(db_user.id, db)
+
+        return db_user
+    except HTTPException:
+        raise
+    except IntegrityError as integrity_error:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=("Duplicate entry error. Check if email and username are unique"),

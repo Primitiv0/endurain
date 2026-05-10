@@ -47,6 +47,90 @@ def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
     return db_user
 
 
+def verify_step_up_credentials(
+    user_id: int,
+    current_password: str | None,
+    mfa_code: str | None,
+    password_hasher: auth_password_hasher.PasswordHasher,
+    db: Session,
+) -> None:
+    """
+    Enforce step-up verification for sensitive account operations.
+
+    A valid access token alone is not sufficient authorisation for
+    operations that grant persistent account access (password
+    change, API-key creation, MFA enrolment, MFA backup-code
+    regeneration, MFA disable, etc.). This helper requires the
+    caller to re-prove possession of the current password and —
+    when MFA is enabled — a fresh TOTP or backup code.
+
+    SSO-only accounts have no local password (``db_user.password``
+    is ``None`` or empty). For those callers the password factor
+    is skipped because there is nothing to verify against; this
+    is a known coverage gap that should eventually be closed by
+    requiring a fresh IdP re-authentication on the same set of
+    sensitive endpoints. Until that flow exists, SSO-only users
+    rely on the access-token check plus (when applicable) MFA.
+
+    Args:
+        user_id: ID of the authenticated user.
+        current_password: The user's current password as supplied
+            in the request body. May be ``None`` for SSO-only
+            accounts; ignored when the account has no local
+            password.
+        mfa_code: TOTP or backup code, required when MFA is
+            enabled. Ignored when MFA is disabled.
+        password_hasher: Password hasher dependency.
+        db: SQLAlchemy database session.
+
+    Raises:
+        HTTPException: 401 if the current password is wrong, is
+            missing for an account that has one, or when MFA is
+            enabled and the supplied code is missing or invalid.
+            The error message intentionally does not distinguish
+            the failure modes.
+    """
+    # Local import to avoid a circular dependency between
+    # users.users.utils and profile.utils (which imports
+    # users.users.crud at module load time).
+    import profile.utils as profile_utils
+
+    db_user = get_user_by_id_or_404(user_id, db)
+
+    has_local_password = bool(db_user.password)
+    if has_local_password:
+        if not current_password:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Step-up verification failed",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not password_hasher.verify(current_password, db_user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Step-up verification failed",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    # else: SSO-only account; no password to verify. See docstring
+    # for the known coverage gap and planned IdP re-auth flow.
+
+    if profile_utils.is_mfa_enabled_for_user(user_id, db):
+        if not mfa_code:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="MFA code required for this operation",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not profile_utils.verify_user_mfa(
+            user_id, mfa_code, password_hasher, db
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Step-up verification failed",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+
 def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
     """
     Retrieve all admin users from database or raise 404 error.
