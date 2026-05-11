@@ -240,6 +240,7 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         Methods:
             add_pending_login(username, user_id):
             get_pending_login(username):
+            claim_pending_login(username):
             delete_pending_login(username):
             has_pending_login(username):
             clear_all():
@@ -278,6 +279,18 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
             """
             return self._store.get(username)
 
+        def claim_pending_login(self, username: str):
+            """
+            Retrieve and remove the pending login information for a username.
+
+            Args:
+                username (str): The username to claim.
+
+            Returns:
+                Any: The pending login information, or None if not found.
+            """
+            return self._store.pop(username, None)
+
         def delete_pending_login(self, username: str):
             """
             Removes the pending login entry for the specified username from the internal store.
@@ -309,6 +322,25 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
             """
             self._store.clear()
             self.calls.clear()
+
+        def clear_for_user(self, user_id: int) -> int:
+            """
+            Remove pending login entries for the given user ID.
+
+            Args:
+                user_id (int): The user ID to remove pending logins for.
+
+            Returns:
+                int: Number of entries removed.
+            """
+            matching = [
+                username
+                for username, entry_user_id in self._store.items()
+                if entry_user_id == user_id
+            ]
+            for username in matching:
+                del self._store[username]
+            return len(matching)
 
     fake_store = FakePendingMFAStore()
     app.state.fake_store = fake_store

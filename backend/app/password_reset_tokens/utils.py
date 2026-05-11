@@ -20,6 +20,7 @@ import users.users.crud as users_crud
 import users.users_sessions.crud as users_sessions_crud
 
 import auth.password_hasher as auth_password_hasher
+import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
 import core.logger as core_logger
@@ -161,6 +162,10 @@ def use_password_reset_token(
 
     # Revoke all existing refresh-token sessions for the user.
     users_sessions_crud.delete_sessions_by_user(db_token.user_id, db)
+
+    # Drop any in-flight pending-MFA login that was started with the
+    # now-rotated password.
+    auth_security_stores.clear_pending_mfa_for_user(db_token.user_id)
 
 
 def delete_invalid_tokens_from_db() -> None:

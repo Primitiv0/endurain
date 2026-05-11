@@ -20,6 +20,7 @@ import auth.constants as auth_constants
 import auth.password_hasher as auth_password_hasher
 import auth.token_manager as auth_token_manager
 import auth.schema as auth_schema
+import auth.security_stores as auth_security_stores
 
 import auth.identity_providers.utils as idp_utils
 
@@ -42,6 +43,32 @@ import core.rate_limit as core_rate_limit
 router = APIRouter()
 
 
+def _raise_auth_security_store_unavailable(
+    err: auth_security_stores.AuthSecurityStoreUnavailable,
+) -> None:
+    """
+    Return a controlled response when auth security storage is down.
+
+    Args:
+        err: Auth security storage outage.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: Always raised with a 503 status.
+    """
+    core_logger.print_to_log(
+        "Auth security storage unavailable during authentication",
+        "error",
+        exc=err,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Authentication temporarily unavailable",
+    ) from err
+
+
 @router.post(
     "/login",
     response_model=(
@@ -58,11 +85,12 @@ async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
     failed_attempts: Annotated[
-        auth_schema.FailedLoginAttempts,
-        Depends(auth_schema.get_failed_login_attempts),
+        auth_security_stores.FailedLoginStore,
+        Depends(auth_security_stores.get_failed_login_attempts),
     ],
     pending_mfa_store: Annotated[
-        auth_schema.PendingMFALogin, Depends(auth_schema.get_pending_mfa_store)
+        auth_security_stores.PendingMFAStore,
+        Depends(auth_security_stores.get_pending_mfa_store),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -123,16 +151,23 @@ async def login_for_access_token(
         HTTPException: If authentication fails, user is inactive, or account is locked
     """
     # Check if username is locked out from too many failed login attempts
-    if failed_attempts.is_locked_out(form_data.username):
-        lockout_until = failed_attempts.get_lockout_time(form_data.username)
-        if lockout_until:
-            seconds_remaining = int(
-                (lockout_until - datetime.now(timezone.utc)).total_seconds()
+    try:
+        if failed_attempts.is_locked_out(form_data.username):
+            lockout_until = failed_attempts.get_lockout_time(
+                form_data.username
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Account locked due to too many failed login attempts. Try again in {seconds_remaining} seconds.",
-            )
+            if lockout_until:
+                seconds_remaining = int(
+                    (
+                        lockout_until - datetime.now(timezone.utc)
+                    ).total_seconds()
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Account locked due to too many failed login attempts. Try again in {seconds_remaining} seconds.",
+                )
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Authenticate user
     try:
@@ -142,7 +177,12 @@ async def login_for_access_token(
     except HTTPException as err:
         # Record failed attempt on authentication errors (401 Unauthorized)
         if err.status_code == 401:
-            failed_attempts.record_failed_attempt(form_data.username)
+            try:
+                failed_attempts.record_failed_attempt(form_data.username)
+            except (
+                auth_security_stores.AuthSecurityStoreUnavailable
+            ) as store_err:
+                _raise_auth_security_store_unavailable(store_err)
         raise err
 
     # Check if the user is active
@@ -151,7 +191,10 @@ async def login_for_access_token(
     # Check if MFA is enabled for this user
     if profile_utils.is_mfa_enabled_for_user(user.id, db):
         # Store the user for pending MFA verification
-        pending_mfa_store.add_pending_login(form_data.username, user.id)
+        try:
+            pending_mfa_store.add_pending_login(form_data.username, user.id)
+        except auth_security_stores.AuthSecurityStoreUnavailable as err:
+            _raise_auth_security_store_unavailable(err)
 
         # Don't reset failed login attempts yet - wait for MFA verification
         # This prevents bypassing lockout by triggering MFA flow
@@ -173,7 +216,10 @@ async def login_for_access_token(
 
     # Password authentication successful and no MFA required
     # Reset failed login attempts counter
-    failed_attempts.reset_attempts(form_data.username)
+    try:
+        failed_attempts.reset_attempts(form_data.username)
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Mobile clients with PKCE use secure token exchange flow
     # Web clients don't need PKCE - they have httpOnly cookies and same-origin protection
@@ -210,11 +256,12 @@ async def verify_mfa_and_login(
     mfa_request: auth_schema.MFALoginRequest,
     client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
     failed_attempts: Annotated[
-        auth_schema.FailedLoginAttempts,
-        Depends(auth_schema.get_failed_login_attempts),
+        auth_security_stores.FailedLoginStore,
+        Depends(auth_security_stores.get_failed_login_attempts),
     ],
     pending_mfa_store: Annotated[
-        auth_schema.PendingMFALogin, Depends(auth_schema.get_pending_mfa_store)
+        auth_security_stores.PendingMFAStore,
+        Depends(auth_security_stores.get_pending_mfa_store),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -262,20 +309,34 @@ async def verify_mfa_and_login(
     Raises:
         HTTPException: If no pending login found, MFA code is invalid, or user not found
     """
+    username_log_id = auth_security_stores.username_log_identifier(
+        mfa_request.username
+    )
+
     # Check if user is locked out from too many failed attempts
-    if pending_mfa_store.is_locked_out(mfa_request.username):
-        lockout_until = pending_mfa_store.get_lockout_time(mfa_request.username)
-        if lockout_until:
-            seconds_remaining = int(
-                (lockout_until - datetime.now(timezone.utc)).total_seconds()
+    try:
+        if pending_mfa_store.is_locked_out(mfa_request.username):
+            lockout_until = pending_mfa_store.get_lockout_time(
+                mfa_request.username
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many failed MFA attempts. Account locked for {seconds_remaining} seconds.",
-            )
+            if lockout_until:
+                seconds_remaining = int(
+                    (
+                        lockout_until - datetime.now(timezone.utc)
+                    ).total_seconds()
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Too many failed MFA attempts. Account locked for {seconds_remaining} seconds.",
+                )
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Check if there's a pending MFA login for this username
-    user_id = pending_mfa_store.get_pending_login(mfa_request.username)
+    try:
+        user_id = pending_mfa_store.get_pending_login(mfa_request.username)
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
     if not user_id:
         # Run a dummy Argon2 verify so the wall-clock latency of the
         # "no pending MFA login" branch matches the "pending login,
@@ -284,7 +345,8 @@ async def verify_mfa_and_login(
         # which usernames are mid-login by measuring response time.
         password_hasher.dummy_verify()
         core_logger.print_to_log(
-            f"No pending MFA login found for username {mfa_request.username}", "warning"
+            f"No pending MFA login found for {username_log_id}",
+            "warning",
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -296,21 +358,42 @@ async def verify_mfa_and_login(
         user_id, mfa_request.mfa_code, password_hasher, db
     ):
         # Record failed attempt and apply lockout if threshold exceeded
-        failed_count = pending_mfa_store.record_failed_attempt(mfa_request.username)
+        try:
+            failed_count = pending_mfa_store.record_failed_attempt(
+                mfa_request.username
+            )
+        except auth_security_stores.AuthSecurityStoreUnavailable as err:
+            _raise_auth_security_store_unavailable(err)
         core_logger.print_to_log(
-            f"Invalid MFA code for {mfa_request.username}. Failed attempts: {failed_count}",
+            f"Invalid MFA code for {username_log_id}. "
+            f"Failed attempts: {failed_count}",
             "warning",
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid MFA code, backup code or backup code already used. Failed attempts: {failed_count}.",
+            detail="Invalid MFA code, backup code or backup code already used.",
+        )
+
+    try:
+        claimed_user_id = pending_mfa_store.claim_pending_login(
+            mfa_request.username
+        )
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
+    if claimed_user_id != user_id:
+        core_logger.print_to_log(
+            f"Pending MFA login for {username_log_id} was missing "
+            "or already claimed",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pending MFA login found for this username",
         )
 
     # Get the user and complete login
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        pending_mfa_store.delete_pending_login(mfa_request.username)
-
         core_logger.print_to_log(
             f"User ID {user_id} not found during MFA verification", "warning"
         )
@@ -324,11 +407,11 @@ async def verify_mfa_and_login(
     users_utils.check_user_is_active(user)
 
     # MFA verification successful - reset both MFA and login failed attempts counters
-    pending_mfa_store.reset_failed_attempts(mfa_request.username)
-    failed_attempts.reset_attempts(mfa_request.username)
-
-    # Clean up pending login
-    pending_mfa_store.delete_pending_login(mfa_request.username)
+    try:
+        pending_mfa_store.reset_failed_attempts(mfa_request.username)
+        failed_attempts.reset_attempts(mfa_request.username)
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Mobile clients with PKCE use secure token exchange flow
     # Web clients don't need PKCE - they have httpOnly cookies and same-origin protection

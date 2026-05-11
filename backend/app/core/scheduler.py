@@ -23,7 +23,7 @@ from users.users_sessions.rotated_refresh_tokens import (
 )
 
 import auth.oauth_state.utils as oauth_state_utils
-import auth.schema as auth_schema
+import auth.security_stores as auth_security_stores
 
 import core.logger as core_logger
 
@@ -119,7 +119,7 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        auth_schema.cleanup_expired_pending_mfa_logins,
+        auth_security_stores.cleanup_expired_pending_mfa_logins,
         "interval",
         5,
         [],

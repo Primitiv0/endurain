@@ -16,6 +16,7 @@ import users.users_identity_providers.crud as user_idp_crud
 import sign_up_tokens.utils as sign_up_tokens_utils
 import auth.security as auth_security
 import auth.password_hasher as auth_password_hasher
+import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
 import core.database as core_database
@@ -430,6 +431,7 @@ async def edit_user_password(
         user_id, user_attributes.password, password_hasher, db
     )
     users_sessions_crud.delete_sessions_by_user(user_id, db)
+    auth_security_stores.clear_pending_mfa_for_user(user_id)
 
     # Return success message
     return {"message": f"User ID {user_id} password updated successfully"}

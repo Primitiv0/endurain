@@ -34,6 +34,7 @@ import users.users_identity_providers.schema as user_idp_schema
 import users.users_identity_providers.utils as user_idp_utils
 
 import auth.password_hasher as auth_password_hasher
+import auth.security_stores as auth_security_stores
 
 import auth.identity_providers.crud as idp_crud
 import auth.idp_link_tokens.utils as idp_link_token_utils
@@ -456,6 +457,8 @@ async def edit_profile_password(
     users_crud.edit_user_password(
         token_user_id, user_attributtes.password, password_hasher, db
     )
+
+    auth_security_stores.clear_pending_mfa_for_user(token_user_id)
 
     core_logger.print_to_log(
         f"User {token_user_id} changed password (step-up verified)", "info"

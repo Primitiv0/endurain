@@ -48,6 +48,7 @@ dependencies = [
     "bleach>=6.3.0",
     "aiofiles>=25.1.0",
     "staticmap>=0.5.7",
+    "redis>=7.4.0",
 ]
 
 [dependency-groups]

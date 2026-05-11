@@ -50,6 +50,22 @@ SUPPORTED_FILE_FORMATS = [
 ]  # used to screen bulk import files
 
 
+def _is_memory_storage_uri(storage_uri: str) -> bool:
+    """
+    Check whether a storage URI selects process-local memory.
+
+    Args:
+        storage_uri: Storage URI from configuration.
+
+    Returns:
+        True when the URI selects memory storage.
+
+    Raises:
+        None.
+    """
+    return storage_uri.strip().lower().startswith("memory://")
+
+
 # Settings — every value driven by an environment variable.
 class Settings(BaseSettings):
     """Environment-driven configuration values.
@@ -93,6 +109,7 @@ class Settings(BaseSettings):
     # --- Rate limiting ---
     RATE_LIMIT_ENABLED: bool = True
     RATE_LIMIT_STORAGE_URI: str = "memory://"
+    AUTH_SECURITY_STORAGE_URI: str | None = None
 
     # --- Reverse-geocoding providers ---
     REVERSE_GEO_PROVIDER: str = "nominatim"
@@ -109,9 +126,9 @@ class Settings(BaseSettings):
     # used by DB_PASSWORD / SECRET_KEY / FERNET_KEY and is
     # never materialised into Settings (kept out of any
     # accidental ``settings.dict()`` dump).
-    SMTP_HOST: str = ""
+    SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
-    SMTP_USERNAME: str = ""
+    SMTP_USERNAME: str | None = None
     SMTP_SECURE: bool = True
     SMTP_SECURE_TYPE: str = "starttls"
 
@@ -206,6 +223,36 @@ class Settings(BaseSettings):
             and "TRUSTED_PROXIES" not in os.environ
         ):
             self.TRUSTED_PROXIES = ["*"]
+        return self
+
+    @model_validator(mode="after")
+    def _warn_on_memory_security_storage(self) -> Self:
+        """Warn when production-like auth protections are process-local."""
+        if self.ENVIRONMENT == "development":
+            return self
+
+        if self.RATE_LIMIT_ENABLED and _is_memory_storage_uri(
+            self.RATE_LIMIT_STORAGE_URI
+        ):
+            core_logger.print_to_log_and_console(
+                "RATE_LIMIT_STORAGE_URI uses process-local memory outside "
+                "development. API rate-limit counters are not shared "
+                "across workers; use Redis for multi-worker deployments.",
+                "warning",
+            )
+
+        auth_security_storage_uri = (
+            self.AUTH_SECURITY_STORAGE_URI or self.RATE_LIMIT_STORAGE_URI
+        )
+        if _is_memory_storage_uri(auth_security_storage_uri):
+            core_logger.print_to_log_and_console(
+                "AUTH_SECURITY_STORAGE_URI resolves to process-local "
+                "memory outside development. Login lockout and pending "
+                "MFA state are not shared across workers; use Redis for "
+                "multi-worker deployments.",
+                "warning",
+            )
+
         return self
 
 

@@ -9,6 +9,8 @@ services:
       - SECRET_KEY=~changeme # openssl rand -hex 32
       - FERNET_KEY=changeme # https://fernetkeygen.com or python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
       - ENDURAIN_HOST=http://localhost:8080 # host or local ip (example: http://192.168.1.10:8080 or https://endurain.com), default is http://localhost:8080
+      - RATE_LIMIT_STORAGE_URI=redis://redis:6379/0
+      - AUTH_SECURITY_STORAGE_URI=redis://redis:6379/0
     volumes:
     #  - <local_path>/endurain/backend/app:/app/backend # Configure volume if you want to edit the code locally by cloning the repo
       - <local_path>/endurain/backend/data:/app/backend/data # necessary for activity files, user images and server images persistence on container image updates
@@ -17,6 +19,8 @@ services:
       - "8080:8080" # Endurain port, change per your needs
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       jaeger: {} # optional
     restart: unless-stopped
@@ -36,7 +40,21 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - <local_path>/postgres:/var/lib/postgresql
+      - <local_path>/endurain/postgres:/var/lib/postgresql
+    restart: unless-stopped
+
+  # redis for rate-limiting and auth security storage
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - <local_path>/endurain/redis:/data
     restart: unless-stopped
 
   # Jaeger for opentelemetry - optional

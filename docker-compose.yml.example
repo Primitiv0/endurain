@@ -13,6 +13,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
    # postgres logic
@@ -28,4 +30,18 @@ services:
       retries: 5
     volumes:
       - <local_path>/endurain/postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # redis for rate-limiting and auth security storage
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - <local_path>/endurain/redis:/data
     restart: unless-stopped

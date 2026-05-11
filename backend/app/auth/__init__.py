@@ -2,8 +2,7 @@
 
 Provides the FastAPI router, JWT token issuance and validation,
 password hashing, scope enforcement, API-key validation, and the
-in-memory progressive-lockout stores used during login and MFA
-verification.
+progressive-lockout stores used during login and MFA verification.
 
 Persistence-bearing concerns (identity providers, IdP link tokens,
 MFA backup codes, OAuth state) live in dedicated sub-packages and
@@ -25,9 +24,11 @@ Exports:
       ``MFARequiredResponse``, ``MobileSessionResponse``,
       ``TokenResponseWeb``, ``TokenResponseMobile``,
       ``LogoutResponse``
-    - Stores: ``PendingMFALogin``, ``FailedLoginAttempts``,
+    - Stores: ``PendingMFALogin``, ``RedisPendingMFALogin``,
+      ``FailedLoginAttempts``, ``RedisFailedLoginAttempts``,
       ``get_pending_mfa_store``, ``get_failed_login_attempts``,
-      ``cleanup_expired_pending_mfa_logins``
+      ``cleanup_expired_pending_mfa_logins``,
+      ``clear_pending_mfa_for_user``
     - Helpers: ``authenticate_user``, ``complete_login``,
       ``create_tokens``, ``create_mobile_pkce_session_response``
 """
@@ -38,16 +39,22 @@ from .password_hasher import (
     get_password_hasher,
 )
 from .schema import (
-    FailedLoginAttempts,
     LoginRequest,
     LogoutResponse,
     MFALoginRequest,
     MFARequiredResponse,
     MobileSessionResponse,
-    PendingMFALogin,
     TokenResponseMobile,
     TokenResponseWeb,
+)
+from .security_stores import (
+    FailedLoginAttempts,
+    PendingMFALogin,
+    RedisFailedLoginAttempts,
+    RedisPendingMFALogin,
     cleanup_expired_pending_mfa_logins,
+    clear_pending_mfa_for_user,
+    create_auth_security_stores,
     get_failed_login_attempts,
     get_pending_mfa_store,
 )
@@ -107,12 +114,16 @@ __all__ = [
     "TokenResponseWeb",
     "TokenResponseMobile",
     "LogoutResponse",
-    # In-memory stores / lockout
+    # Auth security stores / lockout
     "PendingMFALogin",
+    "RedisPendingMFALogin",
     "FailedLoginAttempts",
+    "RedisFailedLoginAttempts",
+    "create_auth_security_stores",
     "get_pending_mfa_store",
     "get_failed_login_attempts",
     "cleanup_expired_pending_mfa_logins",
+    "clear_pending_mfa_for_user",
     # Helpers
     "authenticate_user",
     "complete_login",
