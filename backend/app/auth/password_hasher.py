@@ -155,6 +155,35 @@ class PasswordHasher:
         """
         return self._password_hash.verify_and_update(plain_password, hashed_password)
 
+    def dummy_verify(self) -> None:
+        """Run a constant-time-equivalent password verify against a dummy hash.
+
+        Used by the login and MFA-verify endpoints on the "username/user
+        not found" branch to equalise wall-clock latency with the
+        "found, wrong password" branch. Without this, an unauthenticated
+        attacker can enumerate valid usernames by measuring response
+        time, because Argon2 is deliberately tuned to hundreds of
+        milliseconds and a fast bail-out on the not-found branch is
+        trivially distinguishable from a real verify.
+
+        The dummy hash is generated lazily once per process from a
+        random throwaway password so that no real user's hash is reused
+        and the verify always returns ``False``.
+        """
+        # Lazily generate a dummy hash so cost is paid only on first
+        # call (typically during the first failed login attempt). We
+        # use a random throwaway password and discard it; what we keep
+        # is its hash, which we then verify a *different* random
+        # password against — the verify is guaranteed to return False
+        # but performs the full Argon2 work.
+        if not hasattr(self, "_dummy_hash"):
+            throwaway = secrets.token_urlsafe(32)
+            self._dummy_hash = self._password_hash.hash(throwaway)
+        # Verify a *different* random string so the result is always
+        # False; we ignore the return value — the call exists purely
+        # for its timing side effect.
+        self._password_hash.verify(secrets.token_urlsafe(32), self._dummy_hash)
+
     @staticmethod
     def generate_password(length: int = 8) -> str:
         """

@@ -277,6 +277,12 @@ async def verify_mfa_and_login(
     # Check if there's a pending MFA login for this username
     user_id = pending_mfa_store.get_pending_login(mfa_request.username)
     if not user_id:
+        # Run a dummy Argon2 verify so the wall-clock latency of the
+        # "no pending MFA login" branch matches the "pending login,
+        # wrong code" branch (where backup-code verification performs
+        # an Argon2 verify). Without this, an attacker could enumerate
+        # which usernames are mid-login by measuring response time.
+        password_hasher.dummy_verify()
         core_logger.print_to_log(
             f"No pending MFA login found for username {mfa_request.username}", "warning"
         )

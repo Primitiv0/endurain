@@ -60,6 +60,27 @@ def authenticate_user(
 
     # Check if the user exists and if the password is correct
     if not user:
+        # Run a dummy Argon2 verify so that the wall-clock latency of
+        # the "user not found" branch matches the "user found, wrong
+        # password" branch. Without this, Argon2's deliberately-tuned
+        # ~hundreds-of-milliseconds verify time is trivially observable
+        # from the network and lets an attacker enumerate valid
+        # usernames without ever tripping FailedLoginAttempts (lockout
+        # is only recorded on 401, which the attacker does not care
+        # about while probing existence).
+        password_hasher.dummy_verify()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unable to authenticate with provided credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # User has no local password (SSO-only account). Treat identically
+    # to "wrong password" so neither the response body nor the timing
+    # discloses the account's auth modality. The dummy verify keeps
+    # the latency consistent with a normal Argon2 verify.
+    if not user.password:
+        password_hasher.dummy_verify()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unable to authenticate with provided credentials",
