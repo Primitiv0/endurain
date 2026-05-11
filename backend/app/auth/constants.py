@@ -105,8 +105,8 @@ SCOPE_DICT: Final[dict[str, str]] = {
     "notifications:write": "Write privileges over notifications",
     "server_settings:read": "Read privileges over server settings",
     "server_settings:write": "Write privileges over server settings",
-    "idp:read": "Read privileges over identity providers",
-    "idp:write": "Write privileges over identity providers",
+    "identity_providers:read": "Read privileges over identity providers",
+    "identity_providers:write": "Write privileges over identity providers",
 }
 
 REGULAR_ACCESS_SCOPE: Final[tuple[str, ...]] = (
@@ -124,3 +124,23 @@ ADMIN_ACCESS_SCOPE: Final[tuple[str, ...]] = (
     + IDENTITY_PROVIDERS_ADMIN_SCOPE
     + SERVER_SETTINGS_ADMIN_SCOPE
 )
+
+# Startup invariant: every scope advertised in SCOPE_DICT (which feeds the
+# Swagger UI scope picker for OAuth2PasswordBearer) MUST be one that the
+# server actually mints into a token, and every scope minted into a token
+# MUST be advertised. A drift between the two surfaces means either:
+#   - The UI offers a scope that is never enforced (false sense of
+#     authorisation granularity — the original `idp:read`/`idp:write` bug).
+#   - A token carries a scope that the OpenAPI doc never describes
+#     (silent privilege, harder to audit).
+# Failing fast at import keeps the two in lockstep.
+_ALL_MINTED_SCOPES: Final[frozenset[str]] = frozenset(ADMIN_ACCESS_SCOPE)
+_ADVERTISED_SCOPES: Final[frozenset[str]] = frozenset(SCOPE_DICT)
+_unadvertised = _ALL_MINTED_SCOPES - _ADVERTISED_SCOPES
+_unminted = _ADVERTISED_SCOPES - _ALL_MINTED_SCOPES
+if _unadvertised or _unminted:
+    raise ValueError(
+        "SCOPE_DICT is out of sync with the scope tuples: "
+        f"minted-but-undeclared={sorted(_unadvertised)}, "
+        f"declared-but-never-minted={sorted(_unminted)}"
+    )
