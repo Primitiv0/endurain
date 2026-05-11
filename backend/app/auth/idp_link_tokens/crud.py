@@ -13,13 +13,13 @@ import core.logger as core_logger
 
 
 @core_decorators.handle_db_errors
-def get_idp_link_token_by_id(
-    token_id: str, db: Session
+def get_idp_link_token_by_hash(
+    token_hash: str, db: Session
 ) -> idp_link_token_models.IdpLinkToken | None:
-    """Retrieve an IdP link token by ID, validating it is not expired or used.
+    """Retrieve a valid IdP link token by token hash.
 
     Args:
-        token_id: The token ID to lookup.
+        token_hash: SHA-256 hash of the plaintext link token.
         db: SQLAlchemy database session.
 
     Returns:
@@ -30,7 +30,7 @@ def get_idp_link_token_by_id(
         HTTPException: 500 error if database query fails.
     """
     stmt = select(idp_link_token_models.IdpLinkToken).where(
-        idp_link_token_models.IdpLinkToken.id == token_id,
+        idp_link_token_models.IdpLinkToken.token_hash == token_hash,
         idp_link_token_models.IdpLinkToken.used.is_(False),
         idp_link_token_models.IdpLinkToken.expires_at
         > datetime.now(timezone.utc),
@@ -62,14 +62,14 @@ def create_idp_link_token(
 
 
 @core_decorators.handle_db_errors
-def mark_token_as_used(token_id: str, db: Session) -> bool:
+def mark_token_as_used(token_hash: str, db: Session) -> bool:
     """Atomically mark an unused, unexpired IdP link token as used.
 
     Performs a single conditional UPDATE so concurrent attempts to
     consume the same token cannot both succeed (replay protection).
 
     Args:
-        token_id: The token ID to mark as used.
+        token_hash: SHA-256 hash of the plaintext link token.
         db: SQLAlchemy database session.
 
     Returns:
@@ -82,7 +82,7 @@ def mark_token_as_used(token_id: str, db: Session) -> bool:
     stmt = (
         sa_update(idp_link_token_models.IdpLinkToken)
         .where(
-            idp_link_token_models.IdpLinkToken.id == token_id,
+            idp_link_token_models.IdpLinkToken.token_hash == token_hash,
             idp_link_token_models.IdpLinkToken.used.is_(False),
             idp_link_token_models.IdpLinkToken.expires_at
             > datetime.now(timezone.utc),
@@ -94,9 +94,7 @@ def mark_token_as_used(token_id: str, db: Session) -> bool:
 
     claimed = result.rowcount == 1
     if claimed:
-        core_logger.print_to_log(
-            f"IdP link token marked as used: {token_id[:8]}...", "debug"
-        )
+        core_logger.print_to_log("IdP link token marked as used", "debug")
     return claimed
 
 

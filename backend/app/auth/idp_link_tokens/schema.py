@@ -17,9 +17,15 @@ class IdpLinkTokenCreate(BaseModel):
 
     id: StrictStr = Field(
         ...,
-        min_length=32,
+        min_length=36,
+        max_length=36,
+        description="Random row ID",
+    )
+    token_hash: StrictStr = Field(
+        ...,
+        min_length=64,
         max_length=64,
-        description="Random token ID",
+        description="SHA-256 hash of the one-time link token",
     )
     user_id: StrictInt = Field(
         ...,

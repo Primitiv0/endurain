@@ -6,7 +6,7 @@ providers to existing user accounts.
 
 Exports:
     - CRUD: create_idp_link_token,
-      get_idp_link_token_by_id,
+            get_idp_link_token_by_hash,
       mark_token_as_used,
       delete_expired_tokens
     - Schemas: IdpLinkTokenCreate, IdpLinkTokenResponse
@@ -19,7 +19,7 @@ Exports:
 from .crud import (
     create_idp_link_token,
     delete_expired_tokens,
-    get_idp_link_token_by_id,
+    get_idp_link_token_by_hash,
     mark_token_as_used,
 )
 from .models import IdpLinkToken as IdpLinkTokenModel
@@ -28,13 +28,14 @@ from .utils import (
     TOKEN_EXPIRY_SECONDS,
     delete_idp_link_expired_tokens_from_db,
     generate_idp_link_token,
+    hash_idp_link_token,
 )
 
 __all__ = [
     # CRUD operations
     "create_idp_link_token",
     "delete_expired_tokens",
-    "get_idp_link_token_by_id",
+    "get_idp_link_token_by_hash",
     "mark_token_as_used",
     # Database model
     "IdpLinkTokenModel",
@@ -45,4 +46,5 @@ __all__ = [
     "TOKEN_EXPIRY_SECONDS",
     "delete_idp_link_expired_tokens_from_db",
     "generate_idp_link_token",
+    "hash_idp_link_token",
 ]

@@ -1,7 +1,9 @@
 """Utility helpers for IdP link token generation and cleanup."""
 
+import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,19 @@ import core.logger as core_logger
 
 # Token expiry duration in seconds
 TOKEN_EXPIRY_SECONDS = 60
+
+
+def hash_idp_link_token(token: str) -> str:
+    """
+    Hash an IdP link token for storage or lookup.
+
+    Args:
+        token: Plaintext link token.
+
+    Returns:
+        SHA-256 hexadecimal digest of the token.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def generate_idp_link_token(
@@ -31,8 +46,9 @@ def generate_idp_link_token(
     Returns:
         IdpLinkTokenResponse containing the token and expiration.
     """
-    # Generate random token
-    token_id = secrets.token_urlsafe(32)
+    # Generate random token and store only its hash.
+    token = secrets.token_urlsafe(32)
+    token_hash = hash_idp_link_token(token)
 
     # Calculate expiration
     created_at = datetime.now(timezone.utc)
@@ -40,7 +56,8 @@ def generate_idp_link_token(
 
     # Create token data
     token_data = idp_link_token_schema.IdpLinkTokenCreate(
-        id=token_id,
+        id=str(uuid4()),
+        token_hash=token_hash,
         user_id=user_id,
         idp_id=idp_id,
         created_at=created_at,
@@ -53,12 +70,13 @@ def generate_idp_link_token(
     db_token = idp_link_token_crud.create_idp_link_token(token_data, db)
 
     core_logger.print_to_log(
-        f"Generated IdP link token for user {user_id}, idp {idp_id} (expires in {TOKEN_EXPIRY_SECONDS}s)",
+        f"Generated IdP link token for user {user_id}, idp {idp_id} "
+        f"(expires in {TOKEN_EXPIRY_SECONDS}s)",
         "debug",
     )
 
     return idp_link_token_schema.IdpLinkTokenResponse(
-        token=db_token.id, expires_at=db_token.expires_at
+        token=token, expires_at=db_token.expires_at
     )
 
 

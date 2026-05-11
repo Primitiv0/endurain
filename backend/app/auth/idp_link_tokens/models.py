@@ -23,7 +23,8 @@ class IdpLinkToken(Base):
     IdP linking operations.
 
     Attributes:
-        id: Primary key, random token (secrets.token_urlsafe(32)).
+        id: Primary key, random UUID.
+        token_hash: SHA-256 hash of the plaintext link token.
         user_id: Foreign key to users - the user linking the IdP.
         idp_id: Foreign key to identity_providers - the IdP being linked.
         created_at: Token creation timestamp.
@@ -37,10 +38,18 @@ class IdpLinkToken(Base):
     __tablename__ = "idp_link_tokens"
 
     id: Mapped[str] = mapped_column(
-        String(64),
+        String(36),
         primary_key=True,
         index=True,
-        comment="One-time link token (secrets.token_urlsafe(32))",
+        comment="Opaque row identifier, not the link token",
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+        comment="SHA-256 hash of the one-time link token",
     )
 
     user_id: Mapped[int] = mapped_column(

@@ -22,6 +22,7 @@ import users.users_identity_providers.crud as user_idp_crud
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.service as idp_service
 import auth.idp_link_tokens.crud as idp_link_token_crud
+import auth.idp_link_tokens.utils as idp_link_token_utils
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.utils as oauth_state_utils
 
@@ -75,8 +76,11 @@ async def link_identity_provider(
             - 409 CONFLICT: If the identity provider is already linked to the user's account.
             - 500 INTERNAL_SERVER_ERROR: If an unexpected error occurs during the linking process.
     """
-    # Validate and retrieve link token
-    db_token = idp_link_token_crud.get_idp_link_token_by_id(link_token, db)
+    # Validate and retrieve link token by hash; plaintext is never stored.
+    link_token_hash = idp_link_token_utils.hash_idp_link_token(link_token)
+    db_token = idp_link_token_crud.get_idp_link_token_by_hash(
+        link_token_hash, db
+    )
     if not db_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -125,10 +129,10 @@ async def link_identity_provider(
     # Mark token as used atomically to prevent replay attacks. The conditional
     # UPDATE returns False if another concurrent request already claimed the
     # token (race) or if the row vanished/expired between fetch and claim.
-    if not idp_link_token_crud.mark_token_as_used(link_token, db):
+    if not idp_link_token_crud.mark_token_as_used(link_token_hash, db):
         core_logger.print_to_log(
             f"IdP link token replay/race rejected for user {token_user_id}: "
-            f"{link_token[:8]}...",
+            f"token row {db_token.id}",
             "warning",
         )
         raise HTTPException(

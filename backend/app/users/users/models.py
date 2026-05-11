@@ -6,8 +6,6 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
 
-import followers.models as followers_models
-
 if TYPE_CHECKING:
     from activities.activity.models import Activity
     from auth.mfa_backup_codes.models import MFABackupCode
@@ -251,12 +249,12 @@ class Users(Base):
     followers: Mapped[list["Follower"]] = relationship(
         back_populates="following",
         cascade="all, delete-orphan",
-        foreign_keys=[followers_models.Follower.following_id],
+        foreign_keys="Follower.following_id",
     )
     following: Mapped[list["Follower"]] = relationship(
         back_populates="follower",
         cascade="all, delete-orphan",
-        foreign_keys=[followers_models.Follower.follower_id],
+        foreign_keys="Follower.follower_id",
     )
     health_sleep: Mapped[list["HealthSleep"]] = relationship(
         back_populates="users",
