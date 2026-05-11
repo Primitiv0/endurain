@@ -72,6 +72,32 @@ import websocket.manager as websocket_manager
 router = APIRouter()
 
 
+def _raise_mfa_secret_store_unavailable(
+    err: profile_mfa_store.MFASecretStoreUnavailable,
+) -> None:
+    """
+    Return a controlled response when MFA setup storage is down.
+
+    Args:
+        err: MFA setup secret storage outage.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: Always raised with a 503 status.
+    """
+    core_logger.print_to_log(
+        "MFA setup secret storage unavailable",
+        "error",
+        exc=err,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="MFA setup temporarily unavailable",
+    ) from err
+
+
 @router.get("", status_code=status.HTTP_200_OK, response_model=users_schema.UsersMe)
 async def read_users_me(
     token_user_id: Annotated[
@@ -842,7 +868,7 @@ async def setup_mfa(
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
-        profile_mfa_store.MFASecretStore,
+        profile_mfa_store.MFASecretStoreBackend,
         Depends(profile_mfa_store.get_mfa_secret_store),
     ],
 ) -> profile_schema.MFASetupResponse:
@@ -860,7 +886,10 @@ async def setup_mfa(
     response = profile_utils.setup_user_mfa(token_user_id, db)
 
     # Store the secret temporarily for the enable step
-    mfa_secret_store.add_secret(token_user_id, response.secret)
+    try:
+        mfa_secret_store.add_secret(token_user_id, response.secret)
+    except profile_mfa_store.MFASecretStoreUnavailable as err:
+        _raise_mfa_secret_store_unavailable(err)
 
     return response
 
@@ -878,7 +907,7 @@ async def enable_mfa(
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
-        profile_mfa_store.MFASecretStore,
+        profile_mfa_store.MFASecretStoreBackend,
         Depends(profile_mfa_store.get_mfa_secret_store),
     ],
 ) -> dict:
@@ -926,7 +955,10 @@ async def enable_mfa(
     )
 
     # Get the secret from temporary storage
-    secret = mfa_secret_store.get_secret(token_user_id)
+    try:
+        secret = mfa_secret_store.get_secret(token_user_id)
+    except profile_mfa_store.MFASecretStoreUnavailable as err:
+        _raise_mfa_secret_store_unavailable(err)
     if not secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

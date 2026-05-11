@@ -248,8 +248,8 @@ class Settings(BaseSettings):
             core_logger.print_to_log_and_console(
                 "AUTH_SECURITY_STORAGE_URI resolves to process-local "
                 "memory outside development. Login lockout and pending "
-                "MFA state are not shared across workers; use Redis for "
-                "multi-worker deployments.",
+                "MFA state, including setup secrets, are not shared "
+                "across workers; use Redis for multi-worker deployments.",
                 "warning",
             )
 

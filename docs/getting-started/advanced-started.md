@@ -63,7 +63,7 @@ Table below shows supported environment variables. Variables marked with optiona
 | TRUSTED_PROXIES | "*" | Yes | Comma-separated list of trusted proxy IPs or CIDR ranges for correct client IP detection when `BEHIND_PROXY` is `true`. Defaults to `["*"]` (all proxies trusted) in development and `[]` in production and demo |
 | RATE_LIMIT_ENABLED | true | Yes | Enable or disable API rate limiting. Set to `false` to disable for development or testing. Accepted values are `true` and `false` |
 | RATE_LIMIT_STORAGE_URI | memory:// | Yes | Storage backend URI for rate limit counters. Use `memory://` for single-worker deployments or `redis://redis:6379/0` for multi-worker setups so all workers share counters. |
-| AUTH_SECURITY_STORAGE_URI | No default set | Yes | Storage backend URI for login lockout and pending MFA state. Defaults to `RATE_LIMIT_STORAGE_URI` when unset. Use `memory://` for single-worker deployments or Redis for shared multi-worker protection. |
+| AUTH_SECURITY_STORAGE_URI | No default set | Yes | Storage backend URI for auth security state, including login lockout, pending MFA login state, and temporary MFA setup secrets. Defaults to `RATE_LIMIT_STORAGE_URI` when unset. Use `memory://` for single-worker deployments or Redis for shared multi-worker protection. |
 
 Table below shows the obligatory environment variables for postgres container. You should set them based on what was also set for the Endurain container.
 
