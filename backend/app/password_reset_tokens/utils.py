@@ -17,6 +17,7 @@ import password_reset_tokens.schema as password_reset_tokens_schema
 import password_reset_tokens.crud as password_reset_tokens_crud
 
 import users.users.crud as users_crud
+import users.users_sessions.crud as users_sessions_crud
 
 import auth.password_hasher as auth_password_hasher
 
@@ -157,6 +158,9 @@ def use_password_reset_token(
 
     # Mark token as used
     password_reset_tokens_crud.mark_password_reset_token_used(db_token.id, db)
+
+    # Revoke all existing refresh-token sessions for the user.
+    users_sessions_crud.delete_sessions_by_user(db_token.user_id, db)
 
 
 def delete_invalid_tokens_from_db() -> None:

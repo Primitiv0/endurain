@@ -492,3 +492,30 @@ def delete_sessions_by_family(
     result = db.execute(stmt)
     db.commit()
     return result.rowcount
+
+
+@core_decorators.handle_db_errors
+def delete_sessions_by_user(
+    user_id: int,
+    db: Session,
+) -> int:
+    """
+    Delete all sessions for a user.
+
+    Args:
+        user_id: The ID of the user whose sessions should be
+            deleted.
+        db: SQLAlchemy database session.
+
+    Returns:
+        Number of sessions deleted.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    stmt = delete(users_session_models.UsersSessions).where(
+        users_session_models.UsersSessions.user_id == user_id
+    )
+    result = db.execute(stmt)
+    db.commit()
+    return result.rowcount

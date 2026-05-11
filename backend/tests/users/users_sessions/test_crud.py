@@ -560,3 +560,42 @@ class TestDeleteSessionsByFamily:
 
         # Assert
         assert result == 0
+
+
+class TestDeleteSessionsByUser:
+    """
+    Test suite for delete_sessions_by_user function.
+    """
+
+    def test_delete_sessions_by_user_success(self, mock_db):
+        """
+        Test successful deletion of all sessions for a user.
+        """
+        # Arrange
+        user_id = 1
+        mock_result = MagicMock()
+        mock_result.rowcount = 2
+        mock_db.execute.return_value = mock_result
+
+        # Act
+        result = users_session_crud.delete_sessions_by_user(user_id, mock_db)
+
+        # Assert
+        assert result == 2
+        mock_db.commit.assert_called_once()
+
+    def test_delete_sessions_by_user_none_deleted(self, mock_db):
+        """
+        Test when the user has no sessions.
+        """
+        # Arrange
+        user_id = 1
+        mock_result = MagicMock()
+        mock_result.rowcount = 0
+        mock_db.execute.return_value = mock_result
+
+        # Act
+        result = users_session_crud.delete_sessions_by_user(user_id, mock_db)
+
+        # Assert
+        assert result == 0
