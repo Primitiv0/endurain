@@ -7,10 +7,39 @@ per-username progressive lockout for login and MFA verification.
 
 from datetime import datetime, timedelta, timezone
 from typing import Literal
+from urllib.parse import unquote
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
 
 import core.logger as core_logger
+
+
+def normalize_username_key(username: str) -> str:
+    """Normalise a username for keying per-username security stores.
+
+    Lockout counters (`FailedLoginAttempts`, `PendingMFALogin`) MUST key on
+    the same canonical form regardless of casing, surrounding whitespace, or
+    URL-encoded variants supplied by the client. Without this, an attacker
+    can multiply their brute-force budget by submitting ``Alice``, ``alice``,
+    `` alice ``, ``%41lice`` and so on — each variant maintains an
+    independent failed-attempt counter and never trips the lockout.
+
+    Steps:
+      1. ``unquote`` — collapse percent-encoded variants (``%41`` → ``A``).
+      2. Translate ``+`` to space, mirroring the form-encoded handling in
+         the username-lookup CRUD so the two paths agree on whitespace.
+      3. ``strip`` — drop leading/trailing whitespace.
+      4. ``casefold`` — aggressive case-insensitive compare
+         (Unicode-aware; superset of ``lower``).
+
+    Args:
+        username: Raw username string from the request body / form.
+
+    Returns:
+        Canonical key suitable for use as a dictionary lookup in the
+        in-memory lockout stores.
+    """
+    return unquote(username).replace("+", " ").strip().casefold()
 
 
 class LoginRequest(BaseModel):
@@ -229,6 +258,7 @@ class PendingMFALogin:
             username: The username of the user to add.
             user_id: The unique identifier of the user.
         """
+        username = normalize_username_key(username)
         self._store[username] = (user_id, datetime.now(timezone.utc))
 
     def get_pending_login(self, username: str) -> int | None:
@@ -245,6 +275,7 @@ class PendingMFALogin:
             The user ID if a valid, non-expired entry exists,
             otherwise None.
         """
+        username = normalize_username_key(username)
         entry = self._store.get(username)
         if entry is None:
             return None
@@ -270,6 +301,7 @@ class PendingMFALogin:
         Args:
             username: The username whose entry should be deleted.
         """
+        username = normalize_username_key(username)
         if username in self._store:
             del self._store[username]
 
@@ -321,6 +353,7 @@ class PendingMFALogin:
         Returns:
             True if user is currently locked out, False otherwise
         """
+        username = normalize_username_key(username)
         if username not in self._failed_attempts:
             return False
 
@@ -346,6 +379,7 @@ class PendingMFALogin:
         Returns:
             Lockout expiry datetime if locked out, None otherwise
         """
+        username = normalize_username_key(username)
         if username not in self._failed_attempts:
             return None
 
@@ -372,6 +406,7 @@ class PendingMFALogin:
         """
         now = datetime.now(timezone.utc)
 
+        username = normalize_username_key(username)
         if username in self._failed_attempts:
             failed_count, lockout_until = self._failed_attempts[username]
             # If still locked out, don't increment counter
@@ -415,6 +450,7 @@ class PendingMFALogin:
         Args:
             username: Username to reset
         """
+        username = normalize_username_key(username)
         if username in self._failed_attempts:
             del self._failed_attempts[username]
 
@@ -484,6 +520,7 @@ class FailedLoginAttempts:
         Returns:
             True if username is currently locked out, False otherwise
         """
+        username = normalize_username_key(username)
         if username not in self._attempts:
             return False
 
@@ -509,6 +546,7 @@ class FailedLoginAttempts:
         Returns:
             Lockout expiry datetime if locked out, None otherwise
         """
+        username = normalize_username_key(username)
         if username not in self._attempts:
             return None
 
@@ -535,6 +573,7 @@ class FailedLoginAttempts:
         """
         now = datetime.now(timezone.utc)
 
+        username = normalize_username_key(username)
         if username in self._attempts:
             failed_count, lockout_until = self._attempts[username]
             # If still locked out, don't increment counter
@@ -578,6 +617,7 @@ class FailedLoginAttempts:
         Args:
             username: Username to reset
         """
+        username = normalize_username_key(username)
         if username in self._attempts:
             del self._attempts[username]
 
