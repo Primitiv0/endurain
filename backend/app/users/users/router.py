@@ -9,6 +9,7 @@ import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.dependencies as users_dependencies
 import users.users.utils as users_utils
+import users.users_sessions.crud as users_sessions_crud
 
 import users.users_identity_providers.crud as user_idp_crud
 
@@ -428,6 +429,7 @@ async def edit_user_password(
     users_crud.edit_user_password(
         user_id, user_attributes.password, password_hasher, db
     )
+    users_sessions_crud.delete_sessions_by_user(user_id, db)
 
     # Return success message
     return {"message": f"User ID {user_id} password updated successfully"}
