@@ -250,8 +250,21 @@ async def handle_callback(
                 detail="Invalid or expired OAuth state",
             )
 
-        # Mark state as used atomically (prevents replay attacks)
-        oauth_state_crud.mark_oauth_state_used(state, db)
+        # Mark state as used atomically (prevents replay attacks).
+        # Two concurrent callbacks can both reach this point with the same
+        # `oauth_state` row in memory; only the caller whose conditional UPDATE
+        # actually flips `used=False -> True` is allowed to continue. Losing
+        # races (replays, double-submits) abort here with a generic 400 so we
+        # do not leak whether the state existed but was already consumed.
+        if not oauth_state_crud.mark_oauth_state_used(state, db):
+            core_logger.print_to_log(
+                f"OAuth state replay/race rejected: {state[:8]}...",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired OAuth state",
+            )
 
         core_logger.print_to_log(
             f"OAuth callback received for state {state[:8]}... (client_type={oauth_state.client_type})",

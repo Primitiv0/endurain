@@ -122,8 +122,19 @@ async def link_identity_provider(
             detail=f"Identity provider {idp.name} is already linked to your account",
         )
 
-    # Mark token as used to prevent replay attacks
-    idp_link_token_crud.mark_token_as_used(link_token, db)
+    # Mark token as used atomically to prevent replay attacks. The conditional
+    # UPDATE returns False if another concurrent request already claimed the
+    # token (race) or if the row vanished/expired between fetch and claim.
+    if not idp_link_token_crud.mark_token_as_used(link_token, db):
+        core_logger.print_to_log(
+            f"IdP link token replay/race rejected for user {token_user_id}: "
+            f"{link_token[:8]}...",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired link token",
+        )
 
     # Create database-backed OAuth state for link mode
     state, nonce = oauth_state_utils.create_state_id_and_nonce()
