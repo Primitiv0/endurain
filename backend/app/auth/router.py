@@ -540,23 +540,10 @@ async def refresh_token(
 
     # Token delivery based on client type
     if client_type == "web":
-        # Web: Refresh token as httpOnly cookie
-        secure = (
-            True
-            if core_config.settings.ENVIRONMENT == "production"
-            or core_config.settings.ENVIRONMENT == "demo"
-            else False
-        )
-        response.set_cookie(
-            key="endurain_refresh_token",
-            value=new_refresh_token,
-            expires=datetime.now(timezone.utc)
-            + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-            httponly=True,
-            path="/api/v1/auth",
-            secure=secure,
-            samesite="strict",
-        )
+        # Web: Refresh token as httpOnly cookie. Cookie attributes are
+        # centralised in auth_utils.set_refresh_token_cookie so login,
+        # /refresh, and SSO token exchange share one Secure-flag rule.
+        auth_utils.set_refresh_token_cookie(response, new_refresh_token)
 
         # Return access token and CSRF token in body
         # expires_in / refresh_token_expires_in are seconds-until-expiry

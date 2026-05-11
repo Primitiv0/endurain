@@ -135,6 +135,43 @@ def create_tokens(
     )
 
 
+def _is_secure_cookie_environment() -> bool:
+    """Return ``True`` when refresh cookies must be served with ``Secure``.
+
+    Single source of truth for the cookie ``Secure`` flag used by the
+    password login, refresh, and SSO token-exchange flows. Basing the
+    decision on ``ENVIRONMENT`` (``production``/``demo``) keeps the
+    behaviour identical across all three flows and avoids the prior
+    bug where the SSO path used ``FRONTEND_PROTOCOL`` and could issue
+    a non-Secure refresh cookie when that env var was missing or
+    mis-set in production.
+    """
+    return core_config.settings.ENVIRONMENT in {"production", "demo"}
+
+
+def set_refresh_token_cookie(
+    response: Response,
+    refresh_token: str,
+) -> None:
+    """Set the canonical refresh-token cookie with consistent attributes.
+
+    All web-client refresh-cookie writes (initial login, ``/refresh``,
+    SSO token exchange) must go through this helper so that
+    ``HttpOnly``, ``SameSite=Strict``, ``Path``, expiry, and the
+    ``Secure`` flag stay in lockstep.
+    """
+    response.set_cookie(
+        key="endurain_refresh_token",
+        value=refresh_token,
+        expires=datetime.now(timezone.utc)
+        + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
+        httponly=True,
+        path="/api/v1/auth",
+        secure=_is_secure_cookie_environment(),
+        samesite="strict",
+    )
+
+
 def complete_login(
     response: Response,
     request: Request,
@@ -202,23 +239,11 @@ def complete_login(
 
     # Token delivery based on client type
     if client_type == "web":
-        # Web: Refresh token as httpOnly cookie (XSS protection)
-        secure = (
-            True
-            if core_config.settings.ENVIRONMENT == "production"
-            or core_config.settings.ENVIRONMENT == "demo"
-            else False
-        )
-        response.set_cookie(
-            key="endurain_refresh_token",
-            value=refresh_token,
-            expires=datetime.now(timezone.utc)
-            + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-            httponly=True,
-            path="/api/v1/auth",
-            secure=secure,
-            samesite="strict",  # OAuth 2.1: Strict for defense-in-depth
-        )
+        # Web: Refresh token as httpOnly cookie (XSS protection).
+        # Cookie attributes (Secure, SameSite, Path, expiry) are
+        # centralised in set_refresh_token_cookie so password login,
+        # /refresh, and SSO token exchange stay in lockstep.
+        set_refresh_token_cookie(response, refresh_token)
 
         # Return access token and CSRF token in body for in-memory storage
         # expires_in / refresh_token_expires_in are seconds-until-expiry

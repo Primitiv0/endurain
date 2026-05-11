@@ -1,10 +1,9 @@
 """Public (unauthenticated) HTTP routes for identity provider SSO flows."""
 
 from typing import Annotated, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import secrets
 from uuid import uuid4
-import os
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -543,19 +542,15 @@ async def exchange_tokens_for_session(
         if client_type not in ("web", "mobile"):
             client_type = "web"
 
-        # Set refresh token cookie for web clients (enables logout)
+        # Set refresh token cookie for web clients (enables logout).
+        # Cookie attributes (Secure, SameSite, Path, expiry) are
+        # centralised in auth_utils.set_refresh_token_cookie so this
+        # SSO flow stays in lockstep with password login and /refresh
+        # — previously this site used FRONTEND_PROTOCOL and could
+        # issue a non-Secure refresh cookie when that env var was
+        # missing or mis-set in production.
         if client_type == "web":
-            secure = os.environ.get("FRONTEND_PROTOCOL") == "https"
-            response.set_cookie(
-                key="endurain_refresh_token",
-                value=refresh_token,
-                expires=datetime.now(timezone.utc)
-                + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-                httponly=True,
-                path="/api/v1/auth",
-                secure=secure,
-                samesite="strict",
-            )
+            auth_utils.set_refresh_token_cookie(response, refresh_token)
 
         # Note: tokens_exchanged was flipped atomically together
         # with the refresh-token hash above, so no second write is
