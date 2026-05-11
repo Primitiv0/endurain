@@ -72,9 +72,17 @@ class TokenManager:
             secret_key (str): The secret key used for token encryption and
                 decryption.
             algorithm (str, optional): The algorithm to use for token
-                operations. Defaults to "HS256".
+                operations. Defaults to "HS256". Must be a member of
+                :data:`auth.constants.JWT_ALLOWED_ALGORITHMS` so that the
+                allow-list passed to ``jwt.decode`` cannot drift from the
+                signing algorithm.
 
         """
+        if algorithm not in auth_constants.JWT_ALLOWED_ALGORITHMS:
+            raise ValueError(
+                f"algorithm={algorithm!r} is not in the JWT allow-list "
+                f"{sorted(auth_constants.JWT_ALLOWED_ALGORITHMS)}."
+            )
         self.secret_key = secret_key
         self.algorithm = algorithm
         self._key = OctKey.import_key(secret_key)
@@ -133,8 +141,12 @@ class TokenManager:
                 Unauthorized exception.
         """
         try:
-            # Decode the token and return the payload
-            return jwt.decode(token, self._key)
+            # Decode the token and return the payload. The ``algorithms``
+            # allow-list is mandatory: without it, joserfc would accept any
+            # algorithm the token header advertises (including ``none`` or
+            # asymmetric variants), which would let an attacker who controls
+            # the unauthenticated token bypass the HMAC signature check.
+            return jwt.decode(token, self._key, algorithms=[self.algorithm])
         except InvalidPayloadError as payload_err:
             core_logger.print_to_log(
                 f"Invalid token payload: {payload_err}",
