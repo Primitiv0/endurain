@@ -22,13 +22,20 @@ class UsersApiKeyCreate(BaseModel):
     verification. The caller MUST supply ``current_password``,
     and an MFA code when MFA is enabled on the account.
 
+    For SSO-only accounts (no local password set), the password
+    field may be omitted and the password check is skipped — see
+    :func:`users.users.utils.verify_step_up_credentials` for the
+    rationale and the known coverage gap.
+
     Attributes:
         name: User-friendly label for the key.
         scopes: List of scope strings to grant.
         expires_at: Optional expiration datetime.
             None means the key never expires.
         current_password: Caller's existing password
-            (step-up verification).
+            (step-up verification). Required when the account
+            has a local password; may be omitted for SSO-only
+            accounts.
         mfa_code: TOTP or backup code, required when MFA
             is enabled on the account.
     """
@@ -50,11 +57,14 @@ class UsersApiKeyCreate(BaseModel):
             "Optional expiration datetime. " "None means the key never expires."
         ),
     )
-    current_password: StrictStr = Field(
-        ...,
+    current_password: StrictStr | None = Field(
+        default=None,
         min_length=1,
         max_length=250,
-        description="Current password (step-up verification)",
+        description=(
+            "Current password (step-up verification). Required"
+            " when the account has a local password."
+        ),
     )
     mfa_code: StrictStr | None = Field(
         default=None,

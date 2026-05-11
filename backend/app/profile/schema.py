@@ -68,16 +68,25 @@ class MFADisableRequest(MFARequest):
     the supplied input only and do not impose a policy on the
     stored password.
 
+    For SSO-only accounts (no local password set), the password
+    field may be omitted and the password check is skipped — see
+    :func:`users.users.utils.verify_step_up_credentials` for the
+    rationale and the known coverage gap.
+
     Attributes:
         current_password: Caller's existing password (step-up
-            verification).
+            verification). Required when the account has a local
+            password; may be omitted for SSO-only accounts.
     """
 
-    current_password: StrictStr = Field(
-        ...,
+    current_password: StrictStr | None = Field(
+        default=None,
         min_length=1,
         max_length=250,
-        description="Current password (step-up verification)",
+        description=(
+            "Current password (step-up verification). Required"
+            " when the account has a local password."
+        ),
     )
 
 
