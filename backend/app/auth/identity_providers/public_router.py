@@ -13,9 +13,9 @@ import core.rate_limit as core_rate_limit
 import auth.password_hasher as auth_password_hasher
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
-import auth.constants as auth_constants
 import users.users_sessions.utils as users_session_utils
 import users.users_sessions.crud as users_session_crud
+import users.users.utils as users_utils
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
@@ -293,6 +293,9 @@ async def handle_callback(
             )
 
         # LOGIN MODE: Create session WITHOUT tokens (tokens created during exchange)
+        # Validate that the user is active before creating a session
+        users_utils.check_user_is_active(user)
+
         # Convert to UsersRead schema
         user_read = users_schema.UsersRead.model_validate(user)
 
@@ -475,6 +478,8 @@ async def exchange_tokens_for_session(
 
         # PKCE verification successful - retrieve user and create tokens
         user = session_obj.users
+        # Validate that the user is still active before minting tokens
+        users_utils.check_user_is_active(user)
         user_read = users_schema.UsersRead.model_validate(user)
 
         # Create JWT tokens (now that PKCE is verified)

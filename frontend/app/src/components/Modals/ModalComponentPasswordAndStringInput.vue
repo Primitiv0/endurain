@@ -47,7 +47,7 @@
             </div>
 
             <!-- String field -->
-            <label :for="`${modalId}String`" class="form-label mt-2">
+            <label :for="`${modalId}String`" class="form-label mt-2" v-if="requireStringField">
               <b>* {{ stringLabel }}</b>
             </label>
             <input
@@ -57,9 +57,10 @@
               class="form-control"
               :placeholder="stringPlaceholder || stringLabel"
               :autocomplete="stringAutocomplete"
-              required
+              :required="requireStringField"
+              v-if="requireStringField"
             />
-            <small v-if="stringHint" class="form-text text-muted">{{ stringHint }}</small>
+            <small v-if="stringHint && requireStringField" class="form-text text-muted">{{ stringHint }}</small>
 
             <p class="mt-2">* {{ requiredFieldText }}</p>
           </div>
@@ -81,7 +82,7 @@
                 'btn-warning': actionButtonType === 'warning',
                 'btn-primary': actionButtonType === 'primary'
               }"
-              :disabled="!password || !stringValue || isLoading"
+              :disabled="!password || (requireStringField && !stringValue) || isLoading"
               :aria-label="actionButtonText"
             >
               <span
@@ -107,7 +108,7 @@ import { useBootstrapModal } from '@/composables/useBootstrapModal'
 // Types
 import type { ActionButtonType } from '@/types'
 
-defineProps({
+const props = defineProps({
   modalId: {
     type: String,
     required: true
@@ -147,6 +148,10 @@ defineProps({
   stringAutocomplete: {
     type: String,
     default: 'off'
+  },
+  requireStringField: {
+    type: Boolean,
+    default: true
   },
   requiredFieldText: {
     type: String,
@@ -197,7 +202,7 @@ const handleModalHidden = (): void => {
 }
 
 const handleSubmit = (): void => {
-  if (password.value && stringValue.value) {
+  if (password.value && (!props.requireStringField || stringValue.value)) {
     emit('submitAction', {
       password: password.value,
       stringValue: stringValue.value

@@ -210,10 +210,15 @@ async def read_sessions_me(
 )
 async def generate_link_token(
     idp_id: int,
+    link_request: idp_link_token_schema.IdpLinkTokenRequest,
     request: Request,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
+    ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -227,6 +232,11 @@ async def generate_link_token(
     that can be used to securely initiate the OAuth flow for linking
     an identity provider to the authenticated user's account.
 
+    Linking an identity provider is a sensitive operation that enables
+    persistent authentication. Step-up verification is required: the
+    caller MUST supply ``current_password``, and an MFA code when MFA
+    is enabled on the account.
+
     This approach is more secure than passing access tokens in query
     parameters, as the link token:
     - Expires in 60 seconds
@@ -236,8 +246,10 @@ async def generate_link_token(
 
     Args:
         idp_id (int): The ID of the identity provider to link.
+        link_request (IdpLinkTokenRequest): Request with step-up credentials.
         request (Request): The FastAPI request object.
         token_user_id (int): The authenticated user's ID extracted from the access token.
+        password_hasher (PasswordHasher): Password hasher dependency.
         db (Session): The database session.
 
     Returns:
@@ -245,10 +257,21 @@ async def generate_link_token(
 
     Raises:
         HTTPException:
+            - 401 UNAUTHORIZED: If step-up verification fails.
             - 404 NOT_FOUND: If the identity provider doesn't exist or is disabled.
             - 409 CONFLICT: If the identity provider is already linked.
             - 500 INTERNAL_SERVER_ERROR: If token generation fails.
     """
+    # Step-up verification is required before issuing a link token.
+    # Linking an IdP is a sensitive, persistent grant of account access.
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        link_request.current_password,
+        link_request.mfa_code,
+        password_hasher,
+        db,
+    )
+
     # Validate IDP exists and is enabled
     idp = idp_crud.get_identity_provider(idp_id, db)
     if not idp or not idp.enabled:

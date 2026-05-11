@@ -74,11 +74,11 @@ export const profile = {
   unlinkIdentityProvider(idpId) {
     return fetchDeleteRequest(`profile/idp/${idpId}`)
   },
-  generateLinkToken(idpId) {
-    return fetchPostRequest(`profile/idp/${idpId}/link/token`, {})
+  generateLinkToken(idpId, stepUpData = {}) {
+    return fetchPostRequest(`profile/idp/${idpId}/link/token`, stepUpData)
   },
-  async linkIdentityProvider(idpId) {
-    const response = await this.generateLinkToken(idpId)
+  async linkIdentityProvider(idpId, stepUpData = {}) {
+    const response = await this.generateLinkToken(idpId, stepUpData)
     const linkToken = response.token
 
     fetchGetRequestWithRedirect(`profile/idp/${idpId}/link?link_token=${linkToken}`)

@@ -339,6 +339,27 @@
         </div>
       </div>
 
+      <!-- IdP Link Step-up Verification Modal -->
+      <ModalComponentPasswordAndStringInput
+        ref="idpLinkModalRef"
+        modalId="idpLinkStepUpModal"
+        :title="t('settingsSecurityZone.idpLinkTitle')"
+        :description="t('settingsSecurityZone.idpLinkDescription')"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="primary"
+        :actionButtonText="t('settingsSecurityZone.linkAccountButton')"
+        :isLoading="linkingProviderId !== null"
+        :requireStringField="mfaEnabled"
+        @submitAction="completeLinkAccount"
+      />
+
       <hr />
       <!-- user sessions list -->
       <h4>{{ $t('settingsSecurityZone.subtitleMySessions') }}</h4>
@@ -487,6 +508,7 @@ const mfaSetupModalRef = ref(null)
 const mfaDisableModalRef = ref(null)
 const mfaRegenerateModalRef = ref(null)
 const mfaBackupCodesModalRef = ref(null)
+const idpLinkModalRef = ref(null)
 const backupCodes = ref([])
 const backupCodeStatus = ref(null)
 const backupCodeStatusLoading = ref(false)
@@ -502,6 +524,7 @@ const availableProviders = ref([])
 const allProviders = ref([])
 const isLoadingLinkedAccounts = ref(false)
 const linkingProviderId = ref(null)
+const pendingIdpId = ref(null)
 
 // API keys variables
 const apiKeys = ref([])
@@ -740,20 +763,42 @@ async function unlinkAccount(idpId) {
 }
 
 async function linkAccount(providerId) {
+  pendingIdpId.value = providerId
+  idpLinkModalRef.value?.show()
+}
+
+async function completeLinkAccount({ password, stringValue }) {
+  if (!pendingIdpId.value || !password) return
+
   try {
-    linkingProviderId.value = providerId
-    // Generate token and redirect to OAuth flow
-    await profile.linkIdentityProvider(providerId)
+    linkingProviderId.value = pendingIdpId.value
+
+    // Build credentials object - only include mfa_code if MFA is enabled and code provided
+    const credentials = {
+      current_password: password
+    }
+    if (mfaEnabled.value && stringValue) {
+      credentials.mfa_code = stringValue.toString()
+    }
+
+    // Call linkIdentityProvider with step-up credentials
+    await profile.linkIdentityProvider(pendingIdpId.value, credentials)
+
+    idpLinkModalRef.value?.hide()
   } catch (error) {
-    linkingProviderId.value = null
     const errorMessage = error.message || error.toString()
 
-    // Check for rate limiting
+    // Check for different error types
     if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
       push.error(t('settingsSecurityZone.linkAccountRateLimitError'))
+    } else if (errorMessage.includes('401')) {
+      push.error(t('settingsSecurityZone.linkAccountCredentialsError'))
     } else {
       push.error(`${t('settingsSecurityZone.linkAccountError')} - ${errorMessage}`)
     }
+  } finally {
+    linkingProviderId.value = null
+    pendingIdpId.value = null
   }
 }
 
