@@ -793,6 +793,7 @@ async function submitEditUserForm() {
       // drops administrative fields. Send only the fields the backend accepts so
       // the UI never implies these values were saved.
       const {
+        id,
         access_type,
         active,
         email_verified,

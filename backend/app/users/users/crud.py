@@ -1,5 +1,7 @@
 """CRUD operations for user management."""
 
+import posixpath
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -530,15 +532,37 @@ async def edit_profile_user(
 
         # Constrain photo_path to the user's own image directory to
         # prevent path-traversal or pointing at another user's
-        # photo via the profile update.
+        # photo via the profile update. A naive ``startswith``
+        # against the raw payload is bypassable with traversal
+        # sequences (e.g. ``data/user_images/5./../3.jpg`` passes
+        # the prefix check for user 5 but resolves to user 3's
+        # avatar — a stored IDOR). We therefore:
+        #   1. reject any payload containing a ``..`` segment or
+        #      a backslash (Windows-style separator) outright,
+        #   2. normalise the path through ``posixpath.normpath``
+        #      so ``./`` and redundant slashes collapse,
+        #   3. then enforce the per-user prefix on the NORMALISED
+        #      value.
+        # A tampered path is silently dropped rather than 400'd —
+        # the legitimate upload flow always sets this correctly,
+        # so the only callers who reach the drop branch are
+        # malicious or buggy clients and surfacing the error
+        # would just be an oracle.
         if "photo_path" in updates:
             new_path = updates["photo_path"]
-            if new_path is not None and not new_path.startswith(
-                f"data/user_images/{user_id}."
-            ):
-                # Silently drop a tampered path rather than 400 —
-                # the legitimate upload flow sets this correctly.
-                updates.pop("photo_path")
+            if new_path is not None:
+                expected_prefix = f"data/user_images/{user_id}."
+                has_traversal = (
+                    "\\" in new_path
+                    or any(part == ".." for part in new_path.split("/"))
+                )
+                normalised = posixpath.normpath(new_path)
+                if has_traversal or not normalised.startswith(expected_prefix):
+                    updates.pop("photo_path")
+                else:
+                    # Persist the normalised form so downstream
+                    # consumers always see a canonical path.
+                    updates["photo_path"] = normalised
 
         # If the photo_path is being cleared or replaced, delete
         # the on-disk file (matches legacy edit_user behaviour).
