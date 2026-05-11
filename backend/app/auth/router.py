@@ -442,11 +442,17 @@ async def refresh_token(
     # Verify CSRF token for web clients only
     # Mobile clients don't use CSRF tokens
     # OAuth 2.1 Bootstrap Pattern for page reload:
-    # - On page reload, in-memory tokens are lost but httpOnly cookie persists
-    # - If x_csrf_token is None (missing from request), allow refresh anyway
-    # - Security: httpOnly cookie + SameSite=Strict prevents CSRF at browser level
-    # - If x_csrf_token is provided, it MUST be valid (prevent partial CSRF)
-    # - CSRF token is defense-in-depth; SameSite=Strict is primary protection
+    # - On EVERY page reload, in-memory tokens (incl. CSRF) are lost but the
+    #   httpOnly refresh cookie persists. The client therefore POSTs to
+    #   /refresh without an X-CSRF-Token header to bootstrap a new in-memory
+    #   token. This must continue to work even after a CSRF binding has been
+    #   minted on the session, otherwise the user is logged out on reload.
+    # - When the client DOES send a header, it MUST be valid. An empty/wrong
+    #   value is rejected (prevents partial-CSRF where script can read the
+    #   cookie but not the bound token).
+    # - CSRF protection at this endpoint is defense-in-depth; the primary
+    #   protections are HttpOnly + SameSite=Strict on the refresh cookie,
+    #   which prevent a cross-site attacker from issuing this POST at all.
     if client_type == "web" and x_csrf_token and session.csrf_token_hash is not None:
         # CSRF token was provided: validate it
         if not users_session_utils.verify_csrf_token(

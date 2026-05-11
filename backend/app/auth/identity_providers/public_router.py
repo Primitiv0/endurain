@@ -530,17 +530,57 @@ async def exchange_tokens_for_session(
                 detail="Tokens already exchanged for this session",
             )
 
-        # Determine client_type from the exchange request headers.
-        # The stored oauth_state.client_type is unreliable for system
-        # browser flows (no X-Client-Type header when the browser
-        # opened the initiate_login URL), so we trust the header on
-        # the actual token-exchange call — which *is* made by the
-        # native app and will carry X-Client-Type: mobile.
-        client_type = request.headers.get(
-            "X-Client-Type", stored_client_type or "web"
-        )
-        if client_type not in ("web", "mobile"):
-            client_type = "web"
+        # Determine client_type for this token exchange.
+        #
+        # Authority order:
+        #   1. ``oauth_state.client_type`` (captured above as
+        #      ``stored_client_type``) — set when the IdP flow was
+        #      initiated by an authenticated client that DID send
+        #      ``X-Client-Type``. When this is non-None it represents
+        #      the original, server-recorded intent and the exchange
+        #      caller MUST NOT override it.
+        #   2. ``X-Client-Type`` header on the exchange request —
+        #      only consulted when ``stored_client_type`` is None,
+        #      which is the genuine system-browser case (the OS
+        #      browser carries no custom headers when opening
+        #      ``/initiate_login``, so the original intent could not
+        #      be recorded).
+        #
+        # Previously the header was preferred unconditionally
+        # (`request.headers.get("X-Client-Type", stored or "web")`),
+        # which let the exchange caller switch between the
+        # cookie-set ``web`` shape and the body-only ``mobile`` shape
+        # at will — bypassing the cookie-set decision and the
+        # response shape that should follow from how the flow was
+        # actually initiated.
+        header_client_type = request.headers.get("X-Client-Type")
+        if header_client_type not in ("web", "mobile"):
+            header_client_type = None
+
+        if stored_client_type in ("web", "mobile"):
+            # Recorded intent wins. If the caller declared a
+            # different value, reject the exchange — this is either
+            # a misbehaving client or an attacker trying to flip the
+            # response shape. We do NOT silently downgrade.
+            if (
+                header_client_type is not None
+                and header_client_type != stored_client_type
+            ):
+                core_logger.print_to_log(
+                    "Token exchange client_type mismatch for session "
+                    f"{session_id[:8]}...: stored={stored_client_type}, "
+                    f"header={header_client_type}",
+                    "warning",
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="client_type does not match the OAuth state",
+                )
+            client_type = stored_client_type
+        else:
+            # Genuine system-browser flow — fall back to the header,
+            # defaulting to ``web`` when the header is absent.
+            client_type = header_client_type or "web"
 
         # Set refresh token cookie for web clients (enables logout).
         # Cookie attributes (Secure, SameSite, Path, expiry) are
