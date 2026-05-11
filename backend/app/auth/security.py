@@ -32,6 +32,8 @@ from sqlalchemy.orm import Session
 import auth.constants as auth_constants
 import auth.token_manager as auth_token_manager
 
+import users.users.utils as users_utils
+
 import users.users_api_keys.crud as users_api_keys_crud
 import users.users_api_keys.utils as users_api_keys_utils
 
@@ -679,6 +681,9 @@ async def validate_api_key(
             detail="Invalid API key",
             headers={"WWW-Authenticate": "ApiKey"},
         )
+
+    db_user = users_utils.get_user_by_id_or_404(db_key.user_id, db)
+    users_utils.check_user_is_active(db_user)
 
     if not db_key.is_active:
         raise HTTPException(
