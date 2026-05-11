@@ -920,9 +920,29 @@ async def enable_mfa(
             "message": "MFA enabled successfully",
             "backup_codes": backup_codes,
         }
-    except HTTPException:
-        # Clean up on error
-        mfa_secret_store.delete_secret(token_user_id)
+    except HTTPException as exc:
+        # A wrong TOTP at enrolment is a UX-typical retry scenario:
+        # the user fat-fingered a digit or the authenticator clock
+        # drifted. Burning the pending secret on every wrong code
+        # forces a full restart from ``POST /profile/mfa/setup``
+        # (new QR, new secret), which is hostile to legitimate users
+        # and offers no security benefit — the secret has not yet
+        # been bound to the account, ``MFASecretStore`` already
+        # enforces a 5-minute TTL on the pending entry, and the
+        # caller has already passed step-up password verification
+        # above.
+        #
+        # On any OTHER HTTPException (user vanished, MFA already
+        # enabled by a concurrent request, encryption pipeline
+        # failure, etc.) we still burn the secret to avoid leaving
+        # stale state behind. The status_code + detail check is
+        # tightly coupled to ``profile_utils.enable_user_mfa``'s
+        # wrong-code branch by design — both must change together.
+        if not (
+            exc.status_code == status.HTTP_400_BAD_REQUEST
+            and exc.detail == "Invalid MFA code"
+        ):
+            mfa_secret_store.delete_secret(token_user_id)
         raise
 
 
