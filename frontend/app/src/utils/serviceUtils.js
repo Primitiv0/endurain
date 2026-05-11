@@ -94,6 +94,12 @@ async function fetchWithRetry(url, options, responseType = 'json') {
       if (url === 'profile/api_keys') {
         throw error
       }
+      if (
+        url.startsWith('profile/idp/') &&
+        (url.endsWith('/link/token') || url.endsWith('/unlink'))
+      ) {
+        throw error
+      }
       try {
         // Use auth store's refreshAccessToken which updates tokens in memory
         const authStore = useAuthStore()

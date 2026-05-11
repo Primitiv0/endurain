@@ -71,8 +71,8 @@ export const profile = {
   getMyIdentityProviders() {
     return fetchGetRequest('profile/idp')
   },
-  unlinkIdentityProvider(idpId) {
-    return fetchDeleteRequest(`profile/idp/${idpId}`)
+  unlinkIdentityProvider(idpId, stepUpData = {}) {
+    return fetchPostRequest(`profile/idp/${idpId}/unlink`, stepUpData)
   },
   generateLinkToken(idpId, stepUpData = {}) {
     return fetchPostRequest(`profile/idp/${idpId}/link/token`, stepUpData)

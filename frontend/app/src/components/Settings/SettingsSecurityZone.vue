@@ -356,8 +356,31 @@
         actionButtonType="primary"
         :actionButtonText="t('settingsSecurityZone.linkAccountButton')"
         :isLoading="linkingProviderId !== null"
+        :requirePassword="authStore.user.has_local_password === true"
         :requireStringField="mfaEnabled"
         @submitAction="completeLinkAccount"
+      />
+
+      <!-- IdP Unlink Step-up Verification Modal -->
+      <ModalComponentPasswordAndStringInput
+        ref="idpUnlinkModalRef"
+        modalId="idpUnlinkStepUpModal"
+        :title="t('settingsSecurityZone.unlinkModalTitle')"
+        :description="t('settingsSecurityZone.unlinkModalConfirmation', { providerName: pendingUnlinkProviderName })"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="danger"
+        :actionButtonText="t('settingsSecurityZone.unlinkAccountButton')"
+        :isLoading="unlinkingProviderId !== null"
+        :requirePassword="authStore.user.has_local_password === true"
+        :requireStringField="mfaEnabled"
+        @submitAction="completeUnlinkAccount"
       />
 
       <hr />
@@ -509,6 +532,7 @@ const mfaDisableModalRef = ref(null)
 const mfaRegenerateModalRef = ref(null)
 const mfaBackupCodesModalRef = ref(null)
 const idpLinkModalRef = ref(null)
+const idpUnlinkModalRef = ref(null)
 const backupCodes = ref([])
 const backupCodeStatus = ref(null)
 const backupCodeStatusLoading = ref(false)
@@ -525,6 +549,22 @@ const allProviders = ref([])
 const isLoadingLinkedAccounts = ref(false)
 const linkingProviderId = ref(null)
 const pendingIdpId = ref(null)
+const unlinkingProviderId = ref(null)
+const pendingUnlinkIdpId = ref(null)
+
+const hasLocalPassword = computed(() => authStore.user.has_local_password === true)
+
+const pendingUnlinkProviderName = computed(() => {
+  if (!pendingUnlinkIdpId.value) return ''
+
+  const linkedAccount = linkedAccounts.value.find(
+    (account) => account.idp_id === pendingUnlinkIdpId.value
+  )
+  if (linkedAccount?.idp_name) return linkedAccount.idp_name
+
+  const provider = allProviders.value.find((p) => p.id === pendingUnlinkIdpId.value)
+  return provider?.name || ''
+})
 
 // API keys variables
 const apiKeys = ref([])
@@ -734,17 +774,35 @@ async function loadLinkedAccounts() {
 async function unlinkAccount(idpId) {
   if (!idpId) return
 
-  try {
-    await profile.unlinkIdentityProvider(idpId)
+  pendingUnlinkIdpId.value = idpId
+  idpUnlinkModalRef.value?.show()
+}
 
-    // Find the account being unlinked
-    const unlinkedAccount = linkedAccounts.value.find((account) => account.idp_id === idpId)
+async function completeUnlinkAccount({ password, stringValue }) {
+  if (!pendingUnlinkIdpId.value || (hasLocalPassword.value && !password)) return
+
+  try {
+    unlinkingProviderId.value = pendingUnlinkIdpId.value
+
+    const credentials = {}
+    if (hasLocalPassword.value) {
+      credentials.current_password = password
+    }
+    if (mfaEnabled.value && stringValue) {
+      credentials.mfa_code = stringValue.toString()
+    }
+
+    await profile.unlinkIdentityProvider(pendingUnlinkIdpId.value, credentials)
+
+    idpUnlinkModalRef.value?.hide()
 
     // Remove from linked accounts list
-    linkedAccounts.value = linkedAccounts.value.filter((account) => account.idp_id !== idpId)
+    linkedAccounts.value = linkedAccounts.value.filter(
+      (account) => account.idp_id !== pendingUnlinkIdpId.value
+    )
 
     // Add back to available providers
-    const unlinkedProvider = allProviders.value.find((p) => p.id === idpId)
+    const unlinkedProvider = allProviders.value.find((p) => p.id === pendingUnlinkIdpId.value)
     if (unlinkedProvider) {
       availableProviders.value.push(unlinkedProvider)
     }
@@ -754,11 +812,18 @@ async function unlinkAccount(idpId) {
     const errorMessage = error.message || error.toString()
 
     // Check for specific error scenarios
-    if (errorMessage.includes('last authentication method') || errorMessage.includes('400')) {
+    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
+      push.error(t('settingsSecurityZone.unlinkAccountRateLimitError'))
+    } else if (errorMessage.includes('401')) {
+      push.error(t('settingsSecurityZone.unlinkAccountCredentialsError'))
+    } else if (errorMessage.includes('last authentication method') || errorMessage.includes('400')) {
       push.error(t('settingsSecurityZone.unlinkAccountLastMethodError'))
     } else {
       push.error(`${t('settingsSecurityZone.unlinkAccountError')} - ${errorMessage}`)
     }
+  } finally {
+    unlinkingProviderId.value = null
+    pendingUnlinkIdpId.value = null
   }
 }
 
@@ -768,14 +833,15 @@ async function linkAccount(providerId) {
 }
 
 async function completeLinkAccount({ password, stringValue }) {
-  if (!pendingIdpId.value || !password) return
+  if (!pendingIdpId.value || (hasLocalPassword.value && !password)) return
 
   try {
     linkingProviderId.value = pendingIdpId.value
 
     // Build credentials object - only include mfa_code if MFA is enabled and code provided
-    const credentials = {
-      current_password: password
+    const credentials = {}
+    if (hasLocalPassword.value) {
+      credentials.current_password = password
     }
     if (mfaEnabled.value && stringValue) {
       credentials.mfa_code = stringValue.toString()

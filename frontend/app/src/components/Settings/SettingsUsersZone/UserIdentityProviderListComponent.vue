@@ -53,15 +53,17 @@
           class="btn btn-link btn-lg link-body-emphasis"
           href="#"
           role="button"
-          data-bs-toggle="modal"
-          :data-bs-target="`#idpActionModal${idp.id}`"
+          :data-bs-toggle="actionIcon === 'unlink' ? null : 'modal'"
+          :data-bs-target="actionIcon === 'unlink' ? null : `#idpActionModal${idp.id}`"
           :aria-label="actionButtonAriaLabel"
+          @click.prevent="actionIcon === 'unlink' ? submitDeleteIdp() : null"
         >
           <font-awesome-icon :icon="actionIconName" />
         </a>
 
         <!-- Delete/Unlink IDP Modal -->
         <ModalComponent
+          v-if="actionIcon !== 'unlink'"
           :modalId="`idpActionModal${idp.id}`"
           :title="modalTitle"
           :body="modalBody"

@@ -1203,16 +1203,23 @@ async def get_my_identity_providers(
     )
 
 
-@router.delete(
-    "/idp/{idp_id}",
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
+@router.post(
+    "/idp/{idp_id}/unlink",
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
 )
 async def delete_my_identity_provider(
     idp_id: int,
+    step_up: users_schema.StepUpVerification,
+    request: Request,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
+    ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -1222,32 +1229,48 @@ async def delete_my_identity_provider(
     """
     Delete (unlink) an identity provider from the authenticated user's account.
 
-    This endpoint allows users to remove the association between their account and
-    a specific identity provider. It includes critical safety checks to prevent
-    account lockout by ensuring users maintain at least one authentication method
-    (either a password or another IdP link).
+    This endpoint allows users to remove the association between their
+    account and a specific identity provider. It requires step-up
+    verification (current password and MFA when enabled) and includes
+    safety checks to prevent account lockout by ensuring users maintain
+    at least one authentication method (either a password or another
+    IdP link).
 
     Args:
         idp_id (int): The ID of the identity provider to unlink.
-        token_user_id (int): The authenticated user's ID extracted from the access token.
+        step_up (StepUpVerification): Step-up verification payload.
+        request (Request): The FastAPI request object.
+        token_user_id (int): User ID extracted from the access token.
+        password_hasher (PasswordHasher): Password hasher dependency.
         db (Session): Database session dependency.
 
     Returns:
         None: Returns 204 No Content on successful deletion.
 
     Raises:
-        HTTPException (404): If the identity provider doesn't exist or is not linked
-            to the user's account.
+        HTTPException (401): If step-up verification fails.
+        HTTPException (404): If the identity provider doesn't exist or
+            is not linked to the user's account.
         HTTPException (400): If attempting to unlink the last authentication method
             without having a password set (prevents account lockout).
         HTTPException (500): If the deletion operation fails at the database level.
 
     Notes:
-        - Prevents account lockout by ensuring users have at least one authentication
-          method (password or remaining IdP link).
+        - Enforces step-up verification before unlinking.
+        - Prevents account lockout by ensuring users have at least one
+          authentication method (password or remaining IdP link).
         - Logs the unlinking action for audit purposes.
-        - Uses token-based authentication to ensure users can only unlink their own IdPs.
+        - Uses token-based authentication to ensure users can only
+          unlink their own IdPs.
     """
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        step_up.current_password,
+        step_up.mfa_code,
+        password_hasher,
+        db,
+    )
+
     # Validate IDP exists
     idp = idp_crud.get_identity_provider(idp_id, db)
     if idp is None:

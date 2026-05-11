@@ -58,6 +58,8 @@
   "unlinkAccountSuccess": "Account unlinked successfully",
   "unlinkAccountError": "Error unlinking account",
   "unlinkAccountLastMethodError": "Cannot unlink last authentication method. Please set a password first.",
+  "unlinkAccountCredentialsError": "Invalid password or MFA code. Please try again.",
+  "unlinkAccountRateLimitError": "Too many unlink attempts. Please wait a moment and try again.",
   "linkAccountSuccess": "{providerName} account linked successfully",
   "linkAccountError": "Error linking account",
   "linkAccountRateLimitError": "Too many link attempts. Please wait a moment and try again.",

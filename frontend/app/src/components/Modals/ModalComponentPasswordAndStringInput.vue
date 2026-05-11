@@ -23,10 +23,10 @@
             <p v-if="description">{{ description }}</p>
 
             <!-- Password field -->
-            <label :for="`${modalId}Password`" class="form-label">
+            <label v-if="requirePassword" :for="`${modalId}Password`" class="form-label">
               <b>* {{ passwordLabel }}</b>
             </label>
-            <div class="position-relative">
+            <div v-if="requirePassword" class="position-relative">
               <input
                 :id="`${modalId}Password`"
                 v-model="password"
@@ -34,7 +34,7 @@
                 class="form-control"
                 :placeholder="passwordPlaceholder || passwordLabel"
                 :autocomplete="passwordAutocomplete"
-                required
+                :required="requirePassword"
               />
               <button
                 type="button"
@@ -82,7 +82,7 @@
                 'btn-warning': actionButtonType === 'warning',
                 'btn-primary': actionButtonType === 'primary'
               }"
-              :disabled="!password || (requireStringField && !stringValue) || isLoading"
+              :disabled="(requirePassword && !password) || (requireStringField && !stringValue) || isLoading"
               :aria-label="actionButtonText"
             >
               <span
@@ -132,6 +132,10 @@ const props = defineProps({
   passwordAutocomplete: {
     type: String,
     default: 'current-password'
+  },
+  requirePassword: {
+    type: Boolean,
+    default: true
   },
   stringLabel: {
     type: String,
@@ -202,7 +206,10 @@ const handleModalHidden = (): void => {
 }
 
 const handleSubmit = (): void => {
-  if (password.value && (!props.requireStringField || stringValue.value)) {
+  if (
+    (!props.requirePassword || password.value) &&
+    (!props.requireStringField || stringValue.value)
+  ) {
     emit('submitAction', {
       password: password.value,
       stringValue: stringValue.value
