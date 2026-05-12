@@ -1,8 +1,9 @@
-# Stream type constants for activity streams
-STREAM_TYPE_HR = 1
-STREAM_TYPE_POWER = 2
-STREAM_TYPE_CADENCE = 3
-STREAM_TYPE_ELEVATION = 4
-STREAM_TYPE_SPEED = 5
-STREAM_TYPE_PACE = 6
-STREAM_TYPE_MAP = 7
+"""Constants for activity stream types."""
+
+STREAM_TYPE_HR: int = 1
+STREAM_TYPE_POWER: int = 2
+STREAM_TYPE_CADENCE: int = 3
+STREAM_TYPE_ELEVATION: int = 4
+STREAM_TYPE_SPEED: int = 5
+STREAM_TYPE_PACE: int = 6
+STREAM_TYPE_MAP: int = 7

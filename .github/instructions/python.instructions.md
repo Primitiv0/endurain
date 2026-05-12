@@ -5,13 +5,13 @@ applyTo: '**/*.py'
 # Project Context
 - **Python Version:** 3.13+ (required)
 - **Framework:** FastAPI with SQLAlchemy ORM and Alembic migrations
-- **Dependency Management:** Poetry (see `backend/pyproject.toml`)
+- **Dependency Management:** uv (see `backend/pyproject.toml`)
 - **Project Structure:** All backend code in `backend/app/`
 - **Testing Framework:** Tests must be in `backend/tests/` directory and follow the project structure like best practices.
 
 # Development Setup
-- **Install Poetry:** `pip install poetry`
-- **Install dependencies:** `poetry install` (in `backend/` 
+- **Install uv:** Follow the official uv installation instructions
+- **Install dependencies:** `uv sync` (in `backend/` 
   directory)
 - **Use Docker:** If system Python < 3.13, use Docker for 
   development
@@ -126,8 +126,8 @@ assert MyModel.count.type.python_type == int
 
 ## Coverage Verification
 ```bash
-poetry run pytest tests/module/ -v
-poetry run pytest tests/module/ --cov=app/module \
+uv run pytest tests/module/ -v
+uv run pytest tests/module/ --cov=app/module \
   --cov-report=term-missing
 ```
 

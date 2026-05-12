@@ -1,6 +1,6 @@
 """CRUD operations for user integrations."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -134,7 +134,7 @@ def link_strava_account(
         tokens["refresh_token"]
     )
     user_integrations.strava_token_expires_at = datetime.fromtimestamp(
-        tokens["expires_at"]
+        tokens["expires_at"], tz=timezone.utc
     )
 
     # Set the strava state to None
@@ -299,17 +299,15 @@ def set_user_strava_sync_gear(
 @core_decorators.handle_db_errors
 def link_garminconnect_account(
     user_id: int,
-    oauth1_token: dict,
-    oauth2_token: dict,
+    token: dict,
     db: Session,
 ) -> None:
     """
-    Link a Garmin Connect account by storing OAuth tokens.
+    Link a Garmin Connect account by storing token.
 
     Args:
         user_id: The ID of the user.
-        oauth1_token: Garmin Connect OAuth1 token data.
-        oauth2_token: Garmin Connect OAuth2 token data.
+        token: Garmin Connect token data.
         db: SQLAlchemy database session.
 
     Returns:
@@ -328,9 +326,8 @@ def link_garminconnect_account(
             detail="User integrations not found",
         )
 
-    # Store Garmin Connect OAuth tokens
-    user_integrations.garminconnect_oauth1 = oauth1_token
-    user_integrations.garminconnect_oauth2 = oauth2_token
+    # Store Garmin Connect token
+    user_integrations.garminconnect_token = token
 
     # Commit the changes to the database
     db.commit()
@@ -400,8 +397,7 @@ def unlink_garminconnect_account(user_id: int, db: Session) -> None:
         )
 
     # Clear all Garmin Connect integration data
-    user_integrations.garminconnect_oauth1 = None
-    user_integrations.garminconnect_oauth2 = None
+    user_integrations.garminconnect_token = None
     user_integrations.garminconnect_sync_gear = False
 
     # Commit the changes to the database

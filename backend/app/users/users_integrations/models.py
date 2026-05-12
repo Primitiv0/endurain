@@ -1,9 +1,13 @@
 """User integrations database models."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, JSON, String
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class UsersIntegrations(Base):
@@ -21,9 +25,7 @@ class UsersIntegrations(Base):
         strava_token_expires_at: Strava token expiration
             timestamp.
         strava_sync_gear: Enable Strava gear synchronization.
-        garminconnect_oauth1: Garmin Connect OAuth1 token
-            data.
-        garminconnect_oauth2: Garmin Connect OAuth2 token
+        garminconnect_token: Garmin Connect token
             data.
         garminconnect_sync_gear: Enable Garmin Connect gear
             synchronization.
@@ -76,6 +78,7 @@ class UsersIntegrations(Base):
         ),
     )
     strava_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         default=None,
         nullable=True,
         comment="Strava token expiration date",
@@ -85,17 +88,11 @@ class UsersIntegrations(Base):
         default=False,
         comment="Whether Strava gear is to be synced",
     )
-    garminconnect_oauth1: Mapped[dict | None] = mapped_column(
+    garminconnect_token: Mapped[dict | None] = mapped_column(
         JSON,
         default=None,
         nullable=True,
-        comment="Garmin OAuth1 token",
-    )
-    garminconnect_oauth2: Mapped[dict | None] = mapped_column(
-        JSON,
-        default=None,
-        nullable=True,
-        comment="Garmin OAuth2 token",
+        comment="Garmin Connect token",
     )
     garminconnect_sync_gear: Mapped[bool] = mapped_column(
         nullable=False,
@@ -104,5 +101,4 @@ class UsersIntegrations(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="users_integrations")
+    users: Mapped["Users"] = relationship(back_populates="users_integrations")

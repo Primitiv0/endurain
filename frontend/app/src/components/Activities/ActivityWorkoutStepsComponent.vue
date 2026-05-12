@@ -93,7 +93,7 @@
                 processedWorkoutSteps[i - 1].duration_type === 'time'
               "
             >
-              {{ formatSecondsToMinutes(processedWorkoutSteps[i - 1].duration_value) }}
+              {{ formatSecondsToHoursMinutesSeconds(processedWorkoutSteps[i - 1].duration_value) }}
             </span>
           </td>
           <td
@@ -196,7 +196,7 @@
             "
           >
             <span v-if="activityActivitySets[i - 1]">{{
-              formatSecondsToMinutes(activityActivitySets[i - 1].duration) ??
+              formatSecondsToHoursMinutesSeconds(activityActivitySets[i - 1].duration) ??
               $t('generalItems.labelNoData')
             }}</span>
           </td>
@@ -291,7 +291,7 @@
           </td>
           <td v-if="activityActivitySets[i - 1]">
             {{
-              formatSecondsToMinutes(activityActivitySets[i - 1].duration) ??
+              formatSecondsToHoursMinutesSeconds(activityActivitySets[i - 1].duration) ??
               $t('generalItems.labelNoData')
             }}
           </td>
@@ -338,7 +338,7 @@
 import { ref, computed } from 'vue'
 // Importing the components
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
-import { formatSecondsToMinutes } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutesSeconds } from '@/utils/dateTimeUtils'
 import { formatPaceMetric } from '@/utils/activityUtils'
 import { metersToKm } from '@/utils/unitsUtils'
 
@@ -396,7 +396,7 @@ export default {
     })
 
     return {
-      formatSecondsToMinutes,
+      formatSecondsToHoursMinutesSeconds,
       formatPaceMetric,
       metersToKm,
       processedWorkoutSteps,

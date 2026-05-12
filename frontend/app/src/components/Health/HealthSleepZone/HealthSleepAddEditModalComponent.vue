@@ -615,8 +615,8 @@ onMounted(() => {
 
     formData.value = {
       date: props.userHealthSleep.date,
-      sleepStartTime: formatDateTimeForInput(props.userHealthSleep.sleep_start_time_local),
-      sleepEndTime: formatDateTimeForInput(props.userHealthSleep.sleep_end_time_local),
+      sleepStartTime: formatDateTimeForInput(props.userHealthSleep.sleep_start_time_local) ?? '',
+      sleepEndTime: formatDateTimeForInput(props.userHealthSleep.sleep_end_time_local) ?? '',
       totalSleepHours: totalSleep.hours,
       totalSleepMinutes: totalSleep.minutes,
       deepSleepHours: deepSleep.hours,
@@ -658,10 +658,11 @@ onMounted(() => {
 /**
  * Formats ISO datetime string for datetime-local input.
  *
- * @param isoString - ISO 8601 datetime string.
- * @returns Formatted string for datetime-local input (YYYY-MM-DDTHH:mm).
+ * @param isoString - ISO 8601 datetime string or null.
+ * @returns Formatted string for datetime-local input (YYYY-MM-DDTHH:mm), or null if input is null.
  */
-function formatDateTimeForInput(isoString: string): string {
+function formatDateTimeForInput(isoString: string | null): string | null {
+  if (isoString === null || isoString === undefined) return null
   return isoString.slice(0, 16)
 }
 

@@ -211,6 +211,7 @@ export interface UserIdentityProviderEnriched extends UsersIdentityProvider {
 export interface Activity {
   activity_type: number
   distance: number
+  map_thumbnail_path: string | null
 }
 
 /**

@@ -142,6 +142,13 @@ class ServerSettingsBase(BaseModel):
         pattern=r"^#[0-9A-Fa-f]{6}$",
         description=("Background color for the map (hex format)"),
     )
+    tileserver_regenerate_thumbnails_on_change: StrictBool = Field(
+        False,
+        description=(
+            "Delete and regenerate all activity thumbnails when "
+            "tile server settings change"
+        ),
+    )
     password_type: PasswordType = Field(
         PasswordType.STRICT, description="Password type policy (strict, length_only)"
     )
@@ -245,7 +252,6 @@ class ServerSettings(ServerSettingsBase):
     Attributes:
         id: Unique identifier (always 1, singleton pattern).
         tileserver_api_key: API key encrypted for the tile server.
-        (plus all fields inherited from ServerSettingsBase)
     """
 
     id: StrictInt = Field(
@@ -269,7 +275,6 @@ class ServerSettingsEdit(ServerSettings):
             (true - yes, false - no).
         signup_require_email_verification: Require email verification for new
             sign-ups (true - yes, false - no).
-        (plus all fields inherited from ServerSettings)
     """
 
     signup_require_admin_approval: StrictBool = Field(

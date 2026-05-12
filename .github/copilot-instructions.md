@@ -20,6 +20,7 @@ Always reference these instructions first and fallback to search or bash command
 - Do not alter port numbers, environment variables, or framework versions unless explicitly instructed.
 - Prefer using existing patterns, utilities, and files rather than creating new ones.
 - Use the timing benchmarks in this document to evaluate build success or performance anomalies.
+- **File uploads:** All `UploadFile` handling MUST go through `backend/app/core/file_uploads.py`. Use `save_validated_upload(file, kind=UploadKind.X, upload_dir=..., filename=...)` for any new endpoint that persists an upload, and `validate_upload(file, kind=...)` when the file is consumed in memory only. Do **not** instantiate `safeuploads.FileValidator` outside that module, do **not** join user-supplied filenames into filesystem paths, and use server-generated filenames (UUID/hash/fixed name) for the destination.
 - **Documentation files:** When creating new development documentation files (e.g., `BACKEND_AUTH_DEVELOPMENT_LOG.md`, `OBSERVABILITY_STRATEGY.md`), store them in the `devdocs/` folder. This folder is gitignored and used for local development documentation that should not be committed to the repository.
 - **Development/helper scripts:** When creating new development/helper scripts, store them in the `devscripts/` folder. This folder is gitignored and used for local development scripts that should not be committed to the repository.
 - **Do ONLY what is explicitly requested** - do not add extra documentation, summaries, or "helpful" files unless specifically asked.
@@ -49,7 +50,7 @@ Endurain is a self-hosted fitness tracking application with:
 - **Node.js:** v20.19.4 (for frontend development)
 - **Python:** v3.13 (for backend development)
 - **Docker:** Required for full-stack development and CI/CD builds
-- **Poetry:** For backend dependency management (when not using Docker)
+- **uv:** For backend dependency management (when not using Docker)
 
 ### Quick Start
 
@@ -94,8 +95,8 @@ Complete environment for frontend + backend + database:
 Python development without Docker (requires Python 3.13):
 
 - Navigate: `cd backend`
-- Install Poetry: `pip install poetry`
-- Install dependencies: `poetry install`
+- Install uv: `pip install uv`
+- Install dependencies: `uv sync`
 - Backend codebase in `backend/app/` with `pyproject.toml`
 - **Use Docker if system Python < 3.13**
 

@@ -6,11 +6,17 @@ import {
 } from '@/utils/serviceUtils'
 
 export const health_steps = {
-  getUserHealthSteps() {
-    return fetchGetRequest('health/steps')
-  },
-  getUserHealthStepsWithPagination(pageNumber, numRecords) {
-    return fetchGetRequest(`health/steps/page_number/${pageNumber}/num_records/${numRecords}`)
+  getUserHealthStepsWithPagination(pageNumber, numRecords, paginationFilter, intervalFilter) {
+    const params = new URLSearchParams()
+    if (paginationFilter !== 'disabled') {
+      params.append('page_number', pageNumber)
+      params.append('num_records', numRecords)
+    }
+    params.append('interval', intervalFilter)
+
+    const queryString = params.toString()
+    const url = queryString ? `health/steps?${queryString}` : 'health/steps'
+    return fetchGetRequest(url)
   },
   createHealthSteps(data) {
     return fetchPostRequest('health/steps', data)

@@ -1,3 +1,5 @@
+"""Authenticated API router for activity exercise titles."""
+
 from typing import Annotated, Callable
 
 from fastapi import APIRouter, Depends, Security
@@ -10,22 +12,33 @@ import auth.security as auth_security
 
 import core.database as core_database
 
-# Define the API router
 router = APIRouter()
 
 
 @router.get(
     "/all",
-    response_model=list[activity_exercise_titles_schema.ActivityExerciseTitles] | None,
+    response_model=list[activity_exercise_titles_schema.ActivityExerciseTitles]
+    | None,
 )
 async def read_activities_exercise_titles_all(
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
+        Callable,
+        Security(auth_security.check_scopes, scopes=["activities:read"]),
     ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
-):
-    # Get the exercise titles from the database and return them
+    db: Annotated[Session, Depends(core_database.get_db)],
+) -> list[activity_exercise_titles_schema.ActivityExerciseTitles] | None:
+    """
+    Return all activity exercise titles.
+
+    Args:
+        _check_scopes: Scope check dependency for authorization.
+        db: Database session.
+
+    Returns:
+        List of ActivityExerciseTitles or None when empty.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
     return activity_exercise_titles_crud.get_activity_exercise_titles(db)
+

@@ -1,4 +1,5 @@
-import os
+"""Fernet token encryption helpers."""
+
 from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
 
@@ -6,108 +7,102 @@ import core.logger as core_logger
 import core.config as core_config
 
 
-def create_fernet_cipher():
+def create_fernet_cipher() -> Fernet:
     """
-    Creates and returns a Fernet cipher object using a key from the environment variable 'FERNET_KEY'.
+    Create a Fernet cipher from the configured key.
 
     Returns:
-        Fernet: An instance of the Fernet cipher initialized with the provided key.
+        Fernet cipher initialised with the configured key.
 
     Raises:
-        HTTPException: If there is an error retrieving the key or creating the Fernet cipher, 
-                       raises an HTTPException with a 500 Internal Server Error status code.
+        HTTPException: If the key cannot be loaded or parsed.
     """
     try:
-        # Get the key from environment variable or file and encode it to bytes
         key = core_config.read_secret("FERNET_KEY")
         if key is None:
-            raise ValueError("FERNET_KEY not found in environment or secrets file")
+            raise ValueError(
+                "FERNET_KEY not found in environment or secrets file"
+            )
         return Fernet(key.encode())
     except Exception as err:
-        # Log the exception
         core_logger.print_to_log(
-            f"Error in create_fernet_cipher: {err}", "error", exc=err
+            "Error in create_fernet_cipher: "
+            f"{type(err).__name__}",
+            "error",
+            exc=err,
         )
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from err
 
 
-def encrypt_token_fernet(token) -> str | None:
+def encrypt_token_fernet(token: object | None) -> str | None:
     """
-    Encrypts a given token using Fernet symmetric encryption.
+    Encrypt a token with Fernet symmetric encryption.
 
     Args:
-        token (Any): The token to be encrypted. If not a string, it will be converted to a string.
-                     If None, the function returns None.
+        token: Token value to encrypt, or None.
 
     Returns:
-        str | None: The encrypted token as a string, or None if the input token is None.
+        Encrypted token string, or None when input is None.
 
     Raises:
-        HTTPException: If an error occurs during encryption, raises an HTTPException with
-                       status code 500 (Internal Server Error) and logs the exception.
+        HTTPException: If encryption fails.
     """
     try:
         if token is None:
-            # If the token is None, return None
             return None
 
-        # Create a Fernet cipher
         cipher = create_fernet_cipher()
 
-        # Convert to string if token is not already a string
         if not isinstance(token, str):
             token = str(token)
 
-        # Encrypt the token
         return cipher.encrypt(token.encode()).decode()
     except Exception as err:
-        # Log the exception
         core_logger.print_to_log(
-            f"Error in encrypt_token_fernet: {err}", "error", exc=err
+            "Error in encrypt_token_fernet: "
+            f"{type(err).__name__}",
+            "error",
+            exc=err,
         )
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from err
 
 
-def decrypt_token_fernet(encrypted_token) -> str | None:
+def decrypt_token_fernet(encrypted_token: str | None) -> str | None:
     """
-    Decrypts an encrypted token using Fernet symmetric encryption.
+    Decrypt a Fernet-encrypted token.
 
     Args:
-        encrypted_token (str | None): The encrypted token as a string. If None, the function returns None.
+        encrypted_token: Encrypted token string, or None.
 
     Returns:
-        str | None: The decrypted token as a string if decryption is successful, or None if the input is None.
+        Decrypted token string, or None when input is None.
 
     Raises:
-        HTTPException: If an error occurs during decryption, raises an HTTPException with a 500 Internal Server Error status code and logs the exception.
+        HTTPException: If decryption fails.
     """
     try:
         if encrypted_token is None:
-            # If the encrypted token is None, return None
             return None
 
-        # Create a Fernet cipher
         cipher = create_fernet_cipher()
 
-        # Decrypt the token
         return cipher.decrypt(encrypted_token.encode()).decode()
     except Exception as err:
-        # Log the exception
         core_logger.print_to_log(
-            f"Error in decrypt_token_fernet: {err}", "error", exc=err
+            "Error in decrypt_token_fernet: "
+            f"{type(err).__name__}",
+            "error",
+            exc=err,
         )
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",

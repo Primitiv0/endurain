@@ -1,7 +1,11 @@
-import os
+"""Authentication utilities for the auth router.
+
+Provides credential verification, JWT/CSRF token creation, and the
+``complete_login`` / ``create_mobile_pkce_session_response`` helpers used by
+both password and PKCE login flows.
+"""
 
 from datetime import datetime, timedelta, timezone
-from typing import Tuple
 from fastapi import (
     HTTPException,
     status,
@@ -26,6 +30,8 @@ import users.users.crud as users_crud
 import users.users.schema as users_schema
 
 import users.users_sessions.utils as users_session_utils
+
+import core.config as core_config
 
 
 def authenticate_user(
@@ -54,6 +60,27 @@ def authenticate_user(
 
     # Check if the user exists and if the password is correct
     if not user:
+        # Run a dummy Argon2 verify so that the wall-clock latency of
+        # the "user not found" branch matches the "user found, wrong
+        # password" branch. Without this, Argon2's deliberately-tuned
+        # ~hundreds-of-milliseconds verify time is trivially observable
+        # from the network and lets an attacker enumerate valid
+        # usernames without ever tripping FailedLoginAttempts (lockout
+        # is only recorded on 401, which the attacker does not care
+        # about while probing existence).
+        password_hasher.dummy_verify()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unable to authenticate with provided credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # User has no local password (SSO-only account). Treat identically
+    # to "wrong password" so neither the response body nor the timing
+    # discloses the account's auth modality. The dummy verify keeps
+    # the latency consistent with a normal Argon2 verify.
+    if not user.password:
+        password_hasher.dummy_verify()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unable to authenticate with provided credentials",
@@ -85,7 +112,7 @@ def create_tokens(
     user: users_schema.UsersRead,
     token_manager: auth_token_manager.TokenManager,
     session_id: str | None = None,
-) -> Tuple[str, datetime, str, datetime, str, str]:
+) -> tuple[str, datetime, str, datetime, str, str]:
     """
     Generates session tokens for a user, including access token, refresh token, and CSRF token.
 
@@ -95,7 +122,7 @@ def create_tokens(
         session_id (str | None, optional): An optional session ID. If not provided, a new unique session ID is generated.
 
     Returns:
-        Tuple[str, datetime, str, datetime, str, str]:
+        tuple[str, datetime, str, datetime, str, str]:
             A tuple containing:
                 - session_id (str): The session identifier.
                 - access_token_exp (datetime): Expiration datetime of the access token.
@@ -126,6 +153,43 @@ def create_tokens(
         refresh_token_exp,
         refresh_token,
         csrf_token,
+    )
+
+
+def _is_secure_cookie_environment() -> bool:
+    """Return ``True`` when refresh cookies must be served with ``Secure``.
+
+    Single source of truth for the cookie ``Secure`` flag used by the
+    password login, refresh, and SSO token-exchange flows. Basing the
+    decision on ``ENVIRONMENT`` (``production``/``demo``) keeps the
+    behaviour identical across all three flows and avoids the prior
+    bug where the SSO path used ``FRONTEND_PROTOCOL`` and could issue
+    a non-Secure refresh cookie when that env var was missing or
+    mis-set in production.
+    """
+    return core_config.settings.ENVIRONMENT in {"production", "demo"}
+
+
+def set_refresh_token_cookie(
+    response: Response,
+    refresh_token: str,
+) -> None:
+    """Set the canonical refresh-token cookie with consistent attributes.
+
+    All web-client refresh-cookie writes (initial login, ``/refresh``,
+    SSO token exchange) must go through this helper so that
+    ``HttpOnly``, ``SameSite=Strict``, ``Path``, expiry, and the
+    ``Secure`` flag stay in lockstep.
+    """
+    response.set_cookie(
+        key="endurain_refresh_token",
+        value=refresh_token,
+        expires=datetime.now(timezone.utc)
+        + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
+        httponly=True,
+        path="/api/v1/auth",
+        secure=_is_secure_cookie_environment(),
+        samesite="strict",
     )
 
 
@@ -196,18 +260,11 @@ def complete_login(
 
     # Token delivery based on client type
     if client_type == "web":
-        # Web: Refresh token as httpOnly cookie (XSS protection)
-        secure = os.environ.get("FRONTEND_PROTOCOL") == "https"
-        response.set_cookie(
-            key="endurain_refresh_token",
-            value=refresh_token,
-            expires=datetime.now(timezone.utc)
-            + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-            httponly=True,
-            path="/",
-            secure=secure,
-            samesite="strict",  # OAuth 2.1: Strict for defense-in-depth
-        )
+        # Web: Refresh token as httpOnly cookie (XSS protection).
+        # Cookie attributes (Secure, SameSite, Path, expiry) are
+        # centralised in set_refresh_token_cookie so password login,
+        # /refresh, and SSO token exchange stay in lockstep.
+        set_refresh_token_cookie(response, refresh_token)
 
         # Return access token and CSRF token in body for in-memory storage
         # expires_in / refresh_token_expires_in are seconds-until-expiry
@@ -253,7 +310,7 @@ def create_mobile_pkce_session_response(
 
     Similar to SSO flow, but for password authentication.
     Returns session_id instead of tokens—tokens obtained via
-    POST /session/{session_id}/tokens with code_verifier.
+    POST /public/idp/session/{session_id}/tokens with code_verifier.
 
     Args:
         response: FastAPI response object
@@ -274,7 +331,7 @@ def create_mobile_pkce_session_response(
         - Mobile-only: Web clients use complete_login() with httpOnly cookies
         - Session created without tokens (pending exchange)
         - OAuth state record stores PKCE challenge
-        - Client must POST to /session/{session_id}/tokens with code_verifier
+        - Client must POST to /public/idp/session/{session_id}/tokens
         - Reuses existing token exchange endpoint from SSO flow
     """
     # Validate PKCE challenge format
@@ -320,5 +377,8 @@ def create_mobile_pkce_session_response(
     return auth_schema.MobileSessionResponse(
         session_id=session_id,
         mfa_required=False,
-        message="Complete authentication by exchanging tokens at /session/{session_id}/tokens",
+        message=(
+            "Complete authentication by exchanging tokens at "
+            "/public/idp/session/{session_id}/tokens"
+        ),
     )

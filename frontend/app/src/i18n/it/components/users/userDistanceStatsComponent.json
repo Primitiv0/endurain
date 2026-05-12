@@ -1,4 +1,7 @@
 {
   "thisWeekDistancesTitle": "Top 3 della settimana",
-  "thisMonthDistancesTitle": "Top 3 del mese"
+  "thisMonthDistancesTitle": "Top 3 del mese",
+  "toggleDistance": "Distanza",
+  "toggleTime": "Tempo",
+  "toggleCalories": "Calorie"
 }

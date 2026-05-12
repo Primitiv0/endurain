@@ -47,6 +47,90 @@ def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
     return db_user
 
 
+def verify_step_up_credentials(
+    user_id: int,
+    current_password: str | None,
+    mfa_code: str | None,
+    password_hasher: auth_password_hasher.PasswordHasher,
+    db: Session,
+) -> None:
+    """
+    Enforce step-up verification for sensitive account operations.
+
+    A valid access token alone is not sufficient authorisation for
+    operations that grant persistent account access (password
+    change, API-key creation, MFA enrolment, MFA backup-code
+    regeneration, MFA disable, etc.). This helper requires the
+    caller to re-prove possession of the current password and —
+    when MFA is enabled — a fresh TOTP or backup code.
+
+    SSO-only accounts have no local password (``db_user.password``
+    is ``None`` or empty). For those callers the password factor
+    is skipped because there is nothing to verify against; this
+    is a known coverage gap that should eventually be closed by
+    requiring a fresh IdP re-authentication on the same set of
+    sensitive endpoints. Until that flow exists, SSO-only users
+    rely on the access-token check plus (when applicable) MFA.
+
+    Args:
+        user_id: ID of the authenticated user.
+        current_password: The user's current password as supplied
+            in the request body. May be ``None`` for SSO-only
+            accounts; ignored when the account has no local
+            password.
+        mfa_code: TOTP or backup code, required when MFA is
+            enabled. Ignored when MFA is disabled.
+        password_hasher: Password hasher dependency.
+        db: SQLAlchemy database session.
+
+    Raises:
+        HTTPException: 401 if the current password is wrong, is
+            missing for an account that has one, or when MFA is
+            enabled and the supplied code is missing or invalid.
+            The error message intentionally does not distinguish
+            the failure modes.
+    """
+    # Local import to avoid a circular dependency between
+    # users.users.utils and profile.utils (which imports
+    # users.users.crud at module load time).
+    import profile.utils as profile_utils
+
+    db_user = get_user_by_id_or_404(user_id, db)
+
+    has_local_password = bool(db_user.password)
+    if has_local_password:
+        if not current_password:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Step-up verification failed",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not password_hasher.verify(current_password, db_user.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Step-up verification failed",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    # else: SSO-only account; no password to verify. See docstring
+    # for the known coverage gap and planned IdP re-auth flow.
+
+    if profile_utils.is_mfa_enabled_for_user(user_id, db):
+        if not mfa_code:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="MFA code required for this operation",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not profile_utils.verify_user_mfa(
+            user_id, mfa_code, password_hasher, db
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Step-up verification failed",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+
 def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
     """
     Retrieve all admin users from database or raise 404 error.
@@ -166,6 +250,11 @@ def create_user_default_data(user_id: int, db: Session) -> None:
     user_default_gear_crud.create_user_default_gear(user_id, db)
 
 
+_ALLOWED_USER_IMAGE_EXTENSIONS: frozenset[str] = frozenset(
+    {".png", ".jpg", ".jpeg", ".webp"}
+)
+
+
 async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> str:
     """
     Save user image file with security validation and update DB.
@@ -182,8 +271,8 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
         Path to saved image file.
 
     Raises:
-        HTTPException: 400 if filename missing, 500 if upload
-            fails.
+        HTTPException: 400 if filename or extension is invalid,
+            413 if too large, 500 if upload fails.
     """
     if not file.filename:
         raise HTTPException(
@@ -191,13 +280,25 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
             detail="Filename is required",
         )
 
-    # Get file extension and build filename
+    # Defense-in-depth allow-list on the user-supplied extension.
+    # SafeUploads still validates the magic number afterwards, so a
+    # mismatched signature is rejected even if the extension passes.
     _, file_extension = os.path.splitext(file.filename)
+    file_extension = file_extension.lower()
+    if file_extension not in _ALLOWED_USER_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported user image file type",
+        )
+
     filename = f"{user_id}{file_extension}"
 
     # Save file using centralized file upload handler
-    await core_file_uploads.save_image_file_and_validate_it(
-        file, core_config.USER_IMAGES_DIR, filename
+    await core_file_uploads.save_validated_upload(
+        file,
+        kind=core_file_uploads.UploadKind.IMAGE,
+        upload_dir=core_config.USER_IMAGES_DIR,
+        filename=filename,
     )
 
     # Update user photo path in database

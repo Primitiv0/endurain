@@ -1,23 +1,37 @@
+"""Aggregate application routers under the API root."""
+
 from fastapi import APIRouter, Depends, Security
 
 # Alphabetized router imports
 import activities.activity.router as activities_router
 import activities.activity.public_router as activities_public_router
-import activities.activity_exercise_titles.router as activity_exercise_titles_router
-import activities.activity_exercise_titles.public_router as activity_exercise_titles_public_router
+from activities.activity_exercise_titles import (
+    public_router as activity_exercise_titles_public_router,
+)
+from activities.activity_exercise_titles import (
+    router as activity_exercise_titles_router,
+)
 import activities.activity_laps.router as activity_laps_router
 import activities.activity_laps.public_router as activity_laps_public_router
 import activities.activity_media.router as activity_media_router
 import activities.activity_sets.router as activity_sets_router
 import activities.activity_sets.public_router as activity_sets_public_router
 import activities.activity_streams.router as activity_streams_router
-import activities.activity_streams.public_router as activity_streams_public_router
+from activities.activity_streams import (
+    public_router as activity_streams_public_router,
+)
 import activities.activity_summaries.router as activity_summaries_router
-import activities.activity_workout_steps.router as activity_workout_steps_router
-import activities.activity_workout_steps.public_router as activity_workout_steps_public_router
+from activities.activity_workout_steps import (
+    public_router as activity_workout_steps_public_router,
+)
+from activities.activity_workout_steps import (
+    router as activity_workout_steps_router,
+)
 import auth.router as auth_router
 import auth.identity_providers.router as identity_providers_router
-import auth.identity_providers.public_router as identity_providers_public_router
+from auth.identity_providers import (
+    public_router as identity_providers_public_router,
+)
 import auth.security as auth_security
 import core.config as core_config
 import core.router as core_router
@@ -25,10 +39,14 @@ import followers.router as followers_router
 import garmin.router as garmin_router
 import gears.gear.router as gears_router
 import gears.gear_components.router as gear_components_router
+import health.router as health_router
+import health.health_fasting.router as health_fasting_router
 import health.health_sleep.router as health_sleep_router
 import health.health_weight.router as health_weight_router
+import health.health_poop.router as health_poop_router
 import health.health_steps.router as health_steps_router
 import health.health_targets.router as health_targets_router
+import health.health_water.router as health_water_router
 import notifications.router as notifications_router
 import password_reset_tokens.router as password_reset_tokens_router
 import profile.browser_redirect_router as profile_browser_redirect_router
@@ -39,6 +57,7 @@ import users.users_sessions.router as users_session_router
 import sign_up_tokens.router as sign_up_tokens_router
 import strava.router as strava_router
 import users.users.router as users_router
+import users.users_api_keys.router as users_api_keys_router
 import users.users_goals.router as user_goals_router
 import users.users_identity_providers.router as user_identity_providers_router
 import users.users.public_router as users_public_router
@@ -54,6 +73,12 @@ router.include_router(
     prefix=core_config.ROOT_PATH + "/activities",
     tags=["activities"],
     dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
+    activities_router.api_upload_router,
+    prefix=core_config.ROOT_PATH + "/activities",
+    tags=["activities"],
+    dependencies=[Depends(auth_security.validate_access_token_or_api_key)],
 )
 router.include_router(
     activity_exercise_titles_router.router,
@@ -130,6 +155,12 @@ router.include_router(
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(
+    health_router.router,
+    prefix=core_config.ROOT_PATH + "/health",
+    tags=["health"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
     health_sleep_router.router,
     prefix=core_config.ROOT_PATH + "/health/sleep",
     tags=["health_sleep"],
@@ -148,9 +179,27 @@ router.include_router(
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(
+    health_fasting_router.router,
+    prefix=core_config.ROOT_PATH + "/health/fasting",
+    tags=["health_fasting"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
+    health_poop_router.router,
+    prefix=core_config.ROOT_PATH + "/health/poop",
+    tags=["health_poop"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
     health_targets_router.router,
-    prefix=core_config.ROOT_PATH + "/health_targets",
+    prefix=core_config.ROOT_PATH + "/health/targets",
     tags=["health_targets"],
+    dependencies=[Depends(auth_security.validate_access_token)],
+)
+router.include_router(
+    health_water_router.router,
+    prefix=core_config.ROOT_PATH + "/health/water",
+    tags=["health_water"],
     dependencies=[Depends(auth_security.validate_access_token)],
 )
 router.include_router(
@@ -223,6 +272,15 @@ router.include_router(
     user_goals_router.router,
     prefix=core_config.ROOT_PATH + "/profile/goals",
     tags=["profile"],
+    dependencies=[
+        Depends(auth_security.validate_access_token),
+        Security(auth_security.check_scopes, scopes=["profile"]),
+    ],
+)
+router.include_router(
+    users_api_keys_router.router,
+    prefix=core_config.ROOT_PATH + "/profile/api_keys",
+    tags=["api_keys"],
     dependencies=[
         Depends(auth_security.validate_access_token),
         Security(auth_security.check_scopes, scopes=["profile"]),

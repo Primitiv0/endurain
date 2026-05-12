@@ -1,64 +1,48 @@
+"""Application configuration.
+
+Environment-driven values are loaded into a single
+:class:`Settings` instance backed by ``pydantic-settings``.
+This gives us typed access, declarative validation,
+``.env`` file support, and a single override point for
+tests.
+
+Module-level constants are kept (``LOG_LEVEL``,
+``ENDURAIN_HOST``, ``DATA_DIR``, …) as thin aliases to
+``settings.X`` so that existing call sites
+(``core_config.LOG_LEVEL``, etc.) and existing test
+mocks (``mock.patch("...core_config.ATTR")``) keep
+working unchanged.
+"""
+
 import os
 import threading
 import stat
 from pathlib import Path
+from typing import Self
+
 from cryptography.fernet import Fernet
+from pydantic import field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from typing_extensions import Annotated
 
 import core.logger as core_logger
+import core.redis as core_redis
 
-# Constant related to version
-API_VERSION = "v0.17.8"
+# Pure constants — neither env-driven nor derived from settings.
+API_VERSION = "v0.18.0"
 LICENSE_NAME = "GNU Affero General Public License v3.0 or later"
 LICENSE_IDENTIFIER = "AGPL-3.0-or-later"
 LICENSE_URL = "https://spdx.org/licenses/AGPL-3.0-or-later.html"
 ROOT_PATH = "/api/v1"
-LOG_LEVEL = os.getenv("LOG_LEVEL", "info").lower()
-ENDURAIN_HOST = os.getenv("ENDURAIN_HOST", "http://localhost:8080")
-_allowed_schemes_raw = os.getenv("ALLOWED_REDIRECT_SCHEMES", "")
-ALLOWED_REDIRECT_SCHEMES: set[str] = (
-    {s.strip() for s in _allowed_schemes_raw.split(",") if s.strip()}
-    if _allowed_schemes_raw.strip()
-    else set()
-)
-FRONTEND_DIR = os.getenv("FRONTEND_DIR", "/app/frontend/dist")
-BACKEND_DIR = os.getenv("BACKEND_DIR", "/app/backend")
-DATA_DIR = os.getenv("DATA_DIR", f"{BACKEND_DIR}/data")
-LOGS_DIR = os.getenv("LOGS_DIR", f"{BACKEND_DIR}/logs")
+
 USER_IMAGES_URL_PATH = "user_images"
-USER_IMAGES_DIR = f"{DATA_DIR}/{USER_IMAGES_URL_PATH}"
 SERVER_IMAGES_URL_PATH = "server_images"
-SERVER_IMAGES_DIR = f"{DATA_DIR}/{SERVER_IMAGES_URL_PATH}"
-FILES_DIR = os.getenv("FILES_DIR", f"{DATA_DIR}/activity_files")
-ACTIVITY_MEDIA_DIR = os.getenv("ACTIVITY_MEDIA_DIR", f"{DATA_DIR}/activity_media")
-FILES_PROCESSED_DIR = f"{FILES_DIR}/processed"
-FILES_BULK_IMPORT_DIR = f"{FILES_DIR}/bulk_import"
-FILES_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{FILES_BULK_IMPORT_DIR}/import_errors"
+
+STRAVA_BULK_IMPORT_ACTIVITIES_FILE = "activities.csv"
 STRAVA_BULK_IMPORT_BIKES_FILE = "bikes.csv"
 STRAVA_BULK_IMPORT_SHOES_FILE = "shoes.csv"
 STRAVA_BULK_IMPORT_SHOES_UNNAMED_SHOE = "Unnamed Shoe "
-ENVIRONMENT = os.getenv("ENVIRONMENT", "production").lower()
-TZ = os.getenv("TZ", "UTC")
-REVERSE_GEO_PROVIDER = os.getenv("REVERSE_GEO_PROVIDER", "nominatim").lower()
-PHOTON_API_HOST = os.getenv("PHOTON_API_HOST", "photon.komoot.io").lower()
-PHOTON_API_USE_HTTPS = os.getenv("PHOTON_API_USE_HTTPS", "true").lower() == "true"
-NOMINATIM_API_HOST = os.getenv(
-    "NOMINATIM_API_HOST", "nominatim.openstreetmap.org"
-).lower()
-NOMINATIM_API_USE_HTTPS = os.getenv("NOMINATIM_API_USE_HTTPS", "true").lower() == "true"
-GEOCODES_MAPS_API = os.getenv("GEOCODES_MAPS_API", "changeme")
-try:
-    REVERSE_GEO_RATE_LIMIT = float(os.getenv("REVERSE_GEO_RATE_LIMIT", "1"))
-except ValueError:
-    core_logger.print_to_log_and_console(
-        "Invalid REVERSE_GEO_RATE_LIMIT value, expected an int; defaulting to 1.0",
-        "warning",
-    )
-    REVERSE_GEO_RATE_LIMIT = 1.0
-REVERSE_GEO_MIN_INTERVAL = (
-    1.0 / REVERSE_GEO_RATE_LIMIT if REVERSE_GEO_RATE_LIMIT > 0 else 0
-)
-REVERSE_GEO_LOCK = threading.Lock()
-REVERSE_GEO_LAST_CALL = 0.0
+
 SUPPORTED_FILE_FORMATS = [
     ".fit",
     ".gpx",
@@ -67,7 +51,227 @@ SUPPORTED_FILE_FORMATS = [
 ]  # used to screen bulk import files
 
 
-def read_secret(env_var_name: str, default_value: str | None = None) -> str | None:
+# Settings — every value driven by an environment variable.
+class Settings(BaseSettings):
+    """Environment-driven configuration values.
+
+    Field names mirror their environment variable names
+    so the existing ``ENDURAIN_HOST``, ``LOG_LEVEL``, …
+    contract is preserved end-to-end.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    # --- Logging / environment ---
+    LOG_LEVEL: str = "info"
+    ENVIRONMENT: str = "production"
+    TZ: str = "UTC"
+
+    # --- Host / redirects ---
+    ENDURAIN_HOST: str = "http://localhost:8080"
+    # NoDecode disables the default JSON pre-parsing for
+    # complex types so the validators below see the raw
+    # comma-separated env value (e.g. "a,b,c") rather than
+    # JSON. Without this pydantic-settings would attempt
+    # ``json.loads`` first and raise on plain strings.
+    ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = set()
+    TRUSTED_PROXIES: Annotated[list[str], NoDecode] = []
+
+    # --- Filesystem layout ---
+    FRONTEND_DIR: str = "/app/frontend/dist"
+    BACKEND_DIR: str = "/app/backend"
+    DATA_DIR: str = ""
+    LOGS_DIR: str = ""
+    FILES_DIR: str = ""
+    ACTIVITY_MEDIA_DIR: str = ""
+    ACTIVITY_THUMBNAILS_DIR: str = ""
+
+    # --- Rate limiting ---
+    RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_STORAGE_URI: str = "memory://"
+    AUTH_SECURITY_STORAGE_URI: str | None = None
+
+    # --- Reverse-geocoding providers ---
+    REVERSE_GEO_PROVIDER: str = "nominatim"
+    PHOTON_API_HOST: str = "photon.komoot.io"
+    PHOTON_API_USE_HTTPS: bool = True
+    NOMINATIM_API_HOST: str = "nominatim.openstreetmap.org"
+    NOMINATIM_API_USE_HTTPS: bool = True
+    GEOCODES_MAPS_API: str = "changeme"
+    REVERSE_GEO_RATE_LIMIT: float = 1.0
+
+    # --- Email (SMTP) ---
+    # SMTP_PASSWORD is read separately via ``read_secret``
+    # so it inherits the Docker-secrets ``_FILE`` contract
+    # used by DB_PASSWORD / SECRET_KEY / FERNET_KEY and is
+    # never materialised into Settings (kept out of any
+    # accidental ``settings.dict()`` dump).
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_SECURE: bool = True
+    SMTP_SECURE_TYPE: str = "starttls"
+
+    # ----- Validators -----
+
+    @field_validator("LOG_LEVEL", "ENVIRONMENT", mode="before")
+    @classmethod
+    def _to_lower(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
+
+    @field_validator("PHOTON_API_HOST", "NOMINATIM_API_HOST", mode="before")
+    @classmethod
+    def _host_lower(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
+
+    @field_validator("SMTP_SECURE_TYPE", mode="before")
+    @classmethod
+    def _smtp_secure_type_lower(cls, v):
+        """Normalise to lower-case and validate against the
+        small allow-list Apprise understands (``starttls``,
+        ``ssl``). Falls back to ``starttls`` on garbage input
+        with a warning instead of failing startup.
+        """
+        if v is None or v == "":
+            return "starttls"
+        if not isinstance(v, str):
+            return "starttls"
+        normalised = v.lower().strip()
+        if normalised not in ("starttls", "ssl"):
+            core_logger.print_to_log_and_console(
+                "Invalid SMTP_SECURE_TYPE value, expected 'starttls' or "
+                "'ssl'; defaulting to 'starttls'",
+                "warning",
+            )
+            return "starttls"
+        return normalised
+
+    @field_validator("ALLOWED_REDIRECT_SCHEMES", mode="before")
+    @classmethod
+    def _parse_allowed_schemes(cls, v):
+        """Accept comma-separated env value or already-parsed iterable."""
+        if v is None or v == "":
+            return set()
+        if isinstance(v, str):
+            return {s.strip() for s in v.split(",") if s.strip()}
+        return v
+
+    @field_validator("TRUSTED_PROXIES", mode="before")
+    @classmethod
+    def _parse_trusted_proxies(cls, v):
+        """Accept comma-separated env value or already-parsed iterable."""
+        if v is None or v == "":
+            return []
+        if isinstance(v, str):
+            return [ip.strip() for ip in v.split(",") if ip.strip()]
+        return v
+
+    @field_validator("REVERSE_GEO_RATE_LIMIT", mode="before")
+    @classmethod
+    def _parse_geo_rate(cls, v):
+        """Tolerate non-numeric strings instead of failing startup."""
+        if v is None or v == "":
+            return 1.0
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            core_logger.print_to_log_and_console(
+                "Invalid REVERSE_GEO_RATE_LIMIT value, expected a number;"
+                " defaulting to 1.0",
+                "warning",
+            )
+            return 1.0
+
+    @model_validator(mode="after")
+    def _fill_filesystem_defaults(self) -> Self:
+        """Derive directory defaults from BACKEND_DIR when not explicit."""
+        if not self.DATA_DIR:
+            self.DATA_DIR = f"{self.BACKEND_DIR}/data"
+        if not self.LOGS_DIR:
+            self.LOGS_DIR = f"{self.BACKEND_DIR}/logs"
+        if not self.FILES_DIR:
+            self.FILES_DIR = f"{self.DATA_DIR}/activity_files"
+        if not self.ACTIVITY_MEDIA_DIR:
+            self.ACTIVITY_MEDIA_DIR = f"{self.DATA_DIR}/activity_media"
+        if not self.ACTIVITY_THUMBNAILS_DIR:
+            self.ACTIVITY_THUMBNAILS_DIR = (
+                f"{self.DATA_DIR}/activity_thumbnails"
+            )
+        if (
+            not self.TRUSTED_PROXIES
+            and self.ENVIRONMENT == "development"
+            and "TRUSTED_PROXIES" not in os.environ
+        ):
+            self.TRUSTED_PROXIES = ["*"]
+        return self
+
+    @model_validator(mode="after")
+    def _warn_on_memory_security_storage(self) -> Self:
+        """Warn when production-like auth protections are process-local."""
+        if self.ENVIRONMENT == "development":
+            return self
+
+        if self.RATE_LIMIT_ENABLED and core_redis.is_memory_storage_uri(
+            self.RATE_LIMIT_STORAGE_URI
+        ):
+            core_logger.print_to_log_and_console(
+                "RATE_LIMIT_STORAGE_URI uses process-local memory outside "
+                "development. API rate-limit counters are not shared "
+                "across workers; use Redis for multi-worker deployments.",
+                "warning",
+            )
+
+        auth_security_storage_uri = (
+            self.AUTH_SECURITY_STORAGE_URI or self.RATE_LIMIT_STORAGE_URI
+        )
+        if core_redis.is_memory_storage_uri(auth_security_storage_uri):
+            core_logger.print_to_log_and_console(
+                "AUTH_SECURITY_STORAGE_URI resolves to process-local "
+                "memory outside development. Login lockout and pending "
+                "MFA state, including setup secrets, are not shared "
+                "across workers; use Redis for multi-worker deployments.",
+                "warning",
+            )
+
+        return self
+
+
+settings = Settings()
+
+
+# Derived module-level paths and runtime state.
+USER_IMAGES_DIR = f"{settings.DATA_DIR}/{USER_IMAGES_URL_PATH}"
+SERVER_IMAGES_DIR = f"{settings.DATA_DIR}/{SERVER_IMAGES_URL_PATH}"
+
+FILES_PROCESSED_DIR = f"{settings.FILES_DIR}/processed"
+FILES_BULK_IMPORT_DIR = f"{settings.FILES_DIR}/bulk_import"
+FILES_BULK_IMPORT_IMPORT_ERRORS_DIR = f"{FILES_BULK_IMPORT_DIR}/import_errors"
+STRAVA_BULK_IMPORT_DIR = f"{settings.FILES_DIR}/strava_import"
+STRAVA_BULK_IMPORT_ACTIVITIES_DIR = f"{STRAVA_BULK_IMPORT_DIR}/activities"
+STRAVA_BULK_IMPORT_MEDIA_DIR = f"{STRAVA_BULK_IMPORT_DIR}/media"
+STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR = (
+    f"{STRAVA_BULK_IMPORT_DIR}/import_errors"
+)
+
+REVERSE_GEO_MIN_INTERVAL = (
+    1.0 / settings.REVERSE_GEO_RATE_LIMIT
+    if settings.REVERSE_GEO_RATE_LIMIT > 0
+    else 0
+)
+REVERSE_GEO_LOCK = threading.Lock()
+REVERSE_GEO_LAST_CALL = 0.0
+
+
+# Secret loading and environment validation
+def read_secret(
+    env_var_name: str,
+    default_value: str | None = None,
+) -> str | None:
     """
     Read secret from environment variable or file.
 
@@ -107,27 +311,34 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
                 core_logger.print_to_log_and_console(
                     f"Secret file not found for {file_env_var}", "error"
                 )
-                raise EnvironmentError(f"Secret file not found for {file_env_var}")
+                raise EnvironmentError(
+                    f"Secret file not found for {file_env_var}"
+                )
 
             if not file_path.is_file():
                 core_logger.print_to_log_and_console(
                     f"Secret path is not a file for {file_env_var}", "error"
                 )
-                raise EnvironmentError(f"Secret path is not a file for {file_env_var}")
+                raise EnvironmentError(
+                    f"Secret path is not a file for {file_env_var}"
+                )
 
             # Security: Check file permissions (should not be world-readable)
             file_stat = file_path.stat()
             if file_stat.st_mode & stat.S_IROTH:
                 core_logger.print_to_log_and_console(
-                    f"Secret file is world-readable for {file_env_var}", "warning"
+                    f"Secret file is world-readable for {file_env_var}",
+                    "warning",
                 )
 
-            # Security: Limit file size to prevent memory exhaustion (max 64KB for secrets)
+            # Security: limit file size to prevent memory exhaustion.
             if file_stat.st_size > 65536:  # 64KB
                 core_logger.print_to_log_and_console(
                     f"Secret file too large for {file_env_var}", "error"
                 )
-                raise EnvironmentError(f"Secret file too large for {file_env_var}")
+                raise EnvironmentError(
+                    f"Secret file too large for {file_env_var}"
+                )
 
             # Read the secret file
             with file_path.open("r", encoding="utf-8") as secret_file:
@@ -135,7 +346,8 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
 
                 if content:
                     core_logger.print_to_log_and_console(
-                        f"Successfully loaded secret from file for {env_var_name}",
+                        "Successfully loaded secret from file for "
+                        f"{env_var_name}",
                         "debug",
                     )
                     return content
@@ -147,7 +359,8 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
         except (OSError, IOError, UnicodeDecodeError) as e:
             # Log error without exposing file path details
             core_logger.print_to_log_and_console(
-                f"Error reading secret file for {file_env_var}: {type(e).__name__}",
+                "Error reading secret file for "
+                f"{file_env_var}: {type(e).__name__}",
                 "error",
             )
             raise EnvironmentError(
@@ -155,7 +368,8 @@ def read_secret(env_var_name: str, default_value: str | None = None) -> str | No
             ) from e
         except Exception as e:
             core_logger.print_to_log_and_console(
-                f"Unexpected error reading secret for {file_env_var}: {type(e).__name__}",
+                "Unexpected error reading secret for "
+                f"{file_env_var}: {type(e).__name__}",
                 "error",
             )
             raise EnvironmentError(
@@ -187,8 +401,8 @@ def _is_safe_path(file_path: Path) -> bool:
             "/secrets/",  # Custom secrets directory
         ]
 
-        # For development, also allow relative paths in current working directory
-        if ENVIRONMENT == "development":
+        # For development, also allow paths in the working directory.
+        if settings.ENVIRONMENT == "development":
             cwd = Path.cwd()
             try:
                 file_path.relative_to(cwd)
@@ -199,7 +413,7 @@ def _is_safe_path(file_path: Path) -> bool:
         # Check if path starts with any allowed prefix
         return any(path_str.startswith(prefix) for prefix in allowed_prefixes)
 
-    except Exception:
+    except (OSError, ValueError, TypeError):
         return False
 
 
@@ -214,7 +428,10 @@ def validate_fernet_key(fernet_key: str | None) -> bool:
         True if key is valid, False otherwise.
     """
     if not fernet_key:
-        core_logger.print_to_log_and_console("FERNET_KEY is not set or empty", "error")
+        core_logger.print_to_log_and_console(
+            "FERNET_KEY is not set or empty",
+            "error",
+        )
         return False
 
     try:
@@ -226,14 +443,18 @@ def validate_fernet_key(fernet_key: str | None) -> bool:
             "FERNET_KEY validation successful", "debug"
         )
         return True
-    except ValueError as e:
+    except ValueError as err:
         core_logger.print_to_log_and_console(
-            f"FERNET_KEY validation failed: Invalid key format - {str(e)}", "error"
+            "FERNET_KEY validation failed: Invalid key format "
+            f"({type(err).__name__})",
+            "error",
         )
         return False
-    except Exception as e:
+    except Exception as err:
         core_logger.print_to_log_and_console(
-            f"FERNET_KEY validation failed: Unexpected error - {str(e)}", "error"
+            "FERNET_KEY validation failed: Unexpected error "
+            f"({type(err).__name__})",
+            "error",
         )
         return False
 
@@ -252,8 +473,10 @@ def validate_log_level(log_level: str) -> bool:
     if log_level.lower() in valid_levels:
         return True
     else:
+        allowed_values = ", ".join(sorted(valid_levels))
         core_logger.print_to_log_and_console(
-            f"Log level '{log_level}' is invalid. Must be one of: {', '.join(valid_levels)}",
+            f"Log level '{log_level}' is invalid. "
+            f"Must be one of: {allowed_values}",
             "error",
         )
         return False
@@ -280,41 +503,51 @@ def check_required_env_vars():
         value = read_secret(var) if var == "SMTP_PASSWORD" else os.getenv(var)
         if not value:
             core_logger.print_to_log_and_console(
-                f"Email not configured (missing: {var}). Password reset feature will not work.",
+                f"Email not configured (missing: {var}). "
+                "Password reset feature will not work.",
                 "info",
             )
 
-    # Check secret variables - either direct env var or _FILE variant must be present
+    # Check secret variables. Direct env var or _FILE must be present.
     for var in secret_vars:
         file_var = f"{var}_FILE"
         if var not in os.environ and file_var not in os.environ:
+            message = (
+                f"Missing required environment variable: {var} "
+                f"(or {file_var} for Docker secrets)"
+            )
             core_logger.print_to_log_and_console(
-                f"Missing required environment variable: {var} (or {file_var} for Docker secrets)",
+                message,
                 "error",
             )
-            raise EnvironmentError(
-                f"Missing required environment variable: {var} (or {file_var} for Docker secrets)"
-            )
+            raise EnvironmentError(message)
 
     # Check non-secret required variables
     for var in required_env_vars:
         if var not in os.environ:
+            message = f"Missing required environment variable: {var}"
             core_logger.print_to_log_and_console(
-                f"Missing required environment variable: {var}", "error"
+                message,
+                "error",
             )
-            raise EnvironmentError(f"Missing required environment variable: {var}")
+            raise EnvironmentError(message)
 
     # Validate FERNET_KEY if it's available
     fernet_key = read_secret("FERNET_KEY")
     if fernet_key:
         is_valid = validate_fernet_key(fernet_key)
         if not is_valid:
+            message = (
+                "FERNET_KEY validation failed. Please check the key "
+                "format and regenerate if necessary."
+            )
             core_logger.print_to_log_and_console(
-                "FERNET_KEY validation failed. Please check the key format and regenerate if necessary.",
+                message,
                 "warning",
             )
+            raise ValueError(message)
 
-    validate_log_level(LOG_LEVEL)
+    validate_log_level(settings.LOG_LEVEL)
 
 
 def check_required_dirs():
@@ -325,23 +558,26 @@ def check_required_dirs():
         EnvironmentError: If directory is not valid.
     """
     required_dirs = [
-        DATA_DIR,
+        settings.DATA_DIR,
         USER_IMAGES_DIR,
         SERVER_IMAGES_DIR,
-        ACTIVITY_MEDIA_DIR,
-        FILES_DIR,
+        settings.ACTIVITY_MEDIA_DIR,
+        settings.ACTIVITY_THUMBNAILS_DIR,
+        settings.FILES_DIR,
         FILES_PROCESSED_DIR,
         FILES_BULK_IMPORT_DIR,
         FILES_BULK_IMPORT_IMPORT_ERRORS_DIR,
-        LOGS_DIR,
+        settings.LOGS_DIR,
     ]
 
     for required_dir in required_dirs:
-        if not os.path.exists(required_dir):
-            os.mkdir(required_dir)
-        elif not os.path.isdir(required_dir):
+        required_path = Path(required_dir)
+        if not required_path.exists():
+            required_path.mkdir(parents=True)
+        elif not required_path.is_dir():
             core_logger.print_to_log_and_console(
-                f"Required directory is not a directory: {required_dir}", "error"
+                f"Required directory is not a directory: {required_dir}",
+                "error",
             )
             raise EnvironmentError(
                 f"Required directory is not a directory: {required_dir}"

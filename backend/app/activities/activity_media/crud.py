@@ -1,305 +1,308 @@
-import os
+"""CRUD operations for activity media records."""
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-import activities.activity.schema as activities_schema
-import activities.activity.models as activity_models
 import activities.activity.crud as activity_crud
-
+import activities.activity.models as activity_models
 import activities.activity_media.models as activity_media_models
 import activities.activity_media.schema as activity_media_schema
 
+import core.config as core_config
+import core.decorators as core_decorators
+import core.file_uploads as core_file_uploads
 import core.logger as core_logger
 
 
-def get_all_activity_media(db: Session):
-    try:
-        # Fetch all activity media from the database
-        activity_media = db.query(activity_media_models.ActivityMedia).all()
+@core_decorators.handle_db_errors
+def get_all_activity_media(
+    db: Session,
+) -> list[activity_media_models.ActivityMedia]:
+    """
+    Retrieve every activity media record in the database.
 
-        if not activity_media:
-            return []
+    Args:
+        db: Database session.
 
-        return activity_media
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_all_activity_media: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Returns:
+        List of ActivityMedia models (empty if none exist).
 
-
-def get_activity_media(activity_id: int, token_user_id: int, db: Session):
-    try:
-        activity = activity_crud.get_activity_by_id_from_user_id(
-            activity_id, token_user_id, db
-        )
-
-        if not activity:
-            # If the activity does not exist, return None
-            return None
-
-        """ user_is_owner = True
-        if token_user_id != activity.user_id:
-            user_is_owner = False
-
-        if not user_is_owner and activity.hide_laps:
-            # If the user is not the owner and laps are hidden, return None
-            return None """
-
-        # Get the activity media from the database
-        activity_media = (
-            db.query(activity_media_models.ActivityMedia)
-            .filter(
-                activity_media_models.ActivityMedia.activity_id == activity_id,
-            )
-            .all()
-        )
-
-        # Check if there are activity media if not return None
-        if not activity_media:
-            return None
-
-        # Return the activity media
-        return activity_media
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_activity_media: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = select(activity_media_models.ActivityMedia)
+    return list(db.scalars(stmt).all())
 
 
+@core_decorators.handle_db_errors
+def get_activity_media(
+    activity_id: int, token_user_id: int, db: Session
+) -> list[activity_media_models.ActivityMedia] | None:
+    """
+    Retrieve all media records for a single activity owned by the user.
+
+    Args:
+        activity_id: Activity ID to fetch media for.
+        token_user_id: ID of the user making the request.
+        db: Database session.
+
+    Returns:
+        List of ActivityMedia models, or None if the activity is not
+        accessible or has no media.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    activity = activity_crud.get_activity_by_id_from_user_id(
+        activity_id, token_user_id, db
+    )
+    if not activity:
+        return None
+
+    stmt = select(activity_media_models.ActivityMedia).where(
+        activity_media_models.ActivityMedia.activity_id == activity_id
+    )
+    activity_media = list(db.scalars(stmt).all())
+
+    if not activity_media:
+        return None
+
+    return activity_media
+
+
+@core_decorators.handle_db_errors
 def get_activities_media(
     activity_ids: list[int],
     token_user_id: int,
     db: Session,
-    activities: list[activities_schema.Activity] = None,
-):
-    try:
-        if not activity_ids:
-            return []
+    activities: list[activity_models.Activity] | None = None,
+) -> list[activity_media_models.ActivityMedia]:
+    """
+    Retrieve media records for the activities owned by the user.
 
-        if not activities:
-            # Fetch all activities at once
-            activities = (
-                db.query(activity_models.Activity)
-                .filter(activity_models.Activity.id.in_(activity_ids))
-                .all()
-            )
+    Args:
+        activity_ids: Activity IDs to consider.
+        token_user_id: ID of the user making the request.
+        db: Database session.
+        activities: Optional pre-fetched activity ORM instances; if not
+            provided they will be fetched from the database.
 
-        if not activities:
-            return []
+    Returns:
+        List of ActivityMedia models for activities owned by the user
+        (empty if none match).
 
-        # Filter out hidden media for activities the user doesn't own
-        allowed_ids = [
-            activity.id for activity in activities if activity.user_id == token_user_id
-        ]
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    if not activity_ids:
+        return []
 
-        if not allowed_ids:
-            return []
-
-        # Fetch all media for allowed activities
-        activity_media = (
-            db.query(activity_media_models.ActivityMedia)
-            .filter(activity_media_models.ActivityMedia.activity_id.in_(allowed_ids))
-            .all()
+    if not activities:
+        stmt = select(activity_models.Activity).where(
+            activity_models.Activity.id.in_(activity_ids)
         )
+        activities = list(db.scalars(stmt).all())
 
-        if not activity_media:
-            return []
+    if not activities:
+        return []
 
-        return activity_media
+    allowed_ids = [
+        activity.id
+        for activity in activities
+        if activity.user_id == token_user_id
+    ]
+    if not allowed_ids:
+        return []
 
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Error in get_activities_media: {err}", "error", exc=err
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = select(activity_media_models.ActivityMedia).where(
+        activity_media_models.ActivityMedia.activity_id.in_(allowed_ids)
+    )
+    return list(db.scalars(stmt).all())
 
 
-def create_activity_media(activity_id: int, media_path: str, db: Session):
+@core_decorators.handle_db_errors
+def create_activity_media(
+    activity_id: int, media_path: str, db: Session
+) -> activity_media_models.ActivityMedia:
+    """
+    Create a new activity media record.
+
+    Args:
+        activity_id: Activity ID the media belongs to.
+        media_path: Filesystem path to the stored media file.
+        db: Database session.
+
+    Returns:
+        The newly created ActivityMedia model instance.
+
+    Raises:
+        HTTPException:
+            - 409 Conflict: If a record with the same ``media_path`` exists.
+            - 500 Internal Server Error: For any other database error.
+    """
     try:
-        # Create a new activity_media
         db_activity_media = activity_media_models.ActivityMedia(
             activity_id=activity_id,
             media_path=media_path,
             media_type=1,
         )
-
-        # Add the activity_media to the database
         db.add(db_activity_media)
         db.commit()
         db.refresh(db_activity_media)
-
-        # Return activity_media
         return db_activity_media
     except IntegrityError as integrity_error:
-        # Rollback the transaction
         db.rollback()
-
-        # Raise an HTTPException with a 409 Conflict status code
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Duplicate entry error. Check if path and file name are unique.",
+            detail=(
+                "Duplicate entry error. Check if path and file name are "
+                "unique."
+            ),
         ) from integrity_error
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in create_activity_media: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
 
 
+@core_decorators.handle_db_errors
 def create_activity_medias(
     activity_media: list[activity_media_schema.ActivityMedia],
     activity_id: int,
     db: Session,
-):
-    try:
-        # Create a list to store the ActivityMedia objects
-        media = []
+) -> None:
+    """
+    Persist a batch of activity media records for a single activity.
 
-        # Iterate over the list of ActivityMedia objects
-        for media_item in activity_media:
-            # Create an ActivityMedia object
-            db_media = activity_media_models.ActivityMedia(
+    Args:
+        activity_media: List of ActivityMedia Pydantic schemas.
+        activity_id: Activity ID the media belong to.
+        db: Database session.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    media: list[activity_media_models.ActivityMedia] = []
+    for media_item in activity_media:
+        media.append(
+            activity_media_models.ActivityMedia(
                 activity_id=activity_id,
-                **{
-                    key: getattr(media_item, key)
-                    for key in [
-                        "media_path",
-                        "media_type",
-                    ]
-                },
+                media_path=media_item.media_path,
+                media_type=media_item.media_type,
             )
-
-            # Append the object to the list
-            media.append(db_media)
-
-        # Bulk insert the list of ActivityMedia objects
-        db.bulk_save_objects(media)
-        db.commit()
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in create_activity_medias: {err}", "error", exc=err
         )
 
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    if not media:
+        return
+
+    db.add_all(media)
+    db.commit()
 
 
+@core_decorators.handle_db_errors
 def edit_activity_media_media_path(
     activity_media_id: int, media_path: str, db: Session
-):
-    try:
-        # Get the user from the database
-        db_activity_media = (
-            db.query(activity_media_models.ActivityMedia).filter(activity_media_models.ActivityMedia.id == activity_media_id).first()
-        )
+) -> activity_media_models.ActivityMedia:
+    """
+    Update the ``media_path`` of an activity media record.
 
-        # Update the user
-        db_activity_media.media_path = media_path
+    Args:
+        activity_media_id: ID of the activity media record to update.
+        media_path: New filesystem path to assign.
+        db: Database session.
 
-        # Commit the transaction
-        db.commit()
+    Returns:
+        The refreshed ActivityMedia model instance.
 
-        # Return the media path
-        return media_path
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
+    Raises:
+        HTTPException:
+            - 404 Not Found: If the record does not exist.
+            - 500 Internal Server Error: For any other database error.
+    """
+    stmt = select(activity_media_models.ActivityMedia).where(
+        activity_media_models.ActivityMedia.id == activity_media_id
+    )
+    db_activity_media = db.scalars(stmt).first()
 
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in edit_activity_media_media_path: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
+    if db_activity_media is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
-
-
-
-def delete_activity_media(activity_media_id: int, token_user_id: int, db: Session):
-    try:
-        # Get the activity media from the database
-        activity_media = (
-            db.query(activity_media_models.ActivityMedia)
-            .filter(activity_media_models.ActivityMedia.id == activity_media_id)
-            .first()
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity media not found",
         )
 
-        if not activity_media:
-            # If the activity media does not exist, raise a 404 Not Found error
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Activity media not found",
-            )
+    db_activity_media.media_path = media_path
+    db.commit()
+    db.refresh(db_activity_media)
+    return db_activity_media
 
-        activity = activity_crud.get_activity_by_id_from_user_id(
-            activity_media.activity_id, token_user_id, db
-        )
 
-        if not activity:
-            # If the activity does not exist, raise a 404 Not Found error
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Activity not found",
-            )
+@core_decorators.handle_db_errors
+def delete_activity_media(
+    activity_media_id: int, token_user_id: int, db: Session
+) -> None:
+    """
+    Delete an activity media record and its underlying file.
 
-        # Check if the user is the owner of the activity
-        if activity.user_id != token_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to delete this media",
-            )
+    The file deletion is restricted to paths inside the configured
+    ``ACTIVITY_MEDIA_DIR`` to prevent arbitrary file deletion (defense in
+    depth against tampered ``media_path`` values).
 
-        # Delete the activity media from the database
-        db.delete(activity_media)
-        db.commit()
+    Args:
+        activity_media_id: ID of the activity media record to delete.
+        token_user_id: ID of the user making the request.
+        db: Database session.
 
-        # Remove the media file from the filesystem
-        if os.path.exists(activity_media.media_path):
-            os.remove(activity_media.media_path)
+    Returns:
+        None.
 
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in delete_activity_media: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
+    Raises:
+        HTTPException:
+            - 404 Not Found: If the media or owning activity does not exist.
+            - 403 Forbidden: If the user does not own the activity.
+            - 500 Internal Server Error: For database errors.
+    """
+    stmt = select(activity_media_models.ActivityMedia).where(
+        activity_media_models.ActivityMedia.id == activity_media_id
+    )
+    activity_media = db.scalars(stmt).first()
+
+    if not activity_media:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity media not found",
+        )
+
+    activity = activity_crud.get_activity_by_id_from_user_id(
+        activity_media.activity_id, token_user_id, db
+    )
+    if not activity:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Activity not found",
+        )
+
+    if activity.user_id != token_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this media",
+        )
+
+    media_path = activity_media.media_path
+
+    db.delete(activity_media)
+    db.commit()
+
+    # Best-effort filesystem cleanup, confined to ACTIVITY_MEDIA_DIR.
+    if media_path:
+        try:
+            core_file_uploads.safe_remove_within(
+                media_path,
+                base_dir=core_config.settings.ACTIVITY_MEDIA_DIR,
+            )
+        except HTTPException as fs_err:
+            core_logger.print_to_log(
+                "Refused to remove activity media outside media dir "
+                f"for id {activity_media_id}: {fs_err.detail}",
+                "warning",
+            )

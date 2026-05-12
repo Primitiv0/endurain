@@ -13,10 +13,10 @@ export const activities = {
     return fetchGetRequest(`activities/user/${user_id}/week/${week_number}`)
   },
   getUserThisWeekStats(user_id) {
-    return fetchGetRequest(`activities/user/${user_id}/thisweek/distances`)
+    return fetchGetRequest(`activities/user/${user_id}/thisweek/stats`)
   },
   getUserThisMonthStats(user_id) {
-    return fetchGetRequest(`activities/user/${user_id}/thismonth/distances`)
+    return fetchGetRequest(`activities/user/${user_id}/thismonth/stats`)
   },
   getUserThisMonthActivitiesNumber(user_id) {
     return fetchGetRequest(`activities/user/${user_id}/thismonth/number`)
@@ -31,6 +31,13 @@ export const activities = {
     return fetchGetRequest(
       `activities/gear/${gear_id}/page_number/${pageNumber}/num_records/${numRecords}`
     )
+  },
+  getGearActivitiesList(gear_id, pageNumber, numRecords) {
+    const params = new URLSearchParams()
+    if (pageNumber) params.append('page_number', pageNumber)
+    if (numRecords) params.append('num_records', numRecords)
+    const query = params.toString()
+    return fetchGetRequest(`activities/gear/${gear_id}/list${query ? `?${query}` : ''}`)
   },
   getUserNumberOfActivities(filters = {}) {
     let baseUrl = 'activities/number'

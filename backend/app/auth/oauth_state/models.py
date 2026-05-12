@@ -1,8 +1,18 @@
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey
+"""SQLAlchemy ORM model for OAuth/SSO flow state persistence."""
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 
 from core.database import Base
+
+if TYPE_CHECKING:
+    from auth.identity_providers.models import IdentityProvider
+    from users.users.models import Users
+    from users.users_sessions.models import UsersSessions
 
 
 class OAuthState(Base):
@@ -14,7 +24,7 @@ class OAuthState(Base):
     challenges, OIDC nonce, and flow metadata.
 
     Attributes:
-        id: Primary key, state parameter itself (random UUID).
+        id: Primary key, state parameter itself (random URL-safe token).
         idp_id: Foreign key to identity_provider.
         user_id: Foreign key to users (for link mode, nullable).
         code_challenge: PKCE challenge (base64url-encoded).
@@ -27,20 +37,20 @@ class OAuthState(Base):
         expires_at: Hard expiry at 10 minutes.
         used: Prevents replay attacks.
         identity_provider: Relationship to IdentityProvider model.
-        user: Relationship to Users model (nullable).
+        users: Relationship to Users model (nullable).
         users_sessions: Relationship to UsersSessions model.
     """
 
     __tablename__ = "oauth_states"
 
-    id = Column(
+    id: Mapped[str] = mapped_column(
         String(64),
         primary_key=True,
         index=True,
         comment="State parameter itself (secrets.token_urlsafe(32))",
     )
 
-    idp_id = Column(
+    idp_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("identity_providers.id", ondelete="CASCADE"),
         nullable=True,
@@ -48,7 +58,7 @@ class OAuthState(Base):
         comment="Identity provider ID (may be null if mobile logic)",
     )
 
-    user_id = Column(
+    user_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=True,
@@ -56,45 +66,57 @@ class OAuthState(Base):
         comment="User ID (for link mode)",
     )
 
-    code_challenge = Column(
-        String(128), nullable=True, comment="Base64url-encoded SHA256(code_verifier)"
+    code_challenge: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        comment="Base64url-encoded SHA256(code_verifier)",
     )
 
-    code_challenge_method = Column(
-        String(10), nullable=True, comment="PKCE method (only S256 supported)"
+    code_challenge_method: Mapped[str | None] = mapped_column(
+        String(10),
+        nullable=True,
+        comment="PKCE method (only S256 supported)",
     )
 
-    nonce = Column(
-        String(64), nullable=False, comment="OIDC nonce for ID token validation"
+    nonce: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        comment="OIDC nonce for ID token validation",
     )
 
-    redirect_path = Column(
-        String(500), nullable=True, comment="Frontend path after login"
+    redirect_path: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="Frontend path after login",
     )
 
-    client_type = Column(
-        String(10), nullable=False, comment="Client type: web or mobile"
+    client_type: Mapped[str] = mapped_column(
+        String(10),
+        nullable=False,
+        comment="Client type: web or mobile",
     )
 
-    ip_address = Column(
-        String(45), nullable=True, comment="Client IP address (IPv6 max length)"
+    ip_address: Mapped[str | None] = mapped_column(
+        String(45),
+        nullable=True,
+        comment="Client IP address (IPv6 max length)",
     )
 
-    created_at = Column(
-        DateTime,
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
         comment="OAuth state creation timestamp",
     )
 
-    expires_at = Column(
-        DateTime,
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         index=True,
         comment="Hard expiry at 10 minutes (cleanup marker)",
     )
 
-    used = Column(
+    used: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         nullable=False,
@@ -103,6 +125,12 @@ class OAuthState(Base):
     )
 
     # Relationships
-    identity_provider = relationship("IdentityProvider", back_populates="oauth_states")
-    users = relationship("Users", back_populates="oauth_states")
-    users_sessions = relationship("UsersSessions", back_populates="oauth_state")
+    identity_provider: Mapped["IdentityProvider | None"] = relationship(
+        "IdentityProvider", back_populates="oauth_states"
+    )
+    users: Mapped["Users | None"] = relationship(
+        "Users", back_populates="oauth_states"
+    )
+    users_sessions: Mapped[list["UsersSessions"]] = relationship(
+        "UsersSessions", back_populates="oauth_state"
+    )

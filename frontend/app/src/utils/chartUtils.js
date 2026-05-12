@@ -3,7 +3,7 @@
  * @param {number} seconds - The total number of seconds to format.
  * @returns {string} Formatted duration string (e.g., "2h 30m" or "45m").
  */
-export function formatDuration(seconds) {
+export function formatSecondsToHoursMinutes(seconds) {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   if (hours > 0) {
@@ -23,7 +23,7 @@ export function formatHrZoneLabel(value, timeSeconds) {
   if (!timeSeconds || timeSeconds === 0) {
     return percentage
   }
-  const timeStr = formatDuration(timeSeconds)
+  const timeStr = formatSecondsToHoursMinutes(timeSeconds)
   return `${percentage} (${timeStr})`
 }
 

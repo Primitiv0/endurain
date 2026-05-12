@@ -2,6 +2,8 @@
 docker-compose.yml
 .vscode/
 .env
+.venv/
+docker_forgejo_runner/data
 
 # aux folder
 .garminconnect
@@ -20,6 +22,7 @@ backend/tests/*/*/*/__pycache__/
 backend/tests/*/*/*/*/__pycache__/
 
 # Tests
+.coverage
 backend/.coverage
 backend/htmlcov/
 backend/coverage.xml
@@ -45,6 +48,11 @@ backend/app/data/activity_media/*.jpeg
 backend/app/data/activity_media/*.png
 backend/app/data/activity_media/*.jpg
 
+# activity thumbnail folder images
+backend/app/data/activity_thumbnails/*.jpeg
+backend/app/data/activity_thumbnails/*.png
+backend/app/data/activity_thumbnails/*.jpg
+
 # gpx and fit files
 backend/app/data/activity_files/*.gpx
 backend/app/data/activity_files/*.zip
@@ -65,6 +73,11 @@ backend/app/data/activity_files/processed/*.fit
 backend/app/data/activity_files/processed/*.tcx
 backend/app/data/activity_files/processed/*.gz
 backend/app/data/activity_files/processed/*.csv
+backend/app/data/activity_files/strava_import/*.gpx
+backend/app/data/activity_files/strava_import/*.fit
+backend/app/data/activity_files/strava_import/*.tcx
+backend/app/data/activity_files/strava_import/*.gz
+backend/app/data/activity_files/strava_import/*.csv
 backend/data/activity_files/
 
 # Frontend

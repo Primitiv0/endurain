@@ -5,10 +5,10 @@ from typing import Annotated, Callable
 import aiofiles
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     Security,
     UploadFile,
-    HTTPException,
     Request,
     status,
 )
@@ -27,6 +27,8 @@ import core.database as core_database
 import core.logger as core_logger
 import core.config as core_config
 import core.file_uploads as core_file_uploads
+
+import activities.activity.utils as activities_utils
 
 # Define the API router
 router = APIRouter()
@@ -88,10 +90,11 @@ async def list_tile_maps_templates(
 @router.put(
     "",
     response_model=server_settings_schema.ServerSettingsRead,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_200_OK,
 )
 async def edit_server_settings(
     request: Request,
+    background_tasks: BackgroundTasks,
     server_settings_attributes: server_settings_schema.ServerSettingsEdit,
     _check_scopes: Annotated[
         Callable,
@@ -130,6 +133,24 @@ async def edit_server_settings(
                 f"Error updating tile domains in app.state: {e}", "error", exc=e
             )
 
+    # Trigger full thumbnail regeneration if the setting is enabled
+    # and any map-related field was part of this update
+    _MAP_FIELDS = {"tileserver_url", "tileserver_api_key", "map_background_color"}
+    changed_fields = set(
+        server_settings_attributes.model_dump(exclude_unset=True).keys()
+    )
+    if result.tileserver_regenerate_thumbnails_on_change and (
+        changed_fields & _MAP_FIELDS
+    ):
+        core_logger.print_to_log(
+            "Tile server settings changed with regeneration enabled — "
+            "scheduling thumbnail regeneration",
+            "info",
+        )
+        background_tasks.add_task(
+            activities_utils.delete_and_regenerate_all_activity_thumbnails
+        )
+
     return result
 
 
@@ -161,8 +182,11 @@ async def upload_login_photo(
         Full file path where file was saved.
     """
     # Save file using centralized file upload handler
-    await core_file_uploads.save_image_file_and_validate_it(
-        file, core_config.SERVER_IMAGES_DIR, "login.png"
+    await core_file_uploads.save_validated_upload(
+        file,
+        kind=core_file_uploads.UploadKind.IMAGE,
+        upload_dir=core_config.SERVER_IMAGES_DIR,
+        filename="login.png",
     )
 
     server_settings_crud.update_server_settings_login_photo_set(True, db)

@@ -68,13 +68,13 @@ Splitting up the setup like this make it easy to handle updates to the container
 
 To make it as easy as possible for selfhoster to get up and running examples of docker-compose.yml and .env is on the git repo. Here are links to the files on the repo:
 
-* [docker-compose.yml.example](https://raw.githubusercontent.com/endurain-project/endurain/refs/heads/master/docker-compose.yml.example)
-* [.env.example](https://raw.githubusercontent.com/endurain-project/endurain/refs/heads/master/.env.example)
+* [docker-compose.yml.example](https://codeberg.org/endurain-project/endurain/raw/branch/master/docker-compose.yml.example)
+* [.env.example](https://codeberg.org/endurain-project/endurain/raw/branch/master/.env.example)
 
 ```bash
 cd /opt/endurain
-wget https://raw.githubusercontent.com/endurain-project/endurain/refs/heads/master/docker-compose.yml.example
-wget https://raw.githubusercontent.com/endurain-project/endurain/refs/heads/master/.env.example
+wget https://codeberg.org/endurain-project/endurain/raw/branch/master/docker-compose.yml.example
+wget https://codeberg.org/endurain-project/endurain/raw/branch/master/.env.example
 
 mv docker-compose.yml.example docker-compose.yml
 mv .env.example .env

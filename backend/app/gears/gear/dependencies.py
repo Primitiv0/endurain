@@ -1,30 +1,38 @@
+"""Gear dependency validators."""
+
 import core.dependencies as core_dependencies
 
-def validate_gear_id(gear_id: int):
+
+def validate_gear_id(gear_id: int) -> None:
     """
-    Validates that the provided gear_id is greater than zero.
+    Validate that gear_id is greater than zero.
 
     Args:
-        gear_id (int): The ID of the gear to validate.
+        gear_id: The ID of the gear to validate.
 
     Raises:
-        ValueError: If the gear_id is not greater than zero.
+        HTTPException: If gear_id is invalid.
     """
-    # Check if id higher than 0
-    core_dependencies.validate_id(id=gear_id, min=0, message="Invalid gear ID")
+    core_dependencies.validate_id(
+        id=gear_id,
+        min=0,
+        message="Invalid gear ID",
+    )
 
-def validate_gear_type(gear_type: int):
+
+def validate_gear_type(gear_type: int) -> None:
     """
-    Validates that the provided gear_type is within the allowed range.
+    Validate that gear_type is within 1 and 8.
 
     Args:
-        gear_type (int): The type of gear to validate.
+        gear_type: The type of gear to validate.
 
     Raises:
-        ValueError: If gear_type is not between 1 and 7 (inclusive).
-
-    Returns:
-        None
+        HTTPException: If gear_type is invalid.
     """
-    # Check if gear type is within 1 and 8
-    core_dependencies.validate_type(type=gear_type, min=1, max=8, message="Invalid gear type")
+    core_dependencies.validate_type(
+        type=gear_type,
+        min=1,
+        max=8,
+        message="Invalid gear type",
+    )

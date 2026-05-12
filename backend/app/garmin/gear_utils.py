@@ -47,7 +47,7 @@ def fetch_and_process_gear(
     return len(processed_gears)
 
 
-def process_gear(gear, user_id: int, db: Session) -> gears_schema.Gear | None:
+def process_gear(gear, user_id: int, db: Session) -> gears_schema.GearCreate | None:
     # Get the gear by garminconnect uuid from user id
     gear_db = gears_crud.get_gear_by_garminconnect_id_from_user_id(
         gear["uuid"], user_id, db
@@ -57,7 +57,7 @@ def process_gear(gear, user_id: int, db: Session) -> gears_schema.Gear | None:
     if gear_db:
         return None
 
-    new_gear = gears_schema.Gear(
+    new_gear = gears_schema.GearCreate(
         brand=gear["gearMakeName"] if gear["gearMakeName"] else None,
         model=gear["gearModelName"] if gear["gearModelName"] else None,
         nickname=(
@@ -72,23 +72,18 @@ def process_gear(gear, user_id: int, db: Session) -> gears_schema.Gear | None:
     return new_gear
 
 
-def iterate_over_activities_and_set_gear(
+def match_gear_for_activity(
     activity: activities_schema.Activity,
-    gears: list[gears_schema.Gear],
-    counter: int,
-) -> dict:
-
-    # Iterate over gears and set gear if applicable
-    if activity.garminconnect_gear_id is not None:
-        for gear in gears:
-            if activity.garminconnect_gear_id == gear.garminconnect_gear_id:
-                core_logger.print_to_log(f"Gear found: {gear.nickname}")
-                activity.gear_id = gear.id
-                counter += 1
-                break
-
-    # Return the counter
-    return {"counter": counter, "activity": activity}
+    gears: list[gears_schema.GearRead],
+) -> int | None:
+    """Return the local gear ID matching this activity's Garmin gear, else None."""
+    if activity.garminconnect_gear_id is None:
+        return None
+    for gear in gears:
+        if activity.garminconnect_gear_id == gear.garminconnect_gear_id:
+            core_logger.print_to_log(f"Gear found: {gear.nickname}")
+            return gear.id
+    return None
 
 
 def set_activities_gear(user_id: int, db: Session) -> int:
@@ -113,22 +108,20 @@ def set_activities_gear(user_id: int, db: Session) -> int:
     if gears is None:
         return 0
 
-    # Initialize a counter
-    counter = 0
-
-    # Initialize an empty list for results
-    activities_parsed = []
-
-    # iterate over activities and set gear if applicable
+    # Build {activity_id: gear_id} for all activities with a match
+    gear_assignments: dict[int, int | None] = {}
     for activity in activities:
-        parsed_activity = iterate_over_activities_and_set_gear(activity, gears, counter)
-        counter = parsed_activity["counter"]
-        activities_parsed.append(parsed_activity["activity"])
+        matched_gear_id = match_gear_for_activity(activity, gears)
+        if matched_gear_id is not None:
+            gear_assignments[activity.id] = matched_gear_id
 
-    if len(activities_parsed) > 0:
-        activities_crud.edit_multiple_activities_gear_id(activities_parsed, user_id, db)
+    # Persist via CRUD (single UPDATE per distinct gear_id)
+    if gear_assignments:
+        activities_crud.bulk_set_activities_gear_id(
+            user_id, gear_assignments, db
+        )
 
-    return counter
+    return len(gear_assignments)
 
 
 def get_user_gear(user_id: int):
@@ -150,8 +143,7 @@ def get_user_gear(user_id: int):
 
         # Create a Garmin Connect client with the user's access token
         garminconnect_client = garmin_utils.login_garminconnect_using_tokens(
-            user_integrations.garminconnect_oauth1,
-            user_integrations.garminconnect_oauth2,
+            user_integrations.garminconnect_token,
         )
 
         # Set the user's gear to sync to True

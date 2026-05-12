@@ -1,6 +1,6 @@
-import os
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, Callable
+from typing import Annotated
 
 from fastapi import (
     APIRouter,
@@ -20,6 +20,7 @@ import auth.constants as auth_constants
 import auth.password_hasher as auth_password_hasher
 import auth.token_manager as auth_token_manager
 import auth.schema as auth_schema
+import auth.security_stores as auth_security_stores
 
 import auth.identity_providers.utils as idp_utils
 
@@ -34,6 +35,7 @@ import users.users_sessions.rotated_refresh_tokens.utils as users_session_rotate
 import profile.utils as profile_utils
 
 import core.database as core_database
+import core.config as core_config
 import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 
@@ -41,19 +43,54 @@ import core.rate_limit as core_rate_limit
 router = APIRouter()
 
 
-@router.post("/login")
-@core_rate_limit.limiter.limit(core_rate_limit.SESSION_LOGIN_LIMIT)
+def _raise_auth_security_store_unavailable(
+    err: auth_security_stores.AuthSecurityStoreUnavailable,
+) -> None:
+    """
+    Return a controlled response when auth security storage is down.
+
+    Args:
+        err: Auth security storage outage.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: Always raised with a 503 status.
+    """
+    core_logger.print_to_log(
+        "Auth security storage unavailable during authentication",
+        "error",
+        exc=err,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Authentication temporarily unavailable",
+    ) from err
+
+
+@router.post(
+    "/login",
+    response_model=(
+        auth_schema.MFARequiredResponse
+        | auth_schema.MobileSessionResponse
+        | auth_schema.TokenResponseWeb
+        | auth_schema.TokenResponseMobile
+    ),
+)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def login_for_access_token(
     response: Response,
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
     failed_attempts: Annotated[
-        auth_schema.FailedLoginAttempts,
-        Depends(auth_schema.get_failed_login_attempts),
+        auth_security_stores.FailedLoginStore,
+        Depends(auth_security_stores.get_failed_login_attempts),
     ],
     pending_mfa_store: Annotated[
-        auth_schema.PendingMFALogin, Depends(auth_schema.get_pending_mfa_store)
+        auth_security_stores.PendingMFAStore,
+        Depends(auth_security_stores.get_pending_mfa_store),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -88,7 +125,8 @@ async def login_for_access_token(
     PKCE Support (Mobile):
     - Mobile clients can optionally provide code_challenge and code_challenge_method
     - For mobile clients with PKCE parameters, tokens are not returned directly
-    - Instead, a session_id is returned for secure token exchange via /session/{session_id}/tokens
+        - Instead, a session_id is returned for secure token exchange via
+            /public/idp/session/{session_id}/tokens
 
     Args:
         response: The HTTP response object
@@ -113,16 +151,23 @@ async def login_for_access_token(
         HTTPException: If authentication fails, user is inactive, or account is locked
     """
     # Check if username is locked out from too many failed login attempts
-    if failed_attempts.is_locked_out(form_data.username):
-        lockout_until = failed_attempts.get_lockout_time(form_data.username)
-        if lockout_until:
-            seconds_remaining = int(
-                (lockout_until - datetime.now(timezone.utc)).total_seconds()
+    try:
+        if failed_attempts.is_locked_out(form_data.username):
+            lockout_until = failed_attempts.get_lockout_time(
+                form_data.username
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Account locked due to too many failed login attempts. Try again in {seconds_remaining} seconds.",
-            )
+            if lockout_until:
+                seconds_remaining = int(
+                    (
+                        lockout_until - datetime.now(timezone.utc)
+                    ).total_seconds()
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Account locked due to too many failed login attempts. Try again in {seconds_remaining} seconds.",
+                )
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Authenticate user
     try:
@@ -132,7 +177,12 @@ async def login_for_access_token(
     except HTTPException as err:
         # Record failed attempt on authentication errors (401 Unauthorized)
         if err.status_code == 401:
-            failed_attempts.record_failed_attempt(form_data.username)
+            try:
+                failed_attempts.record_failed_attempt(form_data.username)
+            except (
+                auth_security_stores.AuthSecurityStoreUnavailable
+            ) as store_err:
+                _raise_auth_security_store_unavailable(store_err)
         raise err
 
     # Check if the user is active
@@ -141,7 +191,10 @@ async def login_for_access_token(
     # Check if MFA is enabled for this user
     if profile_utils.is_mfa_enabled_for_user(user.id, db):
         # Store the user for pending MFA verification
-        pending_mfa_store.add_pending_login(form_data.username, user.id)
+        try:
+            pending_mfa_store.add_pending_login(form_data.username, user.id)
+        except auth_security_stores.AuthSecurityStoreUnavailable as err:
+            _raise_auth_security_store_unavailable(err)
 
         # Don't reset failed login attempts yet - wait for MFA verification
         # This prevents bypassing lockout by triggering MFA flow
@@ -163,12 +216,15 @@ async def login_for_access_token(
 
     # Password authentication successful and no MFA required
     # Reset failed login attempts counter
-    failed_attempts.reset_attempts(form_data.username)
+    try:
+        failed_attempts.reset_attempts(form_data.username)
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Mobile clients with PKCE use secure token exchange flow
     # Web clients don't need PKCE - they have httpOnly cookies and same-origin protection
     if client_type == "mobile" and code_challenge and code_challenge_method:
-        # Use PKCE exchange flow - tokens obtained via /session/{session_id}/tokens
+        # Use PKCE exchange flow through the public IdP token exchange endpoint
         return auth_utils.create_mobile_pkce_session_response(
             response,
             request,
@@ -185,19 +241,27 @@ async def login_for_access_token(
     )
 
 
-@router.post("/mfa/verify")
-@core_rate_limit.limiter.limit(core_rate_limit.MFA_VERIFY_LIMIT)
+@router.post(
+    "/mfa/verify",
+    response_model=(
+        auth_schema.MobileSessionResponse
+        | auth_schema.TokenResponseWeb
+        | auth_schema.TokenResponseMobile
+    ),
+)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def verify_mfa_and_login(
     response: Response,
     request: Request,
     mfa_request: auth_schema.MFALoginRequest,
     client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
     failed_attempts: Annotated[
-        auth_schema.FailedLoginAttempts,
-        Depends(auth_schema.get_failed_login_attempts),
+        auth_security_stores.FailedLoginStore,
+        Depends(auth_security_stores.get_failed_login_attempts),
     ],
     pending_mfa_store: Annotated[
-        auth_schema.PendingMFALogin, Depends(auth_schema.get_pending_mfa_store)
+        auth_security_stores.PendingMFAStore,
+        Depends(auth_security_stores.get_pending_mfa_store),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -223,7 +287,8 @@ async def verify_mfa_and_login(
     PKCE Support (Mobile):
     - Mobile clients can optionally provide code_challenge and code_challenge_method
     - For mobile clients with PKCE parameters, tokens are not returned directly
-    - Instead, a session_id is returned for secure token exchange via /session/{session_id}/tokens
+        - Instead, a session_id is returned for secure token exchange via
+            /public/idp/session/{session_id}/tokens
 
     Args:
         response: The HTTP response object
@@ -244,23 +309,44 @@ async def verify_mfa_and_login(
     Raises:
         HTTPException: If no pending login found, MFA code is invalid, or user not found
     """
+    username_log_id = auth_security_stores.username_log_identifier(
+        mfa_request.username
+    )
+
     # Check if user is locked out from too many failed attempts
-    if pending_mfa_store.is_locked_out(mfa_request.username):
-        lockout_until = pending_mfa_store.get_lockout_time(mfa_request.username)
-        if lockout_until:
-            seconds_remaining = int(
-                (lockout_until - datetime.now(timezone.utc)).total_seconds()
+    try:
+        if pending_mfa_store.is_locked_out(mfa_request.username):
+            lockout_until = pending_mfa_store.get_lockout_time(
+                mfa_request.username
             )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Too many failed MFA attempts. Account locked for {seconds_remaining} seconds.",
-            )
+            if lockout_until:
+                seconds_remaining = int(
+                    (
+                        lockout_until - datetime.now(timezone.utc)
+                    ).total_seconds()
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Too many failed MFA attempts. Account locked for {seconds_remaining} seconds.",
+                )
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Check if there's a pending MFA login for this username
-    user_id = pending_mfa_store.get_pending_login(mfa_request.username)
+    try:
+        user_id = pending_mfa_store.get_pending_login(mfa_request.username)
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
     if not user_id:
+        # Run a dummy Argon2 verify so the wall-clock latency of the
+        # "no pending MFA login" branch matches the "pending login,
+        # wrong code" branch (where backup-code verification performs
+        # an Argon2 verify). Without this, an attacker could enumerate
+        # which usernames are mid-login by measuring response time.
+        password_hasher.dummy_verify()
         core_logger.print_to_log(
-            f"No pending MFA login found for username {mfa_request.username}", "warning"
+            f"No pending MFA login found for {username_log_id}",
+            "warning",
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -272,21 +358,42 @@ async def verify_mfa_and_login(
         user_id, mfa_request.mfa_code, password_hasher, db
     ):
         # Record failed attempt and apply lockout if threshold exceeded
-        failed_count = pending_mfa_store.record_failed_attempt(mfa_request.username)
+        try:
+            failed_count = pending_mfa_store.record_failed_attempt(
+                mfa_request.username
+            )
+        except auth_security_stores.AuthSecurityStoreUnavailable as err:
+            _raise_auth_security_store_unavailable(err)
         core_logger.print_to_log(
-            f"Invalid MFA code for {mfa_request.username}. Failed attempts: {failed_count}",
+            f"Invalid MFA code for {username_log_id}. "
+            f"Failed attempts: {failed_count}",
             "warning",
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid MFA code, backup code or backup code already used. Failed attempts: {failed_count}.",
+            detail="Invalid MFA code, backup code or backup code already used.",
+        )
+
+    try:
+        claimed_user_id = pending_mfa_store.claim_pending_login(
+            mfa_request.username
+        )
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
+    if claimed_user_id != user_id:
+        core_logger.print_to_log(
+            f"Pending MFA login for {username_log_id} was missing "
+            "or already claimed",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pending MFA login found for this username",
         )
 
     # Get the user and complete login
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        pending_mfa_store.delete_pending_login(mfa_request.username)
-
         core_logger.print_to_log(
             f"User ID {user_id} not found during MFA verification", "warning"
         )
@@ -300,16 +407,16 @@ async def verify_mfa_and_login(
     users_utils.check_user_is_active(user)
 
     # MFA verification successful - reset both MFA and login failed attempts counters
-    pending_mfa_store.reset_failed_attempts(mfa_request.username)
-    failed_attempts.reset_attempts(mfa_request.username)
-
-    # Clean up pending login
-    pending_mfa_store.delete_pending_login(mfa_request.username)
+    try:
+        pending_mfa_store.reset_failed_attempts(mfa_request.username)
+        failed_attempts.reset_attempts(mfa_request.username)
+    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        _raise_auth_security_store_unavailable(err)
 
     # Mobile clients with PKCE use secure token exchange flow
     # Web clients don't need PKCE - they have httpOnly cookies and same-origin protection
     if client_type == "mobile" and code_challenge and code_challenge_method:
-        # Use PKCE exchange flow - tokens obtained via /session/{session_id}/tokens
+        # Use PKCE exchange flow through the public IdP token exchange endpoint
         return auth_utils.create_mobile_pkce_session_response(
             response,
             request,
@@ -326,7 +433,13 @@ async def verify_mfa_and_login(
     )
 
 
-@router.post("/refresh")
+@router.post(
+    "/refresh",
+    response_model=(
+        auth_schema.TokenResponseWeb | auth_schema.TokenResponseMobile
+    ),
+)
+@core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def refresh_token(
     response: Response,
     request: Request,
@@ -412,14 +525,22 @@ async def refresh_token(
     # Verify CSRF token for web clients only
     # Mobile clients don't use CSRF tokens
     # OAuth 2.1 Bootstrap Pattern for page reload:
-    # - On page reload, in-memory tokens are lost but httpOnly cookie persists
-    # - If x_csrf_token is None (missing from request), allow refresh anyway
-    # - Security: httpOnly cookie + SameSite=Strict prevents CSRF at browser level
-    # - If x_csrf_token is provided, it MUST be valid (prevent partial CSRF)
-    # - CSRF token is defense-in-depth; SameSite=Strict is primary protection
+    # - On EVERY page reload, in-memory tokens (incl. CSRF) are lost but the
+    #   httpOnly refresh cookie persists. The client therefore POSTs to
+    #   /refresh without an X-CSRF-Token header to bootstrap a new in-memory
+    #   token. This must continue to work even after a CSRF binding has been
+    #   minted on the session, otherwise the user is logged out on reload.
+    # - When the client DOES send a header, it MUST be valid. An empty/wrong
+    #   value is rejected (prevents partial-CSRF where script can read the
+    #   cookie but not the bound token).
+    # - CSRF protection at this endpoint is defense-in-depth; the primary
+    #   protections are HttpOnly + SameSite=Strict on the refresh cookie,
+    #   which prevent a cross-site attacker from issuing this POST at all.
     if client_type == "web" and x_csrf_token and session.csrf_token_hash is not None:
         # CSRF token was provided: validate it
-        if not password_hasher.verify(x_csrf_token, session.csrf_token_hash):
+        if not users_session_utils.verify_csrf_token(
+            x_csrf_token, session.csrf_token_hash
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid CSRF token",
@@ -514,18 +635,10 @@ async def refresh_token(
 
     # Token delivery based on client type
     if client_type == "web":
-        # Web: Refresh token as httpOnly cookie
-        secure = os.environ.get("FRONTEND_PROTOCOL") == "https"
-        response.set_cookie(
-            key="endurain_refresh_token",
-            value=new_refresh_token,
-            expires=datetime.now(timezone.utc)
-            + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-            httponly=True,
-            path="/",
-            secure=secure,
-            samesite="strict",
-        )
+        # Web: Refresh token as httpOnly cookie. Cookie attributes are
+        # centralised in auth_utils.set_refresh_token_cookie so login,
+        # /refresh, and SSO token exchange share one Secure-flag rule.
+        auth_utils.set_refresh_token_cookie(response, new_refresh_token)
 
         # Return access token and CSRF token in body
         # expires_in / refresh_token_expires_in are seconds-until-expiry
@@ -558,9 +671,11 @@ async def refresh_token(
         }
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=auth_schema.LogoutResponse)
+@core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def logout(
     response: Response,
+    request: Request,
     _validate_refresh_token: Annotated[
         Callable, Depends(auth_security.validate_refresh_token)
     ],
@@ -591,6 +706,7 @@ async def logout(
 
     Args:
         response: The HTTP response object to modify cookies.
+        request: The HTTP request object.
         _validate_refresh_token: Dependency to validate the refresh token.
         token_session_id: The session ID extracted from the refresh token.
         refresh_token_value: The refresh token value from the request.
@@ -637,7 +753,7 @@ async def logout(
         await idp_utils.clear_all_idp_tokens(token_user_id, db)
 
     if client_type == "web":
-        response.delete_cookie(key="endurain_refresh_token", path="/")
+        response.delete_cookie(key="endurain_refresh_token", path="/api/v1/auth")
         return {"message": "Logout successful"}
     if client_type == "mobile":
         return {"message": "Logout successful"}

@@ -10,30 +10,40 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return
+          }
+
           // Core Vue framework and state management
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          
+          if (/[\\/]node_modules[\\/](vue|vue-router|pinia)[\\/]/.test(id)) {
+            return 'vue-vendor'
+          }
+
           // Large charting library - only needed on stats/activity pages
-          'chart': ['chart.js', 'chartjs-plugin-datalabels'],
-          
+          if (/[\\/]node_modules[\\/](chart\.js|chartjs-plugin-datalabels)[\\/]/.test(id)) {
+            return 'chart'
+          }
+
           // Map library - only needed on activity detail pages with GPS data
-          'leaflet': ['leaflet'],
-          
+          if (/[\\/]node_modules[\\/]leaflet[\\/]/.test(id)) {
+            return 'leaflet'
+          }
+
           // UI framework - used across the app
-          'bootstrap': ['bootstrap'],
-          
+          if (/[\\/]node_modules[\\/]bootstrap[\\/]/.test(id)) {
+            return 'bootstrap'
+          }
+
           // FontAwesome icons - used throughout the app
-          'fontawesome': [
-            '@fortawesome/fontawesome-svg-core',
-            '@fortawesome/free-solid-svg-icons',
-            '@fortawesome/free-regular-svg-icons',
-            '@fortawesome/free-brands-svg-icons',
-            '@fortawesome/vue-fontawesome'
-          ],
-          
+          if (/[\\/]node_modules[\\/]@fortawesome[\\/]/.test(id)) {
+            return 'fontawesome'
+          }
+
           // Date/time utilities and notifications
-          'utils': ['luxon', 'notivue', 'vue-i18n']
+          if (/[\\/]node_modules[\\/](luxon|notivue|vue-i18n)[\\/]/.test(id)) {
+            return 'utils'
+          }
         }
       }
     }

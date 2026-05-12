@@ -165,3 +165,5 @@ The table bellow details the windsurf component gear types supported by Endurain
 | front_foil                  |
 | stabilizer                  |
 | fuselage                    |
+
+

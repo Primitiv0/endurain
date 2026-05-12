@@ -1,10 +1,15 @@
 """User identity provider database models."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String, Text
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from core.database import Base
+
+if TYPE_CHECKING:
+    from auth.identity_providers.models import IdentityProvider
+    from users.users.models import Users
 
 
 class UsersIdentityProvider(Base):
@@ -50,11 +55,13 @@ class UsersIdentityProvider(Base):
         comment="Subject/ID from the identity provider",
     )
     linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         comment="When this IdP was linked to the user",
     )
     last_login: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Last login using this IdP",
     )
@@ -64,19 +71,18 @@ class UsersIdentityProvider(Base):
         comment="Encrypted refresh token",
     )
     idp_access_token_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Access token expiry time",
     )
     idp_refresh_token_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Last refresh token update",
     )
 
     # Relationships
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="user_identity_providers")
-    # TODO: Change to Mapped["IdentityProvider"] when all modules use mapped
-    identity_providers = relationship(
-        "IdentityProvider",
+    users: Mapped["Users"] = relationship(back_populates="user_identity_providers")
+    identity_providers: Mapped["IdentityProvider"] = relationship(
         back_populates="user_identity_providers",
     )

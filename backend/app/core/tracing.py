@@ -1,31 +1,62 @@
+"""OpenTelemetry tracing setup for the FastAPI application."""
+
 import os
 
+from fastapi import FastAPI
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+    OTLPSpanExporter,
+)
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-
-def setup_tracing(app):
-    # Check if Jaeger tracing is enabled using the 'JAEGER_ENABLED' environment variable
-    if os.environ.get("JAEGER_ENABLED", "false") == "true":
-        # Configure OpenTelemetry with a specified service name
-        trace.set_tracer_provider(
-            TracerProvider(resource=Resource.create({"service.name": "backend_api"}))
-        )
-        trace.get_tracer_provider().add_span_processor(
-            BatchSpanProcessor(
-                OTLPSpanExporter(
-                    endpoint=os.environ.get("JAEGER_PROTOCOL", "http")
-                    + "://"
-                    + os.environ.get("JAEGER_HOST", "jaeger")
-                    + ":"
-                    + os.environ.get("JAEGER_PORT", "4317")
-                )
-            )
-        )
 
 
-    # Instrument FastAPI app
+def _tracing_enabled() -> bool:
+    """
+    Return whether tracing is enabled by environment.
+
+    Args:
+        None.
+
+    Returns:
+        True when tracing should be configured.
+
+    Raises:
+        None.
+    """
+    return os.environ.get("JAEGER_ENABLED", "false").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+def setup_tracing(app: FastAPI) -> None:
+    """
+    Configure OpenTelemetry tracing for FastAPI.
+
+    Args:
+        app: FastAPI application to instrument.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    if not _tracing_enabled():
+        return
+
+    endpoint = (
+        f"{os.environ.get('JAEGER_PROTOCOL', 'http')}://"
+        f"{os.environ.get('JAEGER_HOST', 'jaeger')}:"
+        f"{os.environ.get('JAEGER_PORT', '4317')}"
+    )
+    resource = Resource.create({"service.name": "backend_api"})
+    trace.set_tracer_provider(TracerProvider(resource=resource))
+    trace.get_tracer_provider().add_span_processor(
+        BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
+    )
     FastAPIInstrumentor.instrument_app(app)

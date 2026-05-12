@@ -1,16 +1,237 @@
+"""Core logging setup for the application.
+
+Provides:
+  - JsonFormatter: structured JSON output for production.
+  - _DevFormatter: human-readable text for development.
+  - RequestIdFilter: injects the current request ID into
+    every log record so all logs from a single request
+    can be correlated.
+  - _build_handler: environment-aware handler factory
+    (stdout JSON in production, file in development).
+  - setup_main_logger: configures the main, Alembic, and
+    APScheduler loggers.
+  - Utility helpers for application-level log routing.
+"""
+
+import json
 import logging
+import sys
+from datetime import UTC, datetime
+from typing import Any
 
 import core.config as core_config
+import core.middleware_request_id as core_middleware_request_id
+
+
+class RequestIdFilter(logging.Filter):
+    """
+    Inject the current request ID into every log record.
+
+    Reads the value from
+    :func:`core_middleware_request_id.get_request_id`
+    and stores it as ``record.request_id`` so formatters
+    can reference ``%(request_id)s``.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """
+        Add ``request_id`` attribute to the log record.
+
+        Args:
+            record: The log record to augment.
+
+        Returns:
+            Always True so the record is never suppressed.
+        """
+        record.request_id = (  # type: ignore[attr-defined]
+            core_middleware_request_id.get_request_id()
+        )
+        return True
+
+
+# Attributes always present on a LogRecord — excluded from the extra
+# context dict so we only surface caller-supplied fields.
+_STDLIB_RECORD_ATTRS: frozenset[str] = frozenset(
+    (
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "message",
+        "taskName",
+        "request_id",
+        "asctime",
+    )
+)
+
+
+class JsonFormatter(logging.Formatter):
+    """
+    Format log records as newline-delimited JSON.
+
+    Suitable for collection by container orchestrators
+    (Docker, Kubernetes) and log aggregation pipelines.
+    Each record becomes one JSON object on a single line.
+    Any extra fields supplied via ``extra={}`` are emitted
+    under a ``context`` key.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """
+        Serialise a log record to a JSON string.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            Single-line JSON string representing the record.
+        """
+        entry: dict = {
+            "timestamp": datetime.fromtimestamp(
+                record.created, tz=UTC
+            ).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        rid = getattr(record, "request_id", "")
+        if rid:
+            entry["request_id"] = rid
+        if record.exc_info:
+            entry["exception"] = self.formatException(record.exc_info)
+        context = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k not in _STDLIB_RECORD_ATTRS
+        }
+        if context:
+            entry["context"] = context
+        return json.dumps(entry, default=str)
+
+
+class _DevFormatter(logging.Formatter):
+    """
+    Human-readable formatter for development log files.
+
+    Appends any caller-supplied ``extra`` fields as a
+    space-separated ``key=value`` string after the message
+    so engineers can see structured context at a glance.
+    """
+
+    _BASE = (
+        "%(asctime)s - %(name)s - %(levelname)s"
+        " - [%(request_id)s] - %(message)s"
+    )
+
+    def __init__(self) -> None:
+        super().__init__(self._BASE)
+
+    def format(self, record: logging.LogRecord) -> str:
+        """
+        Format the record with extra context appended.
+
+        Args:
+            record: The log record to format.
+
+        Returns:
+            Formatted string with optional context suffix.
+        """
+        base = super().format(record)
+        context = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k not in _STDLIB_RECORD_ATTRS
+        }
+        if not context:
+            return base
+        ctx_str = " ".join(f"{k}={v!r}" for k, v in context.items())
+        return f"{base} | {ctx_str}"
+
+
+def _build_handler(log_level: int) -> logging.Handler:
+    """
+    Build the appropriate log handler for the environment.
+
+    Production emits JSON to stdout so container
+    orchestrators can collect structured logs without file
+    mounts. Development writes human-readable text to
+    ``{LOGS_DIR}/app.log``.
+
+    Args:
+        log_level: Python logging level constant.
+
+    Returns:
+        Configured :class:`logging.Handler` instance.
+    """
+    # Treat both "production" and "demo" as deployed
+    # environments where stdout JSON is preferred.
+    is_deployed = core_config.settings.ENVIRONMENT in ("production", "demo")
+    if is_deployed:
+        handler: logging.Handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(JsonFormatter())
+    else:
+        log_path = f"{core_config.settings.LOGS_DIR}/app.log"
+        handler = logging.FileHandler(log_path)
+        handler.setFormatter(_DevFormatter())
+    handler.setLevel(log_level)
+    handler.addFilter(RequestIdFilter())
+    return handler
+
+
+def _replace_handlers(
+    loggers: tuple[logging.Logger, ...],
+    handler: logging.Handler,
+) -> None:
+    """
+    Replace handlers on a set of related loggers.
+
+    Args:
+        loggers: Loggers that should share one handler.
+        handler: Handler to attach to every logger.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    old_handlers: set[logging.Handler] = set()
+    for logger in loggers:
+        old_handlers.update(logger.handlers)
+        for old_handler in list(logger.handlers):
+            logger.removeHandler(old_handler)
+        logger.addHandler(handler)
+        logger.propagate = False
+
+    for old_handler in old_handlers:
+        old_handler.close()
 
 
 def setup_main_logger():
     """
-    Sets up the main application logger and attaches a file handler to it, as well as to the Alembic and APScheduler loggers.
+    Set up the main application logger.
 
-    The logger writes log messages to 'logs/app.log' with a specific format and log level.
-    - The main logger ('main_logger') uses the LOG_LEVEL from configuration (default: WARNING).
-    - The Alembic logger ('alembic') and APScheduler logger ('apscheduler') are set to INFO level.
-    - All three loggers share the same file handler and formatter.
+    Selects a handler appropriate for the current
+    environment (JSON stdout in production, plain-text
+    file in development). Attaches the same handler to
+    the Alembic and APScheduler loggers so their output
+    is captured consistently.
 
     Returns:
         logging.Logger: The configured main logger instance.
@@ -22,34 +243,42 @@ def setup_main_logger():
         "warning": logging.WARNING,
         "info": logging.INFO,
         "debug": logging.DEBUG,
-        "trace": logging.DEBUG,  # Map trace to debug (Python logging doesn't have trace)
+        "trace": logging.DEBUG,  # Trace to debug (Python doesn't have trace)
     }
 
     # Get log level from config, default to WARNING if invalid
-    log_level = log_level_map.get(core_config.LOG_LEVEL.lower(), logging.WARNING)
+    log_level = log_level_map.get(
+        core_config.settings.LOG_LEVEL.lower(),
+        logging.WARNING,
+    )
 
     main_logger = logging.getLogger("main_logger")
-    main_logger.setLevel(log_level)
-
-    file_handler = logging.FileHandler(f"{core_config.LOGS_DIR}/app.log")
-    file_handler.setLevel(log_level)
-
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    file_handler.setFormatter(formatter)
-
-    main_logger.addHandler(file_handler)
-
-    # Attach the same handler to Alembic's logger
     alembic_logger = logging.getLogger("alembic")
-    alembic_logger.setLevel(log_level)
-    alembic_logger.addHandler(file_handler)
-
-    # Attach the same handler to sheduler's logger
     scheduler_logger = logging.getLogger("apscheduler")
-    scheduler_logger.setLevel(log_level)
-    scheduler_logger.addHandler(file_handler)
+    # Structured upload-audit events emitted by safeuploads.
+    # Attaching it here ensures correlation IDs and validation
+    # outcomes flow through the same handler/format pipeline
+    # as the rest of the backend logs.
+    safeuploads_audit_logger = logging.getLogger("safeuploads.audit")
+
+    for logger in (
+        main_logger,
+        alembic_logger,
+        scheduler_logger,
+        safeuploads_audit_logger,
+    ):
+        logger.setLevel(log_level)
+
+    handler = _build_handler(log_level)
+    _replace_handlers(
+        (
+            main_logger,
+            alembic_logger,
+            scheduler_logger,
+            safeuploads_audit_logger,
+        ),
+        handler,
+    )
 
     return main_logger
 
@@ -58,8 +287,10 @@ def get_main_logger():
     """
     Returns the main logger instance for the application.
 
-    This function retrieves a logger named "main_logger" using Python's standard logging module.
-    It can be used throughout the application to log messages under a consistent logger name.
+    This function retrieves a logger named "main_logger" using Python's
+    standard logging module.
+    It can be used throughout the application to log messages under a
+    consistent logger name.
 
     Returns:
         logging.Logger: The logger instance named "main_logger".
@@ -68,18 +299,24 @@ def get_main_logger():
 
 
 def print_to_log(
-    message: str, log_level: str = "info", exc: Exception = None, context=None
-):
+    message: str,
+    log_level: str = "info",
+    exc: Exception | None = None,
+    context: dict[str, Any] | None = None,
+) -> None:
     """
     Logs a message at the specified log level using the main logger.
 
     Args:
         message (str): The message to log.
-        log_level (str, optional): The log level to use ('info', 'error', 'warning', 'debug'). Defaults to "info".
-        exc (Exception, optional): An exception instance to include in the log if log_level is "error". Defaults to None.
+        log_level (str, optional): The log level to use ('info', 'error',
+            'warning', 'debug'). Defaults to "info".
+        exc (Exception, optional): An exception instance to include in the log
+            if log_level is "error". Defaults to None.
 
     Notes:
-        - If log_level is "error" and exc is provided, exception information will be included in the log.
+        - If log_level is "error" and exc is provided, exception information
+            will be included in the log.
     """
     main_logger = get_main_logger()
     if log_level == "info":
@@ -90,6 +327,8 @@ def print_to_log(
         main_logger.warning(message)
     elif log_level == "debug":
         main_logger.debug(message)
+    elif log_level == "critical":
+        main_logger.critical(message)
 
 
 def print_to_console(message: str, log_level: str = "info"):
@@ -98,7 +337,8 @@ def print_to_console(message: str, log_level: str = "info"):
 
     Args:
         message (str): The message to print.
-        log_level (str, optional): The log level to display ('info', 'error', 'warning', 'debug'). Defaults to "info".
+        log_level (str, optional): The log level to display ('info', 'error',
+            'warning', 'debug'). Defaults to "info".
     """
     if log_level == "info":
         print(f"INFO:     {message}")
@@ -108,20 +348,27 @@ def print_to_console(message: str, log_level: str = "info"):
         print(f"WARNING:  {message}")
     elif log_level == "debug":
         print(f"DEBUG:    {message}")
+    elif log_level == "critical":
+        print(f"CRITICAL: {message}")
 
 
 def print_to_log_and_console(
-    message: str, log_level: str = "info", exc: Exception = None
+    message: str, log_level: str = "info", exc: Exception | None = None
 ):
     """
     Logs a message to both the main logger and the console.
 
-    This function temporarily adds a console handler to the main logger, logs the provided message at the specified log level (optionally including exception information), and then removes the console handler to ensure subsequent logs are not printed to the console.
+    This function temporarily adds a console handler to the main logger, logs
+    the provided message at the specified log level (optionally including
+    exception information), and then removes the console handler to ensure
+    subsequent logs are not printed to the console.
 
     Args:
         message (str): The message to log.
-        log_level (str, optional): The logging level to use (e.g., "info", "warning", "error"). Defaults to "info".
-        exc (Exception, optional): An exception to include in the log entry. Defaults to None.
+        log_level (str, optional): The logging level to use (e.g., "info",
+            "warning", "error"). Defaults to "info".
+        exc (Exception, optional): An exception to include in the log entry.
+            Defaults to None.
     """
     main_logger = get_main_logger()
 

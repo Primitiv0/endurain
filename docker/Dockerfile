@@ -20,15 +20,14 @@ FROM python:3.13-alpine AS requirements-stage
 # Set the working directory
 WORKDIR /tmp/backend
 
-# Install Poetry and add poetry-plugin-export
-RUN pip install --no-cache-dir poetry \
-&& poetry self add poetry-plugin-export
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-# Copy pyproject.toml and poetry.lock* files
-COPY backend/pyproject.toml backend/poetry.lock* ./
+# Copy pyproject.toml and uv.lock files
+COPY backend/pyproject.toml backend/uv.lock ./
 
-# Install dependencies using poetry and export them to requirements.txt
-RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
+# Export production dependencies to requirements.txt
+RUN uv export --no-dev --no-hashes -o requirements.txt
 
 # Stage 3: Build FastAPI app
 FROM python:3.13-alpine
@@ -95,7 +94,7 @@ RUN sed -i 's/\r$//' /docker-entrypoint.d/start.sh \
 EXPOSE 8080
 
 # Add a healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s CMD curl -f http://localhost:8080/api/v1/about || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 CMD curl -f http://localhost:8080/api/v1/about || exit 1
 
 # Run the FastAPI app
 ENTRYPOINT ["/docker-entrypoint.d/start.sh"]

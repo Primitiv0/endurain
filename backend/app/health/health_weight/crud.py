@@ -5,6 +5,10 @@ from sqlalchemy import func, desc, select
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
+import health.constants as health_constants
+
+import health.utils as health_utils
+
 import health.health_weight.schema as health_weight_schema
 import health.health_weight.models as health_weight_models
 import health.health_weight.utils as health_weight_utils
@@ -36,13 +40,17 @@ def get_all_health_weight(
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_number(user_id: int, db: Session) -> int:
+def get_health_weight_number_by_user_id(
+    user_id: int, db: Session, interval: health_constants.Interval | None = None
+) -> int:
     """
-    Retrieve total count of health weight records for a user.
+    Retrieve total count of health weight records for a user. If interval is
+    provided, count only records starting from the calculated start date.
 
     Args:
         user_id: User ID to count records for.
         db: Database session.
+        interval: Optional filter by goal interval.
 
     Returns:
         Total number of health weight records.
@@ -56,6 +64,13 @@ def get_health_weight_number(user_id: int, db: Session) -> int:
         .select_from(health_weight_models.HealthWeight)
         .where(health_weight_models.HealthWeight.user_id == user_id)
     )
+
+    if interval is not None:
+        stmt = stmt.where(
+            health_weight_models.HealthWeight.date
+            >= health_utils.get_start_date_for_interval(interval.value)
+        )
+
     return db.execute(stmt).scalar_one()
 
 
@@ -112,40 +127,56 @@ def get_health_weight_by_id_and_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_with_pagination(
+def get_health_weight_by_user_id(
     user_id: int,
     db: Session,
-    page_number: int = 1,
-    num_records: int = 5,
+    page_number: int | None = None,
+    num_records: int | None = None,
+    interval: health_constants.Interval | None = None,
 ) -> list[health_weight_models.HealthWeight]:
     """
-    Retrieve paginated health weight records for a user.
+    Retrieve health weight records for a specific user with optional pagination
+        and filtering.
 
     Args:
-        user_id: User ID to fetch records for.
-        db: Database session.
-        page_number: Page number to retrieve (1-indexed).
-        num_records: Number of records per page.
+        user_id (int): The ID of the user whose health weight records are to be
+            retrieved.
+        db (Session): The database session used to execute the query.
+        page_number (int | None, optional): The page number for pagination
+            (1-indexed).
+            If provided, num_records must also be provided. Defaults to None.
+        num_records (int | None, optional): The number of records per page.
+            If provided, page_number must also be provided. Defaults to None.
+        interval (health_constants.Interval | None, optional): The time
+            interval to filter records.
+            If provided, only records from the start of the interval to present
+            are returned. Defaults to None.
 
     Returns:
-        List of HealthWeight models for the requested page.
-
-    Raises:
-        HTTPException: If database error occurs.
+        list[health_weight_models.HealthWeight]: A list of health weight
+            records sorted by date in descending order, optionally paginated.
     """
     # Get the health_weight from the database
-    stmt = (
-        select(health_weight_models.HealthWeight)
-        .where(health_weight_models.HealthWeight.user_id == user_id)
-        .order_by(desc(health_weight_models.HealthWeight.date))
-        .offset((page_number - 1) * num_records)
-        .limit(num_records)
+    stmt = select(health_weight_models.HealthWeight).where(
+        health_weight_models.HealthWeight.user_id == user_id
     )
+
+    if interval is not None:
+        stmt = stmt.where(
+            health_weight_models.HealthWeight.date
+            >= health_utils.get_start_date_for_interval(interval.value)
+        )
+
+    stmt = stmt.order_by(desc(health_weight_models.HealthWeight.date))
+
+    if page_number is not None and num_records is not None:
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
+
     return db.execute(stmt).scalars().all()
 
 
 @core_decorators.handle_db_errors
-def get_health_weight_by_date(
+def get_health_weight_by_date_and_user_id(
     user_id: int, date: str, db: Session
 ) -> health_weight_models.HealthWeight | None:
     """
@@ -166,6 +197,32 @@ def get_health_weight_by_date(
     stmt = select(health_weight_models.HealthWeight).where(
         health_weight_models.HealthWeight.date == func.date(date),
         health_weight_models.HealthWeight.user_id == user_id,
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
+@core_decorators.handle_db_errors
+def get_latest_weight_by_user_id(
+    user_id: int, db: Session
+) -> health_weight_models.HealthWeight | None:
+    """
+    Get most recent weight record for dashboard display.
+
+    Args:
+        user_id: User ID to fetch latest weight for.
+        db: Database session.
+
+    Returns:
+        HealthWeight model if found, None otherwise.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    stmt = (
+        select(health_weight_models.HealthWeight)
+        .where(health_weight_models.HealthWeight.user_id == user_id)
+        .order_by(desc(health_weight_models.HealthWeight.date))
+        .limit(1)
     )
     return db.execute(stmt).scalar_one_or_none()
 

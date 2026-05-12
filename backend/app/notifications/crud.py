@@ -1,260 +1,182 @@
-from fastapi import HTTPException, status
+"""CRUD operations for notifications."""
+
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 import notifications.models as notifications_models
 import notifications.schema as notifications_schema
-import notifications.utils as notifications_utils
 
-import core.logger as core_logger
+import core.decorators as core_decorators
 
 
+@core_decorators.handle_db_errors
 def get_user_notification_by_id(
-    notification_id: int, user_id: int, db: Session
-) -> notifications_schema.Notification | None:
+    notification_id: int,
+    user_id: int,
+    db: Session,
+) -> notifications_models.Notification | None:
     """
-    Retrieve a notification for a specific user by notification ID.
+    Retrieve a notification by ID for a user.
 
     Args:
-        notification_id (int): The ID of the notification to retrieve.
-        user_id (int): The ID of the user who owns the notification.
-        db (Session): The SQLAlchemy database session.
+        notification_id: The notification ID.
+        user_id: The owning user ID.
+        db: Database session.
 
     Returns:
-        notifications_schema.Notification | None: The serialized notification object if found, otherwise None.
+        Notification model if found, otherwise None.
 
     Raises:
-        HTTPException: If an unexpected error occurs during the database query or serialization.
+        HTTPException: If a database error occurs.
     """
-    try:
-        notification = (
-            db.query(notifications_models.Notification)
-            .filter(
-                notifications_models.Notification.user_id == user_id,
-                notifications_models.Notification.id == notification_id,
-            )
-            .first()
-        )
-
-        # Check if notification is None and return None if it is
-        if notification is None:
-            return None
-
-        notification = notifications_utils.serialize_notification(notification)
-
-        # Return the notification
-        return notification
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_notification_user_by_id: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = select(notifications_models.Notification).where(
+        notifications_models.Notification.user_id == user_id,
+        notifications_models.Notification.id == notification_id,
+    )
+    return db.execute(stmt).scalars().first()
 
 
+@core_decorators.handle_db_errors
 def get_user_notifications(
-    user_id: int, db: Session
-) -> list[notifications_schema.Notification] | None:
+    user_id: int,
+    db: Session,
+) -> list[notifications_models.Notification]:
     """
-    Retrieve all notifications for a specific user by their user ID.
+    Retrieve all notifications for a user.
 
     Args:
-        user_id (int): The ID of the user whose notifications are to be retrieved.
-        db (Session): The SQLAlchemy database session to use for the query.
+        user_id: The owning user ID.
+        db: Database session.
 
     Returns:
-        list[notifications_schema.Notification] | None:
-            A list of serialized Notification objects for the user, or None if no notifications are found.
+        List of Notification models for the user.
 
     Raises:
-        HTTPException: If an unexpected error occurs during the database query,
-            raises an HTTP 500 Internal Server Error with a relevant message.
+        HTTPException: If a database error occurs.
     """
-    try:
-        notifications = (
-            db.query(notifications_models.Notification)
-            .filter(notifications_models.Notification.user_id == user_id)
-            .all()
-        )
-
-        # Check if notifications is None and return None if it is
-        if notifications is None:
-            return None
-
-        # Serialize each notification
-        for notification in notifications:
-            notification = notifications_utils.serialize_notification(notification)
-
-        # Return the notifications
-        return notifications
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_notifications_user: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = select(notifications_models.Notification).where(
+        notifications_models.Notification.user_id == user_id
+    )
+    return db.execute(stmt).scalars().all()
 
 
+@core_decorators.handle_db_errors
+def get_user_notifications_count(
+    user_id: int,
+    db: Session,
+) -> int:
+    """
+    Count notifications for a user.
+
+    Args:
+        user_id: The owning user ID.
+        db: Database session.
+
+    Returns:
+        Number of notifications for the user.
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = (
+        select(func.count())
+        .select_from(notifications_models.Notification)
+        .where(notifications_models.Notification.user_id == user_id)
+    )
+    return db.execute(stmt).scalar_one()
+
+
+@core_decorators.handle_db_errors
 def get_user_notifications_with_pagination(
-    user_id: int, db: Session, page_number: int = 1, num_records: int = 5
-) -> list[notifications_schema.Notification] | None:
+    user_id: int,
+    db: Session,
+    page_number: int = 1,
+    num_records: int = 5,
+) -> list[notifications_models.Notification]:
     """
-    Retrieve a paginated list of notifications for a specific user.
+    Retrieve paginated notifications for a user.
 
     Args:
-        user_id (int): The ID of the user whose notifications are to be retrieved.
-        db (Session): The SQLAlchemy database session.
-        page_number (int, optional): The page number for pagination (default is 1).
-        num_records (int, optional): The number of notifications to retrieve per page (default is 5).
+        user_id: The owning user ID.
+        db: Database session.
+        page_number: Page number (default 1).
+        num_records: Records per page (default 5).
 
     Returns:
-        list[notifications_schema.Notification] | None:
-            A list of serialized Notification objects for the user, or None if no notifications are found.
+        List of Notification models for the page.
 
     Raises:
-        HTTPException: If an internal server error occurs during the retrieval process.
+        HTTPException: If a database error occurs.
     """
-    try:
-        # Get the notifications for the user with pagination
-        notifications = (
-            db.query(notifications_models.Notification)
-            .filter(notifications_models.Notification.user_id == user_id)
-            .order_by(notifications_models.Notification.created_at.desc())
-            .offset((page_number - 1) * num_records)
-            .limit(num_records)
-            .all()
-        )
-
-        # Check if notifications is None and return None if it is
-        if notifications is None:
-            return None
-
-        # Serialize each notification
-        for notification in notifications:
-            notification = notifications_utils.serialize_notification(notification)
-
-        # Return the notifications
-        return notifications
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_users_notifications_with_pagination: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = (
+        select(notifications_models.Notification)
+        .where(notifications_models.Notification.user_id == user_id)
+        .order_by(desc(notifications_models.Notification.created_at))
+        .offset((page_number - 1) * num_records)
+        .limit(num_records)
+    )
+    return db.execute(stmt).scalars().all()
 
 
-def create_notification(notification: notifications_schema.Notification, db: Session):
+@core_decorators.handle_db_errors
+def create_notification(
+    notification: notifications_schema.NotificationCreate,
+    db: Session,
+) -> notifications_models.Notification:
     """
-    Creates a new notification for a specified user and saves it to the database.
+    Create a new notification record.
 
     Args:
-        notification (notifications_schema.Notification): The notification data to be created.
-        db (Session): The SQLAlchemy database session.
+        notification: The notification data to create.
+        db: Database session.
 
     Returns:
-        dict: The serialized representation of the newly created notification.
+        The newly created Notification model.
 
     Raises:
-        HTTPException: If an error occurs during the creation process, raises a 500 Internal Server Error.
+        HTTPException: If a database error occurs.
     """
-    try:
-        new_notification = notifications_models.Notification(
-            user_id=notification.user_id,
-            type=notification.type,
-            options=notification.options,
-            read=False,
-            created_at=func.now(),
-        )
-
-        # Add the notification to the database
-        db.add(new_notification)
-        db.commit()
-        db.refresh(new_notification)
-
-        notification.id = new_notification.id
-        notification.created_at = new_notification.created_at
-
-        notification_serialized = notifications_utils.serialize_notification(
-            notification
-        )
-
-        # Return the notification
-        return notification_serialized
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
-
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in create_notification: {err}", "error", exc=err
-        )
-
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    new_notification = notifications_models.Notification(
+        user_id=notification.user_id,
+        type=notification.type,
+        options=notification.options,
+        read=False,
+        created_at=func.now(),
+    )
+    db.add(new_notification)
+    db.commit()
+    db.refresh(new_notification)
+    return new_notification
 
 
+@core_decorators.handle_db_errors
 def mark_notification_as_read(
-    notification_id: int, user_id: int, db: Session
-) -> notifications_schema.Notification | None:
+    notification_id: int,
+    user_id: int,
+    db: Session,
+) -> notifications_models.Notification | None:
     """
-    Marks a notification as read for a specific user.
+    Mark a notification as read for a user.
 
     Args:
-        notification_id (int): The ID of the notification to mark as read.
-        user_id (int): The ID of the user who owns the notification.
-        db (Session): The SQLAlchemy database session.
+        notification_id: The notification ID.
+        user_id: The owning user ID.
+        db: Database session.
 
     Returns:
-        notifications_schema.Notification | None: The serialized notification object if found and updated, otherwise None.
+        Updated Notification model, or None if not found.
 
     Raises:
-        HTTPException: If an unexpected error occurs during the database query or serialization.
+        HTTPException: If a database error occurs.
     """
-    try:
-        notification = (
-            db.query(notifications_models.Notification)
-            .filter(
-                notifications_models.Notification.user_id == user_id,
-                notifications_models.Notification.id == notification_id,
-            )
-            .first()
-        )
-
-        # Check if notification is None and return None if it is
-        if notification is None:
-            return None
-
-        # Update the read status
-        notification.read = True
-        db.commit()
-
-        # Serialize the updated notification
-        notification = notifications_utils.serialize_notification(notification)
-
-        # Return the updated notification
-        return notification
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in mark_notification_as_read: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = select(notifications_models.Notification).where(
+        notifications_models.Notification.user_id == user_id,
+        notifications_models.Notification.id == notification_id,
+    )
+    notification = db.execute(stmt).scalars().first()
+    if notification is None:
+        return None
+    notification.read = True
+    db.commit()
+    db.refresh(notification)
+    return notification

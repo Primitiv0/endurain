@@ -6,6 +6,9 @@ import {
 } from '@/utils/serviceUtils'
 
 export const gearsComponents = {
+  getGearComponentTypes() {
+    return fetchGetRequest('gear_components/types')
+  },
   getGearComponentsByGearId(gearId) {
     return fetchGetRequest(`gear_components/gear_id/${gearId}`)
   },

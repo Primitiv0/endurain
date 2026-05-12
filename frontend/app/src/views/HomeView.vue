@@ -28,8 +28,8 @@
         </div>
         <UserDistanceStatsComponent
           v-else
-          :thisWeekDistances="thisWeekDistances"
-          :thisMonthDistances="thisMonthDistances"
+          :thisWeekStats="thisWeekStats"
+          :thisMonthStats="thisMonthStats"
         />
       </div>
 
@@ -225,8 +225,8 @@ const authStore = useAuthStore()
 const serverSettingsStore = useServerSettingsStore()
 const selectedActivityView = ref('userActivities')
 const isLoading = ref(true)
-const thisWeekDistances = ref([])
-const thisMonthDistances = ref([])
+const thisWeekStats = ref({})
+const thisMonthStats = ref({})
 const userGoals = ref(null)
 const userNumberOfActivities = ref(0)
 const userActivities = ref([])
@@ -248,8 +248,8 @@ async function fetchActivityMedia(activityId) {
 
 async function fetchUserStars() {
   try {
-    thisWeekDistances.value = await activities.getUserThisWeekStats(authStore.user.id)
-    thisMonthDistances.value = await activities.getUserThisMonthStats(authStore.user.id)
+    thisWeekStats.value = await activities.getUserThisWeekStats(authStore.user.id)
+    thisMonthStats.value = await activities.getUserThisMonthStats(authStore.user.id)
     userGoals.value = await userGoalsService.getUserGoalResults()
   } catch (error) {
     // Set the error message

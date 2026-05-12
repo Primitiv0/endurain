@@ -29,7 +29,35 @@
               <code class="ms-1">{{ mfaSecret }}</code>
             </p>
             <form @submit.prevent="handleSubmit">
-              <label :for="`${modalId}VerificationCode`" class="form-label">
+              <!-- Current password (step-up verification) -->
+              <template v-if="requirePassword">
+                <label :for="`${modalId}CurrentPassword`" class="form-label">
+                  <b>* {{ currentPasswordLabel }}</b>
+                </label>
+                <div class="position-relative">
+                  <input
+                    :id="`${modalId}CurrentPassword`"
+                    v-model="currentPassword"
+                    :type="showPassword ? 'text' : 'password'"
+                    class="form-control"
+                    :placeholder="currentPasswordLabel"
+                    autocomplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    class="btn position-absolute top-50 end-0 translate-middle-y"
+                    @click="togglePasswordVisibility"
+                    :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                  >
+                    <font-awesome-icon
+                      :icon="showPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']"
+                    />
+                  </button>
+                </div>
+              </template>
+
+              <label :for="`${modalId}VerificationCode`" class="form-label mt-2">
                 <b>* {{ verificationCodeLabel }}</b>
               </label>
               <input
@@ -40,6 +68,7 @@
                 :name="`${modalId}VerificationCode`"
                 :placeholder="verificationCodePlaceholder"
                 :aria-label="verificationCodeLabel"
+                autocomplete="one-time-code"
                 required
               />
               <p class="mt-2">* {{ requiredFieldText }}</p>
@@ -61,7 +90,7 @@
                     'btn-warning': actionButtonType === 'warning',
                     'btn-primary': actionButtonType === 'primary'
                   }"
-                  :disabled="!verificationCode || isLoading"
+                  :disabled="!verificationCode || (requirePassword && !currentPassword) || isLoading"
                   :aria-label="actionButtonText"
                 >
                   <span
@@ -122,6 +151,14 @@ const props = defineProps({
     type: String,
     required: true
   },
+  currentPasswordLabel: {
+    type: String,
+    default: ''
+  },
+  requirePassword: {
+    type: Boolean,
+    default: true
+  },
   requiredFieldText: {
     type: String,
     required: true
@@ -146,22 +183,33 @@ const props = defineProps({
 })
 
 const emit = defineEmits<{
-  submitAction: [verificationCode: string]
+  submitAction: [{ mfa_code: string; current_password: string | null }]
 }>()
 
 const { modalInstance, initializeModal, showModal, hideModal, disposeModal } = useBootstrapModal()
 
 const modalRef = ref<HTMLDivElement | null>(null)
 const verificationCode = ref('')
+const currentPassword = ref('')
+const showPassword = ref(false)
+
+const togglePasswordVisibility = (): void => {
+  showPassword.value = !showPassword.value
+}
 
 const handleModalHidden = (): void => {
   verificationCode.value = ''
+  currentPassword.value = ''
+  showPassword.value = false
 }
 
 const handleSubmit = (): void => {
-  if (verificationCode.value) {
-    emit('submitAction', verificationCode.value)
-  }
+  if (!verificationCode.value) return
+  if (props.requirePassword && !currentPassword.value) return
+  emit('submitAction', {
+    mfa_code: verificationCode.value,
+    current_password: props.requirePassword ? currentPassword.value : null
+  })
 }
 
 const show = (): void => {
@@ -171,6 +219,8 @@ const show = (): void => {
 const hide = (): void => {
   hideModal()
   verificationCode.value = ''
+  currentPassword.value = ''
+  showPassword.value = false
 }
 
 onMounted(async () => {

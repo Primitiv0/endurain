@@ -1,8 +1,9 @@
+"""Public (unauthenticated) HTTP routes for identity provider SSO flows."""
+
 from typing import Annotated, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import secrets
 from uuid import uuid4
-import os
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -12,9 +13,9 @@ import core.rate_limit as core_rate_limit
 import auth.password_hasher as auth_password_hasher
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
-import auth.constants as auth_constants
 import users.users_sessions.utils as users_session_utils
 import users.users_sessions.crud as users_session_crud
+import users.users.utils as users_utils
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
@@ -57,7 +58,7 @@ async def get_enabled_providers(db: Annotated[Session, Depends(core_database.get
 
 
 @router.get("/login/{idp_slug}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-@core_rate_limit.limiter.limit(core_rate_limit.OAUTH_AUTHORIZE_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def initiate_login(
     idp_slug: str,
     request: Request,
@@ -179,7 +180,7 @@ async def initiate_login(
 
 
 @router.get("/callback/{idp_slug}", status_code=status.HTTP_307_TEMPORARY_REDIRECT)
-@core_rate_limit.limiter.limit(core_rate_limit.OAUTH_CALLBACK_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def handle_callback(
     request: Request,
     response: Response,
@@ -248,8 +249,21 @@ async def handle_callback(
                 detail="Invalid or expired OAuth state",
             )
 
-        # Mark state as used atomically (prevents replay attacks)
-        oauth_state_crud.mark_oauth_state_used(db, state)
+        # Mark state as used atomically (prevents replay attacks).
+        # Two concurrent callbacks can both reach this point with the same
+        # `oauth_state` row in memory; only the caller whose conditional UPDATE
+        # actually flips `used=False -> True` is allowed to continue. Losing
+        # races (replays, double-submits) abort here with a generic 400 so we
+        # do not leak whether the state existed but was already consumed.
+        if not oauth_state_crud.mark_oauth_state_used(state, db):
+            core_logger.print_to_log(
+                f"OAuth state replay/race rejected: {state[:8]}...",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired OAuth state",
+            )
 
         core_logger.print_to_log(
             f"OAuth callback received for state {state[:8]}... (client_type={oauth_state.client_type})",
@@ -266,7 +280,7 @@ async def handle_callback(
 
         # Handle link mode differently - redirect to settings without creating new session
         if is_link_mode:
-            frontend_url = core_config.ENDURAIN_HOST
+            frontend_url = core_config.settings.ENDURAIN_HOST
             redirect_url = f"{frontend_url}/settings?tab=security&idp_link=success&idp_name={idp.name}"
 
             core_logger.print_to_log(
@@ -279,6 +293,9 @@ async def handle_callback(
             )
 
         # LOGIN MODE: Create session WITHOUT tokens (tokens created during exchange)
+        # Validate that the user is active before creating a session
+        users_utils.check_user_is_active(user)
+
         # Convert to UsersRead schema
         user_read = users_schema.UsersRead.model_validate(user)
 
@@ -303,7 +320,7 @@ async def handle_callback(
         )
 
         # Redirect to frontend with session_id for token exchange
-        frontend_url = core_config.ENDURAIN_HOST
+        frontend_url = core_config.settings.ENDURAIN_HOST
         redirect_url = f"{frontend_url}/login?sso=success&session_id={session_id}"
 
         redirect_path = result.get("redirect_path")
@@ -334,7 +351,7 @@ async def handle_callback(
         core_logger.print_to_log(f"Error in SSO callback: {err}", "error", exc=err)
 
         # Redirect to frontend with error
-        frontend_url = core_config.ENDURAIN_HOST
+        frontend_url = core_config.settings.ENDURAIN_HOST
         error_url = f"{frontend_url}/login?error=sso_failed"
 
         return RedirectResponse(
@@ -347,7 +364,7 @@ async def handle_callback(
     response_model=idp_schema.TokenExchangeResponse,
     status_code=status.HTTP_200_OK,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.PKCE_TOKEN_EXCHANGE_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def exchange_tokens_for_session(
     session_id: str,
     request: Request,
@@ -364,12 +381,13 @@ async def exchange_tokens_for_session(
     db: Annotated[Session, Depends(core_database.get_db)],
 ):
     """
-    Exchange PKCE code_verifier for JWT tokens (mobile SSO flow).
+    Exchange a PKCE code verifier for JWT tokens.
 
-    After OAuth callback completes and creates a session, mobile clients must
+    After OAuth callback or password PKCE login creates a session, clients
     call this endpoint to prove they possess the code_verifier (PKCE) and
-    receive the actual JWT tokens. This prevents token leakage through browser
-    redirects and ensures only the legitimate client can access the tokens.
+    receive the actual JWT tokens. This prevents token leakage through
+    browser redirects and ensures only the legitimate client can access the
+    tokens.
 
     Security Features:
     - PKCE verification (SHA256 hash of verifier must match challenge)
@@ -422,10 +440,14 @@ async def exchange_tokens_for_session(
             )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not created via mobile SSO flow",
+                detail="Session not eligible for PKCE token exchange",
             )
 
-        # Check if tokens have already been exchanged (prevent replay)
+        # Check if tokens have already been exchanged (prevent replay).
+        # This is a fast-path informational check; the authoritative
+        # protection is the atomic conditional UPDATE below, which
+        # closes a TOCTOU race that two concurrent exchanges with the
+        # same code_verifier would otherwise win.
         if session_obj.tokens_exchanged:
             core_logger.print_to_log(
                 f"Token exchange replay attempt for session {session_id[:8]}...",
@@ -456,6 +478,8 @@ async def exchange_tokens_for_session(
 
         # PKCE verification successful - retrieve user and create tokens
         user = session_obj.users
+        # Validate that the user is still active before minting tokens
+        users_utils.check_user_is_active(user)
         user_read = users_schema.UsersRead.model_validate(user)
 
         # Create JWT tokens (now that PKCE is verified)
@@ -478,40 +502,105 @@ async def exchange_tokens_for_session(
             (refresh_token_exp - datetime.now(timezone.utc)).total_seconds()
         )
 
-        # Update session with the actual hashed refresh token
-        # Note: csrf_token_hash is NOT stored here (OAuth 2.1 bootstrap pattern).
-        # The first /refresh call after page reload establishes the CSRF binding.
-        session_obj.refresh_token = password_hasher.hash_password(refresh_token)
-        db.commit()
+        # Capture the stored client_type from the OAuth state BEFORE
+        # claiming the session — claim_session_for_token_exchange
+        # deletes the OAuth state row as part of its cleanup, after
+        # which any attribute access on ``oauth_state`` would trigger
+        # a lazy reload and raise ObjectDeletedError.
+        stored_client_type = oauth_state.client_type
 
-        # Determine client_type from the exchange request headers.
-        # The stored oauth_state.client_type is unreliable for system
-        # browser flows (no X-Client-Type header when the browser
-        # opened the initiate_login URL), so we trust the header on
-        # the actual token-exchange call — which *is* made by the
-        # native app and will carry X-Client-Type: mobile.
-        client_type = request.headers.get(
-            "X-Client-Type", oauth_state.client_type or "web"
+        # Update session with the actual hashed refresh token AND
+        # mark tokens as exchanged in a single atomic conditional
+        # UPDATE. This closes the check-then-act race where two
+        # concurrent exchanges with the correct verifier could both
+        # pass the ``tokens_exchanged`` guard, both mint refresh
+        # tokens, and the second overwrite the first — handing the
+        # second caller a working refresh token while invalidating
+        # the first.
+        # Note: csrf_token_hash is NOT stored here (OAuth 2.1
+        # bootstrap pattern). The first /refresh call after page
+        # reload establishes the CSRF binding.
+        claimed = users_session_crud.claim_session_for_token_exchange(
+            session_id,
+            password_hasher.hash_password(refresh_token),
+            db,
         )
-        if client_type not in ("web", "mobile"):
-            client_type = "web"
-
-        # Set refresh token cookie for web clients (enables logout)
-        if client_type == "web":
-            secure = os.environ.get("FRONTEND_PROTOCOL") == "https"
-            response.set_cookie(
-                key="endurain_refresh_token",
-                value=refresh_token,
-                expires=datetime.now(timezone.utc)
-                + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-                httponly=True,
-                path="/",
-                secure=secure,
-                samesite="strict",
+        if not claimed:
+            core_logger.print_to_log(
+                f"Token exchange lost race for session {session_id[:8]}...",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tokens already exchanged for this session",
             )
 
-        # Mark tokens as exchanged to prevent replay attacks
-        users_session_crud.mark_tokens_exchanged(session_id, db)
+        # Determine client_type for this token exchange.
+        #
+        # Authority order:
+        #   1. ``oauth_state.client_type`` (captured above as
+        #      ``stored_client_type``) — set when the IdP flow was
+        #      initiated by an authenticated client that DID send
+        #      ``X-Client-Type``. When this is non-None it represents
+        #      the original, server-recorded intent and the exchange
+        #      caller MUST NOT override it.
+        #   2. ``X-Client-Type`` header on the exchange request —
+        #      only consulted when ``stored_client_type`` is None,
+        #      which is the genuine system-browser case (the OS
+        #      browser carries no custom headers when opening
+        #      ``/initiate_login``, so the original intent could not
+        #      be recorded).
+        #
+        # Previously the header was preferred unconditionally
+        # (`request.headers.get("X-Client-Type", stored or "web")`),
+        # which let the exchange caller switch between the
+        # cookie-set ``web`` shape and the body-only ``mobile`` shape
+        # at will — bypassing the cookie-set decision and the
+        # response shape that should follow from how the flow was
+        # actually initiated.
+        header_client_type = request.headers.get("X-Client-Type")
+        if header_client_type not in ("web", "mobile"):
+            header_client_type = None
+
+        if stored_client_type in ("web", "mobile"):
+            # Recorded intent wins. If the caller declared a
+            # different value, reject the exchange — this is either
+            # a misbehaving client or an attacker trying to flip the
+            # response shape. We do NOT silently downgrade.
+            if (
+                header_client_type is not None
+                and header_client_type != stored_client_type
+            ):
+                core_logger.print_to_log(
+                    "Token exchange client_type mismatch for session "
+                    f"{session_id[:8]}...: stored={stored_client_type}, "
+                    f"header={header_client_type}",
+                    "warning",
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="client_type does not match the OAuth state",
+                )
+            client_type = stored_client_type
+        else:
+            # Genuine system-browser flow — fall back to the header,
+            # defaulting to ``web`` when the header is absent.
+            client_type = header_client_type or "web"
+
+        # Set refresh token cookie for web clients (enables logout).
+        # Cookie attributes (Secure, SameSite, Path, expiry) are
+        # centralised in auth_utils.set_refresh_token_cookie so this
+        # SSO flow stays in lockstep with password login and /refresh
+        # — previously this site used FRONTEND_PROTOCOL and could
+        # issue a non-Secure refresh cookie when that env var was
+        # missing or mis-set in production.
+        if client_type == "web":
+            auth_utils.set_refresh_token_cookie(response, refresh_token)
+
+        # Note: tokens_exchanged was flipped atomically together
+        # with the refresh-token hash above, so no second write is
+        # needed here. The atomic claim also detached the OAuth
+        # state row for cleanup.
 
         core_logger.print_to_log(
             f"Token exchange successful for session {session_id[:8]}... (user={user.username}, client_type={client_type})",

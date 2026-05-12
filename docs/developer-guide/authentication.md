@@ -4,9 +4,12 @@ Endurain supports integration with other apps through a comprehensive OAuth 2.1 
 
 ## API Requirements
 
-- **Client Type Header:** Every request must include an `X-Client-Type` header with either `web` or `mobile` as the value. Requests with other values will receive a `403` error.
-- **Authorization:** Every request must include an `Authorization: Bearer <access token>` header with a valid access token.
-- **CSRF Protection (Web Only):** State-changing requests (`POST`, `PUT`, `DELETE`, `PATCH`) from web clients must include an `X-CSRF-Token` header.
+- **Client Type Header:** Protected JWT requests must include an `X-Client-Type` header with either `web` or `mobile` as the value. Authentication, public, browser-redirect, and API-key-only flows follow the endpoint-specific requirements below.
+- **Authorization:** Protected JWT requests must include an `Authorization: Bearer <access token>` header with a valid access token. Login, MFA verification, OAuth initiation/callback, password reset, sign-up, and API-key-authenticated upload requests are exceptions.
+- **CSRF Protection (Web Only):** State-changing protected web requests (`POST`, `PUT`, `DELETE`, `PATCH`) must include an `X-CSRF-Token` header. `/auth/refresh` supports a bootstrap refresh without this header after page reload; if the header is provided and the session has a stored CSRF binding, it must be valid.
+
+!!! note "API Key Authentication"
+    Certain endpoints support API key authentication as an alternative to Bearer + `X-Client-Type` headers. API key requests do not require the `X-Client-Type` header or a CSRF token. See [API Key Authentication](#api-key-authentication) for details.
 
 ## Token Handling
 
@@ -42,7 +45,8 @@ Endurain implements an OAuth 2.1 compliant hybrid token storage model that provi
     - On page reload, call `/auth/refresh` to restore in-memory tokens
 
 - **For mobile apps:** 
-    - All tokens (access, refresh) returned in JSON response body
+  - Password login without PKCE returns access and refresh tokens in the JSON response body
+  - Password login with PKCE and OAuth/SSO return a `session_id` first; the app exchanges that session with its PKCE verifier to receive access and refresh tokens
     - Store tokens in secure platform storage (iOS Keychain, Android EncryptedSharedPreferences)
 
 ## Authentication Flows
@@ -65,9 +69,10 @@ Endurain implements an OAuth 2.1 compliant hybrid token storage model that provi
 3. User authenticates with the OAuth provider
 4. Provider redirects back to `/public/idp/callback/{idp_slug}` with authorization code
 5. Backend exchanges code for provider tokens and user info
-6. Backend creates or links user account and generates session tokens based on client type:
-    - **Web clients:** Redirected to app with tokens set automatically
-    - **Mobile clients:** Exchange session for tokens via PKCE token exchange endpoint `/public/idp/session/{session_id}/tokens`
+6. Backend creates or links the user account, creates a session, and redirects the client with a `session_id`
+7. The client exchanges the session for tokens via the PKCE token exchange endpoint `/public/idp/session/{session_id}/tokens`:
+  - **Web clients:** Access token + CSRF token in response body, refresh token as httpOnly cookie
+  - **Mobile clients:** Access token + refresh token in response body
 
 ### Token Refresh Flow
 
@@ -79,7 +84,7 @@ The token refresh flow implements OAuth 2.1 compliant refresh token rotation:
 2. Backend validates refresh token and session, checks for token reuse
     - **If token reuse detected:** Entire token family is invalidated (security breach response)
 3. New tokens are generated (access, refresh, CSRF) with refresh token rotation
-4. Old refresh token is stored for reuse detection (grace period: 30 seconds)
+4. Old refresh token is stored for reuse detection (grace period: 60 seconds)
 5. Response includes new tokens; web clients receive new httpOnly cookie
 
 **Token Refresh Request (Web):**
@@ -126,9 +131,21 @@ Endurain implements automatic refresh token rotation with reuse detection to pre
 | **Automatic Rotation** | New refresh token issued on every `/auth/refresh` call |
 | **Token Family Tracking** | All tokens in a session share a `token_family_id` |
 | **Reuse Detection** | Old tokens are stored and monitored for reuse |
-| **Grace Period** | 30-second window allows for network retry scenarios |
+| **Grace Period** | 60-second window allows for network retry scenarios |
 | **Family Invalidation** | If reuse detected, ALL tokens in family are invalidated |
 | **Rotation Count** | Tracks number of rotations for audit purposes |
+
+### API Key Authentication Flow
+
+For integrations that do not maintain a JWT session, API keys provide a stateless alternative:
+
+1. Generate an API key via the web UI (Settings → Security → API Keys) or the management API (requires JWT)
+2. Store the raw key securely — it is shown only once at creation time
+3. Include the key in requests to supported endpoints via the `X-API-Key` header or the `?api_key=` query parameter
+4. The backend validates the key hash, checks revocation and expiry, and resolves the user identity and scopes
+5. The endpoint processes the request if the required scope is present in the key's grant
+
+See [API Key Authentication](#api-key-authentication) for the complete reference.
 
 ## API Endpoints 
 
@@ -138,29 +155,30 @@ The API is reachable under `/api/v1`. Below are the authentication-related endpo
 
 | What | Url | Expected Information | Rate Limit |
 | ---- | --- | -------------------- | ---------- |
-| **Authorize** | `/auth/login` | `FORM` with fields: `username`, `password`. HTTPS highly recommended | 3 requests/min per IP |
-| **Refresh Token** | `/auth/refresh` | Cookie: `endurain_refresh_token`, Header: `X-CSRF-Token` (optional because of bootstrap logic) | - |
-| **Verify MFA** | `/auth/mfa/verify` | JSON `{'username': <username>, 'mfa_code': '123456'}` | 3 requests/min per IP |
-| **Logout** | `/auth/logout` | Cookie: `endurain_refresh_token`, Header: `X-CSRF-Token` | - |
+| **Authorize** | `/auth/login` | Header: `X-Client-Type: web`; `FORM` with fields: `username`, `password`. HTTPS highly recommended | 10 requests/min |
+| **Refresh Token** | `/auth/refresh` | Header: `X-Client-Type: web`; Cookie: `endurain_refresh_token`; optional Header: `X-CSRF-Token` (bootstrap logic) | 30 requests/min |
+| **Verify MFA** | `/auth/mfa/verify` | Header: `X-Client-Type: web`; JSON `{'username': <username>, 'mfa_code': '123456'}` | 10 requests/min |
+| **Logout** | `/auth/logout` | Header: `X-Client-Type: web`; Cookie: `endurain_refresh_token` | 30 requests/min |
 
 ### Core Authentication Endpoints (Mobile)
 
 | What | Url | Expected Information | Rate Limit |
 | ---- | --- | -------------------- | ---------- |
-| **Authorize** | `/auth/login` | `FORM` with fields: `username`, `password`. Optional query params: `code_challenge`, `code_challenge_method` (mobile PKCE). HTTPS highly recommended | 3 requests/min per IP |
-| **Refresh Token** | `/auth/refresh` | Header: `Authorization: Bearer <Refresh Token>` | - |
-| **Verify MFA** | `/auth/mfa/verify` | JSON body: `{'username': <username>, 'mfa_code': '123456'}`. Optional query params: `code_challenge`, `code_challenge_method` (mobile PKCE) | 3 requests/min per IP |
-| **Logout** | `/auth/logout` | Header: `Authorization: Bearer <Refresh Token>` | - |
+| **Authorize** | `/auth/login` | Header: `X-Client-Type: mobile`; `FORM` with fields: `username`, `password`. Optional query params: `code_challenge`, `code_challenge_method` (mobile PKCE). HTTPS highly recommended | 10 requests/min |
+| **Refresh Token** | `/auth/refresh` | Header: `X-Client-Type: mobile`; Header: `Authorization: Bearer <Refresh Token>` | 30 requests/min |
+| **Verify MFA** | `/auth/mfa/verify` | Header: `X-Client-Type: mobile`; JSON body: `{'username': <username>, 'mfa_code': '123456'}`. Optional query params: `code_challenge`, `code_challenge_method` (mobile PKCE) | 10 requests/min |
+| **Logout** | `/auth/logout` | Header: `X-Client-Type: mobile`; Header: `Authorization: Bearer <Refresh Token>` | 30 requests/min |
 
 ### OAuth/SSO Endpoints
 
 | What | Url | Expected Information | Rate Limit |
 | ---- | --- | -------------------- | ---------- |
 | **Get Enabled Providers** | `/public/idp` | None (public endpoint) | - |
-| **Initiate OAuth Login** | `/public/idp/login/{idp_slug}` | Query params: `redirect`, `code_challenge`, `code_challenge_method` | 10 requests/min per IP |
+| **Initiate OAuth Login** | `/public/idp/login/{idp_slug}` | Optional Header: `X-Client-Type`; query params: `redirect`, `code_challenge`, `code_challenge_method` | 10 requests/min per IP |
 | **OAuth Callback** | `/public/idp/callback/{idp_slug}` | Query params: `code=<code>`, `state=<state>` | 10 requests/min per IP |
-| **Token Exchange (PKCE)** | `/session/{session_id}/tokens` | JSON: `{"code_verifier": "<verifier>"}` (mobile PKCE: password or SSO) | 10 requests/min per IP |
-| **Link IdP to Account** | `/profile/idp/{idp_id}/link` | Requires authenticated session | 10 requests/min per IP |
+| **Token Exchange (PKCE)** | `/public/idp/session/{session_id}/tokens` | Header: `X-Client-Type`; JSON: `{"code_verifier": "<verifier>"}` (password PKCE or SSO PKCE) | 10 requests/min |
+| **Create IdP Link Token** | `/profile/idp/{idp_id}/link/token` | Requires authenticated session; returns a 60-second one-time link token | 10 requests/min |
+| **Link IdP to Account** | `/profile/idp/{idp_id}/link?link_token=<token>` | Browser redirect endpoint using the one-time link token | - |
 
 ### Session Management Endpoints
 
@@ -169,22 +187,41 @@ The API is reachable under `/api/v1`. Below are the authentication-related endpo
 | **Get User Sessions** | `/sessions/user/{user_id}` | Header: `Authorization: Bearer <Access Token>` |
 | **Delete Session** | `/sessions/{session_id}/user/{user_id}` | Header: `Authorization: Bearer <Access Token>` |
 
+### API Key Management Endpoints
+
+Require JWT authentication. API keys cannot manage other API keys.
+
+| Method | Url | Description |
+| ------ | --- | ----------- |
+| `GET` | `/profile/api_keys` | List all API keys for the authenticated user |
+| `POST` | `/profile/api_keys` | Create a new API key |
+| `PATCH` | `/profile/api_keys/{id}/revoke` | Revoke (deactivate) a key |
+| `DELETE` | `/profile/api_keys/{id}` | Permanently delete a key |
+
 ### Example Resource Endpoints
 
 | What | Url | Expected Information |
 | ---- | --- | -------------------- |
-| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file |
+| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file. Accepts JWT **or** API key (`X-API-Key` header / `?api_key=` query param) with `activities:upload` scope |
 | **Set Weight** | `/health/weight` | JSON `{'weight': <number>, 'created_at': 'yyyy-MM-dd'}` |
 
 ## Progressive Account Lockout
 
-Endurain implements progressive brute-force protection to prevent credential stuffing attacks:
+Endurain implements progressive brute-force protection to prevent credential stuffing attacks. Password login failures use this policy:
 
 | Failed Attempts | Lockout Duration |
 |-----------------|------------------|
 | 5 failures | 5 minutes |
 | 10 failures | 30 minutes |
 | 20 failures | 24 hours |
+
+MFA verification failures use a separate policy:
+
+| Failed Attempts | Lockout Duration |
+|-----------------|------------------|
+| 5 failures | 5 minutes |
+| 10 failures | 30 minutes |
+| 15 failures | 2 hours |
 
 **Features:**
 
@@ -290,7 +327,7 @@ X-Client-Type: web|mobile
 
 ```json
 {
-  "detail": "Invalid MFA code. Failed attempts: 1"
+  "detail": "Invalid MFA code, backup code or backup code already used. Failed attempts: 1."
 }
 ```
 
@@ -303,7 +340,7 @@ X-Client-Type: web|mobile
 ```
 
 ### Important Notes
-- The pending MFA login session is temporary and will expire if not completed within a reasonable time
+- The pending MFA login session is temporary and expires after 5 minutes
 - After successful MFA verification, the pending login is automatically cleaned up
 - The user must still be active at the time of MFA verification
 - If no MFA is enabled for the user, the standard single-step authentication flow applies
@@ -377,6 +414,156 @@ X-Client-Type: web|mobile
     - Regenerating codes invalidates ALL previous backup codes
     - Store backup codes in a secure location separate from your authenticator device
 
+## API Key Authentication
+
+API keys provide a stateless, long-lived authentication mechanism for programmatic access and third-party integrations. Unlike JWT sessions, API keys do not require a login flow or token refresh, and are scoped to specific operations.
+
+!!! warning "Security Notice"
+    API keys are powerful credentials. Treat them like passwords: store them securely and never expose them in client-side code, public repositories, or logs.
+
+### Key Format
+
+API keys use the following format:
+
+```
+endurain_<43-character-base64url-random-string>
+```
+
+- **Prefix**: `endurain_` — identifies Endurain API keys in secret scanning tools (e.g., GitHub secret scanning)
+- **Random part**: 256 bits of cryptographically secure random data (`secrets.token_urlsafe(32)`), encoded as a 43-character base64url string
+- **Total length**: ~52 characters
+
+The raw key is shown **once** at creation time and is never stored by the server (only the SHA-256 hash is stored). If lost, the key must be deleted and a new one created.
+
+### Scopes
+
+API keys are granted one or more scopes at creation time. A key can only access operations covered by its granted scopes:
+
+The key-management API validates requested scopes against the owning user's JWT scopes. API-key authentication is currently accepted by the upload endpoint below, so integrations should grant only the scopes their supported endpoint needs.
+
+| Scope | Description |
+| ----- | ----------- |
+| `activities:upload` | Upload activity files (.gpx, .tcx, .fit, .gz) |
+
+### How to Authenticate with an API Key
+
+API keys bypass the standard JWT and `X-Client-Type` requirements. Send the raw key using either option:
+
+**Option 1: `X-API-Key` header (recommended):**
+
+```http
+POST /api/v1/activities/create/upload
+X-API-Key: endurain_abc12345...
+Content-Type: multipart/form-data
+
+(file body)
+```
+
+**Option 2: `api_key` query parameter (for tools that cannot set custom headers):**
+
+```http
+POST /api/v1/activities/create/upload?api_key=endurain_abc12345...
+Content-Type: multipart/form-data
+
+(file body)
+```
+
+!!! tip "Header vs Query Parameter"
+    The `X-API-Key` header is strongly preferred. Query parameters may appear in server access logs, reverse-proxy logs, and browser history, increasing the risk of key exposure. Use the query parameter only when setting custom headers is not possible.
+
+If both the `X-API-Key` header and the `?api_key=` query parameter are present, the **header takes precedence**.
+
+### Endpoints That Accept API Keys
+
+| Method | Endpoint | Required Scope | Description |
+| ------ | -------- | -------------- | ----------- |
+| `POST` | `/activities/create/upload` | `activities:upload` | Upload a .gpx, .tcx, .fit, or .gz activity file |
+
+### Managing API Keys
+
+API keys are managed through the Endurain web UI (Settings → Security → API Keys) or via the REST API. All management endpoints require a valid JWT access token.
+
+**Create API Key Request:**
+
+```http
+POST /api/v1/profile/api_keys
+Authorization: Bearer {access_token}
+X-Client-Type: web
+Content-Type: application/json
+
+{
+  "name": "Home Server Integration",
+  "scopes": ["activities:upload"],
+  "expires_at": "2027-01-01T00:00:00Z"
+}
+```
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `name` | Yes | Human-readable label (max 100 characters) |
+| `scopes` | Yes | Array of scope strings to grant |
+| `expires_at` | No | ISO 8601 expiry datetime. Omit or `null` for no expiry |
+
+**Create API Key Response (HTTP 201):**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": 1,
+  "name": "Home Server Integration",
+  "key_prefix": "abc12345",
+  "scopes": "[\"activities:upload\"]",
+  "expires_at": "2027-01-01T00:00:00Z",
+  "last_used_at": null,
+  "created_at": "2026-03-02T10:00:00Z",
+  "is_active": true,
+  "key": "endurain_abc12345..."
+}
+```
+
+!!! warning "Save the key immediately"
+    The `key` field is returned **only in this response**. It is not stored by the server and cannot be retrieved later. Store it in a secure location (e.g., a password manager or secrets vault) before dismissing the response.
+
+**List API Keys Response (`GET /profile/api_keys`):**
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_id": 1,
+    "name": "Home Server Integration",
+    "key_prefix": "abc12345",
+    "scopes": "[\"activities:upload\"]",
+    "expires_at": "2027-01-01T00:00:00Z",
+    "last_used_at": "2026-03-01T08:30:00Z",
+    "created_at": "2026-03-02T10:00:00Z",
+    "is_active": true
+  }
+]
+```
+
+The `key` field is **never** returned in list or subsequent get responses — only `key_prefix` is shown for identification.
+
+**Revoke API Key (`PATCH /profile/api_keys/{id}/revoke`):**
+
+Revocation soft-deletes the key by setting `is_active = false`. Revoked keys are rejected immediately but remain visible in the list (useful for audit purposes). Returns HTTP 204 on success.
+
+**Delete API Key (`DELETE /profile/api_keys/{id}`):**
+
+Permanently removes the key from the database. Returns HTTP 204 on success.
+
+### Security Properties
+
+| Property | Detail |
+| -------- | ------ |
+| **Storage** | SHA-256 hex digest stored server-side; raw key never persisted |
+| **Comparison** | Constant-time (`hmac.compare_digest`) prevents timing attacks |
+| **Revocation** | Immediate — revoked keys are rejected at validation time |
+| **Expiry** | Optional; expired keys are rejected at validation time with timezone-aware comparison |
+| **Audit logging** | Every successful authentication is logged with key prefix, user ID, endpoint, and client IP |
+| **No self-escalation** | An API key cannot create, list, or revoke other API keys (JWT required) |
+| **Minimum privilege** | Keys carry only the scopes explicitly granted at creation time |
+
 ## OAuth/SSO Integration
 
 ### Supported Identity Providers
@@ -409,18 +596,19 @@ Identity providers must be configured with the following parameters:
 Users can link their Endurain account to an OAuth provider:
 
 1. User must be authenticated with a valid session
-2. Navigate to `/profile/idp/{idp_id}/link`
-3. Authenticate with the identity provider
-4. Provider is linked to the existing account
+2. Create a one-time link token with `POST /profile/idp/{idp_id}/link/token`
+3. Open `/profile/idp/{idp_id}/link?link_token=<token>` in the browser before the token expires (60 seconds)
+4. Authenticate with the identity provider
+5. Provider is linked to the existing account
 
 ### OAuth Token Response
 When authenticating via OAuth, the response format matches the standard authentication:
 
-- **Web clients**: Tokens set as HTTP-only cookies, redirected to app
-- **Mobile clients**: Must use PKCE flow (see [Mobile SSO with PKCE](#mobile-sso-with-pkce) below)
+- **Web clients**: Redirected to the frontend with a `session_id`; the frontend exchanges the session and receives the access token + CSRF token in the response body, while the refresh token is set as an httpOnly cookie
+- **Mobile clients**: Redirected or deep-linked with a `session_id`; the app exchanges the session and receives access + refresh tokens in the response body
 
 !!! info "Mobile OAuth/SSO"
-    Mobile apps must use the PKCE flow for OAuth/SSO authentication. This provides enhanced security and a cleaner separation between the WebView and native app.
+  OAuth/SSO login requires PKCE for all clients. Mobile apps should still prefer the system browser flow because it keeps provider credentials outside the app process.
 
 ## Mobile Password Login with PKCE
 
@@ -454,11 +642,11 @@ Include the code challenge in the login request:
 **Login Request with PKCE:**
 
 ```http
-POST /api/v1/auth/login
+POST /api/v1/auth/login?code_challenge={challenge}&code_challenge_method=S256
 Content-Type: application/x-www-form-urlencoded
 X-Client-Type: mobile
 
-username=user@example.com&password=userpassword&code_challenge={challenge}&code_challenge_method=S256
+username=user@example.com&password=userpassword
 ```
 
 **Form Parameters:**
@@ -467,6 +655,11 @@ username=user@example.com&password=userpassword&code_challenge={challenge}&code_
 | --------- | -------- | ----------- |
 | `username` | Yes | Username or email |
 | `password` | Yes | User's password |
+
+**Query Parameters:**
+
+| Parameter | Required | Description |
+| --------- | -------- | ----------- |
 | `code_challenge` | Yes (PKCE) | Base64url-encoded SHA256 hash of code_verifier |
 | `code_challenge_method` | Yes (PKCE) | Must be `S256` |
 
@@ -478,7 +671,7 @@ Instead of tokens, receive a session_id for token exchange:
 {
   "session_id": "550e8400-e29b-41d4-a716-446655440000",
   "mfa_required": false,
-  "message": "Complete authentication by exchanging tokens at /session/{session_id}/tokens"
+  "message": "Complete authentication by exchanging tokens at /public/idp/session/{session_id}/tokens"
 }
 ```
 
@@ -489,7 +682,7 @@ Use the code verifier to securely exchange the session for tokens:
 **Token Exchange Request:**
 
 ```http
-POST /api/v1/session/{session_id}/tokens
+POST /api/v1/public/idp/session/{session_id}/tokens
 Content-Type: application/json
 X-Client-Type: mobile
 
@@ -586,7 +779,7 @@ X-Client-Type: mobile
 {
   "session_id": "550e8400-e29b-41d4-a716-446655440000",
   "mfa_required": false,
-  "message": "Complete authentication by exchanging tokens at /session/{session_id}/tokens"
+  "message": "Complete authentication by exchanging tokens at /public/idp/session/{session_id}/tokens"
 }
 ```
 
@@ -605,7 +798,7 @@ Then exchange for tokens as in Step 3 above.
 ## Mobile SSO with PKCE
 
 ### Overview
-PKCE (Proof Key for Code Exchange, RFC 7636) is required for mobile OAuth/SSO authentication. It provides enhanced security by eliminating the need to extract tokens from WebView cookies, preventing authorization code interception attacks, and enabling a cleaner separation between the WebView and native app.
+PKCE (Proof Key for Code Exchange, RFC 7636) is required for OAuth/SSO authentication. It provides enhanced security by eliminating the need to extract tokens from WebView cookies, preventing authorization code interception attacks, and enabling a cleaner separation between browser/WebView and app contexts.
 
 ### Why Use PKCE?
 
@@ -659,7 +852,7 @@ Before initiating the OAuth flow, generate a cryptographically random code verif
 **Code Verifier Requirements (RFC 7636):**
 
 - Length: 43-128 characters
-- Characters: `A-Z`, `a-z`, `0-9`, `-`, `.`, `_`, `~`
+- Characters accepted by Endurain: `A-Z`, `a-z`, `0-9`, `-`, `_`
 - Cryptographically random
 
 **Code Challenge Computation:**
@@ -718,9 +911,9 @@ X-Client-Type: mobile
 
 ```json
 {
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "csrf_token": "abc123def456...",
   "expires_in": 900,
   "refresh_token_expires_in": 604800,
   "token_type": "Bearer"
@@ -751,7 +944,6 @@ Use the tokens for authenticated API calls:
 GET /api/v1/activities
 Authorization: Bearer {access_token}
 X-Client-Type: mobile
-X-CSRF-Token: {csrf_token}
 ```
 
 ### System Browser Alternative (RFC 8252 Recommended)
@@ -833,6 +1025,8 @@ administrator via `ALLOWED_REDIRECT_SCHEMES` (see [Configuration](#configuration
 {custom_scheme}://callback?session_id={uuid}
 ```
 
+In the current web flow, the backend first redirects to the Endurain frontend with `external_redirect=true`; the frontend then forwards the `session_id` to the configured custom scheme.
+
 **Step 4:** The OS invokes the app's deep-link/intent handler with the above URL.
 Extract the `session_id`.
 
@@ -900,7 +1094,8 @@ The following environment variables control authentication behavior:
 
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
-| `FRONTEND_PROTOCOL` | Protocol for cookie security (`http` or `https`) | `http` | No |
+| `ENVIRONMENT` | Controls direct login/refresh cookie security. `production` and `demo` set the refresh cookie `Secure` flag. | `production` | No |
+| `FRONTEND_PROTOCOL` | Controls refresh cookie security during OAuth/SSO session exchange. Set to `https` for secure cookies. | `http` | No |
 | `ALLOWED_REDIRECT_SCHEMES` | Comma-separated custom URI schemes allowed as SSO redirect targets (e.g., `gadgetbridge,myapp`). Empty by default — only relative paths accepted. External `http`/`https` redirects are always rejected. | `` | No |
 
 ### Cookie Configuration
@@ -910,9 +1105,9 @@ For web clients, the refresh token cookie is configured with:
 | Attribute | Value | Purpose |
 |-----------|-------|---------|
 | **HttpOnly** | `true` | Prevents JavaScript access (XSS protection) |
-| **Secure** | `true` (in production) | Only sent over HTTPS |
+| **Secure** | `true` for direct login/refresh when `ENVIRONMENT=production` or `demo`; `true` for OAuth/SSO exchange when `FRONTEND_PROTOCOL=https` | Only sent over HTTPS |
 | **SameSite** | `Strict` | Prevents CSRF attacks |
-| **Path** | `/` | Application-wide access |
+| **Path** | `/api/v1/auth` | Sent only to auth endpoints that need the refresh token |
 | **Expires** | 7 days (default) | Matches refresh token lifetime |
 
 ## Security Scopes
@@ -930,10 +1125,13 @@ Endurain uses OAuth-style scopes to control API access. Each scope controls acce
 | `gears:write` | Modify gear/equipment data | Write |
 | `activities:read` | Read activity data | Read-only |
 | `activities:write` | Create/modify activities | Write |
+| `activities:upload` | Upload activity files (.gpx, .tcx, .fit, .gz) | Write (JWT or API key on upload endpoint) |
 | `health:read` | Read health metrics (weight, sleep, steps) | Read-only |
 | `health:write` | Record health metrics | Write |
 | `health_targets:read` | Read health targets | Read-only |
 | `health_targets:write` | Modify health targets | Write |
+| `notifications:read` | Read notifications | Read-only |
+| `notifications:write` | Modify notifications | Write |
 | `sessions:read` | View active sessions | Read-only |
 | `sessions:write` | Manage sessions | Write |
 | `server_settings:read` | View server configuration | Read-only |
@@ -963,7 +1161,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 ```json
 {
-  "detail": "Invalid client type. Must be 'web' or 'mobile'"
+  "detail": "Invalid client type"
 }
 ```
 
@@ -971,7 +1169,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 ```json
 {
-  "detail": "Token has expired"
+  "detail": "Token is expired."
 }
 ```
 
@@ -979,7 +1177,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 ```json
 {
-  "detail": "Incorrect username or password"
+  "detail": "Unable to authenticate with provided credentials"
 }
 ```
 
@@ -987,7 +1185,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 ```json
 {
-  "detail": "Rate limit exceeded. Please try again later."
+  "detail": "Too many requests. Please try again later."
 }
 ```
 
@@ -995,7 +1193,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 ```json
 {
-  "detail": "Insufficient permissions. Required scope: activities:write"
+  "detail": "Unauthorized Access - Missing permissions: {'activities:write'}"
 }
 ```
 
@@ -1009,7 +1207,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 4. **Always include required headers:**
     - `Authorization: Bearer {access_token}` for all authenticated requests
     - `X-Client-Type: web` for all requests
-    - `X-CSRF-Token: {csrf_token}` for POST/PUT/DELETE/PATCH requests
+    - `X-CSRF-Token: {csrf_token}` for protected POST/PUT/DELETE/PATCH requests, except `/auth/refresh` bootstrap
 5. **Handle page reload gracefully** - Call `/auth/refresh` on app initialization to restore in-memory tokens
 6. **Clear tokens on logout** - The httpOnly cookie is cleared by the backend
 
@@ -1018,11 +1216,10 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 1. **Store tokens securely**:
     - **iOS**: Keychain Services
     - **Android**: EncryptedSharedPreferences or Android Keystore
-2. **Use PKCE for OAuth/SSO** - Required for mobile OAuth flows
+2. **Use PKCE for OAuth/SSO** - Required for OAuth/SSO flows
 3. **Include required headers:**
     - `Authorization: Bearer {access_token}` for all authenticated requests
     - `X-Client-Type: mobile` for all requests
-    - `X-CSRF-Token: {csrf_token}` for state-changing requests
 4. **Handle token refresh proactively** - Refresh before expiration
 5. **Implement secure token deletion** on logout
 
@@ -1038,9 +1235,19 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 ### For OAuth/SSO Integration
 
-1. **Always use PKCE** - Required for mobile, recommended for web
+1. **Always use PKCE** - Required for OAuth/SSO login
 2. **Validate state parameter** - Prevents CSRF attacks on OAuth flow
 3. **Implement proper redirect URL validation** - Prevents open redirects
 4. **Handle provider errors gracefully** with user-friendly messages
 5. **Support account linking** - Allow users to connect multiple providers
 6. **Respect token expiry** - OAuth state expires after 10 minutes
+
+### For API Key Integrations
+
+1. **Store the key securely** — use a secrets manager, environment variable, or encrypted config file. Never hardcode it in source code
+2. **Use the `X-API-Key` header** rather than the `?api_key=` query parameter to avoid key exposure in logs
+3. **Grant minimum scopes** — request only the scopes your integration needs (e.g., `activities:upload` for file upload scripts)
+4. **Set an expiry date** when creating keys for temporary or one-off integrations
+5. **Rotate keys periodically** — delete the old key and create a new one; update any dependent services before deleting
+6. **Revoke immediately** if a key is suspected to be compromised — revocation takes effect instantly
+7. **Monitor `last_used_at`** via the list endpoint to detect unused keys that can be cleaned up

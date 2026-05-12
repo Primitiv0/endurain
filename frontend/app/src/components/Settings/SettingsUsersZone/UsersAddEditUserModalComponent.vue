@@ -789,7 +789,18 @@ async function submitEditUserForm() {
       pending_admin_approval: newEditUserPendingAdminApproval.value
     }
     if (props.action === 'profile') {
-      await profile.editProfile(data)
+      // Self-service profile endpoint enforces a strict allow-list and silently
+      // drops administrative fields. Send only the fields the backend accepts so
+      // the UI never implies these values were saved.
+      const {
+        id,
+        access_type,
+        active,
+        email_verified,
+        pending_admin_approval,
+        ...profileData
+      } = data
+      await profile.editProfile(profileData)
     } else {
       const editedUser = await users.editUser(data.id, data)
       data.external_auth_count = editedUser.external_auth_count

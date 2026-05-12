@@ -2,6 +2,7 @@ import {
   fetchGetRequest,
   fetchPostRequest,
   fetchPutRequest,
+  fetchPatchRequest,
   fetchDeleteRequest,
   fetchPostFileRequest,
   fetchGetRequestWithRedirect
@@ -64,22 +65,35 @@ export const profile = {
   getBackupCodeStatus() {
     return fetchGetRequest('profile/mfa/backup-codes/status')
   },
-  regenerateBackupCodes() {
-    return fetchPostRequest('profile/mfa/backup-codes', {})
+  regenerateBackupCodes(data) {
+    return fetchPostRequest('profile/mfa/backup-codes', data)
   },
   getMyIdentityProviders() {
     return fetchGetRequest('profile/idp')
   },
-  unlinkIdentityProvider(idpId) {
-    return fetchDeleteRequest(`profile/idp/${idpId}`)
+  unlinkIdentityProvider(idpId, stepUpData = {}) {
+    return fetchPostRequest(`profile/idp/${idpId}/unlink`, stepUpData)
   },
-  generateLinkToken(idpId) {
-    return fetchPostRequest(`profile/idp/${idpId}/link/token`, {})
+  generateLinkToken(idpId, stepUpData = {}) {
+    return fetchPostRequest(`profile/idp/${idpId}/link/token`, stepUpData)
   },
-  async linkIdentityProvider(idpId) {
-    const response = await this.generateLinkToken(idpId)
+  async linkIdentityProvider(idpId, stepUpData = {}) {
+    const response = await this.generateLinkToken(idpId, stepUpData)
     const linkToken = response.token
 
     fetchGetRequestWithRedirect(`profile/idp/${idpId}/link?link_token=${linkToken}`)
+  },
+  // API keys endpoints
+  getApiKeys() {
+    return fetchGetRequest('profile/api_keys')
+  },
+  createApiKey(data) {
+    return fetchPostRequest('profile/api_keys', data)
+  },
+  revokeApiKey(id) {
+    return fetchPatchRequest(`profile/api_keys/${id}/revoke`, {})
+  },
+  deleteApiKey(id) {
+    return fetchDeleteRequest(`profile/api_keys/${id}`)
   }
 }

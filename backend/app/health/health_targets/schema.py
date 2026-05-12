@@ -9,6 +9,9 @@ class HealthTargetsBase(BaseModel):
         weight: Target weight in kg.
         steps: Target daily steps count.
         sleep: Target sleep duration in seconds.
+        fasting: Target fasting duration in seconds.
+        water_ml: Target daily water intake in milliliters.
+        poop_count: Target daily bowel movement count.
     """
 
     weight: StrictFloat | None = Field(
@@ -19,6 +22,26 @@ class HealthTargetsBase(BaseModel):
     )
     sleep: StrictInt | None = Field(
         default=None, ge=0, le=86400, description="Target sleep duration in seconds"
+    )
+    fasting: StrictInt | None = Field(
+        default=None,
+        ge=0,
+        le=259200,
+        description="Target fasting duration in seconds (max 72h)",
+    )
+    water_ml: StrictFloat | None = Field(
+        default=None,
+        ge=0,
+        le=20000,
+        description=(
+            "Target daily water intake in milliliters"
+        ),
+    )
+    poop_count: StrictInt | None = Field(
+        default=None,
+        ge=0,
+        le=20,
+        description="Target daily bowel movement count",
     )
 
     model_config = ConfigDict(

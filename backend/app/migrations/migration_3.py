@@ -1,24 +1,31 @@
+"""
+Migration 3: back-fill laps, steps, and sets for all activities.
+
+Processes every existing activity from FIT/GPX files or Strava and populates
+the laps, workout steps, and sets tables.
+"""
+
+import asyncio
 import os
 import glob
 import fitdecode
-import zipfile
 from pytz import UTC
 
 from sqlalchemy.orm import Session
 
 import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
-import activities.activity.schema as activities_schema
+import activities.activity.models as activities_models
 
 import activities.activity_streams.crud as activity_streams_crud
 
-import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
+from activities.activity_exercise_titles import (
+    crud as activity_exercise_titles_crud,
+)
 
 import activities.activity_laps.crud as activity_laps_crud
 
 import activities.activity_sets.crud as activity_sets_crud
-
-import activities.activity_streams.crud as activity_streams_crud
 
 import activities.activity_workout_steps.crud as activity_workout_steps_crud
 
@@ -32,12 +39,26 @@ import strava.activity_utils as strava_activity_utils
 
 import core.logger as core_logger
 import core.config as core_config
+import core.file_uploads as file_uploads
 
-import fit.utils as fit_utils
-import gpx.utils as gpx_utils
+import activities.activity_file_import.utils_fit as fit_utils
+import activities.activity_file_import.utils_gpx as gpx_utils
 
 
-def process_migration_3(db: Session):
+def process_migration_3(db: Session) -> None:
+    """
+    Run migration 3 for all existing activities.
+
+    Args:
+        db: Active database session.
+
+    Returns:
+        None.
+
+    Raises:
+        None — errors are logged; the migration flag is not
+        set when any activity fails to process.
+    """
     core_logger.print_to_log_and_console("Started migration 3")
 
     activities_processed_with_no_errors = True
@@ -46,7 +67,9 @@ def process_migration_3(db: Session):
         activities = activities_crud.get_all_activities_no_serialize(db)
     except Exception as err:
         core_logger.print_to_log_and_console(
-            f"Migration 3 - Error fetching activities: {err}", "error", exc=err
+            f"Migration 3 - Error fetching activities: {err}",
+            "error",
+            exc=err,
         )
         return
 
@@ -56,8 +79,10 @@ def process_migration_3(db: Session):
                 if activity.strava_activity_id is None:
                     # check if activity file exists
                     activity_fit_file_path = find_activity_fit_file(activity.id)
+                    processed_dir = core_config.FILES_PROCESSED_DIR
                     activity_gpx_file_path = os.path.join(
-                        f"{core_config.FILES_PROCESSED_DIR}", f"{activity.id}.gpx"
+                        processed_dir,
+                        f"{activity.id}.gpx",
                     )
 
                     if (
@@ -73,7 +98,9 @@ def process_migration_3(db: Session):
                         or not os.path.exists(activity_fit_file_path)
                     ) and not os.path.exists(activity_gpx_file_path):
                         core_logger.print_to_log_and_console(
-                            f"Migration 3 - Activity {activity.id} does not have a file. Will process it using activity streams.",
+                            f"Migration 3 - Activity {activity.id}"
+                            " does not have a file. Will process it"
+                            " using activity streams.",
                             "info",
                         )
                         # Process the activity using streams
@@ -104,7 +131,8 @@ def process_migration_3(db: Session):
             except Exception as err:
                 activities_processed_with_no_errors = False
                 core_logger.print_to_log_and_console(
-                    f"Migration 3 - Failed to process activity {activity.id}: {err}",
+                    f"Migration 3 - Failed to process activity"
+                    f" {activity.id}: {err}",
                     "error",
                     exc=err,
                 )
@@ -129,7 +157,19 @@ def process_migration_3(db: Session):
     core_logger.print_to_log_and_console("Finished migration 3")
 
 
-def find_activity_fit_file(activity_id):
+def find_activity_fit_file(activity_id: int) -> str | None:
+    """
+    Find the FIT file path for a given activity ID.
+
+    Args:
+        activity_id: The activity's primary-key ID.
+
+    Returns:
+        Absolute path to the FIT file, or None if not found.
+
+    Raises:
+        None.
+    """
     processed_dir = core_config.FILES_PROCESSED_DIR
 
     # Try single activity file first
@@ -150,10 +190,28 @@ def find_activity_fit_file(activity_id):
     return None
 
 
-def get_fit_file_from_garminconnect(activity: activities_schema.Activity, db: Session):
+def get_fit_file_from_garminconnect(
+    activity: activities_models.Activity,
+    db: Session,
+) -> str:
+    """
+    Download the FIT file for an activity from Garmin Connect.
+
+    Args:
+        activity: ORM Activity instance.
+        db: Active database session.
+
+    Returns:
+        Expected path to the downloaded FIT file.
+
+    Raises:
+        OSError: If the downloaded ZIP file cannot be removed.
+    """
     # Log getting file from Garmin Connect
     core_logger.print_to_log_and_console(
-        f"Migration 3 - Activity {activity.id} does not have a file, but it is a Garmin Connect activity. Will retrieve file from Garmin.",
+        f"Migration 3 - Activity {activity.id} does not have"
+        " a file, but it is a Garmin Connect activity."
+        " Will retrieve file from Garmin.",
         "info",
     )
 
@@ -162,55 +220,78 @@ def get_fit_file_from_garminconnect(activity: activities_schema.Activity, db: Se
         activity.user_id, db
     )
 
+    if garminconnect_client is None:
+        core_logger.print_to_log_and_console(
+            f"Migration 3 - Could not get Garmin Connect"
+            f" client for activity {activity.id}.",
+            "error",
+        )
+        return os.path.join(core_config.FILES_PROCESSED_DIR, f"{activity.id}.fit")
+
     # Download the activity in original format (.zip file)
     zip_data = garminconnect_client.download_activity(
         activity.garminconnect_activity_id,
         dl_fmt=garminconnect_client.ActivityDownloadFormat.ORIGINAL,
     )
 
-    # Save the zip file
-    output_file = (
-        f"{core_config.FILES_DIR}/{str(activity.garminconnect_activity_id)}.zip"
+    # Persist + extract through the unified pipeline. Migrations are
+    # synchronous, so we drive the async helpers via a single
+    # ``asyncio.run`` over both calls — one event-loop setup per
+    # archive instead of two.
+    gc_id = str(activity.garminconnect_activity_id)
+    zip_filename = f"{gc_id}.zip"
+    files_dir = core_config.settings.FILES_DIR
+    fallback_path = os.path.join(
+        core_config.FILES_PROCESSED_DIR, f"{activity.id}.fit"
     )
 
-    # Write the ZIP data to the output file
-    with open(output_file, "wb") as fb:
-        fb.write(zip_data)
+    async def _save_and_extract() -> tuple[str, list]:
+        saved = await file_uploads.save_validated_bytes(
+            zip_data,
+            kind=file_uploads.UploadKind.ZIP,
+            upload_dir=files_dir,
+            filename=zip_filename,
+        )
+        try:
+            paths = await file_uploads.extract_validated_zip(
+                saved,
+                dest_dir=files_dir,
+                per_entry_kind=file_uploads.UploadKind.ACTIVITY,
+            )
+        except BaseException:
+            file_uploads.safe_remove_within(saved, base_dir=files_dir)
+            raise
+        return saved, paths
 
-    # Array to store the names of extracted files
-    extracted_files = []
-
-    # Open the ZIP file
-    with zipfile.ZipFile(output_file, "r") as zip_ref:
-        # Extract all contents to the specified directory
-        zip_ref.extractall(core_config.FILES_DIR)
-        # Populate the array with file names
-        extracted_files = zip_ref.namelist()
-
-    # Remove the zip file
     try:
-        os.remove(output_file)
-    except OSError as err:
+        output_file, extracted_paths = asyncio.run(_save_and_extract())
+    except Exception as err:
         core_logger.print_to_log_and_console(
-            f"Error removing file {output_file}: {err}",
+            f"Migration 3 - Garmin ZIP handling failed for activity "
+            f"{activity.id}: {type(err).__name__}",
             "error",
             exc=err,
         )
+        return fallback_path
+
+    file_uploads.safe_remove_within(output_file, base_dir=files_dir)
 
     try:
         # Define the directory where the processed files will be stored
-        files_dir = core_config.FILES_DIR
         processed_dir = core_config.FILES_PROCESSED_DIR
 
-        for file in extracted_files:
-            _, file_extension = os.path.splitext(f"{files_dir}/{file}")
+        for extracted_path in extracted_paths:
+            file_extension = os.path.splitext(extracted_path.name)[1]
 
             # Define new file path with activity ID as filename
             new_file_name = f"{activity.id}{file_extension}"
 
             # Move the file to the processed directory
-            activities_utils.move_file(
-                processed_dir, new_file_name, f"{files_dir}/{file}"
+            file_uploads.move_within(
+                extracted_path,
+                processed_dir,
+                filename=new_file_name,
+                src_base_dir=files_dir,
             )
     except Exception as err:
         core_logger.print_to_log_and_console(
@@ -224,8 +305,24 @@ def get_fit_file_from_garminconnect(activity: activities_schema.Activity, db: Se
 
 
 def process_fit_file(
-    activity: activities_schema.Activity, activity_fit_file_path: str, db: Session
-):
+    activity: activities_models.Activity,
+    activity_fit_file_path: str,
+    db: Session,
+) -> None:
+    """
+    Parse a FIT file and persist its data to the database.
+
+    Args:
+        activity: ORM Activity instance.
+        activity_fit_file_path: Absolute path to the FIT file.
+        db: Active database session.
+
+    Returns:
+        None.
+
+    Raises:
+        Exception: Re-raised after logging on parse failure.
+    """
     # Array to store sessions
     sessions = []
 
@@ -292,7 +389,23 @@ def process_fit_file(
         raise err
 
 
-def process_activity_using_streams(activity: activities_schema.Activity, db: Session):
+def process_activity_using_streams(
+    activity: activities_models.Activity,
+    db: Session,
+) -> None:
+    """
+    Build laps from activity streams and persist to the database.
+
+    Args:
+        activity: ORM Activity instance.
+        db: Active database session.
+
+    Returns:
+        None.
+
+    Raises:
+        Exception: Re-raised after logging on processing failure.
+    """
     core_logger.print_to_log_and_console(
         f"Migration 3 - Activity {activity.id} has a gpx file. Will process it."
     )
@@ -301,39 +414,17 @@ def process_activity_using_streams(activity: activities_schema.Activity, db: Ses
         streams = activity_streams_crud.get_activity_streams(
             activity.id, activity.user_id, db
         )
-        stream_map = {stream.stream_type: stream.stream_waypoints for stream in streams}
+        stream_map = {
+            stream.stream_type: stream.stream_waypoints for stream in (streams or [])
+        }
 
         laps = gpx_utils.generate_activity_laps(
-            (
-                stream_map.get(StreamType.LATLONG.value)
-                if stream_map.get(StreamType.LATLONG.value)
-                else []
-            ),
-            (
-                stream_map.get(StreamType.ELEVATION.value)
-                if stream_map.get(StreamType.ELEVATION.value)
-                else []
-            ),
-            (
-                stream_map.get(StreamType.POWER.value)
-                if stream_map.get(StreamType.POWER.value)
-                else []
-            ),
-            (
-                stream_map.get(StreamType.HEART_RATE.value)
-                if stream_map.get(StreamType.HEART_RATE.value)
-                else []
-            ),
-            (
-                stream_map.get(StreamType.CADENCE.value)
-                if stream_map.get(StreamType.CADENCE.value)
-                else []
-            ),
-            (
-                stream_map.get(StreamType.SPEED.value)
-                if stream_map.get(StreamType.SPEED.value)
-                else []
-            ),
+            stream_map.get(StreamType.LATLONG.value) or [],
+            stream_map.get(StreamType.ELEVATION.value) or [],
+            stream_map.get(StreamType.POWER.value) or [],
+            stream_map.get(StreamType.HEART_RATE.value) or [],
+            stream_map.get(StreamType.CADENCE.value) or [],
+            stream_map.get(StreamType.SPEED.value) or [],
         )
 
         store_data_in_db(activity, [], laps, [], [], [], db)
@@ -346,7 +437,23 @@ def process_activity_using_streams(activity: activities_schema.Activity, db: Ses
         raise
 
 
-def process_strava_activity(activity: activities_schema.Activity, db: Session):
+def process_strava_activity(
+    activity: activities_models.Activity,
+    db: Session,
+) -> bool:
+    """
+    Fetch Strava laps for an activity and persist to the database.
+
+    Args:
+        activity: ORM Activity instance.
+        db: Active database session.
+
+    Returns:
+        True if processed successfully, False otherwise.
+
+    Raises:
+        None.
+    """
     # Get the user integrations by user ID
     user_integrations = strava_utils.fetch_user_integrations_and_validate_token(
         activity.user_id, db
@@ -354,7 +461,8 @@ def process_strava_activity(activity: activities_schema.Activity, db: Session):
 
     if user_integrations is None:
         core_logger.print_to_log_and_console(
-            f"Migration 3 - User {activity.user_id} does not have a Strava account linked. Skipping.",
+            f"Migration 3 - User {activity.user_id} does not have"
+            " a Strava account linked. Skipping.",
             "info",
         )
         # Skip the activity if the user does not have a Strava account linked
@@ -366,28 +474,29 @@ def process_strava_activity(activity: activities_schema.Activity, db: Session):
 
     # Create a dictionary from stream_type to waypoints
     stream_map = {
-        stream.stream_type: stream.stream_waypoints for stream in activity_streams
+        stream.stream_type: stream.stream_waypoints
+        for stream in (activity_streams or [])
     }
 
     # Create flags for which streams are available
-    is_heart_rate_set = StreamType.HEART_RATE in stream_map
-    is_power_set = StreamType.POWER in stream_map
-    is_cadence_set = StreamType.CADENCE in stream_map
-    is_elevation_set = StreamType.ELEVATION in stream_map
-    is_velocity_set = StreamType.SPEED in stream_map
-    is_pace_set = StreamType.PACE in stream_map
+    is_heart_rate_set = StreamType.HEART_RATE.value in stream_map
+    is_power_set = StreamType.POWER.value in stream_map
+    is_cadence_set = StreamType.CADENCE.value in stream_map
+    is_elevation_set = StreamType.ELEVATION.value in stream_map
+    is_velocity_set = StreamType.SPEED.value in stream_map
+    is_pace_set = StreamType.PACE.value in stream_map
     is_lat_lon_set = (
-        StreamType.LATLONG in stream_map
+        StreamType.LATLONG.value in stream_map
     )  # Or: detailedActivity.start_latlng is not None
 
     # Extract waypoints (empty list if not set)
-    hr_waypoints = stream_map.get(StreamType.HEART_RATE, [])
-    power_waypoints = stream_map.get(StreamType.POWER, [])
-    cad_waypoints = stream_map.get(StreamType.CADENCE, [])
-    ele_waypoints = stream_map.get(StreamType.ELEVATION, [])
-    vel_waypoints = stream_map.get(StreamType.SPEED, [])
-    pace_waypoints = stream_map.get(StreamType.PACE, [])
-    lat_lon_waypoints = stream_map.get(StreamType.LATLONG, [])
+    hr_waypoints = stream_map.get(StreamType.HEART_RATE.value, [])
+    power_waypoints = stream_map.get(StreamType.POWER.value, [])
+    cad_waypoints = stream_map.get(StreamType.CADENCE.value, [])
+    ele_waypoints = stream_map.get(StreamType.ELEVATION.value, [])
+    vel_waypoints = stream_map.get(StreamType.SPEED.value, [])
+    pace_waypoints = stream_map.get(StreamType.PACE.value, [])
+    lat_lon_waypoints = stream_map.get(StreamType.LATLONG.value, [])
 
     # Assemble final stream data list
     stream_data = [
@@ -412,7 +521,7 @@ def process_strava_activity(activity: activities_schema.Activity, db: Session):
     )
 
     # Create activity laps in the database
-    activity_laps_crud.create_activity_laps(laps, activity.id, db)
+    activity_laps_crud.create_activity_laps(laps or [], activity.id, db)
 
     core_logger.print_to_log_and_console(
         f"Migration 3 - Strava activity {activity.id} file processed."
@@ -423,14 +532,32 @@ def process_strava_activity(activity: activities_schema.Activity, db: Session):
 
 
 def store_data_in_db(
-    activity: activities_schema.Activity,
+    activity: activities_models.Activity,
     sessions: list,
     laps: list,
     workout_steps: list,
     exercises_titles: list,
     sets: list,
     db: Session,
-):
+) -> None:
+    """
+    Persist FIT-file data (laps, steps, sets) to the database.
+
+    Args:
+        activity: ORM Activity instance.
+        sessions: Parsed session records from the FIT file.
+        laps: Parsed lap records from the FIT file.
+        workout_steps: Parsed workout-step records.
+        exercises_titles: Parsed exercise-title records.
+        sets: Parsed set records from the FIT file.
+        db: Active database session.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
     laps_to_store = []
     workout_steps_to_store = workout_steps if workout_steps else []
     exercises_titles_to_store = exercises_titles if exercises_titles else []
@@ -447,7 +574,9 @@ def store_data_in_db(
                 if start_time <= lap_start_time <= end_time:
                     # Append the lap to the temporary list
                     core_logger.print_to_log_and_console(
-                        f"start_time: {start_time}, lap_start_time: {lap_start_time}, end_time: {end_time}"
+                        f"start_time: {start_time},"
+                        f" lap_start_time: {lap_start_time},"
+                        f" end_time: {end_time}"
                     )
                     filtered_laps.append(lap)
 

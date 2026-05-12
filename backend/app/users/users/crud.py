@@ -1,5 +1,7 @@
 """CRUD operations for user management."""
 
+import posixpath
+
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -58,28 +60,49 @@ def get_users_number(db: Session) -> int:
 
 @core_decorators.handle_db_errors
 def get_users_with_pagination(
-    db: Session, page_number: int = 1, num_records: int = 5
+    db: Session,
+    page_number: int | None = None,
+    num_records: int | None = None,
+    show_inactive: bool | None = True,
+    show_email_unverified: bool | None = True,
+    show_pending_approval: bool | None = True,
 ) -> list[users_models.Users]:
     """
-    Retrieve paginated list of users.
+    Retrieve a paginated list of users with optional filtering.
 
     Args:
-        db: SQLAlchemy database session.
-        page_number: Page number to retrieve (1-indexed).
-        num_records: Number of records per page.
+        db (Session): Database session for executing queries.
+        page_number (int | None): The page number for pagination (1-indexed).
+            If None, pagination is not applied. Defaults to None.
+        num_records (int | None): The number of records per page.
+            If None, pagination is not applied. Defaults to None.
+        show_inactive (bool | None): If False, excludes inactive users.
+            Defaults to True (includes inactive users).
+        show_email_unverified (bool | None): If False, excludes users with
+            unverified emails. Defaults to True (includes email unverified
+            users).
+        show_pending_approval (bool | None): If False, excludes users pending
+            admin approval. Defaults to True (includes pending approval users).
 
     Returns:
-        List of User models for the requested page.
-
-    Raises:
-        HTTPException: 500 error if database query fails.
+        list[users_models.Users]: A list of User objects matching the specified
+            criteria, ordered by username. Returns an empty list if no users
+            match the filters.
     """
-    stmt = (
-        select(users_models.Users)
-        .order_by(users_models.Users.username)
-        .offset((page_number - 1) * num_records)
-        .limit(num_records)
-    )
+    stmt = select(users_models.Users)
+
+    if show_inactive is False:
+        stmt = stmt.where(users_models.Users.active.is_(True))
+    if show_email_unverified is False:
+        stmt = stmt.where(users_models.Users.email_verified.is_(True))
+    if show_pending_approval is False:
+        stmt = stmt.where(users_models.Users.pending_admin_approval.is_(False))
+
+    stmt = stmt.order_by(users_models.Users.username)
+
+    if page_number is not None and num_records is not None:
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
+
     return db.execute(stmt).scalars().all()
 
 
@@ -371,6 +394,15 @@ async def edit_user(
     """
     Update an existing user's information.
 
+    Note:
+        This dynamic-assignment helper is intended for **admin**
+        endpoints that legitimately need to set fields like
+        ``access_type``, ``active``, or ``pending_admin_approval``.
+        Self-service profile updates MUST NOT call this — use
+        :func:`edit_profile_user` instead, which enforces an
+        explicit allow-list and prevents privilege escalation
+        through mass assignment.
+
     Args:
         user_id: ID of user to update.
         user: User data to update with.
@@ -425,7 +457,138 @@ async def edit_user(
         # Raise an HTTPException with a 409 Conflict status code
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=("Duplicate entry error. " "Check if email and username are unique"),
+            detail=("Duplicate entry error. Check if email and username are unique"),
+        ) from integrity_error
+
+
+# Allow-list of fields a user is permitted to change on their own
+# account via the self-service profile endpoint. Any field not in
+# this set is silently dropped before persistence to prevent
+# privilege escalation through mass assignment (e.g. setting
+# ``access_type`` to ``admin`` on the caller's own row).
+PROFILE_SELF_SERVICE_FIELDS: frozenset[str] = frozenset(
+    {
+        "name",
+        "username",
+        "email",
+        "city",
+        "birthdate",
+        "preferred_language",
+        "gender",
+        "units",
+        "height",
+        "max_heart_rate",
+        "first_day_of_week",
+        "currency",
+        "photo_path",
+    }
+)
+
+
+@core_decorators.handle_db_errors
+async def edit_profile_user(
+    user_id: int,
+    profile: users_schema.ProfileUpdate,
+    db: Session,
+) -> users_models.Users:
+    """
+    Apply a self-service profile update with strict allow-listing.
+
+    Only fields enumerated in :data:`PROFILE_SELF_SERVICE_FIELDS`
+    are persisted. Administrative attributes such as
+    ``access_type``, ``active``, ``mfa_enabled``, ``mfa_secret``,
+    ``email_verified``, and ``pending_admin_approval`` are NEVER
+    written from this path — even if a malicious payload smuggles
+    them through validation, they cannot reach the database here.
+
+    Args:
+        user_id: ID of the authenticated user invoking the update.
+        profile: Validated self-service profile payload.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The updated SQLAlchemy ``Users`` row.
+
+    Raises:
+        HTTPException: 404 if the user does not exist, 409 on
+            email/username uniqueness conflict, 500 on DB errors.
+    """
+    try:
+        db_user = users_utils.get_user_by_id_or_404(user_id, db)
+
+        height_before = db_user.height
+        previous_photo_path = db_user.photo_path
+
+        # exclude_unset means only fields the caller actually sent
+        # are considered. The intersection with the allow-list is
+        # the second line of defence.
+        provided = profile.model_dump(exclude_unset=True)
+        updates = {k: v for k, v in provided.items() if k in PROFILE_SELF_SERVICE_FIELDS}
+
+        if "username" in updates and isinstance(updates["username"], str):
+            updates["username"] = updates["username"].lower()
+        if "email" in updates and isinstance(updates["email"], str):
+            updates["email"] = updates["email"].lower()
+
+        # Constrain photo_path to the user's own image directory to
+        # prevent path-traversal or pointing at another user's
+        # photo via the profile update. A naive ``startswith``
+        # against the raw payload is bypassable with traversal
+        # sequences (e.g. ``data/user_images/5./../3.jpg`` passes
+        # the prefix check for user 5 but resolves to user 3's
+        # avatar — a stored IDOR). We therefore:
+        #   1. reject any payload containing a ``..`` segment or
+        #      a backslash (Windows-style separator) outright,
+        #   2. normalise the path through ``posixpath.normpath``
+        #      so ``./`` and redundant slashes collapse,
+        #   3. then enforce the per-user prefix on the NORMALISED
+        #      value.
+        # A tampered path is silently dropped rather than 400'd —
+        # the legitimate upload flow always sets this correctly,
+        # so the only callers who reach the drop branch are
+        # malicious or buggy clients and surfacing the error
+        # would just be an oracle.
+        if "photo_path" in updates:
+            new_path = updates["photo_path"]
+            if new_path is not None:
+                expected_prefix = f"data/user_images/{user_id}."
+                has_traversal = (
+                    "\\" in new_path
+                    or any(part == ".." for part in new_path.split("/"))
+                )
+                normalised = posixpath.normpath(new_path)
+                if has_traversal or not normalised.startswith(expected_prefix):
+                    updates.pop("photo_path")
+                else:
+                    # Persist the normalised form so downstream
+                    # consumers always see a canonical path.
+                    updates["photo_path"] = normalised
+
+        # If the photo_path is being cleared or replaced, delete
+        # the on-disk file (matches legacy edit_user behaviour).
+        photo_changed = (
+            "photo_path" in updates and updates["photo_path"] != previous_photo_path
+        )
+        if photo_changed and previous_photo_path:
+            await users_utils.delete_user_photo_filesystem(db_user.id)
+
+        for key, value in updates.items():
+            setattr(db_user, key, value)
+
+        db.commit()
+        db.refresh(db_user)
+
+        if "height" in updates and height_before != db_user.height:
+            health_weight_utils.calculate_bmi_all_user_entries(db_user.id, db)
+
+        return db_user
+    except HTTPException:
+        raise
+    except IntegrityError as integrity_error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=("Duplicate entry error. Check if email and username are unique"),
         ) from integrity_error
 
 
@@ -504,6 +667,7 @@ def edit_user_password(
     password_hasher: auth_password_hasher.PasswordHasher,
     db: Session,
     is_hashed: bool = False,
+    commit: bool = True,
 ) -> None:
     """
     Update a user's password.
@@ -514,6 +678,7 @@ def edit_user_password(
         password_hasher: Password hasher instance.
         db: SQLAlchemy database session.
         is_hashed: Whether password is already hashed.
+        commit: Whether to commit the password update immediately.
 
     Returns:
         None
@@ -544,9 +709,9 @@ def edit_user_password(
             password, password_hasher, server_settings, access_type_value
         )
 
-    # Commit the transaction
-    db.commit()
-    db.refresh(db_user)
+    if commit:
+        db.commit()
+        db.refresh(db_user)
 
 
 @core_decorators.handle_db_errors

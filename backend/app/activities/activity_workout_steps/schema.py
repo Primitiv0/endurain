@@ -1,22 +1,53 @@
-from pydantic import BaseModel
+"""Activity workout steps schemas."""
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+)
 
 
 class ActivityWorkoutSteps(BaseModel):
-    id: int | None = None
-    activity_id: int | None = None
-    message_index: int
-    duration_type: str
-    duration_value: float | None = None
-    target_type: str | None = None
-    target_value: int | None = None
-    intensity: str | None = None
-    notes: str | None = None
-    exercise_category: int | None = None
-    exercise_name: int | None = None
-    exercise_weight: float | None = None
-    weight_display_unit: str | None = None
-    secondary_target_value: str | None = None
+    """
+    Activity workout step schema.
 
-    model_config = {
-        "from_attributes": True
-    }
+    Attributes:
+        id: Primary key.
+        activity_id: FK to activities table.
+        message_index: Workout step message index.
+        duration_type: Workout step duration type.
+        duration_value: Workout step duration value.
+        target_type: Workout step target type.
+        target_value: Workout step target value.
+        intensity: Workout step intensity type.
+        notes: Workout step notes.
+        exercise_category: Workout step exercise
+            category.
+        exercise_name: Exercise name ID.
+        exercise_weight: Workout step exercise weight.
+        weight_display_unit: Workout step weight
+            display unit.
+        secondary_target_value: Workout step secondary
+            target value.
+    """
+
+    id: StrictInt | None = None
+    activity_id: StrictInt | None = None
+    message_index: StrictInt
+    duration_type: StrictStr
+    duration_value: StrictFloat | None = None
+    target_type: StrictStr | None = None
+    target_value: StrictInt | None = None
+    intensity: StrictStr | None = None
+    notes: StrictStr | None = None
+    exercise_category: StrictInt | None = None
+    exercise_name: StrictInt | None = None
+    exercise_weight: StrictFloat | None = None
+    weight_display_unit: StrictStr | None = None
+    secondary_target_value: StrictStr | None = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

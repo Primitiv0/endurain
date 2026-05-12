@@ -37,10 +37,15 @@ $DATA_FOLDER
 $DATA_FOLDER/user_images
 $DATA_FOLDER/server_images
 $DATA_FOLDER/activity_media
+$DATA_FOLDER/activity_thumbnails
 $DATA_FOLDER/activity_files
 $DATA_FOLDER/activity_files/processed
 $DATA_FOLDER/activity_files/bulk_import
 $DATA_FOLDER/activity_files/bulk_import/import_errors
+$DATA_FOLDER/activity_files/strava_import
+$DATA_FOLDER/activity_files/strava_import/activities
+$DATA_FOLDER/activity_files/strava_import/media
+$DATA_FOLDER/activity_files/strava_import/import_errors
 $LOGS_FOLDER
 "
 

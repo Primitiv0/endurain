@@ -1,11 +1,11 @@
 import os
-import csv
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from stravalib.client import Client
 
 import core.config as core_config
 import core.logger as core_logger
+import core.text_imports as core_text_imports
 
 import strava.utils as strava_utils
 import strava.athlete_utils as strava_athlete_utils
@@ -85,7 +85,7 @@ def fetch_and_process_gear(strava_client: Client, user_id: int, db: Session) -> 
 
 def process_gear(
     gear, gear_type: str, user_id: int, strava_client: Client, db: Session
-) -> gears_schema.Gear | None:
+) -> gears_schema.GearCreate | None:
     # Get the gear by strava id from user id
     gear_db = gears_crud.get_gear_by_strava_id_from_user_id(gear.id, user_id, db)
 
@@ -99,7 +99,7 @@ def process_gear(
     except Exception as err:
         raise err
 
-    new_gear = gears_schema.Gear(
+    new_gear = gears_schema.GearCreate(
         brand=strava_gear.brand_name,
         model=strava_gear.model_name,
         nickname=strava_gear.name,
@@ -112,20 +112,17 @@ def process_gear(
     return new_gear
 
 
-def iterate_over_activities_and_set_gear(
-    activity: activities_schema.Activity, gears: list[gears_schema.Gear], counter: int
-) -> dict:
-
-    # Iterate over gears and set gear if applicable
-    if activity.strava_gear_id is not None:
-        for gear in gears:
-            if activity.strava_gear_id == gear.strava_gear_id:
-                activity.gear_id = gear.id
-                counter += 1
-                break
-
-    # Return the counter
-    return {"counter": counter, "activity": activity}
+def match_gear_for_activity(
+    activity: activities_schema.Activity,
+    gears: list[gears_schema.GearRead],
+) -> int | None:
+    """Return the local gear ID matching this activity's Strava gear, else None."""
+    if activity.strava_gear_id is None:
+        return None
+    for gear in gears:
+        if activity.strava_gear_id == gear.strava_gear_id:
+            return gear.id
+    return None
 
 
 def set_activities_gear(user_id: int, db: Session) -> int:
@@ -143,21 +140,19 @@ def set_activities_gear(user_id: int, db: Session) -> int:
     if gears is None:
         return 0
 
-    # Initialize a counter
-    counter = 0
-
-    # Initialize an empty list for results
-    activities_parsed = []
-
-    # iterate over activities and set gear if applicable
+    # Build {activity_id: gear_id} for all activities with a match
+    gear_assignments: dict[int, int | None] = {}
     for activity in activities:
-        parsed_activity = iterate_over_activities_and_set_gear(activity, gears, counter)
-        counter = parsed_activity["counter"]
-        activities_parsed.append(parsed_activity["activity"])
+        matched_gear_id = match_gear_for_activity(activity, gears)
+        if matched_gear_id is not None:
+            gear_assignments[activity.id] = matched_gear_id
 
-    activities_crud.edit_multiple_activities_gear_id(activities_parsed, user_id, db)
+    # Persist via CRUD (single UPDATE per distinct gear_id)
+    activities_crud.bulk_set_activities_gear_id(
+        user_id, gear_assignments, db
+    )
 
-    return counter
+    return len(gear_assignments)
 
 
 def get_user_gear(user_id: int):
@@ -211,7 +206,7 @@ def iterate_over_bikes_csv() -> dict:
         HTTPException: If the CSV file is missing, has invalid headers, or cannot be parsed.
     """
     # CSV file location
-    bulk_import_dir = core_config.FILES_BULK_IMPORT_DIR
+    bulk_import_dir = core_config.STRAVA_BULK_IMPORT_DIR
     bikes_file_name = core_config.STRAVA_BULK_IMPORT_BIKES_FILE
     bikes_file_path = os.path.join(bulk_import_dir, bikes_file_name)
 
@@ -222,22 +217,20 @@ def iterate_over_bikes_csv() -> dict:
             core_logger.print_to_log_and_console(
                 f"{bikes_file_name} exists in the {bulk_import_dir} directory. Starting to process file."
             )
-            with open(bikes_file_path, "r", encoding="utf-8") as bike_file:
-                bikes_csv = csv.DictReader(bike_file)
-                for row in bikes_csv:
-                    if (
-                        ("Bike Name" not in row)
-                        or ("Bike Brand" not in row)
-                        or ("Bike Model" not in row)
-                    ):
-                        core_logger.print_to_log_and_console(
-                            f"Aborting bikes import: Proper headers not found in {bikes_file_name}.  File should have 'Bike Name', 'Bike Brand', and 'Bike Model'."
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                            detail="Invalid file. Proper headers not found in Strava bikes CSV file.",
-                        )
-                    bikes_dict[row["Bike Name"]] = row
+            for row in core_text_imports.read_bounded_csv(bikes_file_path):
+                if (
+                    ("Bike Name" not in row)
+                    or ("Bike Brand" not in row)
+                    or ("Bike Model" not in row)
+                ):
+                    core_logger.print_to_log_and_console(
+                        f"Aborting bikes import: Proper headers not found in {bikes_file_name}.  File should have 'Bike Name', 'Bike Brand', and 'Bike Model'."
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_424_FAILED_DEPENDENCY,
+                        detail="Invalid file. Proper headers not found in Strava bikes CSV file.",
+                    )
+                bikes_dict[row["Bike Name"]] = row
             core_logger.print_to_log_and_console(
                 f"Strava bike gear csv file parsed and gear dictionary created. File was {len(bikes_dict)} rows long, ignoring header row."
             )
@@ -288,22 +281,20 @@ def iterate_over_shoes_csv() -> list:
             core_logger.print_to_log_and_console(
                 f"{shoesfilename} exists in the {bulk_import_dir} directory. Starting to process file."
             )
-            with open(shoes_file_path, "r", encoding="utf-8") as shoe_file:
-                shoes_csv = csv.DictReader(shoe_file)
-                for row in shoes_csv:
-                    if (
-                        ("Shoe Name" not in row)
-                        or ("Shoe Brand" not in row)
-                        or ("Shoe Model" not in row)
-                    ):
-                        core_logger.print_to_log_and_console(
-                            f"Aborting shoes import: Proper headers not found in {shoesfilename}. File should have 'Shoe Name', 'Shoe Brand', and 'Shoe Model'."
-                        )
-                        raise HTTPException(
-                            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-                            detail="Invalid file. Proper headers not found in Strava shoes CSV file.",
-                        )
-                    shoes_list.append(row)
+            for row in core_text_imports.read_bounded_csv(shoes_file_path):
+                if (
+                    ("Shoe Name" not in row)
+                    or ("Shoe Brand" not in row)
+                    or ("Shoe Model" not in row)
+                ):
+                    core_logger.print_to_log_and_console(
+                        f"Aborting shoes import: Proper headers not found in {shoesfilename}. File should have 'Shoe Name', 'Shoe Brand', and 'Shoe Model'."
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_424_FAILED_DEPENDENCY,
+                        detail="Invalid file. Proper headers not found in Strava shoes CSV file.",
+                    )
+                shoes_list.append(row)
             core_logger.print_to_log_and_console(
                 f"Strava {shoesfilename} file parsed and gear dictionary created. File was {len(shoes_list)} rows long, ignoring header row."
             )
@@ -329,7 +320,7 @@ def iterate_over_shoes_csv() -> list:
 
 def transform_csv_bike_gear_to_schema_gear(
     bikes_dict: dict, token_user_id: int
-) -> list[gears_schema.Gear]:
+) -> list[gears_schema.GearCreate]:
     """
     Transforms a dictionary of bike data (parsed from CSV) into a list of Gear schema objects.
 
@@ -339,11 +330,11 @@ def transform_csv_bike_gear_to_schema_gear(
         token_user_id (int): The user ID to associate with each Gear object.
 
     Returns:
-        list[gears_schema.Gear]: A list of Gear schema objects created from the input bike data.
+        list[gears_schema.GearCreate]: A list of Gear schema objects created from the input bike data.
     """
     gears = []
     for bike in bikes_dict:
-        new_gear = gears_schema.Gear(
+        new_gear = gears_schema.GearCreate(
             user_id=token_user_id,
             brand=bikes_dict[bike]["Bike Brand"],
             model=bikes_dict[bike]["Bike Model"],
@@ -358,7 +349,7 @@ def transform_csv_bike_gear_to_schema_gear(
 
 def transform_csv_shoe_gear_to_schema_gear(
     shoes_list: list, token_user_id: int, db: Session
-) -> list[gears_schema.Gear]:
+) -> list[gears_schema.GearCreate]:
     """
     Transforms a list of shoe data (parsed from CSV) into a list of Gear schema objects.
     Renames any name-less shoes to a default name plus a unique number, as Strava allows name-less shoes, but Endurain does not.
@@ -369,10 +360,11 @@ def transform_csv_shoe_gear_to_schema_gear(
         db (session): Database session
 
     Returns:
-        list[gears_schema.Gear]: A list of Gear schema objects created from the input shoe data.
+        list[gears_schema.GearCreate]: A list of Gear schema objects created from the input shoe data.
     """
     gears = []
     newnumber = 1
+    shoe_name = ""
     for shoerow in shoes_list:
         # 1 - Check for nameless shoes and add a novel name. Why?  Because Strava allows nameless shoes, but Endurain does not.
         if (
@@ -403,7 +395,7 @@ def transform_csv_shoe_gear_to_schema_gear(
             shoe_name = shoerow["Shoe Name"]
 
         # 2 - Add (possibly renamed) gear item to the list of gear to be added.
-        new_gear = gears_schema.Gear(
+        new_gear = gears_schema.GearCreate(
             user_id=token_user_id,
             brand=shoerow["Shoe Brand"],
             model=shoerow["Shoe Model"],

@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/",
+    "",
     response_model=health_targets_schema.HealthTargetsRead | None,
     status_code=status.HTTP_200_OK,
 )
@@ -60,7 +60,7 @@ async def read_health_targets_all(
 
 
 @router.put(
-    "/",
+    "",
     response_model=health_targets_schema.HealthTargetsRead,
     status_code=status.HTTP_200_OK,
 )

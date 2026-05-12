@@ -1,4 +1,7 @@
 {
   "thisWeekDistancesTitle": "周前三",
-  "thisMonthDistancesTitle": "月前三"
+  "thisMonthDistancesTitle": "月前三",
+  "toggleDistance": "距离",
+  "toggleTime": "时间",
+  "toggleCalories": "卡路里"
 }

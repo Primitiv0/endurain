@@ -36,6 +36,7 @@ Table below shows supported environment variables. Variables marked with optiona
 | DB_USER | endurain | Yes | N/A |
 | DB_PASSWORD | No default set | `No` | Database password. Alternatively, use `DB_PASSWORD_FILE` for Docker secrets |
 | DB_DATABASE | endurain | Yes | N/A |
+| DB_SSLMODE | *(empty)* | Yes | Optional TLS mode for the PostgreSQL connection. Leave empty to disable (default — keeps local Postgres without SSL working). Accepted values match libpq: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full`. Recommended for any deployed environment: `require`. Most secure (validates CA + hostname): `verify-full` |
 | SECRET_KEY | No default set | `No` | Run `openssl rand -hex 32` on a terminal to get a secret. Alternatively, use `SECRET_KEY_FILE` for Docker secrets |
 | FERNET_KEY | No default set | `No` | Run `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on a terminal to get a secret or go to [https://fernetkeygen.com](https://fernetkeygen.com). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=`. Alternatively, use `FERNET_KEY_FILE` for Docker secrets |
 | ALGORITHM | HS256 | Yes | Currently only HS256 is supported |
@@ -59,6 +60,10 @@ Table below shows supported environment variables. Variables marked with optiona
 | LOG_LEVEL | info | Yes | Supported levels: critical, error, warning, info, debug, trace |
 | FRONTEND_PROTOCOL | http | Yes | Protocol used for cookie security. Set to `https` when running behind HTTPS to enable the `Secure` flag on authentication cookies |
 | ALLOWED_REDIRECT_SCHEMES | *(empty)* | Yes | Comma-separated list of custom URI schemes allowed as SSO redirect targets for mobile apps using the system browser (e.g., `gadgetbridge,myapp`). Defaults to empty — only relative paths (e.g., `/dashboard`) are accepted. External `http`/`https` URLs are always rejected regardless of this setting. See [Mobile SSO with PKCE](../developer-guide/authentication.md#mobile-sso-with-pkce) |
+| TRUSTED_PROXIES | "*" | Yes | Comma-separated list of trusted proxy IPs or CIDR ranges for correct client IP detection when `BEHIND_PROXY` is `true`. Defaults to `["*"]` (all proxies trusted) in development and `[]` in production and demo |
+| RATE_LIMIT_ENABLED | true | Yes | Enable or disable API rate limiting. Set to `false` to disable for development or testing. Accepted values are `true` and `false` |
+| RATE_LIMIT_STORAGE_URI | memory:// | Yes | Storage backend URI for rate limit counters. Use `memory://` for single-worker deployments or `redis://redis:6379/0` for multi-worker setups so all workers share counters. |
+| AUTH_SECURITY_STORAGE_URI | No default set | Yes | Storage backend URI for auth security state, including login lockout, pending MFA login state, and temporary MFA setup secrets. Defaults to `RATE_LIMIT_STORAGE_URI` when unset. Use `memory://` for single-worker deployments or Redis for shared multi-worker protection. |
 
 Table below shows the obligatory environment variables for postgres container. You should set them based on what was also set for the Endurain container.
 
@@ -163,73 +168,9 @@ Docker image uses a non-root user, so ensure target folders are not owned by roo
 | `<local_path>/endurain/backend/logs:/app/backend/logs` | Log files for the backend |
 | `<local_path>/endurain/backend/data:/app/backend/data` | Necessary for image and activity files persistence on docker image update |
 
-## Bulk import and file upload
-
-To perform a bulk import:
-- Place .fit, .tcx, .gz and/or .gpx files into the data/activity_files/bulk_import folder. Create the folder if needed.
-- In the "Settings" menu select "Import".
-- Click "Import" next to "Bulk Import".
-
-.fit files are preferred. I noticed that Strava/Garmin Connect process of converting .fit to .gpx introduces additional data to the activity file leading to minor variances in the data, like for example additional 
-meters in distance and elevation gain. Some notes:
-
-- After the files are processed, the files are moved to the processed folder
-- GEOCODES API has a limit of 1 Request/Second on the free plan, so if you have a large number of files, it might not be possible to import all in the same action
-- The bulk import currently only imports data present in the .fit, .tcx or .gpx files - no metadata or other media are imported.
-
-## Importing information from a Strava bulk export (BETA)
-
-Strava allows users to create a bulk export of their historical activity on the site. This information is stored in a zip file, primarily as .csv files, GPS recording files (e.g., .gpx, .fit), and media files (e.g., .jpg, .png).
-
-### Importing gear from a Strava bulk export
-
-#### Bike import
-At the present time, importing bikes from a Strava bulk export is implemented as a beta feature - use with caution.  Components of bikes are not imported - just the bikes themselves.  There is no mechanism present to undo an import.
-
-To perform an import of bikes: 
-- Place the bikes.csv file from a Strava bulk export into the data/activity_files/bulk_import folder. Create the folder if needed;
-- In the `Settings` menu select `Import`;
-- Click `Import Strava Bikes` next to `Strava gear import`;
-- Upon successful import, the bikes.csv file is moved to /data/activity_files/processed folder;
-- Status messages about the import, including why any gear was not imported, can be found in the logs.
-
-Ensure the file is named `bikes.csv` and has a header row with at least the fields 'Bike Name', 'Bike Brand', and 'Bike Model'.
-
-#### Shoe import
-
-At the present time, importing shoes from a Strava bulk export is implemented as a beta feature - use with caution.  Components of shooes are not imported - just the shoes themselves. 
-
-To perform an import of shoes: 
-- Place the shoes.csv file from a Strava bulk export into the data/activity_files/bulk_import folder. Create the folder if needed;
-- In the `Settings` menu select `Import`;
-- Click `Shoes import` next to `Strava gear import`;
-- Upon successful import, the shoes.csv file is moved to /data/activity_files/processed folder;
-- Status messages about the import, including why any gear was not imported, can be found in the logs.
-
-Ensure the file is named `shoes.csv` and has a header row with at least the fields 'Shoe Name', 'Shoe Brand', and 'Shoe Model'.
-
-Note that Strava allows blank shoe names, but Endurain does not.  Shoes with a blank name will thus be given a default name of `Unnamed Shoe #` on import.
-
-#### Notes on importing gear
-
-NOTE: There is currently no mechanism to undo a gear import.
-
-All gear will be imported as active, as Strava does not export the active/inactive status of the gear.
-
-Note that Endurain does not allow the `+` character in gear field names, and thus +'s will removed from all fields and replaced with spaces (" ") on import.  All beginning and ending space characters (" ") will be removed on import as well.
-
-Endurain does not allow duplicate gear nicknames, case insensitively (e.g., `Ilves` and `ilves` would not be allowed) and regardless of gear type (e.g., `Ilves` the bike and `ilves` the shoe would not be allowed). Gear with duplicate nicknames will not be imported (i.e., only the first item with a given nickname will be imported).
-
-The import routine checks for duplicate items, and should not import duplicates. Thus it should be safe to re-import the same file mulitple times. However, due to the renaming of un-named shoes, repeated imports of the same shoe file will create duplicate entries of any unnamed shoes present. 
-
-Gear that is already present in Endurain due to having an active link with Strava will not be imported via the manual import process.
-
-### Importing other items from a Strava bulk import
-
-Importing activity metadata and media is under development in October 2025.
-
 ## Image personalization
 
 It is possible (v0.10.0 or higher) to personalize the login image in the login page. To do that, map the data/server_images directory for image persistence on container updates and:
  - Set the image in the server settings zone of the settings page
  - A square image is expected. Default one uses 1000px vs 1000px
+

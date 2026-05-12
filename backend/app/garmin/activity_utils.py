@@ -1,6 +1,4 @@
 import asyncio
-import os
-import zipfile
 
 from datetime import datetime, timedelta, timezone
 import garminconnect
@@ -8,6 +6,7 @@ from sqlalchemy.orm import Session
 
 import core.logger as core_logger
 import core.config as core_config
+import core.file_uploads as file_uploads
 
 import garmin.utils as garmin_utils
 
@@ -16,6 +15,9 @@ import activities.activity.utils as activities_utils
 import activities.activity.crud as activities_crud
 
 import users.users.crud as users_crud
+import users.users_integrations.crud as user_integrations_crud
+
+import notifications.utils as notifications_utils
 
 import websocket.manager as websocket_manager
 
@@ -39,6 +41,17 @@ async def fetch_and_process_activities_by_dates(
             str(start_date.date()),
             str(end_date.date()),
         )
+    except garminconnect.GarminConnectAuthenticationError as err:
+        core_logger.print_to_log(
+            f"Garmin Connect token expired for user {user_id}. Unlinking account. User must re-link: {err}",
+            "error",
+            exc=err,
+        )
+        user_integrations_crud.unlink_garminconnect_account(user_id, db)
+        await notifications_utils.create_garmin_token_expired_notification(
+            user_id, ws_manager
+        )
+        return None
     except Exception as err:
         core_logger.print_to_log(
             f"Error fetching activities for user {user_id} between {start_date.date()} and {end_date.date()}: {err}",
@@ -88,43 +101,63 @@ async def fetch_and_process_activities_by_dates(
             activity_id,
             dl_fmt=garminconnect_client.ActivityDownloadFormat.ORIGINAL,
         )
-        # Save the zip file
-        output_file = f"{core_config.FILES_DIR}/{str(activity_id)}.zip"
 
-        # Write the ZIP data to the output file
-        with open(output_file, "wb") as fb:
-            fb.write(zip_data)
-
-        # Array to store the names of extracted files
-        extracted_files = []
-
-        # Open the ZIP file
-        with zipfile.ZipFile(output_file, "r") as zip_ref:
-            # Extract all contents to the specified directory
-            zip_ref.extractall(core_config.FILES_DIR)
-            # Populate the array with file names
-            extracted_files = zip_ref.namelist()
-
+        # Persist the downloaded ZIP through the unified pipeline so
+        # signature, size and filename safety are enforced even on
+        # bytes that did not arrive via multipart upload.
+        zip_filename = f"{int(activity_id)}.zip"
         try:
-            os.remove(output_file)
-        except OSError as err:
-            core_logger.print_to_log(
-                f"Error removing file {output_file}: {err}", "error", exc=err
+            output_file = await file_uploads.save_validated_bytes(
+                zip_data,
+                kind=file_uploads.UploadKind.ZIP,
+                upload_dir=core_config.settings.FILES_DIR,
+                filename=zip_filename,
             )
+        except Exception as err:
+            core_logger.print_to_log(
+                f"User {user_id}: Garmin ZIP for activity "
+                f"{activity_id} failed validation: "
+                f"{type(err).__name__}",
+                "warning",
+                exc=err,
+            )
+            continue
 
-        for file_path_suffix in extracted_files:
-            # Parse and store the activity from the extracted file
-            full_file_path = os.path.join(core_config.FILES_DIR, file_path_suffix)
+        # Zip-slip-safe extraction with per-entry caps. Each
+        # extracted entry is re-validated as an activity file and
+        # invalid entries are dropped.
+        try:
+            extracted_paths = await file_uploads.extract_validated_zip(
+                output_file,
+                dest_dir=core_config.settings.FILES_DIR,
+                per_entry_kind=file_uploads.UploadKind.ACTIVITY,
+            )
+        except Exception as err:
+            core_logger.print_to_log(
+                f"User {user_id}: Garmin ZIP extraction failed for "
+                f"activity {activity_id}: {type(err).__name__}",
+                "warning",
+                exc=err,
+            )
+            file_uploads.safe_remove_within(
+                output_file, base_dir=core_config.settings.FILES_DIR
+            )
+            continue
 
+        file_uploads.safe_remove_within(
+            output_file, base_dir=core_config.settings.FILES_DIR
+        )
+
+        for full_file_path in extracted_paths:
             parsed_activities.extend(
                 await activities_utils.parse_and_store_activity_from_file(
-                    user_id,
-                    full_file_path,
-                    ws_manager,
-                    db,
-                    True,
-                    activity_gear,
-                    activity_name,
+                    token_user_id=user_id,
+                    file_path=str(full_file_path),
+                    websocket_manager=ws_manager,
+                    db=db,
+                    from_garmin=True,
+                    garminconnect_gear=activity_gear,
+                    activity_name=activity_name,
                 )
                 or []
             )
@@ -184,8 +217,7 @@ def get_user_garminconnect_client(user_id: int, db: Session):
 
         # Create a Garmin Connect client with the user's access token
         garminconnect_client = garmin_utils.login_garminconnect_using_tokens(
-            user_integrations.garminconnect_oauth1,
-            user_integrations.garminconnect_oauth2,
+            user_integrations.garminconnect_token,
         )
 
         # return the Garmin Connect client

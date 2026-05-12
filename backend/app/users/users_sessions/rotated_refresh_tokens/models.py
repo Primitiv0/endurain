@@ -1,9 +1,13 @@
 """Rotated refresh token database models for reuse detection."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users_sessions.models import UsersSessions
 
 
 class RotatedRefreshToken(Base):
@@ -44,17 +48,17 @@ class RotatedRefreshToken(Base):
         comment="Which rotation this token belonged to",
     )
     rotated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="When this token was rotated",
     )
     expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Cleanup marker (rotated_at + 60 seconds)",
     )
 
     # Relationship to UsersSessions model
-    # TODO: Change to Mapped["UsersSessions"] when all modules use mapped
-    users_session = relationship(
-        "UsersSessions",
+    users_session: Mapped["UsersSessions"] = relationship(
         back_populates="rotated_refresh_tokens",
     )

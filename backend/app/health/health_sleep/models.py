@@ -1,8 +1,12 @@
 from datetime import date as date_type, datetime
 from decimal import Decimal
-from sqlalchemy import ForeignKey, JSON, Numeric, String
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, JSON, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class HealthSleep(Base):
@@ -72,18 +76,22 @@ class HealthSleep(Base):
         comment="Calendar date of the sleep session",
     )
     sleep_start_time_gmt: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Start time of sleep in GMT",
     )
     sleep_end_time_gmt: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="End time of sleep in GMT",
     )
     sleep_start_time_local: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Start time of sleep in local time",
     )
     sleep_end_time_local: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="End time of sleep in local time",
     )
@@ -237,5 +245,4 @@ class HealthSleep(Base):
     )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="health_sleep")
+    users: Mapped["Users"] = relationship(back_populates="health_sleep")

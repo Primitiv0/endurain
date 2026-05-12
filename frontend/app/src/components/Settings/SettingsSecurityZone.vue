@@ -5,8 +5,30 @@
       <UsersPasswordRequirementsComponent />
 
       <form @submit.prevent="submitChangeUserPasswordForm">
+        <!-- current password field -->
+        <label for="validationCurrentPassword"
+          ><b>* {{ $t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel') }}</b></label
+        >
+        <div class="position-relative">
+          <input
+            :type="showCurrentPassword ? 'text' : 'password'"
+            class="form-control"
+            id="validationCurrentPassword"
+            :placeholder="$t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+            v-model="currentPassword"
+            required
+          />
+          <button
+            type="button"
+            class="btn position-absolute top-50 end-0 translate-middle-y"
+            @click="toggleCurrentPasswordVisibility"
+          >
+            <font-awesome-icon :icon="showCurrentPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']" />
+          </button>
+        </div>
+
         <!-- password fields -->
-        <label for="validationNewPassword"
+        <label class="mt-1" for="validationNewPassword"
           ><b>* {{ $t('settingsSecurityZone.changeUserPasswordPasswordLabel') }}</b></label
         >
         <div class="position-relative">
@@ -87,12 +109,28 @@
           {{ $t('settingsSecurityZone.changeUserPasswordPasswordsDoNotMatchFeedbackLabel') }}
         </div>
 
+        <!-- MFA code field (shown when MFA is enabled) -->
+        <div v-if="mfaEnabled">
+          <label class="mt-1" for="validationMfaCode"
+            ><b>{{ $t('settingsSecurityZone.changeUserPasswordMfaCodeLabel') }}</b></label
+          >
+          <input
+            type="text"
+            class="form-control"
+            id="validationMfaCode"
+            :placeholder="$t('settingsSecurityZone.changeUserPasswordMfaCodeLabel')"
+            v-model="mfaCode"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+          />
+        </div>
+
         <p>* {{ $t('generalItems.requiredField') }}</p>
 
         <button
           type="submit"
           class="btn btn-success"
-          :disabled="!isNewPasswordValid || !isNewPasswordRepeatValid || !isPasswordMatch"
+          :disabled="!currentPassword || !newPassword || !newPasswordRepeat || !isNewPasswordValid || !isNewPasswordRepeatValid || !isPasswordMatch || (mfaEnabled && !mfaCode)"
           name="editUserPassword"
         >
           {{ $t('settingsSecurityZone.subtitleChangePassword') }}
@@ -144,7 +182,8 @@
             <button
               type="button"
               class="btn btn-primary"
-              @click="regenerateBackupCodes"
+              data-bs-toggle="modal"
+              data-bs-target="#mfaRegenerateBackupCodesModal"
               :disabled="regenerateBackupCodesLoading"
             >
               <span
@@ -180,6 +219,8 @@
         :secretLabel="t('settingsSecurityZone.mfaSecretLabel')"
         :verificationCodeLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
         :verificationCodePlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :currentPasswordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        :requirePassword="authStore.user.has_local_password === true"
         :requiredFieldText="t('generalItems.requiredField')"
         :cancelButtonText="t('generalItems.cancel')"
         actionButtonType="success"
@@ -189,14 +230,43 @@
       />
 
       <!-- MFA Disable Modal -->
-      <ModalComponentNumberInput
+      <ModalComponentPasswordAndStringInput
+        ref="mfaDisableModalRef"
         modalId="mfaDisableModal"
         :title="t('settingsSecurityZone.mfaDisableModalTitle')"
-        :numberFieldLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
-        :numberDefaultValue="null"
-        :actionButtonType="`danger`"
+        :description="t('settingsSecurityZone.mfaDisableConfirmation')"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="danger"
         :actionButtonText="t('settingsSecurityZone.disableMFAButton')"
-        @numberToEmitAction="disableMFA"
+        :isLoading="mfaDisableLoading"
+        @submitAction="disableMFA"
+      />
+
+      <!-- MFA Regenerate Backup Codes Modal -->
+      <ModalComponentPasswordAndStringInput
+        ref="mfaRegenerateModalRef"
+        modalId="mfaRegenerateBackupCodesModal"
+        :title="t('settingsSecurityZone.regenerateBackupCodesButton')"
+        :description="t('settingsSecurityZone.regenerateBackupCodesConfirmation')"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="primary"
+        :actionButtonText="t('settingsSecurityZone.regenerateBackupCodesButton')"
+        :isLoading="regenerateBackupCodesLoading"
+        @submitAction="regenerateBackupCodes"
       />
 
       <!-- MFA Backup Codes Modal -->
@@ -269,6 +339,50 @@
         </div>
       </div>
 
+      <!-- IdP Link Step-up Verification Modal -->
+      <ModalComponentPasswordAndStringInput
+        ref="idpLinkModalRef"
+        modalId="idpLinkStepUpModal"
+        :title="t('settingsSecurityZone.idpLinkTitle')"
+        :description="t('settingsSecurityZone.idpLinkDescription')"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="primary"
+        :actionButtonText="t('settingsSecurityZone.linkAccountButton')"
+        :isLoading="linkingProviderId !== null"
+        :requirePassword="authStore.user.has_local_password === true"
+        :requireStringField="mfaEnabled"
+        @submitAction="completeLinkAccount"
+      />
+
+      <!-- IdP Unlink Step-up Verification Modal -->
+      <ModalComponentPasswordAndStringInput
+        ref="idpUnlinkModalRef"
+        modalId="idpUnlinkStepUpModal"
+        :title="t('settingsSecurityZone.unlinkModalTitle')"
+        :description="t('settingsSecurityZone.unlinkModalConfirmation', { providerName: pendingUnlinkProviderName })"
+        :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        passwordAutocomplete="current-password"
+        :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :stringPlaceholder="t('settingsSecurityZone.mfaVerificationCodePlaceholder')"
+        :stringHint="t('loginView.mfaCodeHint')"
+        stringAutocomplete="one-time-code"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        actionButtonType="danger"
+        :actionButtonText="t('settingsSecurityZone.unlinkAccountButton')"
+        :isLoading="unlinkingProviderId !== null"
+        :requirePassword="authStore.user.has_local_password === true"
+        :requireStringField="mfaEnabled"
+        @submitAction="completeUnlinkAccount"
+      />
+
       <hr />
       <!-- user sessions list -->
       <h4>{{ $t('settingsSecurityZone.subtitleMySessions') }}</h4>
@@ -286,6 +400,67 @@
       <div v-else>
         <NoItemsFoundComponents :show-shadow="false" />
       </div>
+
+      <hr />
+      <!-- API Keys -->
+      <h4>{{ $t('settingsSecurityZone.subtitleApiKeys') }}</h4>
+      <p>{{ $t('settingsSecurityZone.apiKeysDescription') }}</p>
+      <button type="button" class="btn btn-success mb-3" @click="openCreateApiKeyModal">
+        <font-awesome-icon :icon="['fas', 'plus']" class="me-1" />
+        {{ $t('settingsSecurityZone.apiKeyCreateButton') }}
+      </button>
+      <div v-if="isLoadingApiKeys">
+        <LoadingComponent />
+      </div>
+      <div v-else-if="apiKeys && apiKeys.length > 0">
+        <ApiKeyListItemComponent
+          v-for="key in apiKeys"
+          :key="key.id"
+          :apiKey="key"
+          @keyRevoked="onKeyRevoked"
+          @keyDeleted="onKeyDeleted"
+        />
+      </div>
+      <div v-else>
+        <NoItemsFoundComponents :show-shadow="false" />
+      </div>
+
+      <!-- API Key Create Modal -->
+      <ModalComponentApiKeyCreate
+        ref="apiKeyCreateModalRef"
+        modalId="apiKeyCreateModal"
+        :title="t('settingsSecurityZone.apiKeyCreateModalTitle')"
+        :nameLabel="t('settingsSecurityZone.apiKeyNameLabel')"
+        :namePlaceholder="t('settingsSecurityZone.apiKeyNamePlaceholder')"
+        :scopesLabel="t('settingsSecurityZone.apiKeyScopesSelectLabel')"
+        :expiryLabel="t('settingsSecurityZone.apiKeyExpiryOptionalLabel')"
+        :currentPasswordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
+        :mfaCodeLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
+        :mfaCodeHint="t('loginView.mfaCodeHint')"
+        :requirePassword="authStore.user.has_local_password === true"
+        :mfaEnabled="mfaEnabled"
+        :requiredFieldText="t('generalItems.requiredField')"
+        :cancelButtonText="t('generalItems.cancel')"
+        :actionButtonText="t('settingsSecurityZone.apiKeyCreateButton')"
+        :isLoading="apiKeyCreateLoading"
+        @submitAction="onCreateApiKey"
+      />
+
+      <!-- API Key Reveal Modal -->
+      <ModalComponentApiKeyReveal
+        ref="apiKeyRevealModalRef"
+        modalId="apiKeyRevealModal"
+        :title="t('settingsSecurityZone.apiKeyRevealModalTitle')"
+        :description="t('settingsSecurityZone.apiKeyRevealDescription')"
+        :warningTitle="t('settingsSecurityZone.backupCodesWarningTitle')"
+        :warningMessage="t('settingsSecurityZone.apiKeyRevealWarning')"
+        :apiKey="newApiKeyRaw"
+        :copyButtonText="t('settingsSecurityZone.apiKeyRevealCopyButton')"
+        :copySuccessMessage="t('settingsSecurityZone.apiKeyRevealCopied')"
+        :confirmationText="t('settingsSecurityZone.apiKeyRevealConfirmation')"
+        :closeButtonText="t('settingsSecurityZone.apiKeyRevealClose')"
+        @closed="newApiKeyRaw = ''"
+      />
     </div>
   </div>
 </template>
@@ -301,8 +476,8 @@ import { identityProviders } from '@/services/identityProvidersService'
 import { push } from 'notivue'
 // Importing the components
 import UsersPasswordRequirementsComponent from '@/components/Settings/SettingsUsersZone/UsersPasswordRequirementsComponent.vue'
-import ModalComponentNumberInput from '@/components/Modals/ModalComponentNumberInput.vue'
 import ModalComponentMFASetup from '@/components/Modals/ModalComponentMFASetup.vue'
+import ModalComponentPasswordAndStringInput from '@/components/Modals/ModalComponentPasswordAndStringInput.vue'
 import ModalComponentMFABackupCodes from '@/components/Modals/ModalComponentMFABackupCodes.vue'
 import UserIdentityProviderListComponent from '@/components/Settings/SettingsUsersZone/UserIdentityProviderListComponent.vue'
 // Importing validation utilities
@@ -310,6 +485,9 @@ import { isValidPassword, passwordsMatch, buildPasswordRequirements } from '@/ut
 import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
 import NoItemsFoundComponents from '@/components/GeneralComponents/NoItemsFoundComponents.vue'
 import UserSessionsListComponent from '@/components/Settings/SettingsUserSessionsZone/UserSessionsListComponent.vue'
+import ApiKeyListItemComponent from '@/components/Settings/SettingsApiKeysZone/ApiKeyListItemComponent.vue'
+import ModalComponentApiKeyCreate from '@/components/Modals/ModalComponentApiKeyCreate.vue'
+import ModalComponentApiKeyReveal from '@/components/Modals/ModalComponentApiKeyReveal.vue'
 // Importing stores
 import { useAuthStore } from '@/stores/authStore'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
@@ -319,8 +497,10 @@ const { t } = useI18n()
 const route = useRoute()
 const authStore = useAuthStore()
 const serverSettingsStore = useServerSettingsStore()
+const currentPassword = ref('')
 const newPassword = ref('')
 const newPasswordRepeat = ref('')
+const mfaCode = ref('')
 const passwordType = serverSettingsStore.serverSettings.password_type
 const passMinLength =
   authStore.user.access_type === 'admin'
@@ -348,12 +528,17 @@ const mfaDisableLoading = ref(false)
 const qrCodeData = ref('')
 const mfaSecret = ref('')
 const mfaSetupModalRef = ref(null)
+const mfaDisableModalRef = ref(null)
+const mfaRegenerateModalRef = ref(null)
 const mfaBackupCodesModalRef = ref(null)
+const idpLinkModalRef = ref(null)
+const idpUnlinkModalRef = ref(null)
 const backupCodes = ref([])
 const backupCodeStatus = ref(null)
 const backupCodeStatusLoading = ref(false)
 const regenerateBackupCodesLoading = ref(false)
 
+const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showNewPasswordRepeat = ref(false)
 
@@ -363,6 +548,36 @@ const availableProviders = ref([])
 const allProviders = ref([])
 const isLoadingLinkedAccounts = ref(false)
 const linkingProviderId = ref(null)
+const pendingIdpId = ref(null)
+const unlinkingProviderId = ref(null)
+const pendingUnlinkIdpId = ref(null)
+
+const hasLocalPassword = computed(() => authStore.user.has_local_password === true)
+
+const pendingUnlinkProviderName = computed(() => {
+  if (!pendingUnlinkIdpId.value) return ''
+
+  const linkedAccount = linkedAccounts.value.find(
+    (account) => account.idp_id === pendingUnlinkIdpId.value
+  )
+  if (linkedAccount?.idp_name) return linkedAccount.idp_name
+
+  const provider = allProviders.value.find((p) => p.id === pendingUnlinkIdpId.value)
+  return provider?.name || ''
+})
+
+// API keys variables
+const apiKeys = ref([])
+const isLoadingApiKeys = ref(false)
+const newApiKeyRaw = ref('')
+const apiKeyCreateLoading = ref(false)
+const apiKeyCreateModalRef = ref(null)
+const apiKeyRevealModalRef = ref(null)
+
+// Toggle visibility for current password
+const toggleCurrentPasswordVisibility = () => {
+  showCurrentPassword.value = !showCurrentPassword.value
+}
 
 // Toggle visibility for new password
 const toggleNewPasswordVisibility = () => {
@@ -379,7 +594,9 @@ async function submitChangeUserPasswordForm() {
     if (isNewPasswordValid.value && isNewPasswordRepeatValid.value && isPasswordMatch.value) {
       // Create the data object to send to the service.
       const data = {
-        password: newPassword.value
+        current_password: currentPassword.value,
+        password: newPassword.value,
+        ...(mfaCode.value ? { mfa_code: mfaCode.value } : {})
       }
 
       // Call the service to edit the user password.
@@ -388,8 +605,10 @@ async function submitChangeUserPasswordForm() {
       // Show the success alert.
       push.success(t('settingsSecurityZone.userChangePasswordSuccessMessage'))
       // Clear the form fields.
+      currentPassword.value = ''
       newPassword.value = ''
       newPasswordRepeat.value = ''
+      mfaCode.value = ''
     }
   } catch (error) {
     // If there is an error, show the error alert.
@@ -440,10 +659,10 @@ async function setupMFA() {
   }
 }
 
-async function enableMFA(verificationCode) {
+async function enableMFA({ mfa_code, current_password }) {
   try {
     mfaEnableLoading.value = true
-    const response = await profile.enableMFA({ mfa_code: verificationCode })
+    const response = await profile.enableMFA({ mfa_code, current_password })
     mfaEnabled.value = true
     mfaSetupModalRef.value?.hide()
     qrCodeData.value = ''
@@ -462,14 +681,18 @@ async function enableMFA(verificationCode) {
   }
 }
 
-async function disableMFA(mfaCode) {
-  if (!mfaCode) return
+async function disableMFA({ password, stringValue }) {
+  if (!password || !stringValue) return
 
   try {
     mfaDisableLoading.value = true
-    await profile.disableMFA({ mfa_code: mfaCode.toString() })
+    await profile.disableMFA({
+      current_password: password,
+      mfa_code: stringValue.toString()
+    })
     mfaEnabled.value = false
     backupCodeStatus.value = null
+    mfaDisableModalRef.value?.hide()
     push.success(t('settingsSecurityZone.mfaDisabledSuccess'))
   } catch (error) {
     push.error(`${t('settingsSecurityZone.errorDisableMFA')} - ${error}`)
@@ -491,10 +714,17 @@ async function loadBackupCodeStatus() {
   }
 }
 
-async function regenerateBackupCodes() {
+async function regenerateBackupCodes({ password, stringValue }) {
+  if (!password || !stringValue) return
+
   try {
     regenerateBackupCodesLoading.value = true
-    const response = await profile.regenerateBackupCodes()
+    const response = await profile.regenerateBackupCodes({
+      current_password: password,
+      mfa_code: stringValue.toString()
+    })
+
+    mfaRegenerateModalRef.value?.hide()
 
     if (response.codes && response.codes.length > 0) {
       backupCodes.value = response.codes
@@ -544,17 +774,35 @@ async function loadLinkedAccounts() {
 async function unlinkAccount(idpId) {
   if (!idpId) return
 
-  try {
-    await profile.unlinkIdentityProvider(idpId)
+  pendingUnlinkIdpId.value = idpId
+  idpUnlinkModalRef.value?.show()
+}
 
-    // Find the account being unlinked
-    const unlinkedAccount = linkedAccounts.value.find((account) => account.idp_id === idpId)
+async function completeUnlinkAccount({ password, stringValue }) {
+  if (!pendingUnlinkIdpId.value || (hasLocalPassword.value && !password)) return
+
+  try {
+    unlinkingProviderId.value = pendingUnlinkIdpId.value
+
+    const credentials = {}
+    if (hasLocalPassword.value) {
+      credentials.current_password = password
+    }
+    if (mfaEnabled.value && stringValue) {
+      credentials.mfa_code = stringValue.toString()
+    }
+
+    await profile.unlinkIdentityProvider(pendingUnlinkIdpId.value, credentials)
+
+    idpUnlinkModalRef.value?.hide()
 
     // Remove from linked accounts list
-    linkedAccounts.value = linkedAccounts.value.filter((account) => account.idp_id !== idpId)
+    linkedAccounts.value = linkedAccounts.value.filter(
+      (account) => account.idp_id !== pendingUnlinkIdpId.value
+    )
 
     // Add back to available providers
-    const unlinkedProvider = allProviders.value.find((p) => p.id === idpId)
+    const unlinkedProvider = allProviders.value.find((p) => p.id === pendingUnlinkIdpId.value)
     if (unlinkedProvider) {
       availableProviders.value.push(unlinkedProvider)
     }
@@ -564,29 +812,115 @@ async function unlinkAccount(idpId) {
     const errorMessage = error.message || error.toString()
 
     // Check for specific error scenarios
-    if (errorMessage.includes('last authentication method') || errorMessage.includes('400')) {
+    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
+      push.error(t('settingsSecurityZone.unlinkAccountRateLimitError'))
+    } else if (errorMessage.includes('401')) {
+      push.error(t('settingsSecurityZone.unlinkAccountCredentialsError'))
+    } else if (errorMessage.includes('last authentication method') || errorMessage.includes('400')) {
       push.error(t('settingsSecurityZone.unlinkAccountLastMethodError'))
     } else {
       push.error(`${t('settingsSecurityZone.unlinkAccountError')} - ${errorMessage}`)
     }
+  } finally {
+    unlinkingProviderId.value = null
+    pendingUnlinkIdpId.value = null
   }
 }
 
 async function linkAccount(providerId) {
+  pendingIdpId.value = providerId
+  idpLinkModalRef.value?.show()
+}
+
+async function completeLinkAccount({ password, stringValue }) {
+  if (!pendingIdpId.value || (hasLocalPassword.value && !password)) return
+
   try {
-    linkingProviderId.value = providerId
-    // Generate token and redirect to OAuth flow
-    await profile.linkIdentityProvider(providerId)
+    linkingProviderId.value = pendingIdpId.value
+
+    // Build credentials object - only include mfa_code if MFA is enabled and code provided
+    const credentials = {}
+    if (hasLocalPassword.value) {
+      credentials.current_password = password
+    }
+    if (mfaEnabled.value && stringValue) {
+      credentials.mfa_code = stringValue.toString()
+    }
+
+    // Call linkIdentityProvider with step-up credentials
+    await profile.linkIdentityProvider(pendingIdpId.value, credentials)
+
+    idpLinkModalRef.value?.hide()
   } catch (error) {
-    linkingProviderId.value = null
     const errorMessage = error.message || error.toString()
 
-    // Check for rate limiting
+    // Check for different error types
     if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate limit')) {
       push.error(t('settingsSecurityZone.linkAccountRateLimitError'))
+    } else if (errorMessage.includes('401')) {
+      push.error(t('settingsSecurityZone.linkAccountCredentialsError'))
     } else {
       push.error(`${t('settingsSecurityZone.linkAccountError')} - ${errorMessage}`)
     }
+  } finally {
+    linkingProviderId.value = null
+    pendingIdpId.value = null
+  }
+}
+
+// API Keys Functions
+async function loadApiKeys() {
+  try {
+    isLoadingApiKeys.value = true
+    apiKeys.value = await profile.getApiKeys()
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyLoadError')} - ${error}`)
+  } finally {
+    isLoadingApiKeys.value = false
+  }
+}
+
+function openCreateApiKeyModal() {
+  apiKeyCreateModalRef.value?.show()
+}
+
+async function onCreateApiKey(formData) {
+  try {
+    apiKeyCreateLoading.value = true
+    const response = await profile.createApiKey(formData)
+    // Hide create modal and show reveal modal with the raw key
+    apiKeyCreateModalRef.value?.hide()
+    newApiKeyRaw.value = response.key
+    apiKeyRevealModalRef.value?.show()
+    push.success(t('settingsSecurityZone.apiKeyCreateSuccess'))
+    // Reload list to include the new key (without the raw key)
+    await loadApiKeys()
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyCreateError')} - ${error}`)
+  } finally {
+    apiKeyCreateLoading.value = false
+  }
+}
+
+async function onKeyRevoked(keyId) {
+  try {
+    await profile.revokeApiKey(keyId)
+    // Update local state without a full reload
+    const key = apiKeys.value.find((k) => k.id === keyId)
+    if (key) key.is_active = false
+    push.success(t('settingsSecurityZone.apiKeyRevokeSuccess'))
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyRevokeError')} - ${error}`)
+  }
+}
+
+async function onKeyDeleted(keyId) {
+  try {
+    await profile.deleteApiKey(keyId)
+    apiKeys.value = apiKeys.value.filter((k) => k.id !== keyId)
+    push.success(t('settingsSecurityZone.apiKeyDeleteSuccess'))
+  } catch (error) {
+    push.error(`${t('settingsSecurityZone.apiKeyDeleteError')} - ${error}`)
   }
 }
 
@@ -619,6 +953,9 @@ onMounted(async () => {
 
   // Load linked accounts
   await loadLinkedAccounts()
+
+  // Load API keys
+  await loadApiKeys()
 
   // Set the isLoading to false
   isLoading.value = false

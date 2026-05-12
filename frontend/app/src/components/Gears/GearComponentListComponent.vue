@@ -50,8 +50,13 @@
         <span v-if="gear.gear_type === 7">{{
           getGearWindsurfComponentType(gearComponent.type, t)
         }}</span>
-        <span> @ {{ gearComponent.purchase_date }}</span>
-        <span v-if="gearComponent.purchase_value"> - {{ gearComponent.purchase_value }}€ </span>
+        <span> @ {{ formatDateMed(gearComponent.purchase_date) }}</span>
+        <span v-if="gearComponent.purchase_value">
+          - {{ gearComponent.purchase_value }}
+          <span v-if="authStore.user.currency === 'euro'">{{ $t('generalItems.currencyEuroSymbol') }}</span>
+          <span v-else-if="authStore.user.currency === 'dollar'">{{ $t('generalItems.currencyDollarSymbol') }}</span>
+          <span v-else>{{ $t('generalItems.currencyPoundSymbol') }}</span>
+        </span>
         <br />
         <span v-if="gearComponent.expected_kms && gear.gear_type !== 4"
           >{{ formatDistanceRaw(t, gearComponentDistance, authStore.user.units, true, false)
@@ -59,11 +64,11 @@
           }}{{ formatDistanceRaw(t, gearComponent.expected_kms, authStore.user.units) }}</span
         >
         <span v-if="gearComponent.expected_kms && gear.gear_type === 4"
-          >{{ formatSecondsToOnlyHours(gearComponentTime)
+          >{{ formatSecondsToHours(gearComponentTime)
           }}{{ t('gearComponentListComponent.gearComponentOf')
-          }}{{ formatSecondsToOnlyHours(gearComponent.expected_kms) }}</span
+          }}{{ formatSecondsToHours(gearComponent.expected_kms) }}</span
         >
-        <span v-if="gearComponent.retired_date"> @ {{ gearComponent.retired_date }}</span>
+        <span v-if="gearComponent.retired_date"> @ {{ formatDateMed(gearComponent.retired_date) }}</span>
         <div
           v-if="gearComponent.expected_kms && gear.gear_type !== 4"
           class="progress"
@@ -146,7 +151,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gearsComponents } from '@/services/gearsComponentsService'
 import { push } from 'notivue'
@@ -162,7 +167,7 @@ import {
   getGearWindsurfComponentType,
   getGearWindsurfComponentAvatar
 } from '@/utils/gearComponentsUtils'
-import { formatSecondsToOnlyHours } from '@/utils/dateTimeUtils'
+import { formatSecondsToHours, formatDateMed } from '@/utils/dateTimeUtils'
 import ModalComponent from '@/components/Modals/ModalComponent.vue'
 import GearComponentAddEditModalComponent from '@/components/Gears/GearComponentAddEditModalComponent.vue'
 
@@ -174,19 +179,23 @@ const props = defineProps({
   gearComponent: {
     type: Object,
     required: true
-  },
-  gearActivities: {
-    type: [Array, null],
-    required: true
   }
 })
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const gearComponentDistance = ref(0)
-const gearComponentTime = ref(0)
-const gearComponentDistancePercentage = ref(0)
-const gearComponentTimePercentage = ref(0)
+const gearComponentDistance = ref(props.gearComponent.current_distance || 0)
+const gearComponentTime = ref(props.gearComponent.current_time || 0)
+const gearComponentDistancePercentage = ref(
+  props.gearComponent.expected_kms
+    ? Math.round((gearComponentDistance.value / props.gearComponent.expected_kms) * 100)
+    : 0
+)
+const gearComponentTimePercentage = ref(
+  props.gearComponent.expected_kms
+    ? Math.round((gearComponentTime.value / props.gearComponent.expected_kms) * 100)
+    : 0
+)
 
 const emit = defineEmits(['gearComponentDeleted', 'editedGearComponent'])
 
@@ -203,37 +212,6 @@ async function submitDeleteGearComponent() {
 }
 
 function editGearComponentList(editedGearComponent) {
-  updateGearComponentDistance(editedGearComponent)
   emit('editedGearComponent', editedGearComponent)
 }
-
-function updateGearComponentDistance(gearComponent) {
-  gearComponentDistance.value = 0
-  gearComponentTime.value = 0
-  if (props.gearActivities && props.gearActivities && props.gearActivities.length > 0) {
-    props.gearActivities.forEach((activity) => {
-      if (
-        activity.start_time_tz_applied &&
-        gearComponent.purchase_date &&
-        new Date(activity.start_time_tz_applied) >= new Date(gearComponent.purchase_date) &&
-        (gearComponent.retired_date === null ||
-          new Date(activity.start_time_tz_applied).toISOString().slice(0, 10) <=
-            new Date(gearComponent.retired_date).toISOString().slice(0, 10))
-      ) {
-        gearComponentDistance.value += Number(activity.distance) || 0
-        gearComponentTime.value += Number(activity.total_timer_time) || 0
-      }
-    })
-    gearComponentDistancePercentage.value = Math.round(
-      (gearComponentDistance.value / gearComponent.expected_kms) * 100
-    )
-    gearComponentTimePercentage.value = Math.round(
-      (gearComponentTime.value / gearComponent.expected_kms) * 100
-    )
-  }
-}
-
-onMounted(() => {
-  updateGearComponentDistance(props.gearComponent)
-})
 </script>

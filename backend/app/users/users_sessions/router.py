@@ -47,7 +47,7 @@ async def read_sessions_user(
     Returns:
         List of session objects for the specified user.
     """
-    if core_config.ENVIRONMENT != "demo":
+    if core_config.settings.ENVIRONMENT != "demo":
         return users_session_crud.get_user_sessions(user_id, db)
     else:
         core_logger.print_to_log(

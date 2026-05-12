@@ -79,6 +79,27 @@ async function fetchWithRetry(url, options, responseType = 'json') {
       if (url === 'mfa/verify' && error.message.includes('Invalid MFA code')) {
         throw error
       }
+      if (url === 'profile/password') {
+        throw error
+      }
+      if (url === 'profile/mfa/disable') {
+        throw error
+      }
+      if (url === 'profile/mfa/backup-codes') {
+        throw error
+      }
+      if (url === 'profile/mfa/enable') {
+        throw error
+      }
+      if (url === 'profile/api_keys') {
+        throw error
+      }
+      if (
+        url.startsWith('profile/idp/') &&
+        (url.endsWith('/link/token') || url.endsWith('/unlink'))
+      ) {
+        throw error
+      }
       try {
         // Use auth store's refreshAccessToken which updates tokens in memory
         const authStore = useAuthStore()
@@ -229,6 +250,19 @@ export async function fetchPostRequest(url, data) {
 export async function fetchPutRequest(url, data) {
   const options = {
     method: 'PUT',
+    body: JSON.stringify(data),
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Client-Type': 'web'
+    }
+  }
+  return fetchWithRetry(url, options)
+}
+
+export async function fetchPatchRequest(url, data) {
+  const options = {
+    method: 'PATCH',
     body: JSON.stringify(data),
     credentials: 'include',
     headers: {

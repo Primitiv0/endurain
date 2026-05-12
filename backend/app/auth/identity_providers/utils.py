@@ -1,19 +1,19 @@
-"""Identity Provider utility functions and templates"""
+"""Utility helpers and pre-configured templates for identity providers."""
 
-import re
-import hashlib
 import base64
+import hashlib
+import hmac
+import re
 from typing import Any
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
-
-import users.users_identity_providers.crud as user_idp_crud
-
 import core.config as core_config
 import core.logger as core_logger
+import users.users_identity_providers.crud as user_idp_crud
 
 
 def validate_redirect_url(redirect: str | None) -> None:
@@ -50,7 +50,7 @@ def validate_redirect_url(redirect: str | None) -> None:
     # Handle custom URI schemes (e.g., gadgetbridge://callback)
     if "://" in value:
         scheme = value.split("://", 1)[0].lower()
-        allowed = core_config.ALLOWED_REDIRECT_SCHEMES
+        allowed = core_config.settings.ALLOWED_REDIRECT_SCHEMES
         if scheme not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -179,19 +179,17 @@ def _secure_compare(a: str, b: str) -> bool:
     """
     Constant-time string comparison to prevent timing attacks.
 
+    Uses ``hmac.compare_digest`` to avoid both character-by-
+    character and length timing leaks.
+
     Args:
-        a (str): First string.
-        b (str): Second string.
+        a: First string.
+        b: Second string.
 
     Returns:
-        bool: True if strings are equal, False otherwise.
+        True if strings are equal, False otherwise.
     """
-    if len(a) != len(b):
-        return False
-    result = 0
-    for x, y in zip(a, b):
-        result |= ord(x) ^ ord(y)
-    return result == 0
+    return hmac.compare_digest(a.encode(), b.encode())
 
 
 # Pre-configured templates for common IdPs

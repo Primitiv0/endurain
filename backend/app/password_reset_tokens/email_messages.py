@@ -1,33 +1,26 @@
+"""Email message builders for password reset notifications."""
+
+import html
+
 import core.apprise as core_apprise
+import core.email_templates as core_email_templates
 
 
 def get_password_reset_email_en(
     user_name: str, reset_link: str, email_service: core_apprise.AppriseService
-) -> tuple:
+) -> tuple[str, str, str]:
     """
-    Return the subject, HTML body, and plain-text body for an English password-reset email.
+    Build an English password reset email.
 
     Args:
-        user_name (str): The recipient's display name inserted into the greeting.
-        reset_link (str): The URL the user will follow to reset their password; inserted into the CTA button
-            and included as a plain link for clients that do not render the button.
-        email_service (core_apprise.AppriseService): Notification service instance used to obtain service
-            metadata (e.g., `frontend_host`) for the email footer.
+        user_name: The recipient's display name.
+        reset_link: The URL for resetting the password.
+        email_service: AppriseService for footer metadata.
 
     Returns:
-        tuple[str, str, str]: A 3-tuple containing:
-            - subject: The email subject line.
-            - html_content: The full HTML email content (string) including inline styles, logo, a prominent
-              "Reset Password" button linking to `reset_link`, a security notice about a 1-hour expiry, and
-              a footer referencing `email_service.frontend_host`.
-            - text_content: A plain-text alternative suitable for clients that do not render HTML, containing
-              the greeting, reset instructions, the raw `reset_link`, expiry notice, and sign-off.
-
-    Notes:
-        - The function only constructs and returns strings; it does not send emails or perform network I/O.
-        - Calling code should ensure `reset_link` and `user_name` are properly validated/sanitized as needed.
-        - The HTML is crafted with inline styles for broad email-client compatibility.
+        A 3-tuple of (subject, html_content, text_content).
     """
+    safe_name = html.escape(user_name)
     subject = "Endurain - Password reset"
     html_content = f"""
 <!DOCTYPE html>
@@ -57,7 +50,7 @@ def get_password_reset_email_en(
                 password:</p>
 
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{reset_link}" style="background-color: #0d6efd; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Reset Password</a>
+                <a href="{reset_link}" style="background-color: {core_email_templates.LINK_COLOR_PRIMARY}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Reset Password</a>
             </div>
 
             <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 5px; margin: 20px 0;">

@@ -387,6 +387,23 @@
           />
           <span>{{ mapBackgroundColor }}</span>
         </div>
+        <!-- Delete and regenerate all activity thumbnails when tile server settings change -->
+        <label class="form-label mt-1" for="serverSettingsTileserverRegenerateThumbnails">{{
+          $t('settingsServerSettingsZoneComponent.tileserverRegenerateThumbnailsLabel')
+        }}</label>
+        <select
+          class="form-select"
+          name="serverSettingsTileserverRegenerateThumbnails"
+          v-model="tileserverRegenerateThumbnailsOnChange"
+          required
+        >
+          <option :value="false">
+            {{ $t('generalItems.false') }}
+          </option>
+          <option :value="true">
+            {{ $t('generalItems.true') }}
+          </option>
+        </select>
       </div>
       <hr />
       <!-- Login photo set -->
@@ -480,6 +497,9 @@ const ssoAutoRedirect = ref(serverSettingsStore.serverSettings.sso_auto_redirect
 const tileserverUrl = ref(serverSettingsStore.serverSettings.tileserver_url)
 const tileserverAttribution = ref(serverSettingsStore.serverSettings.tileserver_attribution)
 const tileserverApiKey = ref(serverSettingsStore.serverSettings.tileserver_api_key)
+const tileserverRegenerateThumbnailsOnChange = ref(
+  serverSettingsStore.serverSettings.tileserver_regenerate_thumbnails_on_change
+)
 const mapBackgroundColor = ref(serverSettingsStore.serverSettings.map_background_color)
 const passwordType = ref(serverSettingsStore.serverSettings.password_type)
 const passwordLengthRegularUsers = ref(
@@ -517,6 +537,7 @@ async function updateServerSettings() {
     tileserver_url: tileserverUrl.value,
     tileserver_attribution: tileserverAttribution.value,
     tileserver_api_key: tileserverApiKey.value,
+    tileserver_regenerate_thumbnails_on_change: tileserverRegenerateThumbnailsOnChange.value,
     map_background_color: mapBackgroundColor.value,
     password_type: passwordType.value,
     password_length_regular_users: passwordLengthRegularUsers.value,
@@ -605,6 +626,8 @@ onMounted(async () => {
     tileserverUrl.value = serverSettingsStore.serverSettings.tileserver_url
     tileserverAttribution.value = serverSettingsStore.serverSettings.tileserver_attribution
     tileserverApiKey.value = serverSettingsStore.serverSettings.tileserver_api_key
+    tileserverRegenerateThumbnailsOnChange.value =
+      serverSettingsStore.serverSettings.tileserver_regenerate_thumbnails_on_change
     mapBackgroundColor.value = serverSettingsStore.serverSettings.map_background_color
     passwordType.value = serverSettingsStore.serverSettings.password_type
     passwordLengthRegularUsers.value =
@@ -638,6 +661,7 @@ watch(
     tileserverUrl,
     tileserverAttribution,
     tileserverApiKey,
+    tileserverRegenerateThumbnailsOnChange,
     mapBackgroundColor,
     passwordType,
     passwordLengthRegularUsers,

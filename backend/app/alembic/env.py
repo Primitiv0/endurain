@@ -1,10 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
-
 
 import auth.identity_providers.models
 import auth.mfa_backup_codes.models
@@ -20,9 +16,12 @@ import activities.activity_workout_steps.models
 import followers.models
 import gears.gear.models
 import gears.gear_components.models
+import health.health_poop.models
+import health.health_fasting.models
 import health.health_sleep.models
 import health.health_steps.models
 import health.health_targets.models
+import health.health_water.models
 import health.health_weight.models
 import migrations.models
 import notifications.models
@@ -32,6 +31,7 @@ import server_settings.models
 import users.users_sessions.models
 import users.users_sessions.rotated_refresh_tokens.models
 import users.users.models
+import users.users_api_keys.models
 import users.users_goals.models
 import users.users_default_gear.models
 import users.users_identity_providers.models
@@ -93,11 +93,6 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    """ connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    ) """
 
     # Here, instead of creating a new engine, we use the existing engine
     # from database configuration.

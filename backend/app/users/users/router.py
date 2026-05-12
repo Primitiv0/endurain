@@ -1,43 +1,39 @@
 """User management router for authenticated operations."""
 
-import os
 from typing import Annotated, Callable
 
-from fastapi import APIRouter, Depends, UploadFile, Security, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, Security, status, Query
 from sqlalchemy.orm import Session
 
 import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.dependencies as users_dependencies
 import users.users.utils as users_utils
-import users.users.models as users_models
+import users.users_sessions.crud as users_sessions_crud
 
 import users.users_identity_providers.crud as user_idp_crud
 
 import sign_up_tokens.utils as sign_up_tokens_utils
 import auth.security as auth_security
 import auth.password_hasher as auth_password_hasher
+import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
 import core.database as core_database
 import core.dependencies as core_dependencies
-import core.file_uploads as core_file_uploads
-import core.config as core_config
 
 # Define the API router
 router = APIRouter()
 
 
 @router.get(
-    "/page_number/{page_number}/num_records/{num_records}",
+    "",
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersListResponse,
 )
 async def read_users_all_pagination(
-    page_number: int,
-    num_records: int,
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
+    _validate_pagination_values_on_query: Annotated[
+        Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     _check_scopes: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["users:read"])
@@ -46,22 +42,62 @@ async def read_users_all_pagination(
         Session,
         Depends(core_database.get_db),
     ],
+    page_number: Annotated[
+        int | None,
+        Query(description="Pagination page number"),
+    ] = None,
+    num_records: Annotated[
+        int | None,
+        Query(description="Number of records per page"),
+    ] = None,
+    show_inactive: Annotated[
+        bool | None,
+        Query(description="Filter by inactive status"),
+    ] = None,
+    show_email_unverified: Annotated[
+        bool | None,
+        Query(description="Filter by email verification status"),
+    ] = None,
+    show_pending_approval: Annotated[
+        bool | None,
+        Query(description="Filter by pending approval status"),
+    ] = None,
+    show_external_auth: Annotated[
+        bool | None,
+        Query(description="Filter by external authentication status"),
+    ] = None,
+    show_local_auth: Annotated[
+        bool | None,
+        Query(description="Filter by local authentication status"),
+    ] = None,
 ) -> users_schema.UsersListResponse:
     """
     Retrieve paginated list of all users.
 
     Args:
-        page_number: Page number to retrieve.
-        num_records: Number of records per page.
         _validate_pagination_values: Pagination validation.
         _check_scopes: Authorization check.
         db: Database session dependency.
+        page_number: Optional page number to retrieve.
+        num_records: Optional number of records per page.
+        show_inactive: Optional filter by inactive status.
+        show_email_unverified: Optional filter by email verification status.
+        show_pending_approval: Optional filter by pending approval status.
+        show_external_auth: Optional filter by external authentication status.
+        show_local_auth: Optional filter by local authentication status.
 
     Returns:
         Paginated list of users with total count.
     """
     total = users_crud.get_users_number(db)
-    users = users_crud.get_users_with_pagination(db, page_number, num_records)
+    users = users_crud.get_users_with_pagination(
+        db,
+        page_number,
+        num_records,
+        show_inactive,
+        show_email_unverified,
+        show_pending_approval,
+    )
 
     # Enrich with IDP count before serializing
     enriched_users = []
@@ -71,6 +107,13 @@ async def read_users_all_pagination(
         )
         user_read = users_schema.UsersRead.model_validate(user)
         user_read.external_auth_count = idp_count
+
+        # Apply external/local auth filters
+        if idp_count > 0 and show_external_auth is False:
+            continue
+        if idp_count == 0 and show_local_auth is False:
+            continue
+
         enriched_users.append(user_read)
 
     return users_schema.UsersListResponse(
@@ -357,7 +400,7 @@ async def approve_user(
 async def edit_user_password(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
-    user_attributes: users_schema.UsersEditPassword,
+    user_attributes: users_schema.UsersAdminEditPassword,
     _check_scope: Annotated[
         Callable, Security(auth_security.check_scopes, scopes=["users:write"])
     ],
@@ -387,6 +430,8 @@ async def edit_user_password(
     users_crud.edit_user_password(
         user_id, user_attributes.password, password_hasher, db
     )
+    users_sessions_crud.delete_sessions_by_user(user_id, db)
+    auth_security_stores.clear_pending_mfa_for_user(user_id)
 
     # Return success message
     return {"message": f"User ID {user_id} password updated successfully"}

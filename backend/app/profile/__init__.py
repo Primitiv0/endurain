@@ -27,7 +27,7 @@ from .schema import (
 )
 from .export_service import ExportService
 from .import_service import ImportService
-from .mfa_store import MFASecretStore
+from .mfa_store import MFASecretStore, RedisMFASecretStore
 from .exceptions import (
     ProfileOperationError,
     ProfileImportError,
@@ -68,6 +68,7 @@ __all__ = [
     "ImportService",
     # MFA Store
     "MFASecretStore",
+    "RedisMFASecretStore",
     # Exceptions
     "ProfileOperationError",
     "ProfileImportError",

@@ -42,6 +42,7 @@ nav:
     - Proxmox community script: https://community-scripts.github.io/ProxmoxVE/scripts?id=endurain&category=Gaming+%26+Leisure
     - MariaDB to Postgres migration: getting-started/maria-to-postgres-migration.md
   - Features:
+    - Importing data: features/importing.md
     - Single Sign-On (SSO): features/single-sign-on.md
     - Sleep Scoring: features/sleep-scoring.md
   - Integrations:
@@ -51,16 +52,35 @@ nav:
     - Setup a development environment: developer-guide/setup-dev-env.md
     - Authentication: developer-guide/authentication.md
     - Supported types: developer-guide/supported-types.md
+    - Import development notes: developer-guide/import-dev-notes.md
   - Gallery: gallery.md
-  - Reference:
+  - Backend reference:
+    - Activities:
+      - Activity streams: reference/activities/activity_streams.md
+      - Activity summaries: reference/activities/activity_summaries.md
+      - Activity workout steps: reference/activities/activity_workout_steps.md
+    - Gears:
+      - Gear: reference/gears/gear.md
+      - Gear components: reference/gears/gear_components.md
+    - GPX: reference/gpx.md
     - Health:
+      - Health: reference/health.md
+      - Health poop: reference/health/health_poop.md
       - Health sleep: reference/health/health_sleep.md
       - Health steps: reference/health/health_steps.md
       - Health targets: reference/health/health_targets.md
+      - Health water: reference/health/health_water.md
       - Health weight: reference/health/health_weight.md
+    - Migrations: reference/migrations.md
+    - Notifications: reference/notifications.md
+    - Password reset tokens: reference/password_reset_tokens.md
     - Profile: reference/profile.md
+    - Server settings: reference/server_settings.md
+    - Sign up tokens: reference/sign_up_tokens.md
+    - TCX: reference/tcx.md
     - Users:
       - Users: reference/users/users.md
+      - Users API keys: reference/users/users_api_keys.md
       - Users default gear: reference/users/users_default_gear.md
       - Users goals: reference/users/users_goals.md
       - Users identity providers: reference/users/users_identity_providers.md

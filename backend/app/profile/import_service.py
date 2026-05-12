@@ -17,6 +17,7 @@ import zipfile
 import time
 from io import BytesIO
 from typing import Any
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 import core.config as core_config
@@ -381,7 +382,7 @@ class ImportService:
             if filename not in file_list:
                 return []
 
-            data = json.loads(zipf.read(filename))
+            data = json.loads(self._read_zip_entry(zipf, filename))
             core_logger.print_to_log(
                 f"Loaded {len(data) if isinstance(data, list) else 1} items from {filename}",
                 "debug",
@@ -399,6 +400,61 @@ class ImportService:
             error_msg = f"Failed to parse JSON from {filename}: {err}"
             core_logger.print_to_log(error_msg, "error")
             raise JSONParseError(error_msg) from err
+
+    def _read_zip_entry(
+        self,
+        zipf: zipfile.ZipFile,
+        filename: str,
+        *,
+        max_bytes: int | None = None,
+    ) -> bytes:
+        """
+        Read a ZIP entry after checking its declared size.
+
+        Args:
+            zipf: ZipFile instance to read from.
+            filename: Name of the entry to read.
+            max_bytes: Optional byte cap for this entry. Defaults
+                to the import performance file-size cap.
+
+        Returns:
+            Entry bytes.
+
+        Raises:
+            FileSizeError: If the entry exceeds the allowed size.
+        """
+        limit = (
+            max_bytes
+            if max_bytes is not None
+            else self.performance_config.max_file_size_mb * 1024 * 1024
+        )
+        info = zipf.getinfo(filename)
+        # ``info.file_size`` comes from the central directory and a
+        # malicious archive can lie. The declared-size check below
+        # is a fast pre-filter; the streaming read that follows
+        # enforces the same cap against the actual decompressed
+        # bytes so a zip-bomb cannot exhaust memory.
+        if info.file_size > limit:
+            raise FileSizeError(
+                f"ZIP entry {filename} size ({info.file_size} bytes) "
+                f"exceeds maximum allowed ({limit} bytes)"
+            )
+        chunks: list[bytes] = []
+        bytes_read = 0
+        chunk_size = 64 * 1024
+        with zipf.open(info, "r") as src:
+            while True:
+                chunk = src.read(chunk_size)
+                if not chunk:
+                    break
+                bytes_read += len(chunk)
+                if bytes_read > limit:
+                    raise FileSizeError(
+                        f"ZIP entry {filename} decompressed size "
+                        f"exceeds maximum allowed ({limit} bytes)"
+                    )
+                chunks.append(chunk)
+        return b"".join(chunks)
 
     async def collect_and_import_gears_data(
         self, gears_data: list[Any]
@@ -503,8 +559,20 @@ class ImportService:
             extension = photo_path.split(".")[-1]
             user_profile["photo_path"] = f"data/user_images/{self.user_id}.{extension}"
 
-        user = users_schema.UsersRead(**user_profile)
-        await users_crud.edit_user(self.user_id, user, self.db)
+        # Strict allow-list before persistence: profile import is a
+        # self-service operation and MUST NOT be a back door for
+        # privilege escalation. Even if the source ZIP was crafted
+        # to set ``access_type``, ``active``, ``mfa_enabled``,
+        # ``mfa_secret``, ``email_verified``, or
+        # ``pending_admin_approval``, those fields are dropped here
+        # before reaching the database.
+        sanitized = {
+            key: value
+            for key, value in user_profile.items()
+            if key in users_crud.PROFILE_SELF_SERVICE_FIELDS
+        }
+        profile_payload = users_schema.ProfileUpdate.model_validate(sanitized)
+        await users_crud.edit_profile_user(self.user_id, profile_payload, self.db)
         self.counts["user"] += 1
 
         # Import user-related settings
@@ -758,7 +826,7 @@ class ImportService:
             for activity_set in sets_for_activity:
                 activity_set.pop("id", None)
                 activity_set["activity_id"] = new_activity_id
-                set_activity = activity_sets_schema.ActivitySets(**activity_set)
+                set_activity = activity_sets_schema.ActivitySetsCreate(**activity_set)
                 sets.append(set_activity)
 
             if sets:
@@ -818,11 +886,32 @@ class ImportService:
                 # Update media path
                 old_path = media_data.get("media_path", None)
                 if old_path:
-                    filename = old_path.split("/")[-1]
-                    suffix = filename.split("_", 1)[1]
-                    media_data["media_path"] = (
-                        f"{core_config.ACTIVITY_MEDIA_DIR}/{new_activity_id}_{suffix}"
+                    filename = os.path.basename(
+                        str(old_path).replace("\\", "/")
                     )
+                    if "_" not in filename:
+                        core_logger.print_to_log(
+                            "Skipping activity media with invalid "
+                            f"path: {old_path}",
+                            "warning",
+                        )
+                        continue
+                    suffix = filename.split("_", 1)[1]
+                    new_file_name = f"{new_activity_id}_{suffix}"
+                    try:
+                        media_data["media_path"] = str(
+                            file_uploads.resolve_storage_path(
+                                core_config.settings.ACTIVITY_MEDIA_DIR,
+                                new_file_name,
+                            )
+                        )
+                    except HTTPException as err:
+                        core_logger.print_to_log(
+                            "Skipping activity media with unsafe "
+                            f"path {old_path}: {err.detail}",
+                            "warning",
+                        )
+                        continue
 
                 media_item = activity_media_schema.ActivityMedia(**media_data)
                 media.append(media_item)
@@ -1052,7 +1141,9 @@ class ImportService:
         # Load and filter components from each file
         for filename in component_files:
             try:
-                components = json.loads(zipf.read(filename))
+                components = json.loads(
+                    self._read_zip_entry(zipf, filename)
+                )
                 # Only keep components for activities in this batch
                 filtered = [
                     comp
@@ -1223,11 +1314,31 @@ class ImportService:
 
                     new_file_name = f"{new_id}{ext}"
 
-                    # Read bytes from ZIP and save using file_uploads
-                    file_bytes = zipf.read(file_path)
-                    await file_uploads.save_file(
-                        file_bytes, core_config.FILES_PROCESSED_DIR, new_file_name
+                    # Read bytes from ZIP and save through the
+                    # unified validated-write pipeline so the entry
+                    # is re-checked as an activity file.
+                    activity_limit = (
+                        file_uploads.file_validator.config.limits
+                        .max_activity_file_size
                     )
+                    file_bytes = self._read_zip_entry(
+                        zipf, file_path, max_bytes=activity_limit
+                    )
+                    try:
+                        await file_uploads.save_validated_bytes(
+                            file_bytes,
+                            kind=file_uploads.UploadKind.ACTIVITY,
+                            upload_dir=core_config.FILES_PROCESSED_DIR,
+                            filename=new_file_name,
+                        )
+                    except HTTPException as err:
+                        core_logger.print_to_log(
+                            "Profile import dropped invalid "
+                            f"activity file {new_file_name}: "
+                            f"{err.detail}",
+                            "warning",
+                        )
+                        continue
                     self.counts["activity_files"] += 1
                 except ValueError:
                     # Skip files that don't have numeric activity IDs
@@ -1274,11 +1385,33 @@ class ImportService:
 
                         new_file_name = f"{new_id}_{suffix}{ext}"
 
-                        # Read bytes from ZIP and save using file_uploads
-                        file_bytes = zipf.read(file_path)
-                        await file_uploads.save_file(
-                            file_bytes, core_config.ACTIVITY_MEDIA_DIR, new_file_name
+                        # Read bytes from ZIP and save through the
+                        # unified validated-write pipeline so the
+                        # entry is re-checked as an image.
+                        image_limit = (
+                            file_uploads.file_validator.config.limits
+                            .max_image_size
                         )
+                        file_bytes = self._read_zip_entry(
+                            zipf, file_path, max_bytes=image_limit
+                        )
+                        try:
+                            await file_uploads.save_validated_bytes(
+                                file_bytes,
+                                kind=file_uploads.UploadKind.IMAGE,
+                                upload_dir=(
+                                    core_config.settings.ACTIVITY_MEDIA_DIR
+                                ),
+                                filename=new_file_name,
+                            )
+                        except HTTPException as err:
+                            core_logger.print_to_log(
+                                "Profile import dropped invalid "
+                                f"activity media {new_file_name}: "
+                                f"{err.detail}",
+                                "warning",
+                            )
+                            continue
                         self.counts["media"] += 1
                     except ValueError:
                         # Skip files that don't have numeric activity IDs
@@ -1315,9 +1448,27 @@ class ImportService:
                 ext = os.path.splitext(path)[1]
                 new_file_name = f"{self.user_id}{ext}"
 
-                # Read bytes from ZIP and save using file_uploads
-                file_bytes = zipf.read(file_path)
-                await file_uploads.save_file(
-                    file_bytes, core_config.USER_IMAGES_DIR, new_file_name
+                # Read bytes from ZIP and save through the unified
+                # validated-write pipeline so the entry is re-checked
+                # as an image.
+                image_limit = (
+                    file_uploads.file_validator.config.limits.max_image_size
                 )
+                file_bytes = self._read_zip_entry(
+                    zipf, file_path, max_bytes=image_limit
+                )
+                try:
+                    await file_uploads.save_validated_bytes(
+                        file_bytes,
+                        kind=file_uploads.UploadKind.IMAGE,
+                        upload_dir=core_config.USER_IMAGES_DIR,
+                        filename=new_file_name,
+                    )
+                except HTTPException as err:
+                    core_logger.print_to_log(
+                        "Profile import dropped invalid user "
+                        f"image {new_file_name}: {err.detail}",
+                        "warning",
+                    )
+                    continue
                 self.counts["user_images"] += 1

@@ -122,22 +122,20 @@ const router = createRouter({
   }
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth !== false
 
   if (requiresAuth && !authStore.isAuthenticated) {
-    next({
+    return {
       name: 'login',
       query: {
         redirect: to.path,
         ...to.query
       }
-    })
+    }
   } else if (to.name === 'login' && authStore.isAuthenticated) {
-    next({ name: 'home' })
-  } else {
-    next()
+    return { name: 'home' }
   }
 })
 

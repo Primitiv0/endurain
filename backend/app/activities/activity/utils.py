@@ -1,7 +1,11 @@
+"""Activity import, parsing and aggregation utilities."""
+
+import functools
 import gzip
 import os
 import shutil
 import asyncio
+import uuid
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -11,13 +15,15 @@ import time
 from geopy.distance import geodesic
 from zoneinfo import ZoneInfo
 
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, status, UploadFile, BackgroundTasks
+from fastapi.concurrency import run_in_threadpool
 
 from datetime import datetime
 from urllib.parse import urlencode
 from statistics import mean
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 
 import activities.activity.schema as activities_schema
 import activities.activity.crud as activities_crud
@@ -32,21 +38,32 @@ import activities.activity_laps.crud as activity_laps_crud
 
 import activities.activity_sets.crud as activity_sets_crud
 
+import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.crud as activity_streams_crud
+import activities.activity_streams.models as activity_streams_models
 import activities.activity_streams.schema as activity_streams_schema
 
 import activities.activity_workout_steps.crud as activity_workout_steps_crud
 
+import strava.bulk_import_utils as strava_bulk_import_utils
+
 import websocket.manager as websocket_manager
 
-import gpx.utils as gpx_utils
-import tcx.utils as tcx_utils
-import fit.utils as fit_utils
+import activities.activity_file_import.utils_fit as fit_utils
+import activities.activity_file_import.utils_gpx as gpx_utils
+import activities.activity_file_import.utils_tcx as tcx_utils
+
+import activities.activity.thumbnail as activities_thumbnail
+
+import server_settings.crud as server_settings_crud
 
 import core.logger as core_logger
 import core.config as core_config
+import core.cryptography as core_cryptography
 import core.database as core_database
+import core.file_uploads as core_file_uploads
 import core.sanitization as core_sanitization
+import core.timezone as core_timezone
 
 # Global Activity Type Mappings (ID to Name)
 ACTIVITY_ID_TO_NAME = {
@@ -318,72 +335,194 @@ def transform_schema_activity_to_model_activity(
     return new_activity
 
 
-def serialize_activity(activity: activities_schema.Activity):
-    def make_aware_and_format(dt, timezone):
-        if isinstance(dt, str):
-            dt = datetime.fromisoformat(dt)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-        return dt.astimezone(timezone).strftime("%Y-%m-%dT%H:%M:%S")
+def serialize_activity(
+    activity: activities_models.Activity,
+) -> activities_schema.Activity:
+    """
+    Convert an ORM Activity to a schema with TZ.
 
-    def convert_to_datetime_if_string(dt: str | datetime | None) -> datetime:
-        if dt is None:
-            raise ValueError("Datetime cannot be None")
-        if isinstance(dt, str):
-            return datetime.fromisoformat(dt)
-        return dt
+    Converts ORM model to Pydantic schema and
+    applies timezone formatting to datetime fields.
+    Does NOT mutate the ORM object.
 
-    timezone = (
-        ZoneInfo(activity.timezone)
-        if activity.timezone
-        else ZoneInfo(os.environ.get("TZ", "UTC"))
+    Args:
+        activity: The ORM Activity instance.
+
+    Returns:
+        An Activity schema with formatted datetimes.
+    """
+    schema = activities_schema.Activity.model_validate(
+        activity
     )
 
-    activity.start_time_tz_applied = make_aware_and_format(
-        activity.start_time, timezone
+    tz_name = activity.timezone
+    schema.start_time_tz_applied = (
+        core_timezone.format_aware_datetime(
+            activity.start_time, tz_name
+        )
     )
-    activity.end_time_tz_applied = make_aware_and_format(activity.end_time, timezone)
-    activity.created_at_tz_applied = make_aware_and_format(
-        activity.created_at, timezone
+    schema.end_time_tz_applied = (
+        core_timezone.format_aware_datetime(
+            activity.end_time, tz_name
+        )
+    )
+    schema.created_at_tz_applied = (
+        core_timezone.format_aware_datetime(
+            activity.created_at, tz_name
+        )
     )
 
-    # Convert to datetime objects if they are strings before calling astimezone
-    start_time_dt = convert_to_datetime_if_string(activity.start_time)
-    end_time_dt = convert_to_datetime_if_string(activity.end_time)
-    created_at_dt = convert_to_datetime_if_string(activity.created_at)
+    schema.start_time = (
+        core_timezone.format_aware_datetime(
+            activity.start_time, None
+        )
+    )
+    schema.end_time = (
+        core_timezone.format_aware_datetime(
+            activity.end_time, None
+        )
+    )
+    schema.created_at = (
+        core_timezone.format_aware_datetime(
+            activity.created_at, None
+        )
+    )
 
-    activity.start_time = start_time_dt.astimezone(None).strftime("%Y-%m-%dT%H:%M:%S")
-    activity.end_time = end_time_dt.astimezone(None).strftime("%Y-%m-%dT%H:%M:%S")
-    activity.created_at = created_at_dt.astimezone(None).strftime("%Y-%m-%dT%H:%M:%S")
+    return schema
 
-    return activity
+
+def apply_visibility_mask(
+    schema: activities_schema.Activity,
+    *,
+    is_owner: bool,
+    mask_private_notes: bool = True,
+) -> activities_schema.Activity:
+    """Mask hidden activity fields for non-owners.
+
+    Mutates and returns the provided Pydantic schema instance.
+    For owners no masking is applied.
+
+    Args:
+        schema: Activity schema to potentially mask.
+        is_owner: Whether the requesting user owns the
+            activity.
+        mask_private_notes: Whether to clear private_notes
+            for non-owners. Defaults to True.
+
+    Returns:
+        The (possibly mutated) Activity schema.
+    """
+    if is_owner:
+        return schema
+    if mask_private_notes:
+        schema.private_notes = None
+    if schema.hide_start_time:
+        schema.start_time = None
+        schema.end_time = None
+    if schema.hide_location:
+        schema.city = None
+        schema.town = None
+        schema.country = None
+    if schema.hide_gear:
+        schema.gear_id = None
+        schema.strava_gear_id = None
+        schema.garminconnect_gear_id = None
+    return schema
+
+
+def escape_like(term: str) -> str:
+    """Escape SQL LIKE wildcards in a user-provided term.
+
+    Escapes ``\\``, ``%`` and ``_`` so they are matched
+    literally. Use together with ``.like(..., escape="\\\\")``.
+
+    Args:
+        term: Raw search term.
+
+    Returns:
+        Escaped search term safe for use inside a ``LIKE``
+        pattern.
+    """
+    return (
+        term.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
 
 
 def handle_gzipped_file(
     file_path: str,
 ) -> tuple[str, str]:
-    """Handle gzipped files by extracting the inner file and returning its path and extension.
-    The gzipped file is moved to the processed directory after extraction.
+    """Handle gzipped files with bounded extraction.
+
     Args:
-        file_path: the path to the gzipped file, e.g. "activity_files/activity_1234567890.fit.gz"
-    Returns: A tuple containing the path to the temporary file and the inner file extension.
+        file_path: Path to the gzipped activity file.
+
+    Returns:
+        Tuple containing the temporary file path and inner
+        extension.
+
+    Raises:
+        HTTPException: 400 for invalid gzip content or 413 when
+            decompressed content exceeds the configured limit.
     """
     path = Path(file_path)
 
     inner_filename = path.stem  # eg "activity_1234567890.fit"
     inner_file_extension = Path(inner_filename).suffix  # eg ".gz"
+    temp_file_path: str | None = None
+    bytes_written = 0
 
-    with gzip.open(path) as gzipped_file:
-        with NamedTemporaryFile(suffix=inner_filename, delete=False) as temp_file:
-            temp_file.write(gzipped_file.read())
-            temp_file.flush()
-            core_logger.print_to_log_and_console(
-                f"Decompressed {path} with inner type {inner_file_extension} to {temp_file.name}"
-            )
+    try:
+        with gzip.open(path, "rb") as gzipped_file:
+            with NamedTemporaryFile(
+                suffix=inner_file_extension,
+                delete=False,
+            ) as temp_file:
+                temp_file_path = temp_file.name
+                while True:
+                    chunk = gzipped_file.read(_DECOMPRESS_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    bytes_written += len(chunk)
+                    if bytes_written > _MAX_DECOMPRESSED_ACTIVITY_BYTES:
+                        temp_file.close()
+                        try:
+                            os.remove(temp_file_path)
+                        except OSError:
+                            pass
+                        raise HTTPException(
+                            status_code=(
+                                status.HTTP_413_CONTENT_TOO_LARGE
+                            ),
+                            detail=(
+                                "Decompressed file exceeds maximum "
+                                "allowed size"
+                            ),
+                        )
+                    temp_file.write(chunk)
+                temp_file.flush()
 
-            move_file(core_config.FILES_PROCESSED_DIR, path.name, str(path))
+        core_logger.print_to_log_and_console(
+            f"Decompressed {path} with inner type "
+            f"{inner_file_extension} to {temp_file_path}"
+        )
 
-            return temp_file.name, inner_file_extension
+        move_file(core_config.FILES_PROCESSED_DIR, path.name, str(path))
+
+        return temp_file_path, inner_file_extension
+    except HTTPException:
+        raise
+    except (OSError, EOFError, gzip.BadGzipFile) as err:
+        if temp_file_path is not None:
+            try:
+                os.remove(temp_file_path)
+            except OSError:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid gzip file",
+        ) from err
 
 
 async def parse_and_store_activity_from_file(
@@ -392,23 +531,94 @@ async def parse_and_store_activity_from_file(
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
     from_garmin: bool = False,
+    is_bulk_import: bool = False,
     garminconnect_gear: dict | None = None,
+    strava_activities: dict | None = None,
+    import_initiated_time: str | None = None,
+    users_existing_gear_nickname_to_id: dict | None = None,
     activity_name: str | None = None,
 ):
-    try:
-        core_logger.print_to_log_and_console(
-            f"Bulk file import: Beginning processing of {file_path}"
-        )
+    """
+    Parse an activity file and persist the result to the database.
 
+    Supports .gpx, .tcx, .fit, and .gz files. Handles Garmin Connect and Strava
+    bulk imports, moves processed files to the appropriate directory, and emits
+    WebSocket notifications.
+
+    Args:
+        token_user_id: ID of the authenticated user performing the import.
+        file_path: Absolute path to the activity file to parse.
+        websocket_manager: Manager used to push real-time notifications to
+            connected clients.
+        db: SQLAlchemy database session.
+        from_garmin: Whether the file originates from a Garmin Connect sync.
+        garminconnect_gear: Garmin Connect gear metadata to associate with the
+            activity.
+        strava_activities: Strava bulk-import metadata dict keyed by filename,
+            then by activities.csv column header.
+        import_initiated_time: ISO timestamp of when the bulk import was
+            initiated.
+        users_existing_gear_nickname_to_id: Mapping of gear nickname to
+            internal gear ID, used during Strava bulk imports.
+        activity_name: Optional override for the activity name.
+
+    Returns:
+        List of created activity schema objects, or None if the file could not
+            be parsed.
+
+    Raises:
+        HTTPException: When the user is not found.
+    """
+    try:
         # Get file extension
         _, file_extension = os.path.splitext(file_path)
+        file_extension = file_extension.lower()
+
+        if file_extension not in core_config.SUPPORTED_FILE_FORMATS:
+            raise HTTPException(
+                status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                detail=(
+                    "File extension not supported. Supported file "
+                    "extensions are .gpx, .fit, .tcx and .gz"
+                ),
+            )
+
+        # Defense-in-depth signature check on files queued for
+        # processing (Garmin / Strava import paths).
+        await core_file_uploads.validate_local_file(
+            file_path,
+            kind=(
+                core_file_uploads.UploadKind.GZIP
+                if file_extension == ".gz"
+                else core_file_uploads.UploadKind.ACTIVITY
+            ),
+        )
+
+        # Get pathless file name with extension, as this is the dictionary key for Strava's bulk import activities dictionary.
+        _, file_base_name = os.path.split(file_path)
+
         garmin_connect_activity_id = None
 
         if from_garmin:
             garmin_connect_activity_id = os.path.basename(file_path).split("_")[0]
 
-        if file_extension.lower() == ".gz":
+        if file_extension == ".gz":
             file_path, file_extension = handle_gzipped_file(file_path)
+            file_extension = file_extension.lower()
+            if (
+                file_extension not in core_config.SUPPORTED_FILE_FORMATS
+                or file_extension == ".gz"
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Decompressed file extension is not supported"
+                    ),
+                )
+            await core_file_uploads.validate_local_file(
+                file_path,
+                kind=core_file_uploads.UploadKind.ACTIVITY,
+            )
 
         # Open the file and process it
         with open(file_path, "rb"):
@@ -425,29 +635,65 @@ async def parse_and_store_activity_from_file(
                 )
             )
 
-            # Parse the file
-            parsed_info = parse_file(
-                token_user_id,
-                user_privacy_settings,
-                file_extension,
-                file_path,
-                db,
-                activity_name,
+            # Parse the file in a thread pool to avoid
+            # blocking the event loop with CPU-bound and
+            # sync I/O work (gpxpy, geopy, timezonefinder)
+            parsed_info = await run_in_threadpool(
+                functools.partial(
+                    parse_file,
+                    token_user_id,
+                    user_privacy_settings,
+                    file_extension,
+                    file_path,
+                    db,
+                    activity_name,
+                )
             )
 
+            # Gather supplemental metadata. Check if a Strava bulk import is in
+            # progress, and if so check to see if any additional information 
+            # can be added to the activity.
+            activity_metadata_dict = {}
+            if strava_activities and isinstance(strava_activities, dict) and import_initiated_time and is_bulk_import:
+                # Build a metadata dict (which will also include an 
+                # import_dict) based on information in the strava_activities 
+                # dict.
+                activity_metadata_dict = strava_bulk_import_utils.build_metadata_dict(
+                    file_base_name,
+                    strava_activities,
+                    import_initiated_time,
+                    users_existing_gear_nickname_to_id,
+                )
+            elif import_initiated_time and is_bulk_import:
+                # Not doing a Strava bulk import, so build an import info dict 
+                # that reflects the generic import.
+                import_dict = strava_bulk_import_utils.build_import_dictionary(
+                    file_base_name, import_initiated_time, False
+                )
+                activity_metadata_dict["import_dict"] = import_dict
+
+            # Work through the parsed info; process and store any activity 
+            # information found (specific routines depend on file type 
+            # .gpx/.tcx and .fit have very different needs)
             if parsed_info is not None:
                 created_activities = []
-                idsToFileName = ""
+                ids_to_filename = ""
                 if file_extension.lower() in (
                     ".gpx",
                     ".tcx",
                 ):
+                    # Add import metadata and Strava activities.csv metadata to parsed_info
+                    if is_bulk_import:
+                        parsed_info = strava_bulk_import_utils.append_bulk_import_metadata_to_activity(
+                            parsed_info, activity_metadata_dict
+                        )
+
                     # Store the activity in the database
                     created_activity = await store_activity(
                         parsed_info, websocket_manager, db
                     )
                     created_activities.append(created_activity)
-                    idsToFileName = idsToFileName + str(created_activity.id)
+                    ids_to_filename += str(created_activity.id)
                 elif file_extension.lower() == ".fit":
                     # Split the records by activity (check for multiple activities in the file)
                     split_records_by_activity = fit_utils.split_records_by_activity(
@@ -479,61 +725,161 @@ async def parse_and_store_activity_from_file(
                         )
 
                     for activity in created_activities_objects:
+                        # Iterate through activities and add them one at a time.
+
+                        if is_bulk_import:
+                            # For a Strava bulk import of a multi-activity .fit file, check to see if this is the same activity referenced in the activities.csv for this file.
+                            if (
+                                len(created_activities_objects) > 1
+                                and strava_activities
+                                and activity_metadata_dict["metadata_found_in_csv"] is True
+                            ):
+                                # We must check to see if this activity matches the start time of the activity contained in the activities.csv (to avoid double-importing activities)
+                                if not strava_bulk_import_utils.does_activity_start_time_match_the_data_in_strava_activities_csv(
+                                    activity, activity_metadata_dict
+                                ):
+                                    # This is not the activity that aligns with the Strava info - skip import.
+                                    core_logger.print_to_log_and_console(
+                                        f"Bulk activity import of multi-activity .fit file: skipping likely duplicate import. Start time does not align with start time for this .fit file in the Strava activities.csv file.",
+                                        "debug",
+                                    )  #
+                                    continue
+
+                            # Add import metadata and Strava activities.csv metadata
+                            activity = strava_bulk_import_utils.append_bulk_import_metadata_to_activity(
+                                activity, activity_metadata_dict
+                            )
+
                         # Store the activity in the database
                         created_activity = await store_activity(
                             activity, websocket_manager, db
                         )
+
                         created_activities.append(created_activity)
 
-                    for index, activity in enumerate(created_activities):
-                        idsToFileName += str(activity.id)  # Add the id to the string
-                        # Add an underscore if it's not the last item
-                        if index < len(created_activities) - 1:
-                            idsToFileName += (
-                                "_"  # Add an underscore if it's not the last item
-                            )
+                    ids_to_filename = "_".join(
+                        str(activity.id) for activity in created_activities
+                    )
                 else:
-                    # Should no longer get here due to screening of extensions in router.py, but why not.
+                    # Should no longer get here due to screening of extensions 
+                    # in router.py, but why not.
                     core_logger.print_to_log_and_console(
                         f"File extension not supported: {file_extension}", "error"
                     )
+
                 # Define the directory where the processed files will be stored
                 processed_dir = core_config.FILES_PROCESSED_DIR
 
                 # Define new file path with activity ID as filename
-                new_file_name = f"{idsToFileName}{file_extension}"
+                new_file_name = f"{ids_to_filename}{file_extension}"
 
                 # Move the file to the processed directory
                 move_file(processed_dir, new_file_name, file_path)
-                core_logger.print_to_log_and_console(
-                    f"Bulk file import: File successfully processed and moved. {file_path} - has become {new_file_name}"
-                )
+
+                # Log file move, import any associated media, and log completion.
+                if is_bulk_import:
+                    core_logger.print_to_log_and_console(
+                        f"Bulk file import: File successfully processed and moved. {file_path} - has become {new_file_name}"
+                    )
+
+                    # Deal with Strava bulk import media.
+                    # Note - even multi-activity .fit files are good with this code, as there should only be a single imported activity per file in the Strava activities file directory.
+                    if strava_activities:
+                        await strava_bulk_import_utils.import_media_from_strava_bulk_export(
+                            strava_activities,
+                            created_activity,
+                            file_base_name,
+                            db,
+                        )
+
+                    core_logger.print_to_log_and_console(
+                        f"Bulk file import: Import work complete for file {file_base_name}."
+                    )
 
                 # Return the created activity
                 return created_activities
             else:
                 return None
-    # except HTTPException as http_err:
-    # This is causing a crash on the back end when the try fails.  Looks like we cannot raise an http exception in a background task.
-    # raise http_err
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Bulk file import: Error while parsing {file_path} in parse_and_store_activity_from_file - {str(err)}",
+    except (
+        HTTPException,
+        OSError,
+        EOFError,
+        gzip.BadGzipFile,
+        shutil.Error,
+        SQLAlchemyError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+    ) as err:
+        if is_bulk_import:
+            # Log the exception
+            core_logger.print_to_log_and_console(
+                f"Bulk file import: Error while parsing {file_path} in parse_and_store_activity_from_file - {str(err)}",
+                "error",
+                exc=err,
+            )
+            try:
+                # Move the exception-causing file to an import errors directory.
+                if strava_activities:
+                    # Use Strava bulk import errors directory if we are doing a Strava bulk import
+                    error_file_dir = core_config.STRAVA_BULK_IMPORT_IMPORT_ERRORS_DIR
+                else:
+                    # otherwise use standard bulk import error directory
+                    error_file_dir = core_config.FILES_BULK_IMPORT_IMPORT_ERRORS_DIR
+                os.makedirs(error_file_dir, exist_ok=True)
+                move_file(error_file_dir, os.path.basename(file_path), file_path)
+                core_logger.print_to_log_and_console(
+                    f"Bulk file import: Due to import error, file {file_path} has been moved to {error_file_dir}",
+                    "error",
+                )
+            except OSError:
+                core_logger.print_to_log_and_console(
+                    f"Bulk file import: Failed to move the error-producing file {file_path} to the import-error directory.",
+                    "error",
+                )
+        core_logger.print_to_log_and_console(
+            f"Error in parse_and_store_activity_from_file - {err}",
             "error",
             exc=err,
         )
+        # Background-task callers expect ``None`` on failure rather
+        # than re-raising; make that contract explicit.
+        return None
+
+
+# Maximum size accepted when decompressing a gzipped activity
+# upload. Mirrors core_file_uploads' activity cap; safeuploads
+# enforces the same limit on the wrapping ``.gz`` upload before we
+# get here, but we re-cap defensively while expanding the inner
+# payload (decompression-bomb defense in depth).
+_MAX_DECOMPRESSED_ACTIVITY_BYTES = 200 * 1024 * 1024
+# Chunk size used while streaming decompressed bytes to disk.
+_DECOMPRESS_CHUNK_BYTES = 1024 * 1024
+
+
+def _cleanup_upload_artifacts(file_paths: list[str]) -> None:
+    """Remove files created during failed activity uploads.
+
+    Args:
+        file_paths: Files to remove if they still exist.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    for file_path in file_paths:
         try:
-            # Move the exception-causing file to an import errors directory.
-            error_file_dir = core_config.FILES_BULK_IMPORT_IMPORT_ERRORS_DIR
-            os.makedirs(error_file_dir, exist_ok=True)
-            move_file(error_file_dir, os.path.basename(file_path), file_path)
-            core_logger.print_to_log_and_console(
-                f"Bulk file import: Due to import error, file {file_path} has been moved to {error_file_dir}"
-            )
-        except Exception:
-            core_logger.print_to_log_and_console(
-                f"Bulk file import: Failed to move the error-producing file {file_path} to the import-error directory."
+            if os.path.isfile(file_path):
+                os.remove(file_path)
+        except OSError as err:
+            core_logger.print_to_log(
+                "Failed to cleanup upload artifact "
+                f"{file_path}: {err}",
+                "warning",
+                exc=err,
             )
 
 
@@ -543,6 +889,25 @@ async def parse_and_store_activity_from_uploaded_file(
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
 ):
+    """Persist an uploaded activity file and return the result.
+
+    Validates the filename and extension, streams the upload to
+    disk in a thread pool, and delegates parsing to ``parse_file``.
+
+    Args:
+        token_user_id: Authenticated user ID.
+        file: Incoming FastAPI UploadFile.
+        websocket_manager: Manager used for notifications.
+        db: Database session.
+
+    Returns:
+        List of created Activity schemas, or None if no activity
+        could be parsed from the file.
+
+    Raises:
+        HTTPException: 400/404/406/413 on validation errors,
+            500 on internal failures.
+    """
     # Validate filename exists
     if file.filename is None:
         raise HTTPException(
@@ -550,23 +915,81 @@ async def parse_and_store_activity_from_uploaded_file(
             detail="Filename is required",
         )
 
-    # Get file extension
+    # Pre-check the extension so we can short-circuit with a
+    # human-friendly 406 before invoking the validator (which would
+    # otherwise raise a generic ExtensionSecurityError -> 400).
     _, file_extension = os.path.splitext(file.filename)
+    if (
+        file_extension.lower()
+        not in core_config.SUPPORTED_FILE_FORMATS
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_406_NOT_ACCEPTABLE,
+            detail=(
+                "File extension not supported. Supported "
+                "file extensions are .gpx, .fit, .tcx and .gz"
+            ),
+        )
+
+    upload_dir = core_config.settings.FILES_DIR
+    upload_kind = (
+        core_file_uploads.UploadKind.GZIP
+        if file_extension.lower() == ".gz"
+        else core_file_uploads.UploadKind.ACTIVITY
+    )
+    # Server-generated filename to defeat path traversal and
+    # collisions; the upload is renamed to ``{ids}{ext}`` after a
+    # successful parse via ``move_file`` below.
+    storage_name = f"{uuid.uuid4().hex}{file_extension.lower()}"
+    upload_artifacts: list[str] = []
 
     try:
-        # Ensure the 'files' directory exists
-        upload_dir = core_config.FILES_DIR
-        os.makedirs(upload_dir, exist_ok=True)
-
-        # Build the full path where the file will be saved
-        file_path = os.path.join(upload_dir, file.filename)
-
-        # Save the uploaded file in the 'files' directory
-        with open(file_path, "wb") as save_file:
-            save_file.write(file.file.read())
+        # Validate (signature/size/MIME via safeuploads) and stream
+        # the upload to disk in one unified step. The streaming
+        # writer enforces the activity/gzip byte cap and writes via
+        # a ``.part``-then-rename for atomicity.
+        file_path = await core_file_uploads.save_validated_upload(
+            file,
+            kind=upload_kind,
+            upload_dir=upload_dir,
+            filename=storage_name,
+            stream=True,
+        )
+        upload_artifacts.append(file_path)
 
         if file_extension.lower() == ".gz":
-            file_path, file_extension = handle_gzipped_file(file_path)
+            original_file_path = file_path
+            file_path, file_extension = await run_in_threadpool(
+                handle_gzipped_file,
+                file_path,
+            )
+            upload_artifacts.append(file_path)
+            upload_artifacts.append(
+                os.path.join(
+                    core_config.FILES_PROCESSED_DIR,
+                    os.path.basename(original_file_path),
+                )
+            )
+            # Re-validate after decompression so the inner payload
+            # still matches one of the supported activity formats.
+            if (
+                file_extension.lower()
+                not in core_config.SUPPORTED_FILE_FORMATS
+                or file_extension.lower() == ".gz"
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        "Decompressed file extension is not supported"
+                    ),
+                )
+            # Defense in depth: signature-check the inner payload
+            # via the same safeuploads validator used for direct
+            # activity uploads.
+            await core_file_uploads.validate_local_file(
+                file_path,
+                kind=core_file_uploads.UploadKind.ACTIVITY,
+            )
 
         user = users_crud.get_user_by_id(token_user_id, db)
         if user is None:
@@ -581,25 +1004,30 @@ async def parse_and_store_activity_from_uploaded_file(
             )
         )
 
-        # Parse the file
-        parsed_info = parse_file(
-            token_user_id,
-            user_privacy_settings,
-            file_extension,
-            file_path,
-            db,
+        # Parse the file in a thread pool to avoid
+        # blocking the event loop with CPU-bound and
+        # sync I/O work (gpxpy, geopy, timezonefinder)
+        parsed_info = await run_in_threadpool(
+            functools.partial(
+                parse_file,
+                token_user_id,
+                user_privacy_settings,
+                file_extension,
+                file_path,
+                db,
+            )
         )
 
         if parsed_info is not None:
             created_activities = []
-            idsToFileName = ""
+            ids_to_filename = ""
             if file_extension.lower() in (".gpx", ".tcx"):
                 # Store the activity in the database
                 created_activity = await store_activity(
                     parsed_info, websocket_manager, db
                 )
                 created_activities.append(created_activity)
-                idsToFileName = idsToFileName + str(created_activity.id)
+                ids_to_filename += str(created_activity.id)
             elif file_extension.lower() == ".fit":
                 # Split the records by activity (check for multiple activities in the file)
                 split_records_by_activity = fit_utils.split_records_by_activity(
@@ -623,13 +1051,9 @@ async def parse_and_store_activity_from_uploaded_file(
                     )
                     created_activities.append(created_activity)
 
-                for index, activity in enumerate(created_activities):
-                    idsToFileName += str(activity.id)  # Add the id to the string
-                    # Add an underscore if it's not the last item
-                    if index < len(created_activities) - 1:
-                        idsToFileName += (
-                            "_"  # Add an underscore if it's not the last item
-                        )
+                ids_to_filename = "_".join(
+                    str(activity.id) for activity in created_activities
+                )
             else:
                 core_logger.print_to_log_and_console(
                     f"File extension not supported: {file_extension}", "error"
@@ -639,7 +1063,7 @@ async def parse_and_store_activity_from_uploaded_file(
             processed_dir = core_config.FILES_PROCESSED_DIR
 
             # Define new file path with activity ID as filename
-            new_file_name = f"{idsToFileName}{file_extension}"
+            new_file_name = f"{ids_to_filename}{file_extension}"
 
             # Move the file to the processed directory
             move_file(processed_dir, new_file_name, file_path)
@@ -651,41 +1075,62 @@ async def parse_and_store_activity_from_uploaded_file(
             # Return the created activity
             return created_activities
         else:
+            await run_in_threadpool(
+                _cleanup_upload_artifacts, upload_artifacts
+            )
             return None
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as err:
+    except HTTPException:
+        await run_in_threadpool(
+            _cleanup_upload_artifacts, upload_artifacts
+        )
+        raise
+    except (
+        OSError,
+        EOFError,
+        gzip.BadGzipFile,
+        shutil.Error,
+        SQLAlchemyError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+    ) as err:
         # Log the exception
         core_logger.print_to_log(
             f"Error in parse_and_store_activity_from_uploaded_file - {str(err)}",
             "error",
             exc=err,
         )
+        await run_in_threadpool(
+            _cleanup_upload_artifacts, upload_artifacts
+        )
         # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error: {str(err)}",
+            detail="Internal Server Error",
         ) from err
 
 
-def move_file(new_dir: str, new_filename: str, file_path: str):
-    try:
-        # Ensure the new directory exists
-        os.makedirs(new_dir, exist_ok=True)
+def move_file(new_dir: str, new_filename: str, file_path: str) -> None:
+    """Move ``file_path`` into ``new_dir`` as ``new_filename``.
 
-        # Define the new file path
-        new_file_path = os.path.join(new_dir, new_filename)
+    Thin compatibility wrapper around
+    :func:`core.file_uploads.move_within`. New code should call
+    ``move_within`` directly so callers benefit from path
+    containment without an intermediate hop.
 
-        # Move the file
-        shutil.move(file_path, new_file_path)
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(f"Error in move_file - {str(err)}", "error", exc=err)
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error: {str(err)}",
-        ) from err
+    Args:
+        new_dir: Destination directory (created if missing).
+        new_filename: Final filename inside ``new_dir``.
+        file_path: Source path to move.
+
+    Raises:
+        HTTPException: 400 for unsafe filename / containment
+            violations, 500 for I/O failures.
+    """
+    core_file_uploads.move_within(
+        file_path, new_dir, filename=new_filename
+    )
 
 
 def parse_file(
@@ -731,13 +1176,24 @@ def parse_file(
             return None
     except HTTPException as http_err:
         raise http_err
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(f"Error in parse_file - {str(err)}", "error", exc=err)
-        # Raise an HTTPException with a 500 Internal Server Error status code
+    except (
+        OSError,
+        EOFError,
+        gzip.BadGzipFile,
+        SQLAlchemyError,
+        ValueError,
+        RuntimeError,
+        KeyError,
+        TypeError,
+    ) as err:
+        # Log the exception with full traceback but return a generic
+        # error message to the caller to avoid internal info disclosure.
+        core_logger.print_to_log(
+            f"Error in parse_file - {err}", "error", exc=err
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal Server Error: {str(err)}",
+            detail="Internal Server Error",
         ) from err
 
 
@@ -745,7 +1201,7 @@ async def store_activity(
     parsed_info: dict,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-):
+) -> activities_schema.Activity:
     # create the activity in the database
     created_activity = await activities_crud.create_activity(
         parsed_info["activity"], websocket_manager, db
@@ -790,6 +1246,40 @@ async def store_activity(
         activity_sets_crud.create_activity_sets(
             parsed_info["sets"], created_activity.id, db
         )
+
+    # Generate a static map thumbnail if GPS data is present
+    if parsed_info.get("is_lat_lon_set") and parsed_info.get("lat_lon_waypoints"):
+        server_settings = server_settings_crud.get_server_settings(db)
+        tile_url = (
+            server_settings.tileserver_url
+            if server_settings
+            else activities_thumbnail._DEFAULT_TILE_URL
+        )
+        bg_color = (
+            server_settings.map_background_color
+            if server_settings
+            else activities_thumbnail._DEFAULT_BG_COLOR
+        )
+        # Decrypt tile API key if the provider requires backend auth
+        api_key = None
+        if server_settings and server_settings.tileserver_api_key:
+            api_key = core_cryptography.decrypt_token_fernet(
+                server_settings.tileserver_api_key
+            )
+        thumbnail_path = activities_thumbnail.generate_activity_thumbnail(
+            created_activity.id,
+            parsed_info["lat_lon_waypoints"],
+            core_config.settings.ACTIVITY_THUMBNAILS_DIR,
+            tile_url=tile_url,
+            background_color=bg_color,
+            api_key=api_key,
+        )
+        if thumbnail_path is not None:
+            activities_crud.set_activity_thumbnail_path(
+                created_activity.id,
+                thumbnail_path,
+                db,
+            )
 
     # Return the created activity
     return created_activity
@@ -836,67 +1326,74 @@ def parse_activity_streams_from_file(parsed_info: dict, activity_id: int):
     ]
 
 
-def calculate_activity_distances(activities: list[activities_schema.Activity]):
-    # Initialize the distances
-    run = bike = swim = walk = hike = rowing = snow_ski = snowboard = windsurf = (
-        stand_up_paddleboarding
-    ) = surfing = kayaking = sailing = snowshoeing = inline_skating = 0.0
+def calculate_activity_stats(
+    activities: list[activities_schema.Activity],
+) -> activities_schema.ActivityStats:
+    """Aggregate distance (m), time (s), and calories per sport type.
 
-    if activities is not None:
-        # Calculate the distances
+    Args:
+        activities: List of Activity schema objects for the timeframe.
+
+    Returns:
+        ActivityStats with per-sport distance, time, and calories totals.
+    """
+    stats = activities_schema.ActivityStats()
+
+    if activities is None:
+        return stats
+
+    # Sport-type buckets: activity_type IDs → attribute name on ActivityStats
+    _SPORT_BUCKETS: list[tuple[list[int], str]] = [
+        ([1, 2, 3, 34, 40], "run"),
+        ([4, 5, 6, 7, 27, 28, 29, 35, 36], "bike"),
+        ([8, 9], "swim"),
+        ([11, 31], "walk"),
+        ([12], "hike"),
+        ([13], "rowing"),
+        ([15, 16], "snow_ski"),
+        ([17], "snowboard"),
+        ([30], "windsurf"),
+        ([32], "stand_up_paddleboarding"),
+        ([33], "surfing"),
+        ([42], "kayaking"),
+        ([43], "sailing"),
+        ([44], "snowshoeing"),
+        ([45], "inline_skating"),
+    ]
+
+    try:
         for activity in activities:
-            if activity.activity_type in [1, 2, 3, 34, 40]:
-                run += activity.distance
-            elif activity.activity_type in [4, 5, 6, 7, 27, 28, 29, 35, 36]:
-                bike += activity.distance
-            elif activity.activity_type in [8, 9]:
-                swim += activity.distance
-            elif activity.activity_type in [11, 31]:
-                walk += activity.distance
-            elif activity.activity_type in [12]:
-                hike += activity.distance
-            elif activity.activity_type in [13]:
-                rowing += activity.distance
-            elif activity.activity_type in [15, 16]:
-                snow_ski += activity.distance
-            elif activity.activity_type in [17]:
-                snowboard += activity.distance
-            elif activity.activity_type in [30]:
-                windsurf += activity.distance
-            elif activity.activity_type in [32]:
-                stand_up_paddleboarding += activity.distance
-            elif activity.activity_type in [33]:
-                surfing += activity.distance
-            elif activity.activity_type in [42]:
-                kayaking += activity.distance
-            elif activity.activity_type in [43]:
-                sailing += activity.distance
-            elif activity.activity_type in [44]:
-                snowshoeing += activity.distance
-            elif activity.activity_type in [45]:
-                inline_skating += activity.distance
+            for type_ids, bucket_name in _SPORT_BUCKETS:
+                if activity.activity_type in type_ids:
+                    bucket = getattr(stats, bucket_name)
+                    bucket.distance += float(activity.distance or 0)
+                    bucket.time += float(activity.total_timer_time or 0)
+                    bucket.calories += float(activity.calories or 0)
+                    break
+    except (TypeError, ValueError, AttributeError) as err:
+        core_logger.print_to_log(
+            f"Error in calculate_activity_stats - {str(err)}", "error", exc=err
+        )
 
-    # Return the distances
-    return activities_schema.ActivityDistances(
-        run=run,
-        bike=bike,
-        swim=swim,
-        walk=walk,
-        hike=hike,
-        rowing=rowing,
-        snow_ski=snow_ski,
-        snowboard=snowboard,
-        windsurf=windsurf,
-        stand_up_paddleboarding=stand_up_paddleboarding,
-        surfing=surfing,
-        kayaking=kayaking,
-        sailing=sailing,
-        snowshoeing=snowshoeing,
-        inline_skating=inline_skating,
-    )
+    return stats
 
 
-def location_based_on_coordinates(latitude, longitude) -> dict | None:
+def location_based_on_coordinates(
+    latitude: float | None, longitude: float | None
+) -> dict | None:
+    """Reverse-geocode a (lat, lon) pair into a location dict.
+
+    Args:
+        latitude: Latitude in decimal degrees, or ``None``.
+        longitude: Longitude in decimal degrees, or ``None``.
+
+    Returns:
+        Dict with ``city``/``town``/``country`` keys (any of which
+        may be ``None``), or ``None`` when no provider is configured.
+
+    Raises:
+        HTTPException: 424 when the upstream provider errors out.
+    """
     # Check if latitude and longitude are provided
     if latitude is None or longitude is None:
         return {
@@ -906,7 +1403,7 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
         }
 
     # Create a dictionary with the parameters for the request
-    if core_config.REVERSE_GEO_PROVIDER == "nominatim":
+    if core_config.settings.REVERSE_GEO_PROVIDER == "nominatim":
         # Create the URL for the request
         url_params = {
             "format": "jsonv2",
@@ -914,22 +1411,22 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
             "lon": longitude,
         }
         protocol = "https"
-        if not core_config.NOMINATIM_API_USE_HTTPS:
+        if not core_config.settings.NOMINATIM_API_USE_HTTPS:
             protocol = "http"
-        url = f"{protocol}://{core_config.NOMINATIM_API_HOST}/reverse?{urlencode(url_params)}"
-    elif core_config.REVERSE_GEO_PROVIDER == "photon":
+        url = f"{protocol}://{core_config.settings.NOMINATIM_API_HOST}/reverse?{urlencode(url_params)}"
+    elif core_config.settings.REVERSE_GEO_PROVIDER == "photon":
         # Create the URL for the request
         url_params = {
             "lat": latitude,
             "lon": longitude,
         }
         protocol = "https"
-        if not core_config.PHOTON_API_USE_HTTPS:
+        if not core_config.settings.PHOTON_API_USE_HTTPS:
             protocol = "http"
-        url = f"{protocol}://{core_config.PHOTON_API_HOST}/reverse?{urlencode(url_params)}"
-    elif core_config.REVERSE_GEO_PROVIDER == "geocode":
+        url = f"{protocol}://{core_config.settings.PHOTON_API_HOST}/reverse?{urlencode(url_params)}"
+    elif core_config.settings.REVERSE_GEO_PROVIDER == "geocode":
         # Check if the API key is set
-        if core_config.GEOCODES_MAPS_API == "changeme":
+        if core_config.settings.GEOCODES_MAPS_API == "changeme":
             return {
                 "city": None,
                 "town": None,
@@ -939,7 +1436,7 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
         url_params = {
             "lat": latitude,
             "lon": longitude,
-            "api_key": core_config.GEOCODES_MAPS_API,
+            "api_key": core_config.settings.GEOCODES_MAPS_API,
         }
         url = f"https://geocode.maps.co/reverse?{urlencode(url_params)}"
     else:
@@ -970,7 +1467,7 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
 
-        if core_config.REVERSE_GEO_PROVIDER in ("geocode", "nominatim"):
+        if core_config.settings.REVERSE_GEO_PROVIDER in ("geocode", "nominatim"):
             # Get the data from the response
             data = response.json().get("address", {})
             # Return the location based on the coordinates
@@ -991,58 +1488,97 @@ def location_based_on_coordinates(latitude, longitude) -> dict | None:
             "town": data.get("city"),
             "country": data.get("country"),
         }
-    except Exception as err:
-        # Log the error
+    except requests.RequestException as err:
+        # Log the error with full detail; return a generic message
+        # to the caller (no upstream URL/exception leakage).
         core_logger.print_to_log_and_console(
-            f"Error in location_based_on_coordinates - {str(err)}", "error"
+            f"Error in location_based_on_coordinates - {err}", "error"
         )
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail=f"Error in location_based_on_coordinates: {str(err)}",
+            detail="Reverse geocoding provider error",
         ) from err
 
 
-def append_if_not_none(waypoint_list, waypoint_time, value, key):
+def append_if_not_none(
+    waypoint_list: list[dict],
+    waypoint_time,
+    value,
+    key: str,
+) -> None:
+    """Append ``{time, key: value}`` to ``waypoint_list`` if value is set.
+
+    Args:
+        waypoint_list: List to mutate in place.
+        waypoint_time: Timestamp associated with the value.
+        value: The value to record; ignored when ``None``.
+        key: Dict key under which ``value`` is stored.
+    """
     if value is not None:
         waypoint_list.append({"time": waypoint_time, key: value})
 
 
 def calculate_instant_speed(
-    prev_time, waypoint_time, latitude, longitude, prev_latitude, prev_longitude
-):
-    # Convert the time strings to datetime objects
-    time_calc = datetime.fromisoformat(waypoint_time.strftime("%Y-%m-%dT%H:%M:%S"))
+    prev_time,
+    waypoint_time,
+    latitude: float,
+    longitude: float,
+    prev_latitude: float | None,
+    prev_longitude: float | None,
+) -> float:
+    """Compute m/s speed between two GPS waypoints.
 
-    # If prev_time is None, return a default value
-    if prev_time is None:
+    Args:
+        prev_time: Previous waypoint timestamp; ``None`` returns 0.
+        waypoint_time: Current waypoint timestamp.
+        latitude: Current latitude (decimal degrees).
+        longitude: Current longitude (decimal degrees).
+        prev_latitude: Previous latitude (decimal degrees).
+        prev_longitude: Previous longitude (decimal degrees).
+
+    Returns:
+        Instantaneous speed in m/s, or 0 when the time delta is
+        non-positive or ``prev_time`` is missing.
+    """
+    if (
+        prev_time is None
+        or prev_latitude is None
+        or prev_longitude is None
+    ):
         return 0
 
-    # Convert the time strings to datetime objects
-    prev_time_calc = datetime.fromisoformat(prev_time.strftime("%Y-%m-%dT%H:%M:%S"))
+    time_difference = (waypoint_time - prev_time).total_seconds()
 
-    # Calculate the time difference in seconds
-    time_difference = (time_calc - prev_time_calc).total_seconds()
+    if time_difference <= 0:
+        return 0
 
-    # If the time difference is positive, calculate the instant speed
-    if time_difference > 0:
-        # Calculate the distance in meters
-        distance = geodesic(
-            (prev_latitude, prev_longitude), (latitude, longitude)
-        ).meters
-
-        # Calculate the instant speed in m/s
-        instant_speed = distance / time_difference
-    else:
-        # If the time difference is not positive, return a default value
-        instant_speed = 0
-
-    # Return the instant speed
-    return instant_speed
+    distance = geodesic(
+        (prev_latitude, prev_longitude),
+        (latitude, longitude),
+    ).meters
+    return distance / time_difference
 
 
 def compute_elevation_gain_and_loss(
-    elevations, median_window=6, avg_window=3, threshold=0.1
-):
+    elevations: list[dict],
+    median_window: int = 6,
+    avg_window: int = 3,
+    threshold: float = 0.1,
+) -> tuple[float, float]:
+    """Compute total elevation gain/loss in meters from waypoints.
+
+    Applies a median filter then a moving-average smoother before
+    summing per-step deltas above ``threshold``.
+
+    Args:
+        elevations: List of dicts with an ``ele`` key (meters).
+        median_window: Window size for the median pre-filter.
+        avg_window: Window size for the moving-average smoother.
+        threshold: Minimum |delta| (m) counted toward gain/loss.
+
+    Returns:
+        Tuple of (gain_m, loss_m).
+    """
     # 1) Median Filter
     def median_filter(values, window_size):
         if window_size < 2:
@@ -1094,7 +1630,21 @@ def compute_elevation_gain_and_loss(
     return total_gain, total_loss
 
 
-def calculate_pace(distance, first_waypoint_time, last_waypoint_time):
+def calculate_pace(
+    distance: float,
+    first_waypoint_time,
+    last_waypoint_time,
+) -> float:
+    """Compute average pace (seconds per meter).
+
+    Args:
+        distance: Total distance in meters.
+        first_waypoint_time: Datetime of the first waypoint.
+        last_waypoint_time: Datetime of the last waypoint.
+
+    Returns:
+        Pace in s/m, or 0 when ``distance`` is 0.
+    """
     # If the distance is 0, return 0
     if distance == 0:
         return 0
@@ -1117,7 +1667,18 @@ def calculate_pace(distance, first_waypoint_time, last_waypoint_time):
     return pace_seconds_per_meter
 
 
-def calculate_avg_and_max(data, stream_type):
+def calculate_avg_and_max(
+    data: list[dict], stream_type: str
+) -> tuple[float, float]:
+    """Compute the mean and max of ``stream_type`` across waypoints.
+
+    Args:
+        data: List of waypoint dicts.
+        stream_type: Key to read from each waypoint.
+
+    Returns:
+        Tuple of (avg, max), or (0, 0) when no values are present.
+    """
     try:
         # Get the values from the data
         values = [
@@ -1125,8 +1686,11 @@ def calculate_avg_and_max(data, stream_type):
             for waypoint in data
             if waypoint.get(stream_type) is not None
         ]
-    except (ValueError, KeyError):
+    except (ValueError, KeyError, TypeError):
         # If there are no valid values, return 0
+        return 0, 0
+
+    if not values:
         return 0, 0
 
     # Calculate the average and max values
@@ -1136,7 +1700,15 @@ def calculate_avg_and_max(data, stream_type):
     return avg_value, max_value
 
 
-def calculate_np(data):
+def calculate_np(data: list[dict]) -> float:
+    """Compute Normalized Power (NP) from power waypoints.
+
+    Args:
+        data: List of waypoint dicts with a ``power`` key.
+
+    Returns:
+        Normalized Power in watts, or 0 when no values are present.
+    """
     try:
         # Get the power values from the data
         values = [
@@ -1144,8 +1716,11 @@ def calculate_np(data):
             for waypoint in data
             if waypoint["power"] is not None
         ]
-    except:
+    except (ValueError, KeyError, TypeError):
         # If there are no valid values, return 0
+        return 0
+
+    if not values:
         return 0
 
     # Calculate the fourth power of each power value
@@ -1196,6 +1771,7 @@ def process_all_files_sync(
     user_id: int,
     file_paths: list[str],
     websocket_manager: websocket_manager.WebSocketManager,
+    import_initiated_time: str,
 ):
     """
     Process all files sequentially in single thread.
@@ -1218,6 +1794,8 @@ def process_all_files_sync(
                     file_path,
                     websocket_manager,
                     db,
+                    is_bulk_import=True,
+                    import_initiated_time=import_initiated_time,
                 )
             )
             # Small delay between files
@@ -1229,3 +1807,163 @@ def process_all_files_sync(
         )
     finally:
         db.close()
+
+
+def delete_and_regenerate_all_activity_thumbnails() -> None:
+    """
+    Delete all existing thumbnails and regenerate from scratch.
+
+    Called when the tile server settings change and the admin has
+    enabled automatic thumbnail regeneration. Clears all thumbnail
+    file references in the database, deletes the files on disk,
+    then triggers a full regeneration pass.
+
+    Returns:
+        None
+
+    Raises:
+        None — errors are logged; execution continues.
+    """
+    core_logger.print_to_log(
+        "Thumbnail regeneration: deleting all existing thumbnails",
+        "info",
+    )
+
+    # Clear DB references so generate_missing picks them all up
+    with core_database.SessionLocal() as db:
+        activities_crud.clear_all_activity_thumbnail_paths(db)
+
+    # Delete files from disk
+    thumbnails_dir = Path(core_config.settings.ACTIVITY_THUMBNAILS_DIR)
+    deleted = 0
+    if thumbnails_dir.is_dir():
+        for thumb_file in thumbnails_dir.glob("*.png"):
+            try:
+                thumb_file.unlink()
+                deleted += 1
+            except OSError as err:
+                core_logger.print_to_log(
+                    f"Thumbnail regeneration: could not delete " f"{thumb_file}: {err}",
+                    "warning",
+                )
+
+    core_logger.print_to_log(
+        f"Thumbnail regeneration: deleted {deleted} file(s) from disk",
+        "info",
+    )
+
+    # Regenerate all thumbnails
+    generate_missing_activity_thumbnails()
+
+
+def generate_missing_activity_thumbnails() -> None:
+    """
+    Generate thumbnails for activities that are missing one.
+
+    Intended to be called periodically by the scheduler. Opens
+    its own database session, queries for activities whose
+    map_thumbnail_path is NULL, fetches the GPS stream for each,
+    and generates + persists the thumbnail.
+
+    Returns:
+        None
+
+    Raises:
+        None — errors are logged per-activity; execution continues.
+    """
+    with core_database.SessionLocal() as db:
+        activities_with_thumbnail = activities_crud.get_activities_with_thumbnail(
+            db
+        )
+        for activity in activities_with_thumbnail:
+            thumb_path = Path(activity.map_thumbnail_path)
+            if not thumb_path.is_file():
+                activities_crud.set_activity_thumbnail_path(activity.id, None, db)
+                core_logger.print_to_log(
+                    f"Thumbnail scheduler: missing file for activity "
+                    f"{activity.id}, cleared thumbnail path in DB",
+                    "info",
+                )
+
+        activities_without_thumbnail = activities_crud.get_activities_without_thumbnail(
+            db
+        )
+
+        if not activities_without_thumbnail:
+            core_logger.print_to_log(
+                "Thumbnail scheduler: no activities without thumbnail found",
+                "debug",
+            )
+            return
+
+        core_logger.print_to_log(
+            f"Thumbnail scheduler: generating thumbnails for "
+            f"{len(activities_without_thumbnail)} activities",
+            "info",
+        )
+
+        server_settings = server_settings_crud.get_server_settings(db)
+        tile_url = (
+            server_settings.tileserver_url
+            if server_settings
+            else activities_thumbnail._DEFAULT_TILE_URL
+        )
+        bg_color = (
+            server_settings.map_background_color
+            if server_settings
+            else activities_thumbnail._DEFAULT_BG_COLOR
+        )
+        api_key = None
+        if server_settings and server_settings.tileserver_api_key:
+            api_key = core_cryptography.decrypt_token_fernet(
+                server_settings.tileserver_api_key
+            )
+
+        activity_ids = [
+            activity.id for activity in activities_without_thumbnail
+        ]
+        gps_streams = (
+            db.execute(
+                select(activity_streams_models.ActivityStreams).where(
+                    activity_streams_models.ActivityStreams.activity_id.in_(
+                        activity_ids
+                    ),
+                    activity_streams_models.ActivityStreams.stream_type
+                    == activity_streams_constants.STREAM_TYPE_MAP,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        gps_streams_by_activity_id = {
+            stream.activity_id: stream for stream in gps_streams
+        }
+
+        generated = 0
+        for activity in activities_without_thumbnail:
+            gps_stream = gps_streams_by_activity_id.get(activity.id)
+
+            if not gps_stream or not gps_stream.stream_waypoints:
+                continue
+
+            thumbnail_path = activities_thumbnail.generate_activity_thumbnail(
+                activity.id,
+                gps_stream.stream_waypoints,
+                core_config.settings.ACTIVITY_THUMBNAILS_DIR,
+                tile_url=tile_url,
+                background_color=bg_color,
+                api_key=api_key,
+            )
+
+            if thumbnail_path is not None:
+                activities_crud.set_activity_thumbnail_path(
+                    activity.id, thumbnail_path, db
+                )
+                generated += 1
+
+        core_logger.print_to_log(
+            f"Thumbnail scheduler: generated {generated} "
+            f"thumbnail(s) out of "
+            f"{len(activities_without_thumbnail)} candidate(s)",
+            "info",
+        )

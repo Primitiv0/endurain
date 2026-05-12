@@ -1,3 +1,5 @@
+"""Activity workout steps public router."""
+
 from typing import Annotated, Callable
 
 from fastapi import APIRouter, Depends
@@ -16,17 +18,37 @@ router = APIRouter()
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=list[activity_workout_steps_schema.ActivityWorkoutSteps] | None,
+    response_model=(
+        list[
+            activity_workout_steps_schema
+            .ActivityWorkoutSteps
+        ]
+        | None
+    ),
 )
-async def read_public_activities_workout_steps_for_activity_all(
+async def read_public_activity_workout_steps_all(
     activity_id: int,
-    validate_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
+    _validate_id: Annotated[
+        Callable,
+        Depends(
+            activities_dependencies
+            .validate_activity_id
+        ),
     ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
 ):
-    # Get the activity workout steps from the database and return them
-    return activity_workout_steps_crud.get_public_activity_workout_steps(activity_id, db)
+    """
+    Get all workout steps for a public activity.
+
+    Returns:
+        List of workout steps or None.
+    """
+    return (
+        activity_workout_steps_crud
+        .get_public_activity_workout_steps(
+            activity_id, db
+        )
+    )

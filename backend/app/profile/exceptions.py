@@ -234,13 +234,13 @@ def handle_import_export_exception(error: Exception, operation: str) -> HTTPExce
 
     elif isinstance(error, FileSizeError):
         return HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"File too large during {operation}. {str(error)}",
         )
 
     elif isinstance(error, ActivityLimitError):
         return HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=f"Too many activities during {operation}. {str(error)}",
         )
 

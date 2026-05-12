@@ -1,5 +1,6 @@
-from datetime import datetime
+"""Migration 1: compute elapsed time, HR, power, cadence, speed."""
 
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 import activities.activity.crud as activities_crud
@@ -13,7 +14,19 @@ from migrations.schema import StreamType
 import core.logger as core_logger
 
 
-def process_migration_1(db: Session):
+def process_migration_1(db: Session) -> None:
+    """
+    Run migration 1: populate elapsed time and stream metrics.
+
+    Args:
+        db: The SQLAlchemy database session.
+
+    Returns:
+        None
+
+    Raises:
+        Exception: Logs errors per-activity; does not re-raise.
+    """
     core_logger.print_to_log_and_console("Started migration 1")
 
     activities_processed_with_no_errors = True
@@ -40,7 +53,7 @@ def process_migration_1(db: Session):
                     )
 
                 # Initialize additional fields
-                metrics = {
+                metrics: dict[str, float | None] = {
                     "avg_hr": None,
                     "max_hr": None,
                     "avg_power": None,
@@ -55,7 +68,7 @@ def process_migration_1(db: Session):
                 # Get activity streams
                 try:
                     activity_streams = activity_streams_crud.get_activity_streams(
-                        activity.id, db
+                        activity.id, activity.user_id, db
                     )
                 except Exception as err:
                     core_logger.print_to_log_and_console(
@@ -64,6 +77,13 @@ def process_migration_1(db: Session):
                         exc=err,
                     )
                     activities_processed_with_no_errors = False
+                    continue
+
+                if not activity_streams:
+                    core_logger.print_to_log_and_console(
+                        f"Migration 1 - No streams found for activity {activity.id}. Skipping stream processing.",
+                        "info",
+                    )
                     continue
 
                 # Map stream processing functions
@@ -79,16 +99,13 @@ def process_migration_1(db: Session):
 
                 for stream in activity_streams:
                     stream_type = StreamType(stream.stream_type)
-                    if (
-                        stream_type in stream_processing
-                        and stream_processing[stream_type] is not None
-                    ):
-                        attr_avg, attr_max, stream_key = stream_processing[stream_type][
-                            :3
-                        ]
+                    proc = stream_processing.get(stream_type)
+                    if proc is not None:
+                        attr_avg, attr_max, stream_key = proc[:3]
                         metrics[attr_avg], metrics[attr_max] = (
                             activities_utils.calculate_avg_and_max(
-                                stream.stream_waypoints, stream_key
+                                stream.stream_waypoints,
+                                stream_key,
                             )
                         )
                         # Special handling for normalized power

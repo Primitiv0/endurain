@@ -57,3 +57,11 @@ export function metersToKm(meters) {
 export function kmToMeters(km) {
   return Number((km * 1000).toFixed(0))
 }
+
+export function mlToFlOz(ml) {
+  return Number((ml * 0.033814).toFixed(1))
+}
+
+export function flOzToMl(flOz) {
+  return Math.round(flOz * 29.5735)
+}

@@ -21,7 +21,7 @@
         >
           <td>{{ getBreakdownLabel(item) }}</td>
           <td>{{ formatRawDistance(t, item.total_distance, authStore.user.units) }}</td>
-          <td>{{ formatDuration(t, item.total_duration) }}</td>
+          <td>{{ formatSecondsToHoursMinutes(t, item.total_duration) }}</td>
           <td class="d-none d-sm-table-cell">
             {{ formatElevation(t, item.total_elevation_gain, authStore.user.units) }}
           </td>
@@ -41,7 +41,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   formatRawDistance,
-  formatDuration,
+  formatSecondsToHoursMinutes,
   formatElevation,
   formatCalories
 } from '@/utils/activityUtils'

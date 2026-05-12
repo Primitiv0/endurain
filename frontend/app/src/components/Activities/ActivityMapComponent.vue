@@ -9,7 +9,7 @@
         <div class="carousel-indicators position-absolute" style="z-index: 1030">
           <!-- Map indicator -->
           <button
-            v-if="activityStreamLatLng"
+            v-if="activityStreamLatLng || useThumbnail"
             type="button"
             :data-bs-target="`#activityGallery${activity.id}`"
             data-bs-slide-to="0"
@@ -31,7 +31,16 @@
         </div>
         <div class="carousel-inner">
           <!-- Map as first item -->
-          <div v-if="activityStreamLatLng" class="carousel-item active">
+          <div v-if="useThumbnail" class="carousel-item active">
+            <img
+              :src="thumbnailUrl"
+              class="d-block w-100 rounded"
+              alt="Activity map preview"
+              loading="lazy"
+              style="height: 300px; object-fit: cover"
+            />
+          </div>
+          <div v-else-if="activityStreamLatLng" class="carousel-item active">
             <div
               ref="activityMap"
               class="map rounded w-100"
@@ -105,6 +114,15 @@
         </button>
       </div>
     </div>
+    <div v-else-if="useThumbnail">
+      <img
+        :src="thumbnailUrl"
+        class="rounded w-100"
+        alt="Activity map preview"
+        loading="lazy"
+        style="height: 300px; object-fit: cover"
+      />
+    </div>
     <div v-else-if="activityStreamLatLng && !hasGalleryItems">
       <div
         ref="activityMap"
@@ -167,7 +185,28 @@ const hasGalleryItems = computed(() => {
 })
 const endurainHost = `${window.env.ENDURAIN_HOST}/`
 
+// Use a pre-generated thumbnail instead of a live Leaflet map
+// when rendering in the home/dashboard list view.
+const useThumbnail = computed(() => props.source === 'home' && !!props.activity.map_thumbnail_path)
+
+const thumbnailUrl = computed(() => {
+  if (!props.activity.map_thumbnail_path) return null
+  // The path stored in DB is an absolute filesystem path.
+  // Strip the first 4 components (e.g. /app/backend/data) to
+  // produce a URL-relative path served by the StaticFiles mount,
+  // matching the same convention used for activity media paths.
+  const relative = props.activity.map_thumbnail_path.split('/').slice(4).join('/')
+  return `${endurainHost}${relative}`
+})
+
 onMounted(async () => {
+  // When a pre-generated thumbnail is available, skip the GPS
+  // stream API call and Leaflet initialisation entirely.
+  if (useThumbnail.value) {
+    isLoading.value = false
+    return
+  }
+
   try {
     if (authStore.isAuthenticated) {
       activityStreamLatLng.value = await activityStreams.getActivitySteamByStreamTypeByActivityId(

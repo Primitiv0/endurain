@@ -126,7 +126,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 // Importing the utils
-import { formatSecondsToMinutes } from '@/utils/dateTimeUtils'
+import { formatSecondsToHoursMinutesSeconds } from '@/utils/dateTimeUtils'
 import {
   formatDistance,
   formatElevation,
@@ -200,7 +200,7 @@ const normalizedLaps = computed(() => {
       normalizedScore: Math.min(Math.max(normalizedScore, 0), 100), // Clamp between 0 and 100
       formattedPace: formattedPace,
       formattedPaceFull: formattedPaceFull,
-      lapSecondsToMinutes: formatSecondsToMinutes(lap.total_elapsed_time),
+      lapSecondsToMinutes: formatSecondsToHoursMinutesSeconds(lap.total_elapsed_time),
       formattedDistance: formattedDistance,
       formattedElevation: formattedElevation,
       formattedElevationFull: formattedElevationFull,

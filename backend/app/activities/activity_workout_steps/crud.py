@@ -1,7 +1,8 @@
-from fastapi import HTTPException, status
+"""Activity workout steps CRUD operations."""
+
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-import activities.activity.schema as activities_schema
 import activities.activity.models as activity_models
 import activities.activity.crud as activity_crud
 
@@ -10,208 +11,251 @@ import activities.activity_workout_steps.schema as activity_workout_steps_schema
 
 import server_settings.utils as server_settings_utils
 
-import core.logger as core_logger
+import core.decorators as core_decorators
 
 
-def get_activity_workout_steps(activity_id: int, token_user_id: int, db: Session):
-    try:
-        activity = activity_crud.get_activity_by_id(activity_id, db)
+@core_decorators.handle_db_errors
+def get_activity_workout_steps(
+    activity_id: int,
+    token_user_id: int,
+    db: Session,
+) -> (
+    list[
+        activity_workout_steps_models
+        .ActivityWorkoutSteps
+    ]
+    | None
+):
+    """
+    Get workout steps for a single activity.
 
-        if not activity:
-            # If the activity does not exist, return None
-            return None
+    Args:
+        activity_id: Activity ID to fetch steps for.
+        token_user_id: Authenticated user ID.
+        db: Database session.
 
-        user_is_owner = True
-        if token_user_id != activity.user_id:
-            user_is_owner = False
+    Returns:
+        List of workout steps or None if not found
+        or access denied.
 
-        if not user_is_owner and activity.hide_workout_sets_steps:
-            # If the user is not the owner and sets/steps are hidden, return None
-            return None
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    activity = activity_crud.get_activity_by_id(
+        activity_id, db
+    )
 
-        # Get the activity workout steps from the database
-        activity_workout_steps = (
-            db.query(activity_workout_steps_models.ActivityWorkoutSteps)
-            .filter(
-                activity_workout_steps_models.ActivityWorkoutSteps.activity_id
-                == activity_id,
-            )
-            .all()
-        )
+    if not activity:
+        return None
 
-        # Check if there are activity workout steps if not return None
-        if not activity_workout_steps:
-            return None
+    if (
+        token_user_id != activity.user_id
+        and activity.hide_workout_sets_steps
+    ):
+        return None
 
-        # Return the activity laps
-        return activity_workout_steps
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_activity_workout_steps: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    stmt = select(
+        activity_workout_steps_models
+        .ActivityWorkoutSteps
+    ).where(
+        activity_workout_steps_models
+        .ActivityWorkoutSteps.activity_id
+        == activity_id,
+    )
+    workout_steps = db.scalars(stmt).all()
+
+    if not workout_steps:
+        return None
+
+    return workout_steps
 
 
+@core_decorators.handle_db_errors
 def get_activities_workout_steps(
     activity_ids: list[int],
     token_user_id: int,
     db: Session,
-    activities: list[activities_schema.Activity] = None,
-):
-    try:
-        if not activity_ids:
-            return []
+    activities: (
+        list[activity_models.Activity] | None
+    ) = None,
+) -> list[
+    activity_workout_steps_models
+    .ActivityWorkoutSteps
+]:
+    """
+    Get workout steps for multiple activities.
 
-        if not activities:
-            activities = (
-                db.query(activity_models.Activity)
-                .filter(activity_models.Activity.id.in_(activity_ids))
-                .all()
+    Args:
+        activity_ids: List of activity IDs.
+        token_user_id: Authenticated user ID.
+        db: Database session.
+        activities: Pre-fetched Activity ORM
+            instances (optional).
+
+    Returns:
+        List of workout steps (may be empty).
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    if not activity_ids:
+        return []
+
+    if not activities:
+        stmt = select(
+            activity_models.Activity
+        ).where(
+            activity_models.Activity.id.in_(
+                activity_ids
             )
-
-        if not activities:
-            return []
-
-        # Build a map: activity_id -> activity
-        activity_map = {activity.id: activity for activity in activities}
-
-        # Determine which activity IDs the user is allowed to view steps for
-        allowed_ids = [
-            activity.id
-            for activity in activities
-            if activity.user_id == token_user_id or not activity.hide_workout_sets_steps
-        ]
-
-        if not allowed_ids:
-            return []
-
-        # Fetch workout steps for allowed activities
-        workout_steps = (
-            db.query(activity_workout_steps_models.ActivityWorkoutSteps)
-            .filter(
-                activity_workout_steps_models.ActivityWorkoutSteps.activity_id.in_(
-                    allowed_ids
-                )
-            )
-            .all()
         )
+        activities = db.scalars(stmt).all()
 
-        if not workout_steps:
-            return []
+    if not activities:
+        return []
 
-        return workout_steps
-
-    except Exception as err:
-        core_logger.print_to_log(
-            f"Error in get_activities_workout_steps: {err}", "error", exc=err
+    allowed_ids = [
+        activity.id
+        for activity in activities
+        if (
+            activity.user_id == token_user_id
+            or not activity.hide_workout_sets_steps
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    ]
 
+    if not allowed_ids:
+        return []
 
-def get_public_activity_workout_steps(activity_id: int, db: Session):
-    try:
-        activity = activity_crud.get_activity_by_id(activity_id, db)
-
-        if not activity:
-            # If the activity does not exist, return None
-            return None
-
-        if activity.hide_workout_sets_steps:
-            # If the sets/steps are hidden, return None
-            return None
-
-        # Check if public sharable links are enabled in server settings
-        server_settings = server_settings_utils.get_server_settings_or_404(db)
-
-        # Return None if public sharable links are disabled
-        if not server_settings.public_shareable_links:
-            return None
-
-        # Get the activity workout steps from the database
-        activity_workout_steps = (
-            db.query(activity_workout_steps_models.ActivityWorkoutSteps)
-            .join(
-                activity_models.Activity,
-                activity_models.Activity.id
-                == activity_workout_steps_models.ActivityWorkoutSteps.activity_id,
-            )
-            .filter(
-                activity_workout_steps_models.ActivityWorkoutSteps.activity_id
-                == activity_id,
-                activity_models.Activity.visibility == 0,
-                activity_models.Activity.id == activity_id,
-            )
-            .all()
+    stmt = select(
+        activity_workout_steps_models
+        .ActivityWorkoutSteps
+    ).where(
+        activity_workout_steps_models
+        .ActivityWorkoutSteps.activity_id.in_(
+            allowed_ids
         )
+    )
+    workout_steps = db.scalars(stmt).all()
 
-        # Check if there are activity workout steps, if not return None
-        if not activity_workout_steps:
-            return None
+    if not workout_steps:
+        return []
 
-        # Return the activity laps
-        return activity_workout_steps
-    except Exception as err:
-        # Log the exception
-        core_logger.print_to_log(
-            f"Error in get_public_activity_workout_steps: {err}", "error", exc=err
-        )
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    return workout_steps
 
 
-def create_activity_workout_steps(
-    activity_workout_steps: list[activity_workout_steps_schema.ActivityWorkoutSteps],
+@core_decorators.handle_db_errors
+def get_public_activity_workout_steps(
     activity_id: int,
     db: Session,
+) -> (
+    list[
+        activity_workout_steps_models
+        .ActivityWorkoutSteps
+    ]
+    | None
 ):
-    try:
-        # Create a list to store the ActivityWorkoutSteps objects
-        workout_steps = []
+    """
+    Get workout steps for a public activity.
 
-        # Iterate over the list of ActivityWorkoutSteps objects
-        for step in activity_workout_steps:
-            # Create an ActivityWorkoutSteps object
-            db_stream = activity_workout_steps_models.ActivityWorkoutSteps(
-                activity_id=activity_id,
-                message_index=step.message_index,
-                duration_type=step.duration_type,
-                duration_value=step.duration_value,
-                target_type=step.target_type,
-                target_value=step.target_value,
-                intensity=step.intensity,
-                notes=step.notes,
-                exercise_category=step.exercise_category,
-                exercise_name=step.exercise_name,
-                exercise_weight=step.exercise_weight,
-                weight_display_unit=step.weight_display_unit,
-                secondary_target_value=step.secondary_target_value,
-            )
+    Args:
+        activity_id: Activity ID to fetch steps for.
+        db: Database session.
 
-            # Append the object to the list
-            workout_steps.append(db_stream)
+    Returns:
+        List of workout steps or None if not found,
+        hidden, not public, or feature disabled.
 
-        # Bulk insert the list of ActivityWorkoutSteps objects
-        db.bulk_save_objects(workout_steps)
-        db.commit()
-    except Exception as err:
-        # Rollback the transaction
-        db.rollback()
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    activity = activity_crud.get_activity_by_id(
+        activity_id, db
+    )
 
-        # Log the exception
-        core_logger(f"Error in create_activity_workout_steps: {err}", "error", exc=err)
-        # Raise an HTTPException with a 500 Internal Server Error status code
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal Server Error",
-        ) from err
+    if not activity:
+        return None
+
+    if activity.hide_workout_sets_steps:
+        return None
+
+    server_settings = (
+        server_settings_utils
+        .get_server_settings_or_404(db)
+    )
+
+    if not server_settings.public_shareable_links:
+        return None
+
+    if activity.visibility != 0:
+        return None
+
+    stmt = select(
+        activity_workout_steps_models
+        .ActivityWorkoutSteps
+    ).where(
+        activity_workout_steps_models
+        .ActivityWorkoutSteps.activity_id
+        == activity_id,
+    )
+    workout_steps = db.scalars(stmt).all()
+
+    if not workout_steps:
+        return None
+
+    return workout_steps
+
+
+@core_decorators.handle_db_errors
+def create_activity_workout_steps(
+    activity_workout_steps: list[
+        activity_workout_steps_schema
+        .ActivityWorkoutSteps
+    ],
+    activity_id: int,
+    db: Session,
+) -> None:
+    """
+    Bulk create workout steps for an activity.
+
+    Args:
+        activity_workout_steps: List of workout step
+            schemas to persist.
+        activity_id: Activity ID to associate with.
+        db: Database session.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    workout_steps = [
+        activity_workout_steps_models
+        .ActivityWorkoutSteps(
+            activity_id=activity_id,
+            message_index=step.message_index,
+            duration_type=step.duration_type,
+            duration_value=step.duration_value,
+            target_type=step.target_type,
+            target_value=step.target_value,
+            intensity=step.intensity,
+            notes=step.notes,
+            exercise_category=(
+                step.exercise_category
+            ),
+            exercise_name=step.exercise_name,
+            exercise_weight=(
+                step.exercise_weight
+            ),
+            weight_display_unit=(
+                step.weight_display_unit
+            ),
+            secondary_target_value=(
+                step.secondary_target_value
+            ),
+        )
+        for step in activity_workout_steps
+    ]
+
+    db.add_all(workout_steps)
+    db.commit()

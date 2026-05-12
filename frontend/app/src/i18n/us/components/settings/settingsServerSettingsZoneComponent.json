@@ -47,5 +47,6 @@
   "tileserverAttributionLabel": "Tile server attribution",
   "tileserverApiKeyLabel": "Tile server API key",
   "tileApiKeyWarning": "Changing the template will reset the API key",
-  "mapBackgroundColorLabel": "Map background color"
+  "mapBackgroundColorLabel": "Map background color",
+  "tileserverRegenerateThumbnailsLabel": "Regenerate activity thumbnails on tile server settings change"
 }

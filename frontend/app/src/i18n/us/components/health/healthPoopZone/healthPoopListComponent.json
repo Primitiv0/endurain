@@ -1,0 +1,11 @@
+{
+  "labelBristolType": "Bristol type",
+  "labelDate": "Date",
+  "labelNotes": "Notes",
+  "modalDeletePoopTitle": "Delete bowel movement entry",
+  "modalDeletePoopBody": "Are you sure you want to delete the bowel movement entry for ",
+  "successDeletePoop": "Bowel movement entry deleted",
+  "errorDeletePoop": "It was not possible to delete the bowel movement entry",
+  "successEditPoop": "Bowel movement entry edited",
+  "errorEditPoop": "It was not possible to edit the bowel movement entry"
+}

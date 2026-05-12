@@ -25,9 +25,6 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from safeuploads import FileValidator, FileSecurityConfig, SecurityLimits
-from safeuploads.exceptions import FileValidationError
-
 import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.utils as users_utils
@@ -37,6 +34,7 @@ import users.users_identity_providers.schema as user_idp_schema
 import users.users_identity_providers.utils as user_idp_utils
 
 import auth.password_hasher as auth_password_hasher
+import auth.security_stores as auth_security_stores
 
 import auth.identity_providers.crud as idp_crud
 import auth.idp_link_tokens.utils as idp_link_token_utils
@@ -66,21 +64,38 @@ import core.database as core_database
 import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 import core.config as core_config
+import core.file_uploads as core_file_uploads
 
 import websocket.manager as websocket_manager
 
 # Define the API router
 router = APIRouter()
 
-custom_limits = SecurityLimits(
-    max_uncompressed_size=2 * 1024 * 1024 * 1024,
-    max_number_files_same_type=2000,
-)
-custom_config = FileSecurityConfig()
-custom_config.limits = custom_limits
 
-# Initialize the file validator
-file_validator = FileValidator(config=custom_config)
+def _raise_mfa_secret_store_unavailable(
+    err: profile_mfa_store.MFASecretStoreUnavailable,
+) -> None:
+    """
+    Return a controlled response when MFA setup storage is down.
+
+    Args:
+        err: MFA setup secret storage outage.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: Always raised with a 503 status.
+    """
+    core_logger.print_to_log(
+        "MFA setup secret storage unavailable",
+        "error",
+        exc=err,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="MFA setup temporarily unavailable",
+    ) from err
 
 
 @router.get("", status_code=status.HTTP_200_OK, response_model=users_schema.UsersMe)
@@ -148,7 +163,7 @@ async def read_users_me(
         update={
             "is_strava_linked": (1 if user_integrations.strava_token else 0),
             "is_garminconnect_linked": (
-                1 if user_integrations.garminconnect_oauth1 else 0
+                1 if user_integrations.garminconnect_token else 0
             ),
             "default_activity_visibility": (
                 user_privacy_settings.default_activity_visibility
@@ -169,6 +184,11 @@ async def read_users_me(
                 user_privacy_settings.hide_activity_workout_sets_steps
             ),
             "hide_activity_gear": (user_privacy_settings.hide_activity_gear),
+            # Derived flag for the frontend: distinguishes
+            # SSO-only accounts from accounts with a local
+            # password so step-up modals can hide the password
+            # field. The hash itself is never exposed.
+            "has_local_password": bool(user.password),
         }
     )
 
@@ -199,7 +219,7 @@ async def read_sessions_me(
         List of session objects for the user.
     """
     # Get the sessions from the database
-    if core_config.ENVIRONMENT != "demo":
+    if core_config.settings.ENVIRONMENT != "demo":
         return users_session_crud.get_user_sessions(token_user_id, db)
     else:
         core_logger.print_to_log(
@@ -209,7 +229,7 @@ async def read_sessions_me(
         return []
 
 
-@core_rate_limit.limiter.limit(core_rate_limit.OAUTH_DISCONNECT_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 @router.post(
     "/idp/{idp_id}/link/token",
     status_code=status.HTTP_201_CREATED,
@@ -217,10 +237,15 @@ async def read_sessions_me(
 )
 async def generate_link_token(
     idp_id: int,
+    link_request: idp_link_token_schema.IdpLinkTokenRequest,
     request: Request,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
+    ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -234,6 +259,11 @@ async def generate_link_token(
     that can be used to securely initiate the OAuth flow for linking
     an identity provider to the authenticated user's account.
 
+    Linking an identity provider is a sensitive operation that enables
+    persistent authentication. Step-up verification is required: the
+    caller MUST supply ``current_password``, and an MFA code when MFA
+    is enabled on the account.
+
     This approach is more secure than passing access tokens in query
     parameters, as the link token:
     - Expires in 60 seconds
@@ -243,8 +273,10 @@ async def generate_link_token(
 
     Args:
         idp_id (int): The ID of the identity provider to link.
+        link_request (IdpLinkTokenRequest): Request with step-up credentials.
         request (Request): The FastAPI request object.
         token_user_id (int): The authenticated user's ID extracted from the access token.
+        password_hasher (PasswordHasher): Password hasher dependency.
         db (Session): The database session.
 
     Returns:
@@ -252,10 +284,21 @@ async def generate_link_token(
 
     Raises:
         HTTPException:
+            - 401 UNAUTHORIZED: If step-up verification fails.
             - 404 NOT_FOUND: If the identity provider doesn't exist or is disabled.
             - 409 CONFLICT: If the identity provider is already linked.
             - 500 INTERNAL_SERVER_ERROR: If token generation fails.
     """
+    # Step-up verification is required before issuing a link token.
+    # Linking an IdP is a sensitive, persistent grant of account access.
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        link_request.current_password,
+        link_request.mfa_code,
+        password_hasher,
+        db,
+    )
+
     # Validate IDP exists and is enabled
     idp = idp_crud.get_identity_provider(idp_id, db)
     if not idp or not idp.enabled:
@@ -325,7 +368,7 @@ async def upload_profile_image(
 
 @router.put("", status_code=status.HTTP_200_OK, response_model=dict)
 async def edit_user(
-    user_attributtes: users_schema.UsersRead,
+    user_attributtes: users_schema.ProfileUpdate,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
@@ -336,21 +379,25 @@ async def edit_user(
     ],
 ) -> dict:
     """
-    Edit user attributes in database.
+    Edit self-service profile fields for the authenticated user.
+
+    Uses an explicit allow-list (:class:`users_schema.ProfileUpdate`)
+    so administrative attributes such as ``access_type``,
+    ``active``, ``mfa_enabled``, ``mfa_secret``, ``email_verified``,
+    and ``pending_admin_approval`` cannot be modified through this
+    endpoint, even if a malicious client submits them.
 
     Args:
-        user_attributtes: Updated user attributes.
+        user_attributtes: Allow-listed profile updates.
         token_user_id: User ID from access token.
         db: Database session.
 
     Returns:
         Success message with user ID.
     """
-    # Update the user in the database
-    await users_crud.edit_user(token_user_id, user_attributtes, db)
+    await users_crud.edit_profile_user(token_user_id, user_attributtes, db)
 
-    # Return success message
-    return {"message": f"User ID {user_attributtes.id} updated successfully"}
+    return {"message": f"User ID {token_user_id} updated successfully"}
 
 
 @router.put("/privacy", status_code=status.HTTP_200_OK, response_model=dict)
@@ -402,23 +449,47 @@ async def edit_profile_password(
     ],
 ) -> dict:
     """
-    Update user password after validation.
+    Update user password after step-up verification.
+
+    Requires the caller to re-prove identity with the current
+    password — and an MFA code when MFA is enabled — before the
+    new password is accepted. This prevents a stolen access
+    token alone from being parlayed into permanent account
+    takeover.
 
     Args:
-        user_attributtes (users_schema.UsersEditPassword): Schema containing the new password.
-        token_user_id (int): ID of the user extracted from the access token.
-        password_hasher (auth_password_hasher.PasswordHasher): Password hasher dependency.
-        db (Session): Database session dependency.
+        user_attributtes: Schema with current password, new
+            password, and optional MFA code.
+        token_user_id: ID of the user extracted from the access
+            token.
+        password_hasher: Password hasher dependency.
+        db: Database session dependency.
 
     Returns:
-        dict: A success message indicating the user's password was updated.
+        dict: A success message indicating the user's password
+        was updated.
+
+    Raises:
+        HTTPException: 401 if step-up verification fails.
     """
-    # Update the user password in the database
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        user_attributtes.current_password,
+        user_attributtes.mfa_code,
+        password_hasher,
+        db,
+    )
+
     users_crud.edit_user_password(
         token_user_id, user_attributtes.password, password_hasher, db
     )
 
-    # Return success message
+    auth_security_stores.clear_pending_mfa_for_user(token_user_id)
+
+    core_logger.print_to_log(
+        f"User {token_user_id} changed password (step-up verified)", "info"
+    )
+
     return {"message": f"User ID {token_user_id} password updated successfully"}
 
 
@@ -516,9 +587,19 @@ async def export_profile_data(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Prepare user data (excluding password)
+    # Prepare user data — strip every server-managed secret /
+    # privileged attribute before it crosses the trust boundary.
     user_dict = profile_utils.sqlalchemy_obj_to_dict(user)
-    user_dict.pop("password", None)
+    for sensitive_field in (
+        "password",
+        "mfa_secret",
+        "access_type",
+        "active",
+        "mfa_enabled",
+        "email_verified",
+        "pending_admin_approval",
+    ):
+        user_dict.pop(sensitive_field, None)
 
     # Create export service and generate archive
     export_service = profile_export_service.ExportService(token_user_id, db)
@@ -594,13 +675,10 @@ async def import_profile_data(
     Raises:
         HTTPException: If validation or import fails.
     """
-    # Comprehensive security validation
-    try:
-        await file_validator.validate_zip_file(file)
-    except FileValidationError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)
-        ) from err
+    # Comprehensive security validation via the unified pipeline.
+    await core_file_uploads.validate_upload(
+        file, kind=core_file_uploads.UploadKind.ZIP
+    )
 
     try:
         # Read the ZIP file data
@@ -790,7 +868,7 @@ async def setup_mfa(
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
-        profile_mfa_store.MFASecretStore,
+        profile_mfa_store.MFASecretStoreBackend,
         Depends(profile_mfa_store.get_mfa_secret_store),
     ],
 ) -> profile_schema.MFASetupResponse:
@@ -808,7 +886,10 @@ async def setup_mfa(
     response = profile_utils.setup_user_mfa(token_user_id, db)
 
     # Store the secret temporarily for the enable step
-    mfa_secret_store.add_secret(token_user_id, response.secret)
+    try:
+        mfa_secret_store.add_secret(token_user_id, response.secret)
+    except profile_mfa_store.MFASecretStoreUnavailable as err:
+        _raise_mfa_secret_store_unavailable(err)
 
     return response
 
@@ -826,28 +907,58 @@ async def enable_mfa(
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
-        profile_mfa_store.MFASecretStore,
+        profile_mfa_store.MFASecretStoreBackend,
         Depends(profile_mfa_store.get_mfa_secret_store),
     ],
 ) -> dict:
     """
-    Enable MFA for authenticated user.
+    Enable MFA for authenticated user after step-up verification.
+
+    A stolen access token alone must not be sufficient to enrol a
+    new TOTP secret on a victim's account (which would lock the
+    legitimate user out and hand the attacker the backup codes).
+    The caller therefore has to re-prove identity with their
+    current password before the binding is committed. The TOTP
+    code in the request body is the fresh enrolment code from the
+    user's authenticator app and is verified separately by
+    :func:`profile_utils.enable_user_mfa` against the secret
+    issued by ``POST /profile/mfa/setup``. SSO-only accounts may
+    omit ``current_password`` (see
+    :func:`users.users.utils.verify_step_up_credentials`).
 
     Args:
-        request: MFA setup request with code.
+        request: MFA setup request with TOTP code and (when the
+            account has a local password) current password.
         token_user_id: User ID from access token.
-        password_hasher: Password hasher instance for backup code generation.
+        password_hasher: Password hasher instance for backup code
+            generation and step-up verification.
         db: Database session.
         mfa_secret_store: Temporary secret storage.
 
     Returns:
-        Success message.
+        Success message and the freshly issued backup codes.
 
     Raises:
-        HTTPException: If no setup in progress or invalid.
+        HTTPException: 400 if no setup is in progress or the TOTP
+            code is invalid; 401 if step-up verification fails.
     """
+    # Step-up first: if the password is wrong we must not
+    # consume / clear the pending MFA secret.
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        request.current_password,
+        # MFA is not yet enabled here, so the MFA branch of
+        # step-up is a no-op; pass None to make that explicit.
+        None,
+        password_hasher,
+        db,
+    )
+
     # Get the secret from temporary storage
-    secret = mfa_secret_store.get_secret(token_user_id)
+    try:
+        secret = mfa_secret_store.get_secret(token_user_id)
+    except profile_mfa_store.MFASecretStoreUnavailable as err:
+        _raise_mfa_secret_store_unavailable(err)
     if not secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -860,37 +971,90 @@ async def enable_mfa(
         )
         # Clean up the temporary secret
         mfa_secret_store.delete_secret(token_user_id)
+        core_logger.print_to_log(
+            f"User {token_user_id} enabled MFA (step-up verified)", "info"
+        )
         return {
             "message": "MFA enabled successfully",
             "backup_codes": backup_codes,
         }
-    except HTTPException:
-        # Clean up on error
-        mfa_secret_store.delete_secret(token_user_id)
+    except HTTPException as exc:
+        # A wrong TOTP at enrolment is a UX-typical retry scenario:
+        # the user fat-fingered a digit or the authenticator clock
+        # drifted. Burning the pending secret on every wrong code
+        # forces a full restart from ``POST /profile/mfa/setup``
+        # (new QR, new secret), which is hostile to legitimate users
+        # and offers no security benefit — the secret has not yet
+        # been bound to the account, ``MFASecretStore`` already
+        # enforces a 5-minute TTL on the pending entry, and the
+        # caller has already passed step-up password verification
+        # above.
+        #
+        # On any OTHER HTTPException (user vanished, MFA already
+        # enabled by a concurrent request, encryption pipeline
+        # failure, etc.) we still burn the secret to avoid leaving
+        # stale state behind. The status_code + detail check is
+        # tightly coupled to ``profile_utils.enable_user_mfa``'s
+        # wrong-code branch by design — both must change together.
+        if not (
+            exc.status_code == status.HTTP_400_BAD_REQUEST
+            and exc.detail == "Invalid MFA code"
+        ):
+            mfa_secret_store.delete_secret(token_user_id)
         raise
 
 
 @router.put("/mfa/disable", status_code=status.HTTP_200_OK, response_model=dict)
 async def disable_mfa(
-    request: profile_schema.MFARequest,
+    request: profile_schema.MFADisableRequest,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
     ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
+    ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> dict:
     """
-    Disable MFA for authenticated user.
+    Disable MFA for authenticated user after step-up verification.
+
+    Disabling MFA materially weakens the account's security
+    posture, so a valid access token alone is not sufficient: the
+    caller must re-prove identity with both their current
+    password and a fresh MFA code. The MFA code may be either a
+    6-digit TOTP or an unused ``XXXX-XXXX`` backup code — the
+    same set of factors accepted at login. Step-up verification
+    is the single source of truth for the MFA check;
+    :func:`profile_utils.disable_user_mfa` only clears state.
 
     Args:
-        request: MFA disable request with code.
+        request: MFA disable request with current password and
+            MFA code.
         token_user_id: User ID from access token.
+        password_hasher: Password hasher dependency.
         db: Database session.
 
     Returns:
         Success message.
+
+    Raises:
+        HTTPException: 401 if the current password is wrong or
+            the MFA code is invalid; 400 if MFA is not currently
+            enabled.
     """
-    profile_utils.disable_user_mfa(token_user_id, request.mfa_code, db)
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        request.current_password,
+        request.mfa_code,
+        password_hasher,
+        db,
+    )
+    profile_utils.disable_user_mfa(token_user_id, db)
+    core_logger.print_to_log(
+        f"User {token_user_id} disabled MFA (step-up verified)", "info"
+    )
     return {"message": "MFA disabled successfully"}
 
 
@@ -937,10 +1101,11 @@ async def verify_mfa(
     status_code=status.HTTP_201_CREATED,
     response_model=mfa_backup_codes_schema.MFABackupCodesResponse,
 )
-@core_rate_limit.limiter.limit(core_rate_limit.MFA_VERIFY_LIMIT)
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def generate_mfa_backup_codes(
     response: Response,
     request: Request,
+    step_up: users_schema.StepUpVerification,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
@@ -957,9 +1122,16 @@ async def generate_mfa_backup_codes(
     """
     Generate new MFA backup codes for authenticated user.
 
+    Requires step-up verification (current password + MFA code,
+    when MFA is enabled). Issuing new backup codes invalidates
+    the previous set, so an attacker holding only an access
+    token must not be able to lock the legitimate user out of
+    their second factor.
+
     Args:
         response: FastAPI response object.
         request: FastAPI request object for rate limiting.
+        step_up: Step-up verification payload.
         token_user_id: User ID from access token.
         password_hasher: Password hasher for code generation.
         db: Database session.
@@ -968,7 +1140,8 @@ async def generate_mfa_backup_codes(
         Response with generated backup codes and timestamp.
 
     Raises:
-        HTTPException: If user not found or MFA not enabled.
+        HTTPException: 401 if step-up verification fails, 404 if
+            user not found, 400 if MFA is not enabled.
     """
     user = users_crud.get_user_by_id(token_user_id, db)
 
@@ -983,13 +1156,24 @@ async def generate_mfa_backup_codes(
             detail="MFA must be enabled to generate backup codes",
         )
 
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        step_up.current_password,
+        step_up.mfa_code,
+        password_hasher,
+        db,
+    )
+
     # Generate codes (invalidates old codes)
     codes = mfa_backup_codes_crud.create_backup_codes(
         token_user_id, password_hasher, db
     )
 
     # Log event
-    core_logger.print_to_log(f"User {user.id} generated MFA backup codes", "info")
+    core_logger.print_to_log(
+        f"User {user.id} generated MFA backup codes (step-up verified)",
+        "info",
+    )
 
     return mfa_backup_codes_schema.MFABackupCodesResponse(
         codes=codes,
@@ -1054,16 +1238,23 @@ async def get_my_identity_providers(
     )
 
 
-@router.delete(
-    "/idp/{idp_id}",
+@core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
+@router.post(
+    "/idp/{idp_id}/unlink",
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
 )
 async def delete_my_identity_provider(
     idp_id: int,
+    step_up: users_schema.StepUpVerification,
+    request: Request,
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_access_token),
+    ],
+    password_hasher: Annotated[
+        auth_password_hasher.PasswordHasher,
+        Depends(auth_password_hasher.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -1073,32 +1264,48 @@ async def delete_my_identity_provider(
     """
     Delete (unlink) an identity provider from the authenticated user's account.
 
-    This endpoint allows users to remove the association between their account and
-    a specific identity provider. It includes critical safety checks to prevent
-    account lockout by ensuring users maintain at least one authentication method
-    (either a password or another IdP link).
+    This endpoint allows users to remove the association between their
+    account and a specific identity provider. It requires step-up
+    verification (current password and MFA when enabled) and includes
+    safety checks to prevent account lockout by ensuring users maintain
+    at least one authentication method (either a password or another
+    IdP link).
 
     Args:
         idp_id (int): The ID of the identity provider to unlink.
-        token_user_id (int): The authenticated user's ID extracted from the access token.
+        step_up (StepUpVerification): Step-up verification payload.
+        request (Request): The FastAPI request object.
+        token_user_id (int): User ID extracted from the access token.
+        password_hasher (PasswordHasher): Password hasher dependency.
         db (Session): Database session dependency.
 
     Returns:
         None: Returns 204 No Content on successful deletion.
 
     Raises:
-        HTTPException (404): If the identity provider doesn't exist or is not linked
-            to the user's account.
+        HTTPException (401): If step-up verification fails.
+        HTTPException (404): If the identity provider doesn't exist or
+            is not linked to the user's account.
         HTTPException (400): If attempting to unlink the last authentication method
             without having a password set (prevents account lockout).
         HTTPException (500): If the deletion operation fails at the database level.
 
     Notes:
-        - Prevents account lockout by ensuring users have at least one authentication
-          method (password or remaining IdP link).
+        - Enforces step-up verification before unlinking.
+        - Prevents account lockout by ensuring users have at least one
+          authentication method (password or remaining IdP link).
         - Logs the unlinking action for audit purposes.
-        - Uses token-based authentication to ensure users can only unlink their own IdPs.
+        - Uses token-based authentication to ensure users can only
+          unlink their own IdPs.
     """
+    users_utils.verify_step_up_credentials(
+        token_user_id,
+        step_up.current_password,
+        step_up.mfa_code,
+        password_hasher,
+        db,
+    )
+
     # Validate IDP exists
     idp = idp_crud.get_identity_provider(idp_id, db)
     if idp is None:

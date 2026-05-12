@@ -1,0 +1,8 @@
+{
+  "addWaterModalTitle": "Add water intake",
+  "editWaterModalTitle": "Edit water intake",
+  "addWaterAmountLabel": "Amount",
+  "addWaterDateLabel": "Date",
+  "successAddWater": "Water intake added",
+  "errorAddWater": "Error adding water intake"
+}

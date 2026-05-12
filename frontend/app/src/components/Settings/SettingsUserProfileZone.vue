@@ -1009,15 +1009,15 @@ async function getDefaultGear() {
 
 async function getGearsInfo() {
   try {
-    allGears.value = await gears.getGears()
-    runGear.value = allGears.value.filter((gear) => gear.gear_type === 2)
-    bikeGear.value = allGears.value.filter((gear) => gear.gear_type === 1)
-    swimGear.value = allGears.value.filter((gear) => gear.gear_type === 3)
-    racquetGear.value = allGears.value.filter((gear) => gear.gear_type === 4)
-    skisGear.value = allGears.value.filter((gear) => gear.gear_type === 5)
-    snowboardGear.value = allGears.value.filter((gear) => gear.gear_type === 6)
-    windsurfGear.value = allGears.value.filter((gear) => gear.gear_type === 7)
-    waterSportsBoardGear.value = allGears.value.filter((gear) => gear.gear_type === 8)
+    allGears.value = await gears.getUserGearsWithPagination()
+    runGear.value = allGears.value.records.filter((gear) => gear.gear_type === 2)
+    bikeGear.value = allGears.value.records.filter((gear) => gear.gear_type === 1)
+    swimGear.value = allGears.value.records.filter((gear) => gear.gear_type === 3)
+    racquetGear.value = allGears.value.records.filter((gear) => gear.gear_type === 4)
+    skisGear.value = allGears.value.records.filter((gear) => gear.gear_type === 5)
+    snowboardGear.value = allGears.value.records.filter((gear) => gear.gear_type === 6)
+    windsurfGear.value = allGears.value.records.filter((gear) => gear.gear_type === 7)
+    waterSportsBoardGear.value = allGears.value.records.filter((gear) => gear.gear_type === 8)
 
     // Get default gear for the user
     await getDefaultGear()

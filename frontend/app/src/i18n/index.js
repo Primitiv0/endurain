@@ -47,12 +47,26 @@ const componentPaths = {
   healthSleepAddEditModalComponent:
     'components/health/healthSleepZone/healthSleepAddEditModalComponent.json',
   healthRHRZoneComponent: 'components/health/healthRHRZoneComponent.json',
+  healthFastingZoneComponent: 'components/health/healthFastingZoneComponent.json',
+  healthFastingListComponent: 'components/health/healthFastingZone/healthFastingListComponent.json',
+  healthFastingAddEditModalComponent:
+    'components/health/healthFastingZone/healthFastingAddEditModalComponent.json',
+  healthWaterZoneComponent: 'components/health/healthWaterZoneComponent.json',
+  healthWaterListComponent: 'components/health/healthWaterZone/healthWaterListComponent.json',
+  healthWaterAddEditModalComponent:
+    'components/health/healthWaterZone/healthWaterAddEditModalComponent.json',
+  healthPoopZoneComponent: 'components/health/healthPoopZoneComponent.json',
+  healthPoopListComponent: 'components/health/healthPoopZone/healthPoopListComponent.json',
+  healthPoopAddEditModalComponent:
+    'components/health/healthPoopZone/healthPoopAddEditModalComponent.json',
   // Navbar components
   navbarBottomMobileComponent: 'components/navbar/navbarBottomMobileComponent.json',
   navbarComponent: 'components/navbar/navbarComponent.json',
   // Notifications components
   adminNewSignUpApprovalRequestNotificationComponent:
     'components/notifications/adminNewSignUpApprovalRequestNotificationComponent.json',
+  garminTokenExpiredNotificationComponent:
+    'components/notifications/garminTokenExpiredNotificationComponent.json',
   navbarNotificationsComponent: 'components/notifications/navbarNotificationsComponent.json',
   newAcceptedRequestNotificationComponent:
     'components/notifications/newAcceptedRequestNotificationComponent.json',

@@ -1,7 +1,11 @@
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from sqlalchemy import ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from users.users.models import Users
 
 
 class HealthTargets(Base):
@@ -14,6 +18,9 @@ class HealthTargets(Base):
         weight: Target weight in kg.
         steps: Target daily steps count.
         sleep: Target sleep duration in seconds.
+        fasting: Target fasting duration in seconds.
+        water_ml: Target daily water intake in milliliters.
+        poop_count: Target daily bowel movement count.
         user: Relationship to Users model.
     """
 
@@ -43,7 +50,19 @@ class HealthTargets(Base):
         nullable=True,
         comment="Number of hours slept in seconds",
     )
+    fasting: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Target fasting duration in seconds",
+    )
+    water_ml: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=10, scale=2),
+        nullable=True,
+        comment="Target daily water intake in milliliters",
+    )
+    poop_count: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment="Target daily bowel movement count",
+    )
 
     # Define a relationship to the Users model
-    # TODO: Change to Mapped["User"] when all modules use mapped
-    users = relationship("Users", back_populates="health_targets")
+    users: Mapped["Users"] = relationship(back_populates="health_targets")

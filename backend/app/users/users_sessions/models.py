@@ -1,9 +1,17 @@
 """User session database models."""
 
 from datetime import datetime
-from sqlalchemy import ForeignKey, String
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.database import Base
+
+if TYPE_CHECKING:
+    from auth.oauth_state.models import OAuthState
+    from users.users.models import Users
+    from users.users_sessions.rotated_refresh_tokens.models import (
+        RotatedRefreshToken,
+    )
 
 
 class UsersSessions(Base):
@@ -89,14 +97,17 @@ class UsersSessions(Base):
         comment="Browser version",
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Session creation date (datetime)",
     )
     last_activity_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Last activity timestamp for idle timeout",
     )
     expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         comment="Session expiration date (datetime)",
     )
@@ -125,6 +136,7 @@ class UsersSessions(Base):
         comment="Number of times refresh token has been rotated",
     )
     last_rotation_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True,
         comment="Timestamp of last token rotation",
     )
@@ -135,17 +147,15 @@ class UsersSessions(Base):
     )
 
     # Relationship to Users model
-    # TODO: Change to Mapped["Users"] when all modules use mapped
-    users = relationship("Users", back_populates="users_sessions")
+    users: Mapped["Users"] = relationship(back_populates="users_sessions")
 
     # Relationship to OAuthState model
-    # TODO: Change to Mapped["OAuthState"] when all modules use mapped
-    oauth_state = relationship("OAuthState", back_populates="users_sessions")
+    oauth_state: Mapped["OAuthState | None"] = relationship(
+        back_populates="users_sessions"
+    )
 
     # Relationship to RotatedRefreshToken model
-    # TODO: Change to Mapped["RotatedRefreshToken"] when all modules use mapped
-    rotated_refresh_tokens = relationship(
-        "RotatedRefreshToken",
+    rotated_refresh_tokens: Mapped[list["RotatedRefreshToken"]] = relationship(
         back_populates="users_session",
         cascade="all, delete-orphan",
     )

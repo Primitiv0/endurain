@@ -12,7 +12,7 @@ import health.health_sleep.models as health_sleep_models
 
 class TestGetHealthSleepNumber:
     """
-    Test suite for get_health_sleep_number function.
+    Test suite for get_health_sleep_number_by_user_id function.
     """
 
     def test_get_health_sleep_number_success(self, mock_db):
@@ -25,7 +25,7 @@ class TestGetHealthSleepNumber:
         mock_db.execute.return_value.scalar_one.return_value = expected_count
 
         # Act
-        result = health_sleep_crud.get_health_sleep_number(user_id, mock_db)
+        result = health_sleep_crud.get_health_sleep_number_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == expected_count
@@ -40,14 +40,14 @@ class TestGetHealthSleepNumber:
         mock_db.execute.return_value.scalar_one.return_value = 0
 
         # Act
-        result = health_sleep_crud.get_health_sleep_number(user_id, mock_db)
+        result = health_sleep_crud.get_health_sleep_number_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == 0
 
     def test_get_health_sleep_number_exception(self, mock_db):
         """
-        Test exception handling in get_health_sleep_number.
+        Test exception handling in get_health_sleep_number_by_user_id.
         """
         # Arrange
         user_id = 1
@@ -55,69 +55,15 @@ class TestGetHealthSleepNumber:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_health_sleep_number(user_id, mock_db)
+            health_sleep_crud.get_health_sleep_number_by_user_id(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert exc_info.value.detail == "Database error occurred"
 
 
-class TestGetAllHealthSleepByUserId:
-    """
-    Test suite for get_all_health_sleep_by_user_id function.
-    """
-
-    def test_get_all_health_sleep_by_user_id_success(self, mock_db):
-        """
-        Test successful retrieval of all health sleep records for user.
-        """
-        # Arrange
-        user_id = 1
-        mock_sleep1 = MagicMock(spec=health_sleep_models.HealthSleep)
-        mock_sleep2 = MagicMock(spec=health_sleep_models.HealthSleep)
-        mock_db.execute.return_value.scalars.return_value.all.return_value = [
-            mock_sleep1,
-            mock_sleep2,
-        ]
-
-        # Act
-        result = health_sleep_crud.get_all_health_sleep_by_user_id(user_id, mock_db)
-
-        # Assert
-        assert result == [mock_sleep1, mock_sleep2]
-        mock_db.execute.assert_called_once()
-
-    def test_get_all_health_sleep_by_user_id_empty(self, mock_db):
-        """
-        Test retrieval when user has no health sleep records.
-        """
-        # Arrange
-        user_id = 1
-        mock_db.execute.return_value.scalars.return_value.all.return_value = []
-
-        # Act
-        result = health_sleep_crud.get_all_health_sleep_by_user_id(user_id, mock_db)
-
-        # Assert
-        assert result == []
-
-    def test_get_all_health_sleep_by_user_id_exception(self, mock_db):
-        """
-        Test exception handling in get_all_health_sleep_by_user_id.
-        """
-        # Arrange
-        user_id = 1
-        mock_db.execute.side_effect = SQLAlchemyError("Database error")
-
-        # Act & Assert
-        with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_all_health_sleep_by_user_id(user_id, mock_db)
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-
 class TestGetHealthSleepWithPagination:
     """
-    Test suite for get_health_sleep_with_pagination function.
+    Test suite for get_health_sleep_by_user_id function.
     """
 
     def test_get_health_sleep_with_pagination_success(self, mock_db):
@@ -136,7 +82,7 @@ class TestGetHealthSleepWithPagination:
         ]
 
         # Act
-        result = health_sleep_crud.get_health_sleep_with_pagination(
+        result = health_sleep_crud.get_health_sleep_by_user_id(
             user_id, mock_db, page_number, num_records
         )
 
@@ -153,14 +99,14 @@ class TestGetHealthSleepWithPagination:
         mock_db.execute.return_value.scalars.return_value.all.return_value = []
 
         # Act
-        result = health_sleep_crud.get_health_sleep_with_pagination(user_id, mock_db)
+        result = health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db)
 
         # Assert
         mock_db.execute.assert_called_once()
 
     def test_get_health_sleep_with_pagination_exception(self, mock_db):
         """
-        Test exception handling in get_health_sleep_with_pagination.
+        Test exception handling in get_health_sleep_by_user_id.
         """
         # Arrange
         user_id = 1
@@ -168,14 +114,14 @@ class TestGetHealthSleepWithPagination:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_health_sleep_with_pagination(user_id, mock_db)
+            health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestGetHealthSleepByDate:
     """
-    Test suite for get_health_sleep_by_date function.
+    Test suite for get_health_sleep_by_date_and_user_id function.
     """
 
     def test_get_health_sleep_by_date_success(self, mock_db):
@@ -189,7 +135,9 @@ class TestGetHealthSleepByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_sleep
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_date(user_id, test_date, mock_db)
+        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(
+            user_id, test_date, mock_db
+        )
 
         # Assert
         assert result == mock_sleep
@@ -205,14 +153,16 @@ class TestGetHealthSleepByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_date(user_id, test_date, mock_db)
+        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(
+            user_id, test_date, mock_db
+        )
 
         # Assert
         assert result is None
 
     def test_get_health_sleep_by_date_exception(self, mock_db):
         """
-        Test exception handling in get_health_sleep_by_date.
+        Test exception handling in get_health_sleep_by_date_and_user_id.
         """
         # Arrange
         user_id = 1
@@ -221,7 +171,9 @@ class TestGetHealthSleepByDate:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_health_sleep_by_date(user_id, test_date, mock_db)
+            health_sleep_crud.get_health_sleep_by_date_and_user_id(
+                user_id, test_date, mock_db
+            )
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 

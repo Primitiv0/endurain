@@ -36,7 +36,7 @@
                 {{ $t('navbarComponent.activities') }}
               </span>
             </a>
-            <ul class="dropdown-menu">
+            <ul class="dropdown-menu dropdown-menu-end">
               <li>
                 <!-- Activities list link -->
                 <router-link :to="{ name: 'activities' }" class="dropdown-item link-body-emphasis">

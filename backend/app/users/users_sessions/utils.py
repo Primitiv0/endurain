@@ -1,5 +1,7 @@
 """Session utility functions and classes."""
 
+import hashlib
+import hmac
 from enum import Enum
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
@@ -22,6 +24,7 @@ import users.users_sessions.crud as users_session_crud
 import users.users.schema as users_schema
 
 import core.logger as core_logger
+import core.network as core_network
 from core.database import SessionLocal
 
 
@@ -58,6 +61,45 @@ class DeviceInfo:
     operating_system_version: str
     browser: str
     browser_version: str
+
+
+def _hash_csrf_token(token: str) -> str:
+    """Compute HMAC-SHA256 of a CSRF token using the server secret key.
+
+    Uses the JWT_SECRET_KEY as the HMAC key so the MAC is unforgeable
+    without knowledge of the server secret, while being microseconds-fast
+    (unlike Argon2 which is designed for password storage).
+
+    Args:
+        token: The plain CSRF token string.
+
+    Returns:
+        Hex-encoded HMAC-SHA256 digest.
+    """
+    # JWT_SECRET_KEY is validated non-None at application startup
+    assert auth_constants.JWT_SECRET_KEY, "SECRET_KEY must be configured"
+    return hmac.new(
+        auth_constants.JWT_SECRET_KEY.encode(),
+        token.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def verify_csrf_token(candidate: str, stored_hmac: str) -> bool:
+    """Verify a CSRF token candidate against its stored HMAC in constant time.
+
+    Recomputes the HMAC of ``candidate`` and uses ``hmac.compare_digest``
+    to prevent timing attacks.
+
+    Args:
+        candidate: The CSRF token value from the request header.
+        stored_hmac: The HMAC-SHA256 digest stored in the session.
+
+    Returns:
+        True if the candidate matches the stored HMAC, False otherwise.
+    """
+    expected = _hash_csrf_token(candidate)
+    return hmac.compare_digest(expected, stored_hmac)
 
 
 def validate_session_timeout(
@@ -138,7 +180,7 @@ def create_session_object(
         id=session_id,
         user_id=user.id,
         refresh_token=hashed_refresh_token,
-        ip_address=get_ip_address(request),
+        ip_address=core_network.get_ip_address(request),
         device_type=device_info.device_type.value,
         operating_system=device_info.operating_system,
         operating_system_version=device_info.operating_system_version,
@@ -186,7 +228,7 @@ def edit_session_object(
         id=session.id,
         user_id=session.user_id,
         refresh_token=hashed_refresh_token,
-        ip_address=get_ip_address(request),
+        ip_address=core_network.get_ip_address(request),
         device_type=device_info.device_type.value,
         operating_system=device_info.operating_system,
         operating_system_version=device_info.operating_system_version,
@@ -235,8 +277,8 @@ def create_session(
         days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS
     )
 
-    # Hash the CSRF token if provided
-    csrf_hash = password_hasher.hash_password(csrf_token) if csrf_token else None
+    # Compute HMAC-SHA256 of the CSRF token if provided
+    csrf_hash = _hash_csrf_token(csrf_token) if csrf_token else None
 
     # Create a new session
     new_session = create_session_object(
@@ -280,10 +322,8 @@ def edit_session(
         days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS
     )
 
-    # Hash the new CSRF token if provided
-    csrf_hash = None
-    if new_csrf_token:
-        csrf_hash = password_hasher.hash_password(new_csrf_token)
+    # Compute HMAC-SHA256 of the new CSRF token if provided
+    csrf_hash = _hash_csrf_token(new_csrf_token) if new_csrf_token else None
 
     # Update the session
     updated_session = edit_session_object(
@@ -309,32 +349,6 @@ def get_user_agent(request: Request) -> str:
         User-Agent header value or empty string.
     """
     return request.headers.get("user-agent", "")
-
-
-def get_ip_address(request: Request) -> str:
-    """
-    Extract client IP address from request.
-
-    Checks proxy headers (X-Forwarded-For, X-Real-IP) first,
-    then falls back to direct client host.
-
-    Args:
-        request: Request object with headers and client info.
-
-    Returns:
-        Client IP address or "unknown" if indeterminate.
-    """
-    # Check for proxy headers first
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # Take the first IP in the chain
-        return forwarded_for.split(",")[0].strip()
-
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip
-
-    return request.client.host if request.client else "unknown"
 
 
 def parse_user_agent(user_agent: str) -> DeviceInfo:

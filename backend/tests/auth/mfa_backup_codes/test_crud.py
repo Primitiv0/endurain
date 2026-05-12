@@ -1,9 +1,12 @@
 """Tests for MFA backup codes CRUD operations."""
 
-import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.sql import operators
 
 import auth.mfa_backup_codes.crud as backup_crud
 import auth.mfa_backup_codes.models as backup_models
@@ -54,9 +57,8 @@ class TestGetUserUnusedBackupCodes:
         mock_code1 = MagicMock(spec=backup_models.MFABackupCode, used=False)
         mock_code2 = MagicMock(spec=backup_models.MFABackupCode, used=False)
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.all.return_value = [mock_code1, mock_code2]
+        mock_scalars = mock_db.execute.return_value.scalars.return_value
+        mock_scalars.all.return_value = [mock_code1, mock_code2]
 
         # Act
         result = backup_crud.get_user_unused_backup_codes(user_id, mock_db)
@@ -69,13 +71,37 @@ class TestGetUserUnusedBackupCodes:
         """Test exception handling in get_user_unused_backup_codes."""
         # Arrange
         user_id = 1
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             backup_crud.get_user_unused_backup_codes(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    def test_get_unused_codes_excludes_expired_codes(self, mock_db):
+        """Test unused backup code lookup enforces expires_at."""
+        # Arrange
+        user_id = 1
+        mock_db.execute.return_value.scalars.return_value.all.return_value = []
+
+        # Act
+        backup_crud.get_user_unused_backup_codes(user_id, mock_db)
+
+        # Assert
+        stmt = mock_db.execute.call_args.args[0]
+        expiry_clause = stmt._where_criteria[2]
+        expiry_checks = list(expiry_clause.clauses)
+        assert any(
+            check.left.name == "expires_at"
+            and check.operator is operators.is_
+            for check in expiry_checks
+        )
+        assert any(
+            check.left.name == "expires_at"
+            and check.operator is operators.gt
+            for check in expiry_checks
+        )
 
 
 class TestCreateBackupCodes:

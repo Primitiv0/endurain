@@ -1,34 +1,71 @@
-from sqlalchemy import (
-    Column,
-    Integer,
-    ForeignKey,
-    BigInteger,
-    JSON,
+"""ORM models for activity stream data."""
+
+from typing import TYPE_CHECKING
+
+from sqlalchemy import ForeignKey, JSON
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
 )
-from sqlalchemy.orm import relationship
+
 from core.database import Base
+
+if TYPE_CHECKING:
+    from activities.activity.models import Activity
 
 
 class ActivityStreams(Base):
+    """
+    ORM model for activity stream data.
+
+    Attributes:
+        id: Primary key, auto-incremented.
+        activity_id: FK to the parent activity.
+        stream_type: Stream type integer code.
+        stream_waypoints: JSON waypoint data.
+        strava_activity_stream_id: Strava stream ID.
+    """
+
     __tablename__ = "activities_streams"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    activity_id = Column(
-        Integer,
-        ForeignKey("activities.id", ondelete="CASCADE"),
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+    activity_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "activities.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
         index=True,
-        comment="Activity ID that the activity stream belongs",
+        comment=(
+            "Activity ID that the activity"
+            " stream belongs"
+        ),
     )
-    stream_type = Column(
-        Integer,
+    stream_type: Mapped[int] = mapped_column(
         nullable=False,
-        comment="Stream type (1 - HR, 2 - Power, 3 - Cadence, 4 - Elevation, 5 - Velocity, 6 - Pace, 7 - lat/lon)",
+        comment=(
+            "Stream type (1-HR, 2-Power,"
+            " 3-Cadence, 4-Elevation,"
+            " 5-Velocity, 6-Pace, 7-lat/lon)"
+        ),
     )
-    stream_waypoints = Column(JSON, nullable=False, comment="Store waypoints data")
-    strava_activity_stream_id = Column(
-        BigInteger, nullable=True, comment="Strava activity stream ID"
+    stream_waypoints: Mapped[list] = mapped_column(
+        JSON,
+        nullable=False,
+        comment="Store waypoints data",
+    )
+    strava_activity_stream_id: Mapped[
+        int | None
+    ] = mapped_column(
+        nullable=True,
+        comment="Strava activity stream ID",
     )
 
-    # Define a relationship to the Users model
-    activity = relationship("Activity", back_populates="activities_streams")
+    # Define a relationship to the Activity model
+    activity: Mapped["Activity"] = relationship(
+        back_populates="activities_streams",
+    )

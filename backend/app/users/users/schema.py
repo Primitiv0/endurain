@@ -204,14 +204,21 @@ class UsersBase(BaseModel):
 
 class Users(UsersBase):
     """
-    Complete users schema with all fields.
+    Complete users schema with administrative fields.
+
+    Note:
+        ``mfa_secret`` is intentionally NOT part of any API-facing
+        schema. It lives only on the SQLAlchemy model and is
+        accessed directly by MFA verification utilities. Including
+        it in a Pydantic schema would risk leaking the encrypted
+        seed through responses, exports, logs, or future
+        ``model_dump`` callers.
 
     Attributes:
         access_type: User access level.
         photo_path: Path to user's photo.
         active: Whether the user is active.
         mfa_enabled: Whether MFA is enabled.
-        mfa_secret: MFA secret (encrypted at rest).
         email_verified: Whether email is verified.
         pending_admin_approval: Whether pending admin approval.
     """
@@ -232,11 +239,6 @@ class Users(UsersBase):
     mfa_enabled: StrictBool = Field(
         default=False,
         description="Whether MFA is enabled",
-    )
-    mfa_secret: StrictStr | None = Field(
-        default=None,
-        max_length=512,
-        description="MFA secret (encrypted at rest)",
     )
     email_verified: StrictBool = Field(
         default=False,
@@ -346,6 +348,16 @@ class UsersMe(UsersRead):
     hide_activity_gear: StrictBool | None = Field(
         default=None, description="Hide activity gear"
     )
+    has_local_password: StrictBool | None = Field(
+        default=None,
+        description=(
+            "Whether the account has a local password set. False"
+            " indicates an SSO-only account, in which case"
+            " step-up flows must skip the password factor. The"
+            " raw password hash is never exposed; only this"
+            " derived boolean is returned."
+        ),
+    )
 
 
 class UsersSignup(UsersBase):
@@ -382,7 +394,53 @@ class UsersCreate(Users):
 
 class UsersEditPassword(BaseModel):
     """
-    Schema for password update operations.
+    Schema for password update operations (self-service).
+
+    Requires the caller to prove possession of the current
+    password — and an MFA code when MFA is enabled — before
+    the new password is accepted. This prevents a stolen
+    in-memory access token from being parlayed into permanent
+    account takeover.
+
+    Attributes:
+        current_password: Caller's existing password.
+        password: New password (min 8 chars).
+        mfa_code: TOTP or backup code, required when MFA is
+            enabled on the account.
+    """
+
+    current_password: StrictStr = Field(
+        ...,
+        min_length=1,
+        max_length=250,
+        description="Current password (step-up verification)",
+    )
+    password: StrictStr = Field(
+        ...,
+        min_length=8,
+        max_length=250,
+        description="New password",
+    )
+    mfa_code: StrictStr | None = Field(
+        default=None,
+        max_length=32,
+        description="TOTP or backup code, required when MFA is enabled",
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class UsersAdminEditPassword(BaseModel):
+    """
+    Schema for admin password reset operations.
+
+    Admin password resets are authorised by the caller's
+    ``users:write`` scope on the admin route, not by knowing the
+    target user's current password. Self-service password changes
+    must use :class:`UsersEditPassword` instead.
 
     Attributes:
         password: New password (min 8 chars).
@@ -399,6 +457,113 @@ class UsersEditPassword(BaseModel):
         extra="forbid",
         validate_assignment=True,
     )
+
+
+class StepUpVerification(BaseModel):
+    """
+    Generic step-up verification payload.
+
+    Used by sensitive account-level operations (API key
+    creation, MFA backup-code regeneration, etc.) to require
+    fresh proof of identity beyond a valid access token.
+
+    For SSO-only accounts (no local password set), the password
+    field may be omitted and the password check is skipped — see
+    :func:`users.users.utils.verify_step_up_credentials` for the
+    rationale and the known coverage gap.
+
+    Attributes:
+        current_password: Caller's existing password. Required
+            when the account has a local password; may be
+            omitted for SSO-only accounts.
+        mfa_code: TOTP or backup code, required when MFA is
+            enabled on the account.
+    """
+
+    current_password: StrictStr | None = Field(
+        default=None,
+        min_length=1,
+        max_length=250,
+        description=(
+            "Current password (step-up verification). Required"
+            " when the account has a local password."
+        ),
+    )
+    mfa_code: StrictStr | None = Field(
+        default=None,
+        max_length=32,
+        description="TOTP or backup code, required when MFA is enabled",
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class ProfileUpdate(BaseModel):
+    """
+    Schema for self-service profile updates.
+
+    Strict allow-list of fields the authenticated user is
+    permitted to change on their own account. Administrative
+    fields (``access_type``, ``active``, ``mfa_enabled``,
+    ``mfa_secret``, ``email_verified``,
+    ``pending_admin_approval``) are intentionally excluded —
+    accepting them here would allow self-service privilege
+    escalation through mass assignment.
+
+    Attributes:
+        name: User's full name.
+        username: Unique username.
+        email: User's email address.
+        city: User's city.
+        birthdate: User's birthdate.
+        preferred_language: Preferred application language.
+        gender: User's gender.
+        units: Preferred unit system.
+        height: User's height in centimeters.
+        max_heart_rate: Maximum heart rate in bpm.
+        first_day_of_week: First day of the week.
+        currency: Preferred currency.
+        photo_path: Server-issued photo path. Validated to
+            stay within the user's own photo directory.
+    """
+
+    name: StrictStr | None = Field(default=None, min_length=1, max_length=250)
+    username: StrictStr | None = Field(
+        default=None,
+        min_length=1,
+        max_length=250,
+        pattern=r"^[a-zA-Z0-9._-]+$",
+    )
+    email: EmailStr | None = Field(default=None, max_length=250)
+    city: StrictStr | None = Field(default=None, max_length=250)
+    birthdate: datetime_date | None = None
+    preferred_language: Language | None = None
+    gender: Gender | None = None
+    units: server_settings_schema.Units | None = None
+    height: StrictInt | None = Field(default=None, ge=1, le=300)
+    max_heart_rate: StrictInt | None = Field(default=None, ge=30, le=250)
+    first_day_of_week: WeekDay | None = None
+    currency: server_settings_schema.Currency | None = None
+    photo_path: StrictStr | None = Field(default=None, max_length=250)
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+        use_enum_values=True,
+    )
+
+    @field_validator("birthdate", mode="before")
+    @classmethod
+    def validate_birthdate(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, datetime_date):
+            return value.isoformat()
+        return value
 
 
 class UsersListResponse(BaseModel):

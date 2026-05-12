@@ -27,7 +27,7 @@
             <font-awesome-icon :icon="['fas', 'file-import']" size="2x" />
             <div class="ms-3">
               <div class="fw-bold">
-                {{ $t('settingsImportZone.stravaGearImportTitle') }}
+                {{ $t('settingsImportZone.stravaBulkImportTitle') }}
                 {{ $t('generalItems.betaTag') }}
               </div>
               {{ $t('settingsImportZone.stravaGearImportBody') }}
@@ -45,15 +45,23 @@
                 {{ $t('settingsImportZone.importTitle') }}
               </a>
 
-              <ul class="dropdown-menu">
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" @click="submitStravaBulkImport">{{
+                    $t('settingsImportZone.stravaBulkImportButton')
+                  }}</a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider" />
+                </li>
                 <li>
                   <a class="dropdown-item" @click="submitStravaBikesImport">{{
-                    $t('settingsImportZone.stravaGearImportbuttonBikes')
+                    $t('settingsImportZone.stravaGearImportButtonBikes')
                   }}</a>
                 </li>
                 <li>
                   <a class="dropdown-item" @click="submitStravaShoesImport">{{
-                    $t('settingsImportZone.stravaImportbuttonShoes')
+                    $t('settingsImportZone.stravaGearImportButtonShoes')
                   }}</a>
                 </li>
               </ul>
@@ -107,6 +115,18 @@ async function submitStravaShoesImport() {
   } catch (error) {
     // Reject the loading message with an error message
     notification.reject(`${t('settingsImportZone.errorMessageUnableToImportShoes')} - ${error}`)
+  }
+}
+async function submitStravaBulkImport() {
+  // Set the loading message
+  const notification = push.promise(t('settingsImportZone.loadingMessageStravaBulkImport'))
+  try {
+    await stravaService.stravaBulkImport()
+    // Resolve the loading message with a success message
+    notification.resolve(t('settingsImportZone.successMessageStravaBulkImport'))
+  } catch (error) {
+    // If there is an error, show the error alert.
+    push.error(`${t('settingsImportZone.errorMessageUnableToBulkImport')} - ${error}`)
   }
 }
 </script>

@@ -1,5 +1,9 @@
 import { metersToKm, metersToMiles, metersToFeet, metersToYards } from '@/utils/unitsUtils'
-import { formatDateMed, formatTime, formatSecondsToMinutes } from '@/utils/dateTimeUtils' // Import date/time utils
+import {
+  formatDateMed,
+  formatTime,
+  formatSecondsToHoursMinutesSeconds
+} from '@/utils/dateTimeUtils' // Import date/time utils
 
 /**
  * An array of numeric identifiers representing different activity types.
@@ -635,9 +639,9 @@ export function formatDateTime(t, dateTimeString, separator = ', ') {
  * @param {number|null|undefined} seconds - The duration in seconds to format.
  * @returns {string} The formatted duration or a "Not Applicable" label if the input is invalid.
  */
-export function formatDuration(t, seconds) {
+export function formatSecondsToHoursMinutes(t, seconds) {
   if (seconds === null || seconds === undefined || seconds < 0) return t('generalItems.labelNoData')
-  return formatSecondsToMinutes(seconds)
+  return formatSecondsToHoursMinutesSeconds(seconds)
 }
 
 /**

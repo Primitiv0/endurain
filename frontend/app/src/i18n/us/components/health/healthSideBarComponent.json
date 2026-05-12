@@ -3,5 +3,8 @@
   "sleepSection": "Sleep",
   "RHRSection": "Resting heart rate",
   "stepsSection": "Steps",
-  "weightSection": "Weight"
+  "weightSection": "Weight",
+  "fastingSection": "Fasting",
+  "waterSection": "Water intake",
+  "poopSection": "Bowel movements"
 }

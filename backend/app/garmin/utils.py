@@ -94,7 +94,6 @@ async def link_garminconnect(
         user_integrations_crud.link_garminconnect_account(
             user_id,
             serialize_garmin_token(garmin.client),
-            None,
             db,
         )
     except HTTPException as http_err:
@@ -138,14 +137,14 @@ async def link_garminconnect(
             mfa_codes.delete_code(user_id)
 
 
-def login_garminconnect_using_tokens(oauth1_token, oauth2_token):
+def login_garminconnect_using_tokens(token):
     try:
         # Create a new Garmin object
         garmin = garminconnect.Garmin()
 
         # Restore session from stored DI tokens
         garmin.client.loads(
-            deserialize_garmin_token(oauth1_token)
+            deserialize_garmin_token(token)
         )
         return garmin
     except (
@@ -229,8 +228,8 @@ def fetch_user_integrations_and_validate_token(
             detail="User information not found",
         )
 
-    # Check if user_integrations.garminconnect_oauth1 is None
-    if user_integrations.garminconnect_oauth1 is None:
+    # Check if user_integrations.garminconnect_token is None
+    if user_integrations.garminconnect_token is None:
         return None
 
     # Return the user integrations

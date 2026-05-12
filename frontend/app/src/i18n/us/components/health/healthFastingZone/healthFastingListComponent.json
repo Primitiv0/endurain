@@ -1,0 +1,13 @@
+{
+  "notesLabel": "Notes:",
+  "statusCompleted": "Completed",
+  "statusInProgress": "In progress",
+  "statusBroken": "Broken",
+  "statusCancelled": "Cancelled",
+  "modalDeleteFastingTitle": "Delete fasting entry",
+  "modalDeleteFastingBody": "Are you sure you want to delete fasting entry started at ",
+  "successDeleteFasting": "Fasting deleted",
+  "errorDeleteFasting": "It was not possible to delete fasting entry",
+  "successEditFasting": "Fasting edited",
+  "errorEditFasting": "It was not possible to edit fasting entry"
+}

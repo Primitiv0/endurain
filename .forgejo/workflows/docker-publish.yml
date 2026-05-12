@@ -16,22 +16,33 @@ concurrency:
 
 jobs:
 
-  build:
+  build-arch-images:
 
-    runs-on: codeberg-medium
+    name: Build ${{ matrix.arch }} image
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: codeberg-medium
+          - arch: arm64
+            platform: linux/arm64
+            runner: local-runner
     env:
       IMAGE_NAME: codeberg.org/${{ forgejo.repository }}
 
     steps:
       - name: Checkout code
-        uses: https://data.forgejo.org/actions/checkout@v4
+        uses: https://data.forgejo.org/actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Install Buildah
         run: apt-get update && apt-get install --yes buildah ca-certificates
 
-      - name: Publish release tag image
+      - name: Publish release architecture image
         if: ${{ forgejo.event_name == 'release' }}
         uses: https://codeberg.org/actions/buildah-simple@main
         with:
@@ -40,22 +51,10 @@ jobs:
           registry: codeberg.org
           username: ${{ forgejo.repository_owner }}
           password: ${{ secrets.TOKEN_FOR_ACTIONS }}
-          tag: ${{ env.IMAGE_NAME }}:${{ forgejo.ref_name }}
-          additional_flags: "--file docker/Dockerfile"
+          tag: ${{ env.IMAGE_NAME }}:${{ forgejo.ref_name }}-${{ matrix.arch }}
+          additional_flags: "--file docker/Dockerfile --platform ${{ matrix.platform }}"
 
-      - name: Publish latest image
-        if: ${{ forgejo.event_name == 'release' }}
-        uses: https://codeberg.org/actions/buildah-simple@main
-        with:
-          context: .
-          push: true
-          registry: codeberg.org
-          username: ${{ forgejo.repository_owner }}
-          password: ${{ secrets.TOKEN_FOR_ACTIONS }}
-          tag: ${{ env.IMAGE_NAME }}:latest
-          additional_flags: "--file docker/Dockerfile"
-
-      - name: Publish development image
+      - name: Publish development architecture image
         if: ${{ forgejo.event_name == 'workflow_dispatch' }}
         uses: https://codeberg.org/actions/buildah-simple@main
         with:
@@ -64,5 +63,59 @@ jobs:
           registry: codeberg.org
           username: ${{ forgejo.repository_owner }}
           password: ${{ secrets.TOKEN_FOR_ACTIONS }}
-          tag: ${{ env.IMAGE_NAME }}:dev-${{ forgejo.sha }}
-          additional_flags: "--file docker/Dockerfile"
+          tag: ${{ env.IMAGE_NAME }}:dev-${{ forgejo.sha }}-${{ matrix.arch }}
+          additional_flags: "--file docker/Dockerfile --platform ${{ matrix.platform }}"
+
+  publish-manifests:
+
+    name: Publish multi-arch manifests
+    runs-on: local-runner
+    needs: build-arch-images
+    env:
+      IMAGE_NAME: codeberg.org/${{ forgejo.repository }}
+
+    steps:
+      - name: Install Buildah
+        run: apt-get update && apt-get install --yes buildah ca-certificates
+
+      - name: Login to Codeberg registry
+        env:
+          REGISTRY_PASSWORD: ${{ secrets.TOKEN_FOR_ACTIONS }}
+        run: |
+          echo "${REGISTRY_PASSWORD}" | buildah login \
+            --username "${{ forgejo.repository_owner }}" \
+            --password-stdin \
+            codeberg.org
+
+      - name: Publish release tag manifest
+        if: ${{ forgejo.event_name == 'release' }}
+        env:
+          RELEASE_TAG: ${{ forgejo.ref_name }}
+        run: |
+          set -eu
+          buildah manifest create "${IMAGE_NAME}:${RELEASE_TAG}"
+          buildah manifest add "${IMAGE_NAME}:${RELEASE_TAG}" "docker://${IMAGE_NAME}:${RELEASE_TAG}-amd64"
+          buildah manifest add "${IMAGE_NAME}:${RELEASE_TAG}" "docker://${IMAGE_NAME}:${RELEASE_TAG}-arm64"
+          buildah manifest push --all "${IMAGE_NAME}:${RELEASE_TAG}" "docker://${IMAGE_NAME}:${RELEASE_TAG}"
+
+      - name: Publish latest manifest
+        if: ${{ forgejo.event_name == 'release' }}
+        env:
+          RELEASE_TAG: ${{ forgejo.ref_name }}
+        run: |
+          set -eu
+          buildah manifest create "${IMAGE_NAME}:latest"
+          buildah manifest add "${IMAGE_NAME}:latest" "docker://${IMAGE_NAME}:${RELEASE_TAG}-amd64"
+          buildah manifest add "${IMAGE_NAME}:latest" "docker://${IMAGE_NAME}:${RELEASE_TAG}-arm64"
+          buildah manifest push --all "${IMAGE_NAME}:latest" "docker://${IMAGE_NAME}:latest"
+
+      - name: Publish development manifest
+        if: ${{ forgejo.event_name == 'workflow_dispatch' }}
+        env:
+          DEVELOPMENT_TAG: dev-${{ forgejo.sha }}
+        run: |
+          set -eu
+          buildah manifest create "${IMAGE_NAME}:${DEVELOPMENT_TAG}"
+          buildah manifest add "${IMAGE_NAME}:${DEVELOPMENT_TAG}" "docker://${IMAGE_NAME}:${DEVELOPMENT_TAG}-amd64"
+          buildah manifest add "${IMAGE_NAME}:${DEVELOPMENT_TAG}" "docker://${IMAGE_NAME}:${DEVELOPMENT_TAG}-arm64"
+          buildah manifest push --all "${IMAGE_NAME}:${DEVELOPMENT_TAG}" "docker://${IMAGE_NAME}:${DEVELOPMENT_TAG}"

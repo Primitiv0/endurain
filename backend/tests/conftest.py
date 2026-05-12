@@ -31,6 +31,7 @@ DEFAULT_ROUTER_MODULES = [
     "health.health_targets.router",
     "health.health_weight.router",
     "users.users_goals.router",
+    "users.users_api_keys.router",
 ]
 
 PUBLIC_ROUTER_MODULES = [
@@ -149,11 +150,13 @@ def _include_router_if_exists(app: FastAPI, dotted: str):
             elif dotted == "health.health_steps.router":
                 app.include_router(router, prefix="/health_steps")
             elif dotted == "health.health_targets.router":
-                app.include_router(router, prefix="/health_targets")
+                app.include_router(router, prefix="/health/targets")
             elif dotted == "health.health_weight.router":
                 app.include_router(router, prefix="/health_weight")
             elif dotted == "users.users_goals.router":
                 app.include_router(router, prefix="/user_goals")
+            elif dotted == "users.users_api_keys.router":
+                app.include_router(router, prefix="/api_keys")
             elif dotted == "server_settings.public_router":
                 app.include_router(router, prefix="/server_settings/public")
             else:
@@ -237,6 +240,7 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         Methods:
             add_pending_login(username, user_id):
             get_pending_login(username):
+            claim_pending_login(username):
             delete_pending_login(username):
             has_pending_login(username):
             clear_all():
@@ -275,6 +279,18 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
             """
             return self._store.get(username)
 
+        def claim_pending_login(self, username: str):
+            """
+            Retrieve and remove the pending login information for a username.
+
+            Args:
+                username (str): The username to claim.
+
+            Returns:
+                Any: The pending login information, or None if not found.
+            """
+            return self._store.pop(username, None)
+
         def delete_pending_login(self, username: str):
             """
             Removes the pending login entry for the specified username from the internal store.
@@ -306,6 +322,25 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
             """
             self._store.clear()
             self.calls.clear()
+
+        def clear_for_user(self, user_id: int) -> int:
+            """
+            Remove pending login entries for the given user ID.
+
+            Args:
+                user_id (int): The user ID to remove pending logins for.
+
+            Returns:
+                int: Number of entries removed.
+            """
+            matching = [
+                username
+                for username, entry_user_id in self._store.items()
+                if entry_user_id == user_id
+            ]
+            for username in matching:
+                del self._store[username]
+            return len(matching)
 
     fake_store = FakePendingMFAStore()
     app.state.fake_store = fake_store
