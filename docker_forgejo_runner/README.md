@@ -1,13 +1,13 @@
 # Forgejo Runner for Multi-Arch Docker Images
 
-This directory contains the local Forgejo runner setup used by the Docker publish workflow to build multi-architecture images. The self-hosted runner builds both AMD64 and ARM64 images, then publishes a multi-architecture manifest that points to both images.
+This directory contains the local Forgejo runner setup used by the Docker publish workflow to build the ARM64 image on Apple Silicon, then publish a multi-architecture manifest that points to the Codeberg AMD64 image and the local ARM64 image.
 
 ## Workflow Logic
 
 The workflow in `.forgejo/workflows/docker-publish.yml` has two jobs:
 
 1. `build-arch-images` builds and pushes architecture-specific images.
-  - `linux/amd64` runs on the self-hosted runner label `local-runner`.
+  - `linux/amd64` runs on the Codeberg runner label `codeberg-medium`.
   - `linux/arm64` runs on the self-hosted runner label `local-runner`.
 2. `publish-manifests` waits for both builds and publishes manifest tags.
 
@@ -41,7 +41,6 @@ codeberg.org/<owner>/<repo>:dev-<commit-sha>
 ## Requirements
 
 - A machine capable of building Linux ARM64 containers.
-- QEMU/binfmt support for `linux/amd64` when the runner host is ARM64, such as Apple Silicon.
 - Docker installed and running on that machine.
 - A Codeberg runner registration token for this repository, user, or organization.
 - The repository secret `TOKEN_FOR_ACTIONS` configured with permission to push packages to Codeberg.
@@ -78,10 +77,14 @@ server:
 
 runner:
   capacity: 1 # or 2
+  envs:
+    DOCKER_HOST: tcp://127.0.0.1:2375
+  env_file: ""
   labels:
-    - local-runner:docker://node:24-bookworm
+    - local-runner:docker://endurain-forgejo-runner-job:node24-docker-cli
 
 container:
+  network: "host"
   privileged: true
 ```
 
@@ -102,46 +105,39 @@ docker compose up -d
 docker compose logs -f runner
 ```
 
+The compose setup first builds `endurain-forgejo-runner-job:node24-docker-cli` into the Docker-in-Docker daemon. This job image is based on `node:24-bookworm` and includes Docker CLI plus Buildx, which lets local workflow jobs run Node actions and Docker Buildx commands without installing Docker tooling on every job.
+
 The runner should appear as online in Codeberg under the runner settings page where it was registered.
 
-## Enable AMD64 Builds on ARM64 Hosts
+## Enable Local ARM64 Builds
 
-On Apple Silicon or another ARM64 host, the ARM64 image builds natively. The AMD64 image requires emulation because the Dockerfile executes architecture-specific binaries during `RUN` steps.
+On Apple Silicon or another ARM64 host, the ARM64 image builds natively. The AMD64 image is built by Codeberg, so this local runner does not need QEMU/binfmt for AMD64 builds.
 
-The `docker-in-docker` service exposes Docker on both the normal Unix socket and TCP port `2375`. If the service was already running before this compose file exposed the Unix socket, recreate it first:
+The `docker-in-docker` service exposes Docker on TCP port `2375`. Local workflow containers use host networking inside Docker-in-Docker plus `DOCKER_HOST=tcp://127.0.0.1:2375`, so Docker CLI commands in the workflow can reach the dedicated daemon. If the service was already running before this configuration was applied, recreate it first:
 
 ```bash
-docker compose up -d --force-recreate docker-in-docker runner
+docker compose up -d --force-recreate docker-in-docker runner-job-image runner
 ```
 
-Test whether AMD64 containers can run inside Docker-in-Docker:
+Test whether local ARM64 containers can run inside Docker-in-Docker:
 
 ```bash
 docker compose exec docker-in-docker \
-  docker run --rm --platform linux/amd64 alpine uname -m
+  docker run --rm --platform linux/arm64 alpine uname -m
 ```
 
 Expected output:
 
 ```text
-x86_64
+aarch64
 ```
 
 If Docker reports that the Unix socket is missing, use the explicit TCP endpoint instead:
 
 ```bash
 docker compose exec docker-in-docker \
-  docker -H tcp://127.0.0.1:2375 run --rm --platform linux/amd64 alpine uname -m
+  docker -H tcp://127.0.0.1:2375 run --rm --platform linux/arm64 alpine uname -m
 ```
-
-If the command cannot execute the AMD64 container, register binfmt in the Docker-in-Docker daemon:
-
-```bash
-docker compose exec docker-in-docker \
-  docker -H tcp://127.0.0.1:2375 run --privileged --rm tonistiigi/binfmt --install amd64
-```
-
-Then rerun the `alpine uname -m` test.
 
 ## Stop or Restart the Runner
 
@@ -159,7 +155,7 @@ docker compose logs -f runner
 
 ## Security Notes
 
-This setup uses Docker-in-Docker. The workflow jobs get access to the dedicated `docker-in-docker` daemon, not the host Docker daemon. Keep `runner.capacity` set to `1` so the AMD64 build, ARM64 build, and manifest job run one after another on the same local runner.
+This setup uses Docker-in-Docker. The workflow jobs get access to the dedicated `docker-in-docker` daemon, not the host Docker daemon. Keep `runner.capacity` set to `1` if you want local ARM64 build and manifest jobs to run one after another.
 
 Only register this runner for repositories or organizations you trust. A Forgejo runner executes workflow code from the repositories it is allowed to serve.
 

@@ -18,6 +18,23 @@ services:
       start_period: '10s'
     restart: 'unless-stopped'
 
+  runner-job-image:
+    image: docker:cli
+    depends_on:
+      docker-in-docker:
+        condition: service_healthy
+    environment:
+      DOCKER_HOST: tcp://docker-in-docker:2375
+    volumes:
+      - ./job-image:/job-image:ro
+    command:
+      - 'build'
+      - '--network'
+      - 'host'
+      - '--tag'
+      - 'endurain-forgejo-runner-job:node24-docker-cli'
+      - '/job-image'
+
   runner:
     image: 'data.forgejo.org/forgejo/runner:12'
     links:
@@ -25,6 +42,8 @@ services:
     depends_on:
       docker-in-docker:
         condition: service_healthy
+      runner-job-image:
+        condition: service_completed_successfully
     container_name: 'runner'
     environment:
       DOCKER_HOST: tcp://docker-in-docker:2375
