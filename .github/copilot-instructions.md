@@ -45,6 +45,14 @@ Endurain is a self-hosted fitness tracking application with:
 
 ## Development Workflows
 
+### Commits logic
+
+Committing should use clear messages following [Conventional Commits](https://www.conventionalcommits.org/) format, e.g.:
+- `feat: add GPX max speed parsing`
+- `fix: handle multi-segment GPX distance correctly`
+- `docs: update development instructions`
+- `test: add regression test for GPX segment handling`
+
 ### Prerequisites
 - **Node.js:** v20.19.4 (for frontend development)
 - **Python:** v3.13 (for backend development)
