@@ -19,7 +19,16 @@ import sys
 from datetime import UTC, datetime
 from typing import Any
 
-import core.config as core_config
+# NOTE: ``core.config`` is intentionally NOT imported at module top level.
+# ``core.config`` depends on this module to emit warnings from its settings
+# validators (e.g. invalid SMTP_SECURE_TYPE, memory-backed rate limiting in
+# production). A top-level import here would create a circular import that
+# only fails when the entry point imports ``core.logger`` before
+# ``core.config`` -- the partially-initialized ``core.logger`` module would
+# not yet expose ``print_to_log_and_console`` when a validator calls it.
+# ``logger`` is the lower-level module: it must not depend on ``config`` at
+# import time. The two functions below that genuinely need ``settings``
+# import it locally, after both modules have finished initializing.
 import core.middleware_request_id as core_middleware_request_id
 
 
@@ -179,6 +188,11 @@ def _build_handler(log_level: int) -> logging.Handler:
     Returns:
         Configured :class:`logging.Handler` instance.
     """
+    # Local import: see top-of-module note. ``setup_main_logger`` /
+    # ``_build_handler`` run at app startup, never at import time, so by the
+    # time we get here ``core.config`` is fully initialized.
+    import core.config as core_config
+
     # Treat both "production" and "demo" as deployed
     # environments where stdout JSON is preferred.
     is_deployed = core_config.settings.ENVIRONMENT in ("production", "demo")
@@ -236,6 +250,10 @@ def setup_main_logger():
     Returns:
         logging.Logger: The configured main logger instance.
     """
+    # Local import: see top-of-module note. Deferring this keeps
+    # ``core.logger`` free of any import-time dependency on ``core.config``.
+    import core.config as core_config
+
     # Map string log levels to Python logging constants
     log_level_map = {
         "critical": logging.CRITICAL,
