@@ -10,7 +10,7 @@ _LOGO_URL = (
 )
 
 
-def html_header(title: str, heading: str) -> str:
+def html_header(title: str, heading: str, lang: str = "en") -> str:
     """
     Return the opening HTML block shared by all Endurain emails.
 
@@ -20,8 +20,11 @@ def html_header(title: str, heading: str) -> str:
     :func:`html_footer`.
 
     Args:
-        title: Value placed in ``<title>`` (typically the email subject).
+        title: Value placed in ``<title>`` (typically the email
+            subject).
         heading: Text rendered inside the ``<h3>`` below the logo.
+        lang: BCP 47 language tag for the ``<html lang>`` attribute.
+            Defaults to ``"en"``.
 
     Returns:
         A partial HTML string ending with an open ``<div
@@ -29,7 +32,7 @@ def html_header(title: str, heading: str) -> str:
     """
     return f"""\
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{lang}">
 
 <head>
     <meta charset="UTF-8">
@@ -66,24 +69,34 @@ def html_header(title: str, heading: str) -> str:
 def html_footer(
     frontend_host: str,
     link_color: str,
+    best_regards: str = "Best regards,",
     sign_off: str = "The Endurain team",
+    visit_label: str = "Visit Endurain at:",
+    source_code_label: str = "Source code at:",
 ) -> str:
     """
     Return the closing HTML block shared by all Endurain emails.
 
-    Closes the content ``<div>`` opened by :func:`html_header`, renders
-    the footer with a sign-off greeting and links to the frontend host
-    and the Codeberg repository, then closes the outer wrapper,
-    ``<body>``, and ``<html>``.
+    Closes the content ``<div>`` opened by :func:`html_header`,
+    renders the footer with a sign-off greeting and links to the
+    frontend host and the Codeberg repository, then closes the outer
+    wrapper, ``<body>``, and ``<html>``.
 
     Args:
-        frontend_host: Base URL of the Endurain frontend, shown in the
-            footer link (e.g. ``"https://endurain.example.com"``).
-        link_color: CSS colour string applied to all footer anchor tags.
-            Use module-level constants :data:`LINK_COLOR_PRIMARY` or
+        frontend_host: Base URL of the Endurain frontend, shown in
+            the footer link.
+        link_color: CSS colour string applied to all footer anchor
+            tags. Use module-level constants
+            :data:`LINK_COLOR_PRIMARY` or
             :data:`LINK_COLOR_SUCCESS` for consistency.
-        sign_off: Name used in the "Best regards" line.
+        best_regards: Localized salutation line.
+            Defaults to ``"Best regards,"``.
+        sign_off: Localized team or system name for the sign-off.
             Defaults to ``"The Endurain team"``.
+        visit_label: Localized label before the frontend URL.
+            Defaults to ``"Visit Endurain at:"``.
+        source_code_label: Localized label before the repo link.
+            Defaults to ``"Source code at:"``.
 
     Returns:
         A partial HTML string that closes all tags opened by
@@ -97,12 +110,12 @@ def html_footer(
             margin-top: 30px; padding-top: 20px;
             border-top: 1px solid #eee;"
         >
-            <p>Best regards,<br>{sign_off}</p>
+            <p>{best_regards}<br>{sign_off}</p>
             <p>
-                Visit Endurain at:
+                {visit_label}
                 <a style="color: {link_color};" href="{frontend_host}">
                     {frontend_host}
-                </a> - Source code at:
+                </a> - {source_code_label}
                 <a
                     style="color: {link_color};"
                     href="https://codeberg.org/endurain-project/endurain"

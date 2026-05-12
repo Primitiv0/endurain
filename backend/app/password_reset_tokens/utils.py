@@ -24,6 +24,7 @@ import auth.password_hasher as auth_password_hasher
 import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
+import core.i18n as core_i18n
 import core.logger as core_logger
 
 from core.database import SessionLocal
@@ -103,10 +104,11 @@ async def send_password_reset_email(
     # Generate reset link
     reset_link = f"{email_service.frontend_host}/reset-password?token={token}"
 
-    # use default email message in English
+    # Build localized email using the user's preferred language
+    locale = core_i18n.normalize_locale(user.preferred_language)
     subject, html_content, text_content = (
-        password_reset_tokens_email_messages.get_password_reset_email_en(
-            user.name, reset_link, email_service
+        password_reset_tokens_email_messages.get_password_reset_email(
+            user.name, reset_link, email_service, locale
         )
     )
 
