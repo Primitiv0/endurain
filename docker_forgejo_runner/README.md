@@ -79,7 +79,7 @@ server:
 runner:
   capacity: 1 # or 2
   labels:
-    - local-runner:docker://node:20-bookworm
+    - local-runner:docker://node:24-bookworm
 
 container:
   privileged: true
