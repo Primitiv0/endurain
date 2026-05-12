@@ -498,6 +498,7 @@ def delete_sessions_by_family(
 def delete_sessions_by_user(
     user_id: int,
     db: Session,
+    commit: bool = True,
 ) -> int:
     """
     Delete all sessions for a user.
@@ -506,6 +507,7 @@ def delete_sessions_by_user(
         user_id: The ID of the user whose sessions should be
             deleted.
         db: SQLAlchemy database session.
+        commit: Whether to commit the session deletion immediately.
 
     Returns:
         Number of sessions deleted.
@@ -517,5 +519,6 @@ def delete_sessions_by_user(
         users_session_models.UsersSessions.user_id == user_id
     )
     result = db.execute(stmt)
-    db.commit()
+    if commit:
+        db.commit()
     return result.rowcount

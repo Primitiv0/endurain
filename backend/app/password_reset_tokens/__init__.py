@@ -7,7 +7,9 @@ password reset token management.
 Exports:
     - CRUD: create_password_reset_token,
       get_password_reset_token_by_hash,
+      claim_password_reset_token,
       mark_password_reset_token_used,
+      mark_user_password_reset_tokens_used,
       delete_expired_password_reset_tokens
     - Schemas: PasswordResetToken, PasswordResetRequest,
       PasswordResetConfirm, PasswordResetResponse
@@ -17,7 +19,9 @@ Exports:
 from .crud import (
     create_password_reset_token,
     get_password_reset_token_by_hash,
+    claim_password_reset_token,
     mark_password_reset_token_used,
+    mark_user_password_reset_tokens_used,
     delete_expired_password_reset_tokens,
 )
 from .models import PasswordResetToken as PasswordResetTokenModel
@@ -32,7 +36,9 @@ __all__ = [
     # CRUD operations
     "create_password_reset_token",
     "get_password_reset_token_by_hash",
+    "claim_password_reset_token",
     "mark_password_reset_token_used",
+    "mark_user_password_reset_tokens_used",
     "delete_expired_password_reset_tokens",
     # Database model
     "PasswordResetTokenModel",

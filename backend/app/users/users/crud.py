@@ -667,6 +667,7 @@ def edit_user_password(
     password_hasher: auth_password_hasher.PasswordHasher,
     db: Session,
     is_hashed: bool = False,
+    commit: bool = True,
 ) -> None:
     """
     Update a user's password.
@@ -677,6 +678,7 @@ def edit_user_password(
         password_hasher: Password hasher instance.
         db: SQLAlchemy database session.
         is_hashed: Whether password is already hashed.
+        commit: Whether to commit the password update immediately.
 
     Returns:
         None
@@ -707,9 +709,9 @@ def edit_user_password(
             password, password_hasher, server_settings, access_type_value
         )
 
-    # Commit the transaction
-    db.commit()
-    db.refresh(db_user)
+    if commit:
+        db.commit()
+        db.refresh(db_user)
 
 
 @core_decorators.handle_db_errors

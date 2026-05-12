@@ -8,6 +8,7 @@ from fastapi import (
 from uuid import uuid4
 import hashlib
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from password_reset_tokens import (
@@ -143,29 +144,43 @@ def use_password_reset_token(
     # Hash the provided token to find the database record
     token_hash = hashlib.sha256(token.encode()).hexdigest()
 
-    # Look up the token in the database
-    db_token = password_reset_tokens_crud.get_password_reset_token_by_hash(
+    token_user_id = password_reset_tokens_crud.claim_password_reset_token(
         token_hash, db
     )
-
-    if not db_token:
+    if token_user_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired password reset token",
         )
 
-    # Update user password
-    users_crud.edit_user_password(db_token.user_id, new_password, password_hasher, db)
-
-    # Mark token as used
-    password_reset_tokens_crud.mark_password_reset_token_used(db_token.id, db)
-
-    # Revoke all existing refresh-token sessions for the user.
-    users_sessions_crud.delete_sessions_by_user(db_token.user_id, db)
+    try:
+        users_crud.edit_user_password(
+            token_user_id,
+            new_password,
+            password_hasher,
+            db,
+            commit=False,
+        )
+        password_reset_tokens_crud.mark_user_password_reset_tokens_used(
+            token_user_id, db
+        )
+        users_sessions_crud.delete_sessions_by_user(
+            token_user_id, db, commit=False
+        )
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as err:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to reset password",
+        ) from err
 
     # Drop any in-flight pending-MFA login that was started with the
     # now-rotated password.
-    auth_security_stores.clear_pending_mfa_for_user(db_token.user_id)
+    auth_security_stores.clear_pending_mfa_for_user(token_user_id)
 
 
 def delete_invalid_tokens_from_db() -> None:
@@ -181,8 +196,8 @@ def delete_invalid_tokens_from_db() -> None:
     # Create a new database session using context manager
     with SessionLocal() as db:
         # Get num tokens deleted
-        num_deleted = password_reset_tokens_crud.delete_expired_password_reset_tokens(
-            db
+        num_deleted = (
+            password_reset_tokens_crud.delete_expired_password_reset_tokens(db)
         )
 
         # Log the number of deleted tokens
