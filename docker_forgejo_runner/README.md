@@ -1,14 +1,14 @@
 # Forgejo Runner for Multi-Arch Docker Images
 
-This directory contains the local Forgejo runner setup used by the Docker publish workflow to build the ARM64 image on Apple Silicon, then publish a multi-architecture manifest that points to the Codeberg AMD64 image and the local ARM64 image.
+This directory contains the local Forgejo runner setup used by the Docker publish workflow to build both the AMD64 and ARM64 images locally, then publish a multi-architecture manifest pointing at both images.
 
 ## Workflow Logic
 
 The workflow in `.forgejo/workflows/docker-publish.yml` has two jobs:
 
 1. `build-arch-images` builds and pushes architecture-specific images.
-  - `linux/amd64` runs on the Codeberg runner label `codeberg-medium`.
-  - `linux/arm64` runs on the self-hosted runner label `local-runner`.
+  - Both `linux/amd64` and `linux/arm64` run on the self-hosted runner label `local-runner`.
+  - On an ARM64 host such as Apple Silicon, the AMD64 build relies on QEMU/binfmt emulation (see _Enable Local Multi-Arch Builds_ below).
 2. `publish-manifests` waits for both builds and publishes manifest tags.
 
 Release builds push these architecture images:
@@ -40,7 +40,7 @@ codeberg.org/<owner>/<repo>:dev-<commit-sha>
 
 ## Requirements
 
-- A machine capable of building Linux ARM64 containers.
+- A machine capable of building Linux containers for both AMD64 and ARM64 (natively or via QEMU/binfmt emulation).
 - Docker installed and running on that machine.
 - A Codeberg runner registration token for this repository, user, or organization.
 - The repository secret `TOKEN_FOR_ACTIONS` configured with permission to push packages to Codeberg.
@@ -109,9 +109,16 @@ The compose setup first builds `endurain-forgejo-runner-job:node24-docker-cli` i
 
 The runner should appear as online in Codeberg under the runner settings page where it was registered.
 
-## Enable Local ARM64 Builds
+## Enable Local Multi-Arch Builds
 
-On Apple Silicon or another ARM64 host, the ARM64 image builds natively. The AMD64 image is built by Codeberg, so this local runner does not need QEMU/binfmt for AMD64 builds.
+On Apple Silicon or another ARM64 host, the ARM64 image builds natively, but the AMD64 image needs QEMU/binfmt emulation inside the Docker-in-Docker daemon. Register the binfmt handlers once after the daemon starts (and again whenever it is recreated):
+
+```bash
+docker compose exec docker-in-docker \
+  docker run --privileged --rm tonistiigi/binfmt --install all
+```
+
+On an AMD64 host, AMD64 builds natively and ARM64 needs the same emulation step.
 
 The `docker-in-docker` service exposes Docker on TCP port `2375`. Local workflow containers use host networking inside Docker-in-Docker plus `DOCKER_HOST=tcp://127.0.0.1:2375`, so Docker CLI commands in the workflow can reach the dedicated daemon. If the service was already running before this configuration was applied, recreate it first:
 
@@ -119,17 +126,20 @@ The `docker-in-docker` service exposes Docker on TCP port `2375`. Local workflow
 docker compose up -d --force-recreate docker-in-docker runner-job-image runner
 ```
 
-Test whether local ARM64 containers can run inside Docker-in-Docker:
+Test whether both architectures can run inside Docker-in-Docker:
 
 ```bash
 docker compose exec docker-in-docker \
   docker run --rm --platform linux/arm64 alpine uname -m
+docker compose exec docker-in-docker \
+  docker run --rm --platform linux/amd64 alpine uname -m
 ```
 
 Expected output:
 
 ```text
 aarch64
+x86_64
 ```
 
 If Docker reports that the Unix socket is missing, use the explicit TCP endpoint instead:
@@ -155,7 +165,7 @@ docker compose logs -f runner
 
 ## Security Notes
 
-This setup uses Docker-in-Docker. The workflow jobs get access to the dedicated `docker-in-docker` daemon, not the host Docker daemon. Keep `runner.capacity` set to `1` if you want local ARM64 build and manifest jobs to run one after another.
+This setup uses Docker-in-Docker. The workflow jobs get access to the dedicated `docker-in-docker` daemon, not the host Docker daemon. Keep `runner.capacity` set to `1` if you want local AMD64, ARM64, and manifest jobs to run one after another.
 
 Only register this runner for repositories or organizations you trust. A Forgejo runner executes workflow code from the repositories it is allowed to serve.
 

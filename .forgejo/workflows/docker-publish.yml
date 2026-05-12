@@ -19,17 +19,15 @@ jobs:
   build-arch-images:
 
     name: Build ${{ matrix.arch }} image
-    runs-on: ${{ matrix.runner }}
+    runs-on: local-runner
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: amd64
             platform: linux/amd64
-            runner: codeberg-medium
           - arch: arm64
             platform: linux/arm64
-            runner: local-runner
     env:
       IMAGE_NAME: codeberg.org/${{ forgejo.repository }}
 
@@ -39,12 +37,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install Buildah
-        if: ${{ matrix.arch == 'amd64' }}
-        run: apt-get update && apt-get install --yes buildah ca-certificates
-
       - name: Login to Codeberg registry with Docker
-        if: ${{ matrix.arch == 'arm64' }}
         env:
           REGISTRY_PASSWORD: ${{ secrets.TOKEN_FOR_ACTIONS }}
         run: |
@@ -54,31 +47,7 @@ jobs:
             codeberg.org
 
       - name: Publish release architecture image
-        if: ${{ forgejo.event_name == 'release' && matrix.arch == 'amd64' }}
-        uses: https://codeberg.org/actions/buildah-simple@main
-        with:
-          context: .
-          push: true
-          registry: codeberg.org
-          username: ${{ forgejo.repository_owner }}
-          password: ${{ secrets.TOKEN_FOR_ACTIONS }}
-          tag: ${{ env.IMAGE_NAME }}:${{ forgejo.ref_name }}-${{ matrix.arch }}
-          additional_flags: "--file docker/Dockerfile --platform ${{ matrix.platform }}"
-
-      - name: Publish development architecture image
-        if: ${{ forgejo.event_name == 'workflow_dispatch' && matrix.arch == 'amd64' }}
-        uses: https://codeberg.org/actions/buildah-simple@main
-        with:
-          context: .
-          push: true
-          registry: codeberg.org
-          username: ${{ forgejo.repository_owner }}
-          password: ${{ secrets.TOKEN_FOR_ACTIONS }}
-          tag: ${{ env.IMAGE_NAME }}:dev-${{ forgejo.sha }}-${{ matrix.arch }}
-          additional_flags: "--file docker/Dockerfile --platform ${{ matrix.platform }}"
-
-      - name: Publish release ARM64 image
-        if: ${{ forgejo.event_name == 'release' && matrix.arch == 'arm64' }}
+        if: ${{ forgejo.event_name == 'release' }}
         run: |
           set -eu
           docker buildx build \
@@ -89,8 +58,8 @@ jobs:
             --push \
             .
 
-      - name: Publish development ARM64 image
-        if: ${{ forgejo.event_name == 'workflow_dispatch' && matrix.arch == 'arm64' }}
+      - name: Publish development architecture image
+        if: ${{ forgejo.event_name == 'workflow_dispatch' }}
         run: |
           set -eu
           docker buildx build \
