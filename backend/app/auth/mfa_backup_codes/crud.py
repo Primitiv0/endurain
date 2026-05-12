@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 
 import auth.mfa_backup_codes.models as mfa_backup_codes_models
@@ -52,9 +52,14 @@ def get_user_unused_backup_codes(
     Raises:
         HTTPException: If a database error occurs.
     """
+    now = datetime.now(timezone.utc)
     stmt = select(mfa_backup_codes_models.MFABackupCode).where(
         mfa_backup_codes_models.MFABackupCode.user_id == user_id,
         mfa_backup_codes_models.MFABackupCode.used.is_(False),
+        or_(
+            mfa_backup_codes_models.MFABackupCode.expires_at.is_(None),
+            mfa_backup_codes_models.MFABackupCode.expires_at > now,
+        ),
     )
     return db.execute(stmt).scalars().all()
 
