@@ -47,7 +47,7 @@ Endurain is a self-hosted fitness tracking application with:
 ## Development Workflows
 
 ### Prerequisites
-- **Node.js:** v20.19.4 (for frontend development)
+- **Node.js:** v24 (for frontend development)
 - **Python:** v3.13 (for backend development)
 - **Docker:** Required for full-stack development and CI/CD builds
 - **uv:** For backend dependency management (when not using Docker)
