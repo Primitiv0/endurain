@@ -6,6 +6,7 @@
   "labels": [
     "dependencies"
   ],
+  "osvVulnerabilityAlerts": true,
   "prHourlyLimit": 2,
   "prConcurrentLimit": 10,
   "lockFileMaintenance": {
