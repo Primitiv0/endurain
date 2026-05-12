@@ -62,6 +62,59 @@ def is_redis_storage_uri(storage_uri: str) -> bool:
     return normalized_uri.startswith(("redis://", "rediss://", "unix://"))
 
 
+def is_memory_storage_uri(storage_uri: str) -> bool:
+    """
+    Check whether a storage URI selects process-local memory.
+
+    Args:
+        storage_uri: Storage URI from configuration.
+
+    Returns:
+        True when the URI selects memory storage.
+
+    Raises:
+        None.
+    """
+    return storage_uri.strip().lower().startswith("memory://")
+
+
+def delete_matching_keys(
+    redis_client: Redis,
+    key_pattern: str,
+    scan_count: int = 100,
+) -> int:
+    """
+    Delete Redis keys matching a scan pattern in small batches.
+
+    Args:
+        redis_client: Redis client used for deletion.
+        key_pattern: Redis glob-style key pattern.
+        scan_count: Requested Redis SCAN batch size.
+
+    Returns:
+        Number of keys deleted.
+
+    Raises:
+        RedisError: When Redis scan or delete fails.
+    """
+    deleted_count = 0
+    keys_to_delete: list[str] = []
+
+    for redis_key in redis_client.scan_iter(
+        match=key_pattern,
+        count=scan_count,
+    ):
+        keys_to_delete.append(redis_key)
+        if len(keys_to_delete) >= scan_count:
+            deleted_count += redis_client.delete(*keys_to_delete)
+            keys_to_delete.clear()
+
+    if keys_to_delete:
+        deleted_count += redis_client.delete(*keys_to_delete)
+
+    return deleted_count
+
+
 def create_redis_client(
     storage_uri: str,
     purpose: str,

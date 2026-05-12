@@ -695,22 +695,6 @@ def username_log_identifier(username: str) -> str:
     return f"username_hash={_username_digest(username)}"
 
 
-def _is_memory_storage_uri(storage_uri: str) -> bool:
-    """
-    Check whether a storage URI selects process-local memory.
-
-    Args:
-        storage_uri: Storage URI from configuration.
-
-    Returns:
-        True when the URI selects memory storage.
-
-    Raises:
-        None.
-    """
-    return storage_uri.strip().lower().startswith("memory://")
-
-
 def get_auth_security_storage_uri() -> str:
     """
     Resolve the configured auth security storage URI.
@@ -968,11 +952,7 @@ class _RedisProgressiveLockout:
         """
         key_pattern = f"{_REDIS_AUTH_KEY_PREFIX}:{self._name}:*"
         try:
-            for redis_key in self._redis.scan_iter(
-                match=key_pattern,
-                count=100,
-            ):
-                self._redis.delete(redis_key)
+            core_redis.delete_matching_keys(self._redis, key_pattern)
         except RedisError as err:
             _raise_store_unavailable("clear lockout store", err)
 
@@ -1375,11 +1355,7 @@ class RedisPendingMFALogin:
         """
         key_pattern = f"{_REDIS_AUTH_KEY_PREFIX}:mfa:pending:*"
         try:
-            for redis_key in self._redis.scan_iter(
-                match=key_pattern,
-                count=100,
-            ):
-                self._redis.delete(redis_key)
+            core_redis.delete_matching_keys(self._redis, key_pattern)
         except RedisError as err:
             _raise_store_unavailable("clear pending MFA logins", err)
         self._lockout.clear_all()
@@ -1406,7 +1382,7 @@ def create_auth_security_stores(
         ValueError: When the storage URI scheme is unsupported.
     """
     normalized_storage_uri = storage_uri.strip() or "memory://"
-    if _is_memory_storage_uri(normalized_storage_uri):
+    if core_redis.is_memory_storage_uri(normalized_storage_uri):
         return FailedLoginAttempts(), PendingMFALogin()
     if core_redis.is_redis_storage_uri(normalized_storage_uri):
         redis_client = core_redis.create_redis_client(

@@ -49,22 +49,6 @@ def _raise_store_unavailable(operation: str, err: RedisError) -> NoReturn:
         ) from store_err
 
 
-def _is_memory_storage_uri(storage_uri: str) -> bool:
-    """
-    Check whether a storage URI selects process-local memory.
-
-    Args:
-        storage_uri: Storage URI from configuration.
-
-    Returns:
-        True when the URI selects memory storage.
-
-    Raises:
-        None.
-    """
-    return storage_uri.strip().lower().startswith("memory://")
-
-
 def get_mfa_secret_storage_uri() -> str:
     """
     Resolve the configured MFA secret storage URI.
@@ -594,11 +578,7 @@ class RedisMFASecretStore:
         """
         key_pattern = f"{_REDIS_MFA_SECRET_KEY_PREFIX}:*"
         try:
-            for redis_key in self._redis.scan_iter(
-                match=key_pattern,
-                count=100,
-            ):
-                self._redis.delete(redis_key)
+            core_redis.delete_matching_keys(self._redis, key_pattern)
         except RedisError as err:
             _raise_store_unavailable("clear MFA setup secrets", err)
 
@@ -673,7 +653,7 @@ def create_mfa_secret_store(
         ValueError: When the storage URI scheme is unsupported.
     """
     normalized_storage_uri = storage_uri.strip() or "memory://"
-    if _is_memory_storage_uri(normalized_storage_uri):
+    if core_redis.is_memory_storage_uri(normalized_storage_uri):
         return MFASecretStore()
     if core_redis.is_redis_storage_uri(normalized_storage_uri):
         redis_client = core_redis.create_redis_client(

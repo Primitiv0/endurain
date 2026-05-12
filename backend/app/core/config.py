@@ -26,6 +26,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from typing_extensions import Annotated
 
 import core.logger as core_logger
+import core.redis as core_redis
 
 # Pure constants — neither env-driven nor derived from settings.
 API_VERSION = "v0.18.0"
@@ -48,22 +49,6 @@ SUPPORTED_FILE_FORMATS = [
     ".tcx",
     ".gz",
 ]  # used to screen bulk import files
-
-
-def _is_memory_storage_uri(storage_uri: str) -> bool:
-    """
-    Check whether a storage URI selects process-local memory.
-
-    Args:
-        storage_uri: Storage URI from configuration.
-
-    Returns:
-        True when the URI selects memory storage.
-
-    Raises:
-        None.
-    """
-    return storage_uri.strip().lower().startswith("memory://")
 
 
 # Settings — every value driven by an environment variable.
@@ -231,7 +216,7 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT == "development":
             return self
 
-        if self.RATE_LIMIT_ENABLED and _is_memory_storage_uri(
+        if self.RATE_LIMIT_ENABLED and core_redis.is_memory_storage_uri(
             self.RATE_LIMIT_STORAGE_URI
         ):
             core_logger.print_to_log_and_console(
@@ -244,7 +229,7 @@ class Settings(BaseSettings):
         auth_security_storage_uri = (
             self.AUTH_SECURITY_STORAGE_URI or self.RATE_LIMIT_STORAGE_URI
         )
-        if _is_memory_storage_uri(auth_security_storage_uri):
+        if core_redis.is_memory_storage_uri(auth_security_storage_uri):
             core_logger.print_to_log_and_console(
                 "AUTH_SECURITY_STORAGE_URI resolves to process-local "
                 "memory outside development. Login lockout and pending "
