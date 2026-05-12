@@ -10,6 +10,12 @@ services:
       - '-H'
       - 'tcp://0.0.0.0:2375'
       - '--tls=false'
+    healthcheck:
+      test: ['CMD', 'docker', 'info']
+      interval: '5s'
+      timeout: '3s'
+      retries: 12
+      start_period: '10s'
     restart: 'unless-stopped'
 
   runner:
@@ -18,7 +24,7 @@ services:
       - docker-in-docker
     depends_on:
       docker-in-docker:
-        condition: service_started
+        condition: service_healthy
     container_name: 'runner'
     environment:
       DOCKER_HOST: tcp://docker-in-docker:2375

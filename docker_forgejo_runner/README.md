@@ -74,7 +74,7 @@ server:
     codeberg:
       url: https://codeberg.org/
       uuid: <runner-uuid-from-codeberg>
-      token: <runner-token-from-codeberg>
+      token_url: file:/data/runner-token.txt
 
 runner:
   capacity: 1 # or 2
@@ -85,7 +85,7 @@ container:
   privileged: true
 ```
 
-`data/runner-config.yml` contains a secret token and must not be committed. The repository `.gitignore` ignores `docker_forgejo_runner/data` for this reason.
+Store the runner token in `data/runner-token.txt`. The repository `.gitignore` ignores `docker_forgejo_runner/data` because it contains local registration state and secrets.
 
 ## Start the Runner
 
