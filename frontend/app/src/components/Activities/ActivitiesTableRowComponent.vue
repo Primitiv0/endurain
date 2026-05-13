@@ -1,6 +1,12 @@
 <template>
   <td>
-    <font-awesome-icon :icon="getIcon(activity.activity_type)" />
+    <span
+      role="img"
+      :title="activityTypeName(activity.activity_type, t)"
+      :aria-label="activityTypeName(activity.activity_type, t)"
+    >
+      <font-awesome-icon :icon="getIcon(activity.activity_type)" aria-hidden="true" />
+    </span>
   </td>
   <td>
     <router-link
@@ -56,6 +62,7 @@ import {
   formatHr,
   formatCalories,
   getIcon,
+  activityTypeName,
   formatLocation,
   formatAverageSpeed,
   activityTypeIsWalking,
