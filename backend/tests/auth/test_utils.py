@@ -10,6 +10,15 @@ import auth.token_manager as auth_token_manager
 import users.users.schema as user_schema
 
 
+def _set_cookie_headers(response: Response) -> list[str]:
+    """Return all Set-Cookie headers from a response."""
+    return [
+        value.decode()
+        for key, value in response.raw_headers
+        if key == b"set-cookie"
+    ]
+
+
 class TestAuthenticateUser:
     """Test user authentication function."""
 
@@ -365,11 +374,62 @@ class TestCompleteLogin:
             )
 
         # Assert
-        set_cookie_header = response.headers.get("set-cookie", "")
+        set_cookie_header = _set_cookie_headers(response)[-1]
         assert "endurain_refresh_token" in set_cookie_header
         assert "httponly" in set_cookie_header.lower()
         assert "samesite=strict" in set_cookie_header.lower()
-        assert "path=/" in set_cookie_header.lower()
+        assert "path=/api/v1/auth" in set_cookie_header.lower()
+
+    def test_set_refresh_token_cookie_clears_legacy_paths(self):
+        """Test setting a refresh cookie clears all known old paths."""
+        response = Response()
+
+        auth_utils.set_refresh_token_cookie(response, "new-refresh-token")
+
+        set_cookie_headers = [
+            header.lower() for header in _set_cookie_headers(response)
+        ]
+        assert any(
+            "endurain_refresh_token" in header
+            and "max-age=0" in header
+            and "path=/;" in header
+            for header in set_cookie_headers
+        )
+        assert any(
+            "endurain_refresh_token" in header
+            and "max-age=0" in header
+            and "path=/api/v1/auth" in header
+            for header in set_cookie_headers
+        )
+        assert set_cookie_headers[-1].startswith(
+            "endurain_refresh_token=new-refresh-token"
+        )
+        assert "path=/api/v1/auth" in set_cookie_headers[-1]
+
+    @pytest.mark.asyncio
+    async def test_clear_refresh_token_cookie_exception_handler(self):
+        """Test missing-claim errors clear all refresh cookie paths."""
+        exc = auth_utils.ClearRefreshTokenCookieHTTPException(
+            status_code=401,
+            detail="Token is missing required claims.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+        response = await auth_utils.clear_refresh_token_cookie_exception_handler(
+            MagicMock(),
+            exc,
+        )
+
+        set_cookie_headers = [
+            header.lower() for header in _set_cookie_headers(response)
+        ]
+        assert response.status_code == 401
+        assert response.headers["www-authenticate"] == "Bearer"
+        assert any("max-age=0" in h and "path=/;" in h for h in set_cookie_headers)
+        assert any(
+            "max-age=0" in h and "path=/api/v1/auth" in h
+            for h in set_cookie_headers
+        )
 
     def test_complete_login_returns_different_tokens_on_each_call(
         self, password_hasher, token_manager, mock_db, sample_user_read, mock_request

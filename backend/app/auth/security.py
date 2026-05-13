@@ -467,20 +467,16 @@ def validate_refresh_token(
         # If a pre-upgrade token (e.g. missing the ``typ`` claim) reaches
         # this point the SPA would otherwise loop forever: every page load
         # would resend the same stale cookie, refresh would 401, and the
-        # client would never recover. Attach a Set-Cookie header that
-        # evicts ``endurain_refresh_token`` so the browser drops the
-        # legacy token and the next request falls through to the login
-        # screen instead. We only do this for ``MissingClaimError``-style
-        # failures to avoid logging users out on transient issues.
+        # client would never recover. A custom exception handler clears
+        # both the legacy root-scoped cookie and the current auth-scoped
+        # cookie using separate Set-Cookie headers. We only do this for
+        # ``MissingClaimError``-style failures to avoid logging users out
+        # on transient issues.
         if isinstance(http_err.__cause__, MissingClaimError):
-            headers = dict(http_err.headers or {})
-            headers["Set-Cookie"] = (
-                auth_utils.build_clear_refresh_token_cookie_header()
-            )
-            raise HTTPException(
+            raise auth_utils.ClearRefreshTokenCookieHTTPException(
                 status_code=http_err.status_code,
                 detail=http_err.detail,
-                headers=headers,
+                headers=http_err.headers,
             ) from http_err
         raise
 

@@ -8,6 +8,9 @@ from fastapi.security import SecurityScopes
 
 import auth.security as auth_security
 import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
+
+from joserfc.errors import MissingClaimError
 
 
 class TestGetToken:
@@ -194,6 +197,33 @@ class TestRefreshTokenValidation:
         with pytest.raises(HTTPException) as exc_info:
             auth_security.validate_refresh_token(expired_token, token_manager)
         assert exc_info.value.status_code == 401
+
+    def test_validate_refresh_token_missing_claim_clears_cookies(self):
+        """Test missing refresh claims raise the cookie-clearing exception."""
+
+        def raise_missing_claim(*_args):
+            try:
+                raise MissingClaimError("typ")
+            except MissingClaimError as err:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token is missing required claims.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                ) from err
+
+        token_manager = MagicMock()
+        token_manager.validate_token_expiration.side_effect = raise_missing_claim
+
+        with pytest.raises(
+            auth_utils.ClearRefreshTokenCookieHTTPException
+        ) as exc_info:
+            auth_security.validate_refresh_token(
+                "legacy-refresh-token",
+                token_manager,
+            )
+
+        assert exc_info.value.status_code == 401
+        assert exc_info.value.headers == {"WWW-Authenticate": "Bearer"}
 
 
 class TestGetSubFromRefreshToken:

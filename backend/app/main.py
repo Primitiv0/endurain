@@ -38,6 +38,7 @@ import sign_up_tokens.utils as sign_up_tokens_utils
 
 import auth.oauth_state.utils as oauth_state_utils
 import auth.idp_link_tokens.utils as idp_link_token_utils
+import auth.utils as auth_utils
 
 import activities.activity.utils as activities_utils
 
@@ -354,6 +355,10 @@ def create_app() -> FastAPI:
     fastapi_app.add_exception_handler(
         core_rate_limit.RateLimitExceeded,
         core_rate_limit.rate_limit_exceeded_handler,  # type: ignore[arg-type]
+    )
+    fastapi_app.add_exception_handler(
+        auth_utils.ClearRefreshTokenCookieHTTPException,
+        auth_utils.clear_refresh_token_cookie_exception_handler,
     )
     fastapi_app.add_middleware(SlowAPIMiddleware)
 

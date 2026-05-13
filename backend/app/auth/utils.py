@@ -12,6 +12,7 @@ from fastapi import (
     Response,
     Request,
 )
+from fastapi.responses import JSONResponse
 import secrets
 from uuid import uuid4
 
@@ -32,6 +33,19 @@ import users.users.schema as users_schema
 import users.users_sessions.utils as users_session_utils
 
 import core.config as core_config
+
+
+REFRESH_TOKEN_COOKIE_NAME = "endurain_refresh_token"
+REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
+LEGACY_REFRESH_TOKEN_COOKIE_PATHS = ("/",)
+REFRESH_TOKEN_COOKIE_CLEAR_PATHS = (
+    *LEGACY_REFRESH_TOKEN_COOKIE_PATHS,
+    REFRESH_TOKEN_COOKIE_PATH,
+)
+
+
+class ClearRefreshTokenCookieHTTPException(HTTPException):
+    """HTTP exception that clears refresh-token cookies."""
 
 
 def authenticate_user(
@@ -181,37 +195,64 @@ def set_refresh_token_cookie(
     ``HttpOnly``, ``SameSite=Strict``, ``Path``, expiry, and the
     ``Secure`` flag stay in lockstep.
     """
+    clear_refresh_token_cookies(response)
     response.set_cookie(
-        key="endurain_refresh_token",
+        key=REFRESH_TOKEN_COOKIE_NAME,
         value=refresh_token,
         expires=datetime.now(timezone.utc)
         + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
         httponly=True,
-        path="/api/v1/auth",
+        path=REFRESH_TOKEN_COOKIE_PATH,
         secure=_is_secure_cookie_environment(),
         samesite="strict",
     )
 
 
-def build_clear_refresh_token_cookie_header() -> str:
-    """Return a ``Set-Cookie`` header value that clears the refresh cookie.
+def clear_refresh_token_cookies(response: Response) -> None:
+    """Clear refresh-token cookies on all known paths.
 
-    Used when an HTTPException is raised from a dependency (e.g. when a
-    pre-upgrade refresh token without the ``typ`` claim is rejected) and
-    the response object cannot be mutated directly. Mirrors the attributes
-    of :func:`set_refresh_token_cookie` so the browser actually treats the
-    two cookies as the same and evicts it.
+    Args:
+        response: Response object to receive cookie-deletion headers.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
     """
-    parts = [
-        'endurain_refresh_token=""',
-        "Max-Age=0",
-        "Path=/api/v1/auth",
-        "HttpOnly",
-        "SameSite=strict",
-    ]
-    if _is_secure_cookie_environment():
-        parts.append("Secure")
-    return "; ".join(parts)
+    for path in REFRESH_TOKEN_COOKIE_CLEAR_PATHS:
+        response.delete_cookie(
+            key=REFRESH_TOKEN_COOKIE_NAME,
+            path=path,
+            secure=_is_secure_cookie_environment(),
+            httponly=True,
+            samesite="strict",
+        )
+
+
+async def clear_refresh_token_cookie_exception_handler(
+    _request: Request,
+    exc: ClearRefreshTokenCookieHTTPException,
+) -> JSONResponse:
+    """Build an error response that clears refresh-token cookies.
+
+    Args:
+        _request: Request that triggered the exception.
+        exc: Exception carrying the HTTP status, detail, and headers.
+
+    Returns:
+        JSON response with refresh-token deletion headers.
+
+    Raises:
+        None.
+    """
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=exc.headers,
+    )
+    clear_refresh_token_cookies(response)
+    return response
 
 
 def complete_login(
