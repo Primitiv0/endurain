@@ -12,10 +12,14 @@ import zoomPlugin from 'chartjs-plugin-zoom'
 import {
   formatAverageSpeedMetric,
   formatAverageSpeedImperial,
+  formatAverageSpeedKnots,
   activityTypeIsSwimming,
   activityTypeIsRunning,
   activityTypeIsRowing,
-  activityTypeIsWalking
+  activityTypeIsWalking,
+  activityTypeIsStandUpPaddling,
+  activityTypeIsSailing,
+  activityTypeIsWindsurf
 } from '@/utils/activityUtils'
 import { metersToFeet, kmToMiles, celsiusToFahrenheit } from '@/utils/unitsUtils'
 import type { Activity, ActivityStream, StreamWaypoint } from '@/types'
@@ -192,7 +196,16 @@ const computedChartData = computed(() => {
         }
       }
     } else if (stream.stream_type === 5 && props.graphSelection === 'vel') {
-      if (units.value === 'metric') {
+      const isMarine =
+        activityTypeIsSailing(props.activity) || activityTypeIsWindsurf(props.activity)
+      if (isMarine) {
+        data.push(
+          ...stream.stream_waypoints.map((velData: StreamWaypoint) =>
+            Number.parseFloat(formatAverageSpeedKnots(velData.vel || 0))
+          )
+        )
+        label = t('generalItems.labelVelocityInKnots')
+      } else if (units.value === 'metric') {
         data.push(
           ...stream.stream_waypoints.map((velData: StreamWaypoint) =>
             Number.parseFloat(formatAverageSpeedMetric(velData.vel || 0))
@@ -208,16 +221,16 @@ const computedChartData = computed(() => {
         label = t('generalItems.labelVelocityInMph')
       }
     } else if (stream.stream_type === 6 && props.graphSelection === 'pace') {
+      const isPaddling =
+        activityTypeIsRowing(props.activity) || activityTypeIsStandUpPaddling(props.activity)
+      const isFootSport =
+        activityTypeIsRunning(props.activity) || activityTypeIsWalking(props.activity)
       for (const paceData of stream.stream_waypoints) {
         if (paceData.pace === 0 || paceData.pace === null) {
           data.push(null)
         } else {
           let converted: number | null = null
-          if (
-            activityTypeIsRunning(props.activity) ||
-            activityTypeIsWalking(props.activity) ||
-            activityTypeIsRowing(props.activity)
-          ) {
+          if (isFootSport) {
             if (units.value === 'metric') {
               converted = (paceData.pace! * 1000) / 60
             } else {
@@ -225,6 +238,14 @@ const computedChartData = computed(() => {
             }
             const threshold = units.value === 'metric' ? 20 : 20 * 1.60934
             if (converted > threshold || Number.isNaN(converted)) {
+              data.push(null)
+            } else {
+              data.push(converted)
+            }
+          } else if (isPaddling) {
+            // min/500m is the universal rowing/paddle split — no imperial variant
+            converted = (paceData.pace! * 500) / 60
+            if (converted > 10 || Number.isNaN(converted)) {
               data.push(null)
             } else {
               data.push(converted)
@@ -244,22 +265,18 @@ const computedChartData = computed(() => {
           }
         }
       }
-      if (
-        activityTypeIsRunning(props.activity) ||
-        activityTypeIsWalking(props.activity) ||
-        activityTypeIsRowing(props.activity)
-      ) {
-        if (units.value === 'metric') {
-          label = t('generalItems.labelPaceInMinKm')
-        } else {
-          label = t('generalItems.labelPaceInMinMile')
-        }
+      if (isFootSport) {
+        label =
+          units.value === 'metric'
+            ? t('generalItems.labelPaceInMinKm')
+            : t('generalItems.labelPaceInMinMile')
+      } else if (isPaddling) {
+        label = t('generalItems.labelPaceInMin500m')
       } else if (activityTypeIsSwimming(props.activity)) {
-        if (units.value === 'metric') {
-          label = t('generalItems.labelPaceInMin100m')
-        } else {
-          label = t('generalItems.labelPaceInMin100yd')
-        }
+        label =
+          units.value === 'metric'
+            ? t('generalItems.labelPaceInMin100m')
+            : t('generalItems.labelPaceInMin100yd')
       }
     } else if (stream.stream_type === 8 && props.graphSelection === 'temp') {
       for (const streamPoint of stream.stream_waypoints) {

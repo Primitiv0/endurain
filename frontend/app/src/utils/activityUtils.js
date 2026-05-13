@@ -180,9 +180,9 @@ export function formatPaceImperial(pace, units = true) {
 }
 
 /**
- * Formats the swimming pace from minutes per kilometer to minutes per 100 meters.
+ * Formats a swimming pace from seconds per meter to minutes per 100 meters.
  *
- * @param {number} pace - The swimming pace in minutes per kilometer.
+ * @param {number} pace - The swimming pace in seconds per meter.
  * @param {boolean} units - Whether to include the units in the output string.
  * @returns {string} The formatted pace as a string in the format "MM:SS min/100m".
  */
@@ -240,6 +240,33 @@ export function formatPaceSwimImperial(pace, units = true) {
 }
 
 /**
+ * Formats a rowing/paddling pace from seconds per meter to minutes per 500 meters.
+ * The 500 m split is the universal standard for rowing/erg/kayak/SUP (Concept2, FISA,
+ * Strava, Garmin) and is used regardless of the user's metric/imperial preference.
+ *
+ * @param {number} pace - The pace in seconds per meter.
+ * @param {boolean} units - Whether to include the units in the output string.
+ * @returns {string} The formatted pace as a string in the format "MM:SS min/500m".
+ */
+export function formatPaceRowing(pace, units = true) {
+  const pacePer500m = (pace * 500) / 60
+  let minutes = Math.floor(pacePer500m)
+  let seconds = Math.round((pacePer500m - minutes) * 60)
+
+  if (seconds === 60) {
+    minutes += 1
+    seconds = 0
+  }
+
+  const formattedSeconds = seconds < 10 ? `0${seconds}` : seconds
+
+  if (units) {
+    return `${minutes}:${formattedSeconds} min/500m`
+  }
+  return `${minutes}:${formattedSeconds}`
+}
+
+/**
  * Converts a speed from meters per second (m/s) to kilometers per hour (km/h) and formats it to two decimal places.
  *
  * @param {number} speed - The speed in meters per second (m/s).
@@ -257,6 +284,17 @@ export function formatAverageSpeedMetric(speed) {
  */
 export function formatAverageSpeedImperial(speed) {
   return (speed * 2.23694).toFixed(2)
+}
+
+/**
+ * Converts a speed from meters per second to knots (nautical miles per hour)
+ * and formats it to two decimal places. Used for sailing and windsurfing.
+ *
+ * @param {number} speed - The speed in meters per second.
+ * @returns {string} The speed in knots, formatted to two decimal places.
+ */
+export function formatAverageSpeedKnots(speed) {
+  return (speed * 1.94384).toFixed(2)
 }
 
 /**
@@ -542,6 +580,16 @@ export function activityTypeIsSurf(activity) {
 }
 
 /**
+ * Checks if an activity is ice skating.
+ * @param {Object} activity - The activity object to check.
+ * @param {number} activity.activity_type - The type identifier of the activity.
+ * @returns {boolean} True if the activity type is 37 (ice skate), false otherwise.
+ */
+export function activityTypeIsIceSkating(activity) {
+  return activity.activity_type === 37
+}
+
+/**
  * Formats the pace of an activity based on its type and the specified unit system.
  *
  * @param {Object} t - The translation function.
@@ -560,16 +608,18 @@ export function formatPace(t, activity, unitSystem, lap = null, units = true, is
   if (isRest) {
     return t('generalItems.labelRest')
   }
-  if (
-    activityTypeIsSwimming(activity) ||
-    activityTypeIsRowing(activity) ||
-    activityTypeIsWindsurf(activity)
-  ) {
+  // Paddle sports (rowing, kayaking, SUP) → min/500m (domain standard, unit-pref agnostic)
+  if (activityTypeIsRowing(activity) || activityTypeIsStandUpPaddling(activity)) {
+    return formatPaceRowing(pace, units)
+  }
+  // Swimming → min/100m
+  if (activityTypeIsSwimming(activity)) {
     if (unitSystem === 'metric') {
       return formatPaceSwimMetric(pace, units)
     }
     return formatPaceSwimImperial(pace, units)
   }
+  // Default: running, walking, hiking → min/km or min/mi
   if (unitSystem === 'metric') {
     return formatPaceMetric(pace, units)
   }
@@ -577,45 +627,55 @@ export function formatPace(t, activity, unitSystem, lap = null, units = true, is
 }
 
 /**
- * Formats the average speed of an activity based on the unit system and activity type.
+ * Formats a raw speed value (m/s) per activity type and unit preference.
+ * Marine sports (sailing, windsurf) use knots regardless of unit system.
+ * Land/snow sports use km/h or mph per the user's preference.
  *
- * @param {Object} t - The translation function.
- * @param {Object} activity - The activity object containing speed and type information.
- * @param {string} unitSystem - The unit system to use ('metric' or 'imperial').
- * @param {Object|null} [lap=null] - Optional lap object to use for speed calculation.
- * @param {boolean} [units=true] - Whether to include units in the formatted string.
- * @returns {string} The formatted average speed, including units if specified, or a "No Data" label if unavailable.
+ * @param {Object} t - Translation function.
+ * @param {number} speed - Speed in meters per second.
+ * @param {Object} activity - Activity object (used for type dispatch).
+ * @param {string} unitSystem - 'metric' or 'imperial'.
+ * @param {boolean} [units=true] - Whether to append unit label.
+ * @returns {string} Formatted speed string, or "No data" label if invalid.
  */
-export function formatAverageSpeed(t, activity, unitSystem, lap = null, units = true) {
-  let speed = activity.average_speed
-  if (lap) {
-    speed = lap.enhanced_avg_speed
-  }
-  if (
-    activity.average_speed === null ||
-    activity.average_speed === undefined ||
-    activity.average_speed < 0
-  )
+export function formatSpeed(t, speed, activity, unitSystem, units = true) {
+  if (speed === null || speed === undefined || speed < 0) {
     return t('generalItems.labelNoData')
+  }
 
+  // Marine sports → knots (overrides metric/imperial preference)
+  if (activityTypeIsSailing(activity) || activityTypeIsWindsurf(activity)) {
+    if (units) {
+      return `${formatAverageSpeedKnots(speed)} ${t('generalItems.unitsKnots')}`
+    }
+    return `${formatAverageSpeedKnots(speed)}`
+  }
+
+  // Speed-based land/snow sports → km/h or mph
   if (
     activityTypeIsCycling(activity) ||
-    activityTypeIsWindsurf(activity) ||
-    activityTypeIsSailing(activity)
+    activityTypeIsSnowSkiing(activity) ||
+    activityTypeIsSnowboarding(activity) ||
+    activityTypeIsSkating(activity) ||
+    activityTypeIsIceSkating(activity)
   ) {
     if (unitSystem === 'metric') {
       if (units) {
         return `${formatAverageSpeedMetric(speed)} ${t('generalItems.unitsKmH')}`
       }
       return `${formatAverageSpeedMetric(speed)}`
-    } else {
-      if (units) {
-        return `${formatAverageSpeedImperial(speed)} ${t('generalItems.unitsMph')}`
-      }
-      return `${formatAverageSpeedImperial(speed)}`
     }
+    if (units) {
+      return `${formatAverageSpeedImperial(speed)} ${t('generalItems.unitsMph')}`
+    }
+    return `${formatAverageSpeedImperial(speed)}`
   }
   return t('generalItems.labelNoData')
+}
+
+export function formatAverageSpeed(t, activity, unitSystem, lap = null, units = true) {
+  const speed = lap ? lap.enhanced_avg_speed : activity.average_speed
+  return formatSpeed(t, speed, activity, unitSystem, units)
 }
 
 /**

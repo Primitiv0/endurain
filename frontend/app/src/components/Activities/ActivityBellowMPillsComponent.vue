@@ -59,18 +59,7 @@
           {{ $t('activityBellowMPillsComponent.labelAvgSpeed') }}
         </span>
         <span>
-          <span v-if="activity.average_speed && units === 'metric'"
-            ><b
-              >{{ formatAverageSpeedMetric(activity.average_speed)
-              }}{{ ' ' + $t('generalItems.unitsKmH') }}</b
-            ></span
-          >
-          <span v-else-if="activity.average_speed && units === 'imperial'"
-            ><b
-              >{{ formatAverageSpeedImperial(activity.average_speed)
-              }}{{ ' ' + $t('generalItems.unitsMph') }}</b
-            ></span
-          >
+          <b>{{ formatSpeed(t, activity.average_speed, activity, units) }}</b>
         </span>
       </div>
       <div class="d-flex justify-content-between mt-3" v-if="activity.max_speed">
@@ -78,18 +67,7 @@
           {{ $t('activityBellowMPillsComponent.labelMaxSpeed') }}
         </span>
         <span>
-          <span v-if="activity.max_speed && units === 'metric'"
-            ><b
-              >{{ formatAverageSpeedMetric(activity.max_speed)
-              }}{{ ' ' + $t('generalItems.unitsKmH') }}</b
-            ></span
-          >
-          <span v-else-if="activity.max_speed && units === 'imperial'"
-            ><b
-              >{{ formatAverageSpeedImperial(activity.max_speed)
-              }}{{ ' ' + $t('generalItems.unitsMph') }}</b
-            ></span
-          >
+          <b>{{ formatSpeed(t, activity.max_speed, activity, units) }}</b>
         </span>
       </div>
       <div class="d-flex justify-content-between mt-3" v-if="activity.total_elapsed_time">
@@ -315,23 +293,31 @@ import { push } from 'notivue'
 // Import the utils
 import { getHrBarChartData, formatHrZoneLabel } from '@/utils/chartUtils'
 import {
-  formatPaceMetric,
-  formatPaceImperial,
-  formatPaceSwimMetric,
-  formatPaceSwimImperial,
-  formatAverageSpeedMetric,
-  formatAverageSpeedImperial,
+  formatPace,
+  formatSpeed,
   activityTypeIsCycling,
-  activityTypeNotCycling,
   activityTypeIsSwimming,
-  activityTypeIsRowing,
   activityTypeIsSailing,
-  activityTypeNotSailing,
   activityTypeIsWindsurf,
-  activityTypeNotWindsurf
+  activityTypeIsSnowSkiing,
+  activityTypeIsSnowboarding,
+  activityTypeIsSkating,
+  activityTypeIsIceSkating
 } from '@/utils/activityUtils'
 import { formatSecondsToHoursMinutesSeconds } from '@/utils/dateTimeUtils'
 import { metersToFeet } from '@/utils/unitsUtils'
+
+function activityUsesSpeedDisplay(activity) {
+  return (
+    activityTypeIsCycling(activity) ||
+    activityTypeIsSailing(activity) ||
+    activityTypeIsWindsurf(activity) ||
+    activityTypeIsSnowSkiing(activity) ||
+    activityTypeIsSnowboarding(activity) ||
+    activityTypeIsSkating(activity) ||
+    activityTypeIsIceSkating(activity)
+  )
+}
 
 // Define props
 const props = defineProps({
@@ -405,20 +391,12 @@ onMounted(async () => {
           elePresent.value = true
         }
         if (props.activityActivityStreams[i].stream_type === 5) {
-          if (
-            activityTypeIsCycling(props.activity) ||
-            activityTypeIsSailing(props.activity) ||
-            activityTypeIsWindsurf(props.activity)
-          ) {
+          if (activityUsesSpeedDisplay(props.activity)) {
             velPresent.value = true
           }
         }
         if (props.activityActivityStreams[i].stream_type === 6) {
-          if (
-            activityTypeNotCycling(props.activity) &&
-            activityTypeNotSailing(props.activity) &&
-            activityTypeNotWindsurf(props.activity)
-          ) {
+          if (!activityUsesSpeedDisplay(props.activity)) {
             pacePresent.value = true
           }
         }
@@ -435,19 +413,7 @@ onMounted(async () => {
   }
 
   try {
-    if (activityTypeIsSwimming(props.activity) || activityTypeIsRowing(props.activity)) {
-      if (props.units === 'metric') {
-        formattedPace.value = computed(() => formatPaceSwimMetric(props.activity.pace))
-      } else {
-        formattedPace.value = computed(() => formatPaceSwimImperial(props.activity.pace))
-      }
-    } else {
-      if (props.units === 'metric') {
-        formattedPace.value = computed(() => formatPaceMetric(props.activity.pace))
-      } else {
-        formattedPace.value = computed(() => formatPaceImperial(props.activity.pace))
-      }
-    }
+    formattedPace.value = computed(() => formatPace(t, props.activity, props.units))
   } catch (error) {
     push.error(`${t('activitySummaryComponent.errorFetchingUserById')} - ${error}`)
   }
