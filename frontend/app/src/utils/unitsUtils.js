@@ -65,3 +65,8 @@ export function mlToFlOz(ml) {
 export function flOzToMl(flOz) {
   return Math.round(flOz * 29.5735)
 }
+
+export function celsiusToFahrenheit(celsius) {
+  return Number(((celsius * 9) / 5 + 32).toFixed(1))
+}
+

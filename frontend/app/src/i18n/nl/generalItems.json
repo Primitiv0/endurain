@@ -75,5 +75,6 @@
   "RHRLabel": "Rusthartslag",
   "labelHours": "Uren",
   "labelMinutes": "Minuten",
-  "labelHoursShort": "u"
+  "labelHoursShort": "u",
+  "labelTemperature": "Temperatuur"
 }

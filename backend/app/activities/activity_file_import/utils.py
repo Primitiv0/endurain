@@ -104,6 +104,8 @@ def build_activity_file_payload(
         "cad_waypoints": waypoints.get("cad_waypoints", []),
         "is_lat_lon_set": bool(waypoints.get("lat_lon_waypoints")),
         "lat_lon_waypoints": waypoints.get("lat_lon_waypoints", []),
+        "is_temperature_set": bool(waypoints.get("temp_waypoints")),
+        "temp_waypoints": waypoints.get("temp_waypoints", []),
         "laps": laps,
     }
     if extras:

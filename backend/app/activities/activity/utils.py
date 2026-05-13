@@ -1295,6 +1295,7 @@ def parse_activity_streams_from_file(parsed_info: dict, activity_id: int):
         5: ("is_velocity_set", "vel_waypoints"),
         6: ("is_velocity_set", "pace_waypoints"),
         7: ("is_lat_lon_set", "lat_lon_waypoints"),
+        8: ("is_temperature_set", "temp_waypoints"),
     }
 
     # Create a list of tuples containing stream type, is_set, and waypoints
@@ -1304,13 +1305,15 @@ def parse_activity_streams_from_file(parsed_info: dict, activity_id: int):
             (
                 is_set_key(parsed_info)
                 if callable(is_set_key)
-                else parsed_info[is_set_key]
+                else parsed_info.get(is_set_key, False)
             ),
-            parsed_info[waypoints_key],
+            parsed_info.get(waypoints_key, []),
         )
         for stream_type, (is_set_key, waypoints_key) in stream_mapping.items()
         if (
-            is_set_key(parsed_info) if callable(is_set_key) else parsed_info[is_set_key]
+            is_set_key(parsed_info)
+            if callable(is_set_key)
+            else parsed_info.get(is_set_key, False)
         )
     ]
 
@@ -1388,19 +1391,13 @@ def location_based_on_coordinates(
         longitude: Longitude in decimal degrees, or ``None``.
 
     Returns:
-        Dict with ``city``/``town``/``country`` keys (any of which
-        may be ``None``), or ``None`` when no provider is configured.
-
-    Raises:
-        HTTPException: 424 when the upstream provider errors out.
+        Dict with ``city``/``town``/``country`` keys (all non-None), or
+        ``None`` when no provider is configured, coordinates are missing,
+        all geocoded fields are empty, or the provider returns an error.
     """
     # Check if latitude and longitude are provided
     if latitude is None or longitude is None:
-        return {
-            "city": None,
-            "town": None,
-            "country": None,
-        }
+        return None
 
     # Create a dictionary with the parameters for the request
     if core_config.settings.REVERSE_GEO_PROVIDER == "nominatim":
@@ -1427,11 +1424,7 @@ def location_based_on_coordinates(
     elif core_config.settings.REVERSE_GEO_PROVIDER == "geocode":
         # Check if the API key is set
         if core_config.settings.GEOCODES_MAPS_API == "changeme":
-            return {
-                "city": None,
-                "town": None,
-                "country": None,
-            }
+            return None
         # Create the URL for the request
         url_params = {
             "lat": latitude,
@@ -1441,11 +1434,7 @@ def location_based_on_coordinates(
         url = f"https://geocode.maps.co/reverse?{urlencode(url_params)}"
     else:
         # If no provider is set, return None
-        return {
-            "city": None,
-            "town": None,
-            "country": None,
-        }
+        return None
 
     # Throttle requests according to configured rate limit
     if core_config.REVERSE_GEO_MIN_INTERVAL > 0:
@@ -1472,32 +1461,39 @@ def location_based_on_coordinates(
             data = response.json().get("address", {})
             # Return the location based on the coordinates
             # Note: 'town' is used for district in Geocode API
-            return {
-                "city": data.get("city"),
-                "town": data.get("town"),
-                "country": data.get("country"),
-            }
+            city = data.get("city")
+            town = data.get("town")
+            country = data.get("country")
+            if any([city, town, country]):
+                return {
+                    "city": city,
+                    "town": town,
+                    "country": country,
+                }
+            return None
 
         # Get the data from the response
         data_root = response.json().get("features", [])
         data = data_root[0].get("properties", {}) if data_root else {}
         # Return the location based on the coordinates
         # Note: 'district' is used for city and 'city' is used for town in Photon API
-        return {
-            "city": data.get("district"),
-            "town": data.get("city"),
-            "country": data.get("country"),
-        }
-    except requests.RequestException as err:
-        # Log the error with full detail; return a generic message
-        # to the caller (no upstream URL/exception leakage).
+        city = data.get("district")
+        town = data.get("city")
+        country = data.get("country")
+        if any([city, town, country]):
+            return {
+                "city": city,
+                "town": town,
+                "country": country,
+            }
+        return None
+    except Exception as err:
+        # Log the error; return None so the activity import can continue
+        # without location data rather than aborting the whole operation.
         core_logger.print_to_log_and_console(
             f"Error in location_based_on_coordinates - {err}", "error"
         )
-        raise HTTPException(
-            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail="Reverse geocoding provider error",
-        ) from err
+        return None
 
 
 def append_if_not_none(

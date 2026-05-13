@@ -231,6 +231,7 @@ export interface StreamWaypoint {
   ele?: string
   vel?: number
   pace?: number | null
+  temp?: number | null
 }
 
 /**

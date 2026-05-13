@@ -75,5 +75,6 @@
   "labelMaximum": "Máximo",
   "RHRLabel": "Pulso en repouso",
   "labelHours": "Horas",
-  "labelMinutes": "Minutos"
+  "labelMinutes": "Minutos",
+  "labelTemperature": "Temperatura"
 }

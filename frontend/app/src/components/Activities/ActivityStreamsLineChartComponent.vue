@@ -17,7 +17,7 @@ import {
   activityTypeIsRowing,
   activityTypeIsWalking
 } from '@/utils/activityUtils'
-import { metersToFeet, kmToMiles } from '@/utils/unitsUtils'
+import { metersToFeet, kmToMiles, celsiusToFahrenheit } from '@/utils/unitsUtils'
 import type { Activity, ActivityStream, StreamWaypoint } from '@/types'
 
 Chart.register(...registerables, zoomPlugin)
@@ -86,7 +86,7 @@ function formatPaceForTooltip(value: number | null | undefined): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
-type GraphType = 'hr' | 'power' | 'cad' | 'ele' | 'vel' | 'pace'
+type GraphType = 'hr' | 'power' | 'cad' | 'ele' | 'vel' | 'pace' | 'temp'
 
 const graphColors: Record<GraphType, GraphColors> = {
   hr: {
@@ -118,6 +118,11 @@ const graphColors: Record<GraphType, GraphColors> = {
     border: 'rgba(236, 72, 153, 0.8)',
     gradientStart: 'rgba(236, 72, 153, 0.4)',
     gradientEnd: 'rgba(236, 72, 153, 0.0)'
+  },
+  temp: {
+    border: 'rgba(253, 126, 20, 0.8)',
+    gradientStart: 'rgba(253, 126, 20, 0.4)',
+    gradientEnd: 'rgba(253, 126, 20, 0.0)'
   }
 }
 
@@ -256,6 +261,21 @@ const computedChartData = computed(() => {
           label = t('generalItems.labelPaceInMin100yd')
         }
       }
+    } else if (stream.stream_type === 8 && props.graphSelection === 'temp') {
+      for (const streamPoint of stream.stream_waypoints) {
+        let rawTemp = (streamPoint.temp !== undefined && streamPoint.temp !== null) ? Number(streamPoint.temp) : null
+        
+        if (rawTemp !== null) {
+          if (units.value === 'metric') {
+            data.push(rawTemp)
+          } else {
+            data.push(celsiusToFahrenheit(rawTemp))
+          }
+        } else {
+          data.push(data.length > 0 ? (data[data.length - 1] as number) : null)
+        }
+      }
+      label = t('generalItems.labelTemperature')
     }
   }
 
@@ -492,6 +512,9 @@ onMounted(() => {
                 return `${label}: ${value.toFixed(1)}`
               } else if (props.graphSelection === 'vel') {
                 return `${label}: ${value.toFixed(1)}`
+              } else if (props.graphSelection === 'temp') {
+                const tempUnit = units.value === 'metric' ? '°C' : '°F'
+                return `${label}: ${value.toFixed(1)} ${tempUnit}`
               }
 
               return `${label}: ${value}`

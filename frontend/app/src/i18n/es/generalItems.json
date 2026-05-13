@@ -58,5 +58,6 @@
   "genderFemale": "Mujer",
   "genderUnspecified": "Sin especificar",
   "labelAverage": "Promedio",
-  "labelMaximum": "Máximo"
+  "labelMaximum": "Máximo",
+  "labelTemperature": "Temperatura"
 }

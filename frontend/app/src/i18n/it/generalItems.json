@@ -53,5 +53,6 @@
   "currencyPound": "Sterlina britannica",
   "genderMale": "Maschio",
   "genderFemale": "Femmina",
-  "genderUnspecified": "Non specificato"
+  "genderUnspecified": "Non specificato",
+  "labelTemperature": "Temperatura"
 }

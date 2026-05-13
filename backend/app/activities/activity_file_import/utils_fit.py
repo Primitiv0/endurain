@@ -191,6 +191,7 @@ def create_activity_objects(
                 "pace_waypoints": session_record["pace_waypoints"],
                 "cad_waypoints": session_record["cad_waypoints"],
                 "lat_lon_waypoints": session_record["lat_lon_waypoints"],
+                "temp_waypoints": session_record.get("temp_waypoints", []),
             }
             extras = {
                 "sets": session_record["sets"],
@@ -229,6 +230,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
     power_waypoints = parsed_data.get("power_waypoints", [])
     vel_waypoints = parsed_data.get("vel_waypoints", [])
     pace_waypoints = parsed_data.get("pace_waypoints", [])
+    temp_waypoints = parsed_data.get("temp_waypoints", [])
 
     # Check for each auxiliary flag
     is_lat_lon_set = parsed_data.get("is_lat_lon_set", False)
@@ -237,6 +239,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
     is_cadence_set = parsed_data.get("is_cadence_set", False)
     is_power_set = parsed_data.get("is_power_set", False)
     is_velocity_set = parsed_data.get("is_velocity_set", False)
+    is_temperature_set = parsed_data.get("is_temperature_set", False)
 
     # Dictionary to hold split waypoints per activity
     activity_waypoints = {
@@ -248,6 +251,7 @@ def split_records_by_activity(parsed_data: dict) -> dict:
             "power_waypoints": [] if is_power_set else None,
             "vel_waypoints": [] if is_velocity_set else None,
             "pace_waypoints": [] if is_velocity_set else None,
+            "temp_waypoints": [] if is_temperature_set else None,
         }
         for i in range(len(sessions))
     }
@@ -300,6 +304,8 @@ def split_records_by_activity(parsed_data: dict) -> dict:
             "vel_waypoints": [],
             "pace_waypoints": [],
             "is_velocity_set": False,
+            "temp_waypoints": [],
+            "is_temperature_set": False,
             "laps": laps_records,
             "split_summary": parsed_data["split_summary"],
             "workout_steps": parsed_data["workout_steps"],
@@ -324,6 +330,8 @@ def split_records_by_activity(parsed_data: dict) -> dict:
         if is_velocity_set:
             raw_streams["vel_waypoints"] = vel_waypoints
             raw_streams["pace_waypoints"] = pace_waypoints
+        if is_temperature_set:
+            raw_streams["temp_waypoints"] = temp_waypoints
 
         filtered = activity_file_import_utils.filter_streams_by_time_range(
             raw_streams, start_time, end_time
@@ -392,6 +400,12 @@ def split_records_by_activity(parsed_data: dict) -> dict:
                 parsed_session["pace_waypoints"] = filtered["pace_waypoints"]
                 parsed_session["is_velocity_set"] = True
 
+        if is_temperature_set:
+            activity_waypoints[i]["temp_waypoints"] = filtered["temp_waypoints"]
+            if filtered["temp_waypoints"]:
+                parsed_session["temp_waypoints"] = filtered["temp_waypoints"]
+                parsed_session["is_temperature_set"] = True
+
         # Append the parsed session to the sessions list
         sessions_records.append(parsed_session)
 
@@ -431,6 +445,7 @@ class FitParseState:
     power_waypoints: list[dict] = field(default_factory=list)
     vel_waypoints: list[dict] = field(default_factory=list)
     pace_waypoints: list[dict] = field(default_factory=list)
+    temp_waypoints: list[dict] = field(default_factory=list)
     prev_latitude: float | None = None
     prev_longitude: float | None = None
     is_lat_lon_set: bool = False
@@ -439,6 +454,7 @@ class FitParseState:
     is_heart_rate_set: bool = False
     is_cadence_set: bool = False
     is_velocity_set: bool = False
+    is_temperature_set: bool = False
 
     def reset_record_cursor(self) -> None:
         """Clear cursors that must not bridge across FIT sessions."""
@@ -461,6 +477,8 @@ class FitParseState:
             "is_velocity_set": self.is_velocity_set,
             "vel_waypoints": self.vel_waypoints,
             "pace_waypoints": self.pace_waypoints,
+            "is_temperature_set": self.is_temperature_set,
+            "temp_waypoints": self.temp_waypoints,
             "is_cadence_set": self.is_cadence_set,
             "cad_waypoints": self.cad_waypoints,
             "is_lat_lon_set": self.is_lat_lon_set,
@@ -598,6 +616,7 @@ def _handle_record_frame(frame, state: FitParseState) -> None:
         heart_rate,
         cadence,
         power,
+        temperature,
     ) = parse_frame_record(frame)
 
     if elevation is not None:
@@ -608,6 +627,8 @@ def _handle_record_frame(frame, state: FitParseState) -> None:
         state.is_cadence_set = True
     if power is not None:
         state.is_power_set = True
+    if temperature is not None:
+        state.is_temperature_set = True
 
     instant_speed = None
     if (
@@ -655,6 +676,9 @@ def _handle_record_frame(frame, state: FitParseState) -> None:
     )
     activities_utils.append_if_not_none(
         state.pace_waypoints, timestamp, instant_pace, "pace"
+    )
+    activities_utils.append_if_not_none(
+        state.temp_waypoints, timestamp, temperature, "temp"
     )
 
     state.prev_latitude = latitude
@@ -815,11 +839,12 @@ def parse_frame_record(frame):
     heart_rate = get_value_from_frame(frame, "heart_rate")
     cadence = get_value_from_frame(frame, "cadence")
     power = get_value_from_frame(frame, "power")
+    temperature = get_value_from_frame(frame, "temperature")
 
     latitude, longitude = convert_coordinates_to_degrees(latitude, longitude)
 
     # Return all extracted values
-    return latitude, longitude, elevation, time, heart_rate, cadence, power
+    return latitude, longitude, elevation, time, heart_rate, cadence, power, temperature
 
 
 def parse_frame_lap(frame):

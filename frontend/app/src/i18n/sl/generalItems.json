@@ -73,5 +73,6 @@
   "labelMaximum": "Največ",
   "RHRLabel": "Srčni utrip v mirovanju",
   "labelHours": "Ur",
-  "labelMinutes": "Minut"
+  "labelMinutes": "Minut",
+  "labelTemperature": "Temperatura"
 }

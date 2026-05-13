@@ -79,8 +79,9 @@
   "markdownEditor": {
     "showPreview": "Aperçu",
     "hidePreview": "Modifier",
-    "markdownSupported": "Options de filtrage",
+    "markdownSupported": "Options de formattage",
     "noContentToPreview": "Aucun contenu à prévisualiser"
   },
-  "filterOptionsLabel": "Options de filtrage"
+  "filterOptionsLabel": "Options de filtrage",
+  "labelTemperature": "Température"
 }

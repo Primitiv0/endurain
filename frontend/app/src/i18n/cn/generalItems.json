@@ -76,5 +76,6 @@
   "genderFemale": "女",
   "genderUnspecified": "未指定",
   "labelAverage": "平均",
-  "labelMaximum": "最大值"
+  "labelMaximum": "最大值",
+  "labelTemperature": "温度"
 }
