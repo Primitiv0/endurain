@@ -126,19 +126,36 @@ class TestGetPasswordResetEmail:
         )
         assert "Alice & Bob" in text_body
 
-    def test_pt_subject_differs_from_us(self):
-        """Portuguese subject differs from the English subject."""
-        subject_us, _, _ = email_messages.get_password_reset_email(
-            "Alice",
-            "https://example.com/reset",
-            _make_service(),
-            locale="us",
-        )
-        subject_pt, _, _ = email_messages.get_password_reset_email(
-            "Alice",
-            "https://example.com/reset",
-            _make_service(),
-            locale="pt",
-        )
+    def test_pt_subject_differs_from_us(self, monkeypatch, tmp_path):
+        """Translated catalogs produce locale-specific subjects."""
+        # Drive the test off isolated on-disk catalogs so we do not
+        # depend on which non-default catalogs ship with the repo.
+        import json as _json
+
+        import core.i18n as core_i18n
+
+        for code, subj in (("us", "EN subject"), ("pt", "PT subject")):
+            (tmp_path / code).mkdir()
+            (tmp_path / code / "email.json").write_text(
+                _json.dumps({"password_reset.subject": subj}),
+                encoding="utf-8",
+            )
+        monkeypatch.setattr(core_i18n, "_LOCALES_DIR", tmp_path)
+        core_i18n._load_catalog.cache_clear()
+        try:
+            subject_us, _, _ = email_messages.get_password_reset_email(
+                "Alice",
+                "https://example.com/reset",
+                _make_service(),
+                locale="us",
+            )
+            subject_pt, _, _ = email_messages.get_password_reset_email(
+                "Alice",
+                "https://example.com/reset",
+                _make_service(),
+                locale="pt",
+            )
+        finally:
+            core_i18n._load_catalog.cache_clear()
         assert subject_us != subject_pt
 

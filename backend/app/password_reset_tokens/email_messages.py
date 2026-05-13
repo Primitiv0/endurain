@@ -21,42 +21,36 @@ def get_password_reset_email(
         user_name: The recipient's display name.
         reset_link: The URL for resetting the password.
         email_service: AppriseService for footer metadata.
-        locale: Preferred locale code for the recipient.
-            Falls back to ``"us"`` if unsupported or None.
+        locale: Preferred locale code for the recipient. Falls back
+            to ``"us"`` if unsupported or ``None``.
 
     Returns:
         A 3-tuple of (subject, html_content, text_content).
     """
     safe_name = html.escape(user_name)
-    lang = core_i18n.html_lang(locale)
 
     def tr(key: str, **kwargs: str) -> str:
         return core_i18n.t(key, locale, **kwargs)
 
     subject = tr("password_reset.subject")
     heading = tr("password_reset.heading")
-    greeting = tr("password_reset.greeting", name=safe_name)
     intro = tr("password_reset.intro")
     cta = tr("password_reset.cta")
     security_label = tr("password_reset.security_label")
     security_notice = tr("password_reset.security_notice")
     ignore = tr("password_reset.ignore")
     copy_link = tr("common.copy_link")
-    best_regards = tr("common.best_regards")
-    team = tr("common.team")
-    visit = tr("common.visit")
-    source_code = tr("common.source_code")
 
-    frontend_host = html.escape(email_service.frontend_host)
-    safe_reset_link = url_quote(reset_link, safe=":/?=&%#@")
     color = core_email_templates.LINK_COLOR_PRIMARY
+    # Defense in depth: percent-encode the URL, then HTML-escape it
+    # before placing it into href and <p> contexts so a future change
+    # that puts user-controlled data into the link cannot break out.
+    safe_reset_link = html.escape(
+        url_quote(reset_link, safe=":/?=&%#@"), quote=True
+    )
 
-    html_content = (
-        core_email_templates.html_header(
-            html.escape(subject), html.escape(heading), lang
-        )
-        + f"""
-            <p>{greeting}</p>
+    body_inner = f"""
+            <p>{tr("password_reset.greeting", name=safe_name)}</p>
             <p>{intro}</p>
             <div style="text-align: center; margin: 30px 0;">
                 <a
@@ -76,27 +70,26 @@ def get_password_reset_email(
             </div>
             <p>{ignore}</p>
             <p>{copy_link}</p>
-            <p style="word-break: break-all; color: {color};">"""
-        + f"""{safe_reset_link}</p>"""
-        + core_email_templates.html_footer(
-            frontend_host=frontend_host,
-            link_color=color,
-            best_regards=best_regards,
-            sign_off=team,
-            visit_label=visit,
-            source_code_label=source_code,
-        )
+            <p style="word-break: break-all; color: {color};">{safe_reset_link}</p>"""
+
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
     )
 
+    labels = core_i18n.common_labels(locale)
     text_content = (
         f"{tr('password_reset.greeting', name=user_name)}\n\n"
         f"{intro}\n"
         f"{reset_link}\n\n"
         f"{security_notice}\n\n"
         f"{ignore}\n\n"
-        f"{best_regards}\n"
-        f"{team}"
+        f"{labels['best_regards']}\n"
+        f"{labels['team']}"
     )
 
     return subject, html_content, text_content
-

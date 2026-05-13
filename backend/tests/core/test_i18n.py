@@ -1,6 +1,31 @@
 """Tests for backend i18n helpers."""
 
+import json
+
+import pytest
+
 import core.i18n as core_i18n
+
+
+@pytest.fixture
+def isolated_catalogs(tmp_path, monkeypatch):
+    """
+    Point :mod:`core.i18n` at an isolated locales directory and clear
+    the catalog LRU cache so tests cannot leak data into each other.
+    """
+    monkeypatch.setattr(core_i18n, "_LOCALES_DIR", tmp_path)
+    core_i18n._load_catalog.cache_clear()
+    yield tmp_path
+    core_i18n._load_catalog.cache_clear()
+
+
+def _write_catalog(root, locale, payload):
+    """Write a catalog JSON file under ``root/locale/email.json``."""
+    locale_dir = root / locale
+    locale_dir.mkdir(parents=True, exist_ok=True)
+    (locale_dir / "email.json").write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
 
 
 class TestNormalizeLocale:
@@ -40,6 +65,18 @@ class TestNormalizeLocale:
             assert core_i18n.normalize_locale(locale) == locale
 
 
+class TestSupportedLocalesSource:
+    """SUPPORTED_LOCALES must be derived from the Language enum."""
+
+    def test_matches_language_enum(self):
+        """Every Language enum value appears in SUPPORTED_LOCALES."""
+        from users.users.schema import Language
+
+        assert core_i18n.SUPPORTED_LOCALES == frozenset(
+            language.value for language in Language
+        )
+
+
 class TestHtmlLang:
     """Tests for html_lang."""
 
@@ -63,14 +100,22 @@ class TestHtmlLang:
         """'tw' maps to 'zh-Hant'."""
         assert core_i18n.html_lang("tw") == "zh-Hant"
 
-    def test_unmapped_supported_locale_returns_itself(self):
-        """Supported locales without explicit mapping return code."""
-        result = core_i18n.html_lang("de")
-        assert result == "de"
+    def test_de_returns_de_de(self):
+        """'de' maps to the region-tagged 'de-DE'."""
+        assert core_i18n.html_lang("de") == "de-DE"
+
+    def test_es_returns_es_es(self):
+        """'es' maps to the region-tagged 'es-ES'."""
+        assert core_i18n.html_lang("es") == "es-ES"
 
     def test_unsupported_falls_back_to_en_us(self):
         """Unsupported locale normalizes to 'us' → 'en-US'."""
         assert core_i18n.html_lang("xx") == "en-US"
+
+    def test_every_supported_locale_has_region_tag(self):
+        """Every supported locale must have an explicit BCP 47 entry."""
+        for locale in core_i18n.SUPPORTED_LOCALES:
+            assert locale in core_i18n.HTML_LANG_BY_LOCALE
 
 
 class TestTranslate:
@@ -99,14 +144,57 @@ class TestTranslate:
         )
         assert "Alice" in result
 
-    def test_pt_subject_differs_from_us(self):
-        """Portuguese subject differs from the English one."""
-        en_subject = core_i18n.t("password_reset.subject", "us")
-        pt_subject = core_i18n.t("password_reset.subject", "pt")
-        assert en_subject != pt_subject
+    def test_pt_subject_differs_from_us(self, isolated_catalogs):
+        """Translated catalog returns a locale-specific subject."""
+        _write_catalog(
+            isolated_catalogs, "us", {"k.subject": "English subject"}
+        )
+        _write_catalog(
+            isolated_catalogs, "pt", {"k.subject": "Portuguese subject"}
+        )
+        assert core_i18n.t("k.subject", "pt") == "Portuguese subject"
+        assert core_i18n.t("k.subject", "us") == "English subject"
+
+    def test_missing_key_in_locale_falls_back_to_us(self, isolated_catalogs):
+        """A key missing from the locale catalog reads from us catalog."""
+        _write_catalog(isolated_catalogs, "us", {"only.in.us": "default"})
+        _write_catalog(isolated_catalogs, "pt", {"other.key": "x"})
+        assert core_i18n.t("only.in.us", "pt") == "default"
 
     def test_none_locale_returns_english(self):
         """None locale produces the same result as 'us'."""
         assert core_i18n.t("password_reset.subject", None) == (
             core_i18n.t("password_reset.subject", "us")
         )
+
+
+class TestCommonLabels:
+    """Tests for common_labels helper."""
+
+    def test_returns_expected_keys(self):
+        """common_labels exposes every shared footer/body label."""
+        labels = core_i18n.common_labels("us")
+        for key in (
+            "best_regards",
+            "team",
+            "system",
+            "visit",
+            "source_code",
+            "copy_link",
+        ):
+            assert key in labels and labels[key]
+
+    def test_falls_back_to_us_for_unknown_locale(self):
+        """Unknown locale produces the English labels."""
+        assert core_i18n.common_labels("xx") == core_i18n.common_labels("us")
+
+
+class TestLoadCatalogPathSafety:
+    """_load_catalog must reject locales not in SUPPORTED_LOCALES."""
+
+    def test_unsupported_locale_uses_default(self, isolated_catalogs):
+        """A non-allow-listed locale is silently coerced to default."""
+        _write_catalog(isolated_catalogs, "us", {"k": "v"})
+        # Even an attempted path-traversal segment is rejected.
+        result = core_i18n._load_catalog("../etc")
+        assert result == {"k": "v"}

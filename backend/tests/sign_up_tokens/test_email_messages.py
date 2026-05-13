@@ -164,22 +164,43 @@ class TestGetAdminSignupNotificationEmail:
         )
         assert "<script>" not in html_body
 
-    def test_uses_admin_locale_not_new_user_locale(self):
-        """Admin locale is used, independent of new user locale."""
-        subject_pt, _, _ = email_messages.get_admin_signup_notification_email(
-            "Admin",
-            "New User",
-            "newuser",
-            _make_service(),
-            locale="pt",
-        )
-        subject_us, _, _ = email_messages.get_admin_signup_notification_email(
-            "Admin",
-            "New User",
-            "newuser",
-            _make_service(),
-            locale="us",
-        )
+    def test_uses_admin_locale_not_new_user_locale(
+        self, monkeypatch, tmp_path
+    ):
+        """Different admin locales produce different subjects."""
+        import json as _json
+
+        import core.i18n as core_i18n
+
+        for code, subj in (("us", "EN subj"), ("pt", "PT subj")):
+            (tmp_path / code).mkdir()
+            (tmp_path / code / "email.json").write_text(
+                _json.dumps({"admin_signup.subject": subj}),
+                encoding="utf-8",
+            )
+        monkeypatch.setattr(core_i18n, "_LOCALES_DIR", tmp_path)
+        core_i18n._load_catalog.cache_clear()
+        try:
+            subject_pt, _, _ = (
+                email_messages.get_admin_signup_notification_email(
+                    "Admin",
+                    "New User",
+                    "newuser",
+                    _make_service(),
+                    locale="pt",
+                )
+            )
+            subject_us, _, _ = (
+                email_messages.get_admin_signup_notification_email(
+                    "Admin",
+                    "New User",
+                    "newuser",
+                    _make_service(),
+                    locale="us",
+                )
+            )
+        finally:
+            core_i18n._load_catalog.cache_clear()
         assert subject_pt != subject_us
 
 
@@ -228,12 +249,12 @@ class TestGetUserSignupApprovedEmail:
         assert "<script>" not in html_body
 
     def test_html_lang_es(self):
-        """HTML uses 'es' lang tag for Spanish locale."""
+        """HTML uses 'es-ES' lang tag for Spanish locale."""
         _, html_body, _ = email_messages.get_user_signup_approved_email(
             "Alice",
             "alice99",
             _make_service(),
             locale="es",
         )
-        assert 'lang="es"' in html_body
+        assert 'lang="es-ES"' in html_body
 

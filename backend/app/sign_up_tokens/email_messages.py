@@ -26,35 +26,28 @@ def get_signup_confirmation_email(
         A 3-tuple of (subject, html_content, text_content).
     """
     safe_name = html.escape(user_name)
-    lang = core_i18n.html_lang(locale)
 
     def tr(key: str, **kwargs: str) -> str:
         return core_i18n.t(key, locale, **kwargs)
 
     subject = tr("signup_confirmation.subject")
     heading = tr("signup_confirmation.heading")
-    greeting = tr("signup_confirmation.greeting", name=safe_name)
     intro = tr("signup_confirmation.intro")
     cta = tr("signup_confirmation.cta")
     security_label = tr("signup_confirmation.security_label")
     security_notice = tr("signup_confirmation.security_notice")
     ignore = tr("signup_confirmation.ignore")
     copy_link = tr("common.copy_link")
-    best_regards = tr("common.best_regards")
-    team = tr("common.team")
-    visit = tr("common.visit")
-    source_code = tr("common.source_code")
 
-    frontend_host = html.escape(email_service.frontend_host)
-    safe_signup_link = url_quote(signup_link, safe=":/?=&%#@")
     color = core_email_templates.LINK_COLOR_SUCCESS
+    # Defense in depth: percent-encode then HTML-escape the link
+    # before it lands in href and visible-text contexts.
+    safe_signup_link = html.escape(
+        url_quote(signup_link, safe=":/?=&%#@"), quote=True
+    )
 
-    html_content = (
-        core_email_templates.html_header(
-            html.escape(subject), html.escape(heading), lang
-        )
-        + f"""
-            <p>{greeting}</p>
+    body_inner = f"""
+            <p>{tr("signup_confirmation.greeting", name=safe_name)}</p>
             <p>{intro}</p>
             <div style="text-align: center; margin: 30px 0;">
                 <a
@@ -74,26 +67,26 @@ def get_signup_confirmation_email(
             </div>
             <p>{ignore}</p>
             <p>{copy_link}</p>
-            <p style="word-break: break-all; color: {color};">"""
-        + f"""{safe_signup_link}</p>"""
-        + core_email_templates.html_footer(
-            frontend_host=frontend_host,
-            link_color=color,
-            best_regards=best_regards,
-            sign_off=team,
-            visit_label=visit,
-            source_code_label=source_code,
-        )
+            <p style="word-break: break-all; color: {color};">{safe_signup_link}</p>"""
+
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
     )
 
+    labels = core_i18n.common_labels(locale)
     text_content = (
         f"{tr('signup_confirmation.greeting', name=user_name)}\n\n"
         f"{intro}\n"
         f"{signup_link}\n\n"
         f"{security_notice}\n\n"
         f"{ignore}\n\n"
-        f"{best_regards}\n"
-        f"{team}"
+        f"{labels['best_regards']}\n"
+        f"{labels['team']}"
     )
 
     return subject, html_content, text_content
@@ -120,41 +113,31 @@ def get_admin_signup_notification_email(
     """
     safe_name = html.escape(user_name)
     safe_sign_up_name = html.escape(sign_up_user_name)
-    lang = core_i18n.html_lang(locale)
 
     def tr(key: str, **kwargs: str) -> str:
         return core_i18n.t(key, locale, **kwargs)
 
     subject = tr("admin_signup.subject")
     heading = tr("admin_signup.heading")
-    greeting = tr("admin_signup.greeting", name=safe_name)
     intro = tr("admin_signup.intro")
     user_label = tr("admin_signup.user_label")
     review = tr("admin_signup.review")
     cta = tr("admin_signup.cta")
     copy_link = tr("common.copy_link")
-    best_regards = tr("common.best_regards")
-    system = tr("common.system")
-    visit = tr("common.visit")
-    source_code = tr("common.source_code")
 
-    frontend_host = html.escape(email_service.frontend_host)
     color = core_email_templates.LINK_COLOR_SUCCESS
 
-    # URL-encode username for query-string safety.
+    # URL-encode username for query-string safety, then HTML-escape
+    # the assembled URL before placing it into href and text contexts.
     encoded_username = url_quote(sign_up_user_username, safe="")
     admin_link = (
         f"{email_service.frontend_host}"
         f"/settings?tab=users&username={encoded_username}"
     )
-    safe_admin_link = html.escape(admin_link)
+    safe_admin_link = html.escape(admin_link, quote=True)
 
-    html_content = (
-        core_email_templates.html_header(
-            html.escape(subject), html.escape(heading), lang
-        )
-        + f"""
-            <p>{greeting}</p>
+    body_inner = f"""
+            <p>{tr("admin_signup.greeting", name=safe_name)}</p>
             <p>{intro}</p>
             <div
                 style="background-color: #e9ecef;
@@ -174,26 +157,27 @@ def get_admin_signup_notification_email(
                 >{cta}</a>
             </div>
             <p>{copy_link}</p>
-            <p style="word-break: break-all; color: {color};">"""
-        + f"""{safe_admin_link}</p>"""
-        + core_email_templates.html_footer(
-            frontend_host=frontend_host,
-            link_color=color,
-            best_regards=best_regards,
-            sign_off=system,
-            visit_label=visit,
-            source_code_label=source_code,
-        )
+            <p style="word-break: break-all; color: {color};">{safe_admin_link}</p>"""
+
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
+        sign_off_key="system",
     )
 
+    labels = core_i18n.common_labels(locale)
     text_content = (
         f"{tr('admin_signup.greeting', name=user_name)}\n\n"
         f"{intro}\n"
         f"{user_label} {sign_up_user_name}\n\n"
         f"{review}\n"
         f"{admin_link}\n\n"
-        f"{best_regards}\n"
-        f"{system}"
+        f"{labels['best_regards']}\n"
+        f"{labels['system']}"
     )
 
     return subject, html_content, text_content
@@ -218,35 +202,25 @@ def get_user_signup_approved_email(
     """
     safe_name = html.escape(sign_up_user_name)
     safe_username = html.escape(sign_up_user_username)
-    lang = core_i18n.html_lang(locale)
 
     def tr(key: str, **kwargs: str) -> str:
         return core_i18n.t(key, locale, **kwargs)
 
     subject = tr("signup_approved.subject")
     heading = tr("signup_approved.heading")
-    greeting = tr("signup_approved.greeting", name=safe_name)
     intro = tr("signup_approved.intro")
     username_label = tr("signup_approved.username_label")
     login_intro = tr("signup_approved.login_intro")
     cta = tr("signup_approved.cta")
     copy_link = tr("common.copy_link")
-    best_regards = tr("common.best_regards")
-    team = tr("common.team")
-    visit = tr("common.visit")
-    source_code = tr("common.source_code")
 
-    frontend_host = html.escape(email_service.frontend_host)
     color = core_email_templates.LINK_COLOR_SUCCESS
     login_link = f"{email_service.frontend_host}/login"
-    safe_login_link = html.escape(login_link)
+    # Defense in depth: HTML-escape before insertion into HTML contexts.
+    safe_login_link = html.escape(login_link, quote=True)
 
-    html_content = (
-        core_email_templates.html_header(
-            html.escape(subject), html.escape(heading), lang
-        )
-        + f"""
-            <p>{greeting}</p>
+    body_inner = f"""
+            <p>{tr("signup_approved.greeting", name=safe_name)}</p>
             <p>{intro}</p>
             <div
                 style="background-color: #e9ecef;
@@ -266,26 +240,26 @@ def get_user_signup_approved_email(
                 >{cta}</a>
             </div>
             <p>{copy_link}</p>
-            <p style="word-break: break-all; color: {color};">"""
-        + f"""{safe_login_link}</p>"""
-        + core_email_templates.html_footer(
-            frontend_host=frontend_host,
-            link_color=color,
-            best_regards=best_regards,
-            sign_off=team,
-            visit_label=visit,
-            source_code_label=source_code,
-        )
+            <p style="word-break: break-all; color: {color};">{safe_login_link}</p>"""
+
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
     )
 
+    labels = core_i18n.common_labels(locale)
     text_content = (
         f"{tr('signup_approved.greeting', name=sign_up_user_name)}\n\n"
         f"{intro}\n"
         f"{username_label} {sign_up_user_username}\n\n"
         f"{login_intro}\n"
         f"{login_link}\n\n"
-        f"{best_regards}\n"
-        f"{team}"
+        f"{labels['best_regards']}\n"
+        f"{labels['team']}"
     )
 
     return subject, html_content, text_content

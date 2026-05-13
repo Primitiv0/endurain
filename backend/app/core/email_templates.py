@@ -1,5 +1,9 @@
 """Shared HTML email template helpers for all Endurain email builders."""
 
+import html
+
+import core.i18n as core_i18n
+
 # Bootstrap-derived brand colours used across email templates.
 LINK_COLOR_PRIMARY = "#0d6efd"  # blue  – password reset
 LINK_COLOR_SUCCESS = "#198754"  # green – sign-up flows
@@ -128,3 +132,59 @@ def html_footer(
 </body>
 
 </html>"""
+
+
+def wrap_email(
+    *,
+    locale: str | None,
+    subject: str,
+    heading: str,
+    body_inner: str,
+    frontend_host: str,
+    link_color: str,
+    sign_off_key: str = "team",
+) -> str:
+    """
+    Render a complete localized email by wrapping ``body_inner`` in the
+    shared header/footer chrome.
+
+    Centralizes the boilerplate that every email builder used to repeat
+    (HTML escaping of header/footer fields, fetching the six common
+    catalog labels, computing the BCP 47 ``lang`` tag, and threading
+    them into :func:`html_header` and :func:`html_footer`).
+
+    Args:
+        locale: Raw recipient locale string or None.
+        subject: Pre-translated subject line. Will be HTML-escaped
+            before insertion into ``<title>``.
+        heading: Pre-translated ``<h3>`` heading. Will be HTML-escaped.
+        body_inner: HTML fragment for the email body. The caller is
+            responsible for escaping any user-controlled values inside
+            this fragment.
+        frontend_host: Base URL of the Endurain frontend. Will be
+            HTML-escaped before use in attribute and text contexts.
+        link_color: CSS colour for footer anchors (use
+            :data:`LINK_COLOR_PRIMARY` or :data:`LINK_COLOR_SUCCESS`).
+        sign_off_key: Which common label to use as the sign-off; one
+            of ``"team"`` or ``"system"``. Defaults to ``"team"``.
+
+    Returns:
+        A complete HTML document string.
+    """
+    labels = core_i18n.common_labels(locale)
+    sign_off = labels.get(sign_off_key, labels["team"])
+    lang = core_i18n.html_lang(locale)
+    safe_host = html.escape(frontend_host, quote=True)
+
+    return (
+        html_header(html.escape(subject), html.escape(heading), lang)
+        + body_inner
+        + html_footer(
+            frontend_host=safe_host,
+            link_color=link_color,
+            best_regards=labels["best_regards"],
+            sign_off=sign_off,
+            visit_label=labels["visit"],
+            source_code_label=labels["source_code"],
+        )
+    )
