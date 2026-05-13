@@ -673,6 +673,17 @@ export function formatSpeed(t, speed, activity, unitSystem, units = true) {
   return t('generalItems.labelNoData')
 }
 
+/**
+ * Formats the average speed of an activity based on the unit system and activity type.
+ * Delegates to {@link formatSpeed} after resolving the speed value from the activity or lap.
+ *
+ * @param {Object} t - The translation function.
+ * @param {Object} activity - The activity object containing speed and type information.
+ * @param {string} unitSystem - The unit system to use ('metric' or 'imperial').
+ * @param {Object|null} [lap=null] - Optional lap object; when provided, uses lap.enhanced_avg_speed instead of activity.average_speed.
+ * @param {boolean} [units=true] - Whether to include units in the formatted string.
+ * @returns {string} The formatted average speed including units if specified, or a "No Data" label if unavailable.
+ */
 export function formatAverageSpeed(t, activity, unitSystem, lap = null, units = true) {
   const speed = lap ? lap.enhanced_avg_speed : activity.average_speed
   return formatSpeed(t, speed, activity, unitSystem, units)
