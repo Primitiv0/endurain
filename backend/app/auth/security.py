@@ -31,6 +31,9 @@ from sqlalchemy.orm import Session
 
 import auth.constants as auth_constants
 import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
+
+from joserfc.errors import MissingClaimError
 
 import users.users.utils as users_utils
 
@@ -461,6 +464,24 @@ def validate_refresh_token(
             exc=http_err,
             context={"refresh_token": "[REDACTED]"},
         )
+        # If a pre-upgrade token (e.g. missing the ``typ`` claim) reaches
+        # this point the SPA would otherwise loop forever: every page load
+        # would resend the same stale cookie, refresh would 401, and the
+        # client would never recover. Attach a Set-Cookie header that
+        # evicts ``endurain_refresh_token`` so the browser drops the
+        # legacy token and the next request falls through to the login
+        # screen instead. We only do this for ``MissingClaimError``-style
+        # failures to avoid logging users out on transient issues.
+        if isinstance(http_err.__cause__, MissingClaimError):
+            headers = dict(http_err.headers or {})
+            headers["Set-Cookie"] = (
+                auth_utils.build_clear_refresh_token_cookie_header()
+            )
+            raise HTTPException(
+                status_code=http_err.status_code,
+                detail=http_err.detail,
+                headers=headers,
+            ) from http_err
         raise
 
 

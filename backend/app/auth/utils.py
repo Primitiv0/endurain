@@ -193,6 +193,27 @@ def set_refresh_token_cookie(
     )
 
 
+def build_clear_refresh_token_cookie_header() -> str:
+    """Return a ``Set-Cookie`` header value that clears the refresh cookie.
+
+    Used when an HTTPException is raised from a dependency (e.g. when a
+    pre-upgrade refresh token without the ``typ`` claim is rejected) and
+    the response object cannot be mutated directly. Mirrors the attributes
+    of :func:`set_refresh_token_cookie` so the browser actually treats the
+    two cookies as the same and evicts it.
+    """
+    parts = [
+        'endurain_refresh_token=""',
+        "Max-Age=0",
+        "Path=/api/v1/auth",
+        "HttpOnly",
+        "SameSite=strict",
+    ]
+    if _is_secure_cookie_environment():
+        parts.append("Secure")
+    return "; ".join(parts)
+
+
 def complete_login(
     response: Response,
     request: Request,
