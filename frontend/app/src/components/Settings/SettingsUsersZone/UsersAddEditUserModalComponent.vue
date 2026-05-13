@@ -788,6 +788,7 @@ async function submitEditUserForm() {
       email_verified: newEditUserEmailVerified.value,
       pending_admin_approval: newEditUserPendingAdminApproval.value
     }
+    let updatedUser = data
     if (props.action === 'profile') {
       // Self-service profile endpoint enforces a strict allow-list and silently
       // drops administrative fields. Send only the fields the backend accepts so
@@ -801,6 +802,7 @@ async function submitEditUserForm() {
         ...profileData
       } = data
       await profile.editProfile(profileData)
+      updatedUser = await profile.getProfileInfo()
     } else {
       const editedUser = await users.editUser(data.id, data)
       data.external_auth_count = editedUser.external_auth_count
@@ -808,7 +810,7 @@ async function submitEditUserForm() {
     if (newEditUserPhotoFile.value) {
       try {
         if (props.action === 'profile') {
-          data.photo_path = await profile.uploadProfileImage(newEditUserPhotoFile.value)
+          updatedUser.photo_path = await profile.uploadProfileImage(newEditUserPhotoFile.value)
         } else {
           data.photo_path = await users.uploadImage(newEditUserPhotoFile.value, data.id)
         }
@@ -822,7 +824,7 @@ async function submitEditUserForm() {
       emit('editedUser', data)
     }
     if (data.id === authStore.user.id || props.action === 'profile') {
-      authStore.setUser(data, authStore.session_id, locale)
+      authStore.setUser(props.action === 'profile' ? updatedUser : data, authStore.session_id, locale)
     }
     push.success(t('usersAddEditUserModalComponent.addEditUserModalSuccessEditUser'))
   } catch (error) {
