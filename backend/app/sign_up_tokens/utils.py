@@ -19,6 +19,7 @@ import users.users.models as users_models
 import users.users.utils as users_utils
 
 import core.apprise as core_apprise
+import core.i18n as core_i18n
 import core.logger as core_logger
 
 from core.database import SessionLocal
@@ -89,10 +90,11 @@ async def send_sign_up_email(
     # Generate reset link
     reset_link = f"{email_service.frontend_host}/verify-email?token={token}"
 
-    # use default email message in English
+    # Build localized email using the user's preferred language
+    locale = core_i18n.normalize_locale(user.preferred_language)
     subject, html_content, text_content = (
-        sign_up_tokens_email_messages.get_signup_confirmation_email_en(
-            user.name, reset_link, email_service
+        sign_up_tokens_email_messages.get_signup_confirmation_email(
+            user.name, reset_link, email_service, locale
         )
     )
 
@@ -135,13 +137,15 @@ async def send_sign_up_admin_approval_email(
 
     # Send email to all admin users
     for admin in admins:
-        # use default email message in English
+        # Use the admin's preferred language for each notification
+        locale = core_i18n.normalize_locale(admin.preferred_language)
         subject, html_content, text_content = (
-            sign_up_tokens_email_messages.get_admin_signup_notification_email_en(
+            sign_up_tokens_email_messages.get_admin_signup_notification_email(
                 admin.name,
                 user.name,
                 user.username,
                 email_service,
+                locale,
             )
         )
 
@@ -190,10 +194,11 @@ async def send_sign_up_approval_email(
             detail="User not found",
         )
 
-    # use default email message in English
+    # Build localized email using the approved user's preferred language
+    locale = core_i18n.normalize_locale(user.preferred_language)
     subject, html_content, text_content = (
-        sign_up_tokens_email_messages.get_user_signup_approved_email_en(
-            user.name, user.username, email_service
+        sign_up_tokens_email_messages.get_user_signup_approved_email(
+            user.name, user.username, email_service, locale
         )
     )
 

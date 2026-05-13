@@ -1,301 +1,265 @@
 """Email message builders for sign-up notifications."""
 
 import html
+from urllib.parse import quote as url_quote
 
 import core.apprise as core_apprise
 import core.email_templates as core_email_templates
+import core.i18n as core_i18n
 
 
-def get_signup_confirmation_email_en(
-    user_name: str, signup_link: str, email_service: core_apprise.AppriseService
+def get_signup_confirmation_email(
+    user_name: str,
+    signup_link: str,
+    email_service: core_apprise.AppriseService,
+    locale: str | None = None,
 ) -> tuple[str, str, str]:
-    """
-    Return the subject, HTML body, and plain-text body for an English sign-up
-    confirmation email.
+    """Build a localized sign-up confirmation email.
 
     Args:
-        user_name (str): The recipient's display name inserted into the
-            greeting.
-        signup_link (str): The URL the user will follow to confirm their
-            sign-up; inserted into the CTA button and included as a plain link
-            for clients that do not render the button.
-        email_service (core_apprise.AppriseService): Notification service
-            instance used to obtain service metadata (e.g., `frontend_host`)
-            for the email footer.
+        user_name: The recipient's display name.
+        signup_link: The URL to confirm the account.
+        email_service: AppriseService for footer metadata.
+        locale: Preferred locale code for the recipient.
 
     Returns:
-        tuple[str, str, str]: A 3-tuple containing:
-            - subject: The email subject line.
-            - html_content: The full HTML email content (string) including
-                inline styles, logo, a prominent "Confirm Account" button
-                linking to `signup_link`, a security notice about a 24-hour
-                expiry, and a footer referencing `email_service.frontend_host`.
-            - text_content: A plain-text alternative suitable for clients that
-                do not render HTML, containing the greeting, confirmation
-                instructions, the raw `signup_link`, expiry notice, and
-                sign-off.
-
-    Notes:
-        - The function only constructs and returns strings; it does not send
-            emails or perform network I/O.
-        - Calling code should ensure `signup_link` and `user_name` are properly
-            validated/sanitized as needed.
-        - The HTML is crafted with inline styles for broad email-client
-            compatibility.
+        A 3-tuple of (subject, html_content, text_content).
     """
     safe_name = html.escape(user_name)
-    subject = "Endurain - Confirm your account"
-    html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{subject}</title>
-</head>
+    def tr(key: str, **kwargs: str) -> str:
+        return core_i18n.t(key, locale, **kwargs)
 
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
-    <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <div style="font-size: 34px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <img src="https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.svg"
-                    alt="Endurain logo" style="height: 32px; width: auto;">
-                <span>Endurain</span>
-            </div>
-            <h3 style="margin: 0;">Confirm your account</h3>
-        </div>
+    subject = tr("signup_confirmation.subject")
+    heading = tr("signup_confirmation.heading")
+    intro = tr("signup_confirmation.intro")
+    cta = tr("signup_confirmation.cta")
+    security_label = tr("signup_confirmation.security_label")
+    security_notice = tr("signup_confirmation.security_notice")
+    ignore = tr("signup_confirmation.ignore")
+    copy_link = tr("common.copy_link")
 
-        <div style="margin-bottom: 30px;">
-            <p>Hi {user_name},</p>
+    color = core_email_templates.LINK_COLOR_SUCCESS
+    # Defense in depth: percent-encode then HTML-escape the link
+    # before it lands in href and visible-text contexts.
+    safe_signup_link = html.escape(
+        url_quote(signup_link, safe=":/?=&%#@"), quote=True
+    )
 
-            <p>Thank you for signing up for Endurain! Please confirm your account by clicking the button below:</p>
-
+    body_inner = f"""
+            <p>{tr("signup_confirmation.greeting", name=safe_name)}</p>
+            <p>{intro}</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{signup_link}" style="background-color: #198754; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Confirm Account</a>
+                <a
+                    href="{safe_signup_link}"
+                    style="background-color: {color}; color: white;
+                    padding: 12px 30px; text-decoration: none;
+                    border-radius: 5px; display: inline-block;
+                    font-weight: bold;"
+                >{cta}</a>
             </div>
-
-            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <strong>Security notice:</strong> This confirmation link will expire in 24 hours.
+            <div
+                style="background-color: #fff3cd;
+                border: 1px solid #ffeaa7; color: #856404;
+                padding: 15px; border-radius: 5px; margin: 20px 0;"
+            >
+                <strong>{security_label}</strong> {security_notice}
             </div>
+            <p>{ignore}</p>
+            <p>{copy_link}</p>
+            <p style="word-break: break-all; color: {color};">{safe_signup_link}</p>"""
 
-            <p>If you didn’t create an Endurain account, please ignore this email.</p>
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
+    )
 
-            <p>If the button above doesn’t work, you can copy and paste the following link into your browser:</p>
-            <p style="word-break: break-all; color: #198754;">{signup_link}</p>
-        </div>
-
-        <div style="text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p>Best regards,<br>The Endurain team</p>
-            <p>Visit Endurain at: <a style="color: #198754;" href="{email_service.frontend_host}">{email_service.frontend_host}</a> -
-                Source code at: <a style="color: #198754;"
-                    href="https://codeberg.org/endurain-project/endurain">Codeberg</a></p>
-        </div>
-    </div>
-</body>
-
-</html>
-    """.strip()
-
-    # Create text version
-    text_content = f"""
-    Hi {user_name},
-
-    Thank you for signing up for Endurain!
-
-    Please confirm your account by clicking the following link:
-    {signup_link}
-
-    This confirmation link will expire in 24 hours.
-
-    If you didn’t create an Endurain account, please ignore this email.
-
-    Best regards,
-    The Endurain team
-    """.strip()
+    labels = core_i18n.common_labels(locale)
+    text_content = (
+        f"{tr('signup_confirmation.greeting', name=user_name)}\n\n"
+        f"{intro}\n"
+        f"{signup_link}\n\n"
+        f"{security_notice}\n\n"
+        f"{ignore}\n\n"
+        f"{labels['best_regards']}\n"
+        f"{labels['team']}"
+    )
 
     return subject, html_content, text_content
 
 
-def get_admin_signup_notification_email_en(
+def get_admin_signup_notification_email(
     user_name: str,
     sign_up_user_name: str,
     sign_up_user_username: str,
     email_service: core_apprise.AppriseService,
+    locale: str | None = None,
 ) -> tuple[str, str, str]:
-    """
-    Build an English admin notification email for a pending sign-up.
+    """Build a localized admin notification email.
 
     Args:
-        user_name: Display name of the admin receiving the notification.
-        sign_up_user_name: Display name of the user who signed up.
-        sign_up_user_username: Username of the user who signed up, used to
-            build the direct link to the admin approval page.
+        user_name: Display name of the admin recipient.
+        sign_up_user_name: Display name of the signed-up user.
+        sign_up_user_username: Username of the signed-up user.
         email_service: AppriseService for footer metadata.
+        locale: Preferred locale code for the admin recipient.
 
     Returns:
         A 3-tuple of (subject, html_content, text_content).
     """
     safe_name = html.escape(user_name)
     safe_sign_up_name = html.escape(sign_up_user_name)
-    safe_sign_up_username = html.escape(sign_up_user_username)
-    subject = "Endurain - New user sign-up pending approval"
 
-    html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
+    def tr(key: str, **kwargs: str) -> str:
+        return core_i18n.t(key, locale, **kwargs)
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{subject}</title>
-</head>
+    subject = tr("admin_signup.subject")
+    heading = tr("admin_signup.heading")
+    intro = tr("admin_signup.intro")
+    user_label = tr("admin_signup.user_label")
+    review = tr("admin_signup.review")
+    cta = tr("admin_signup.cta")
+    copy_link = tr("common.copy_link")
 
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
-    <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <div style="font-size: 34px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <img src="https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.svg"
-                    alt="Endurain logo" style="height: 32px; width: auto;">
-                <span>Endurain</span>
+    color = core_email_templates.LINK_COLOR_SUCCESS
+
+    # URL-encode username for query-string safety, then HTML-escape
+    # the assembled URL before placing it into href and text contexts.
+    encoded_username = url_quote(sign_up_user_username, safe="")
+    admin_link = (
+        f"{email_service.frontend_host}"
+        f"/settings?tab=users&username={encoded_username}"
+    )
+    safe_admin_link = html.escape(admin_link, quote=True)
+
+    body_inner = f"""
+            <p>{tr("admin_signup.greeting", name=safe_name)}</p>
+            <p>{intro}</p>
+            <div
+                style="background-color: #e9ecef;
+                border: 1px solid #ccc; padding: 15px;
+                border-radius: 5px; margin: 20px 0;"
+            >
+                <strong>{user_label}</strong> {safe_sign_up_name}
             </div>
-            <h3 style="margin: 0;">New sign-up requires approval</h3>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-            <p>Hello {user_name},</p>
-
-            <p>A new user has signed up and is awaiting approval:</p>
-
-            <div style="background-color: #e9ecef; border: 1px solid #ccc; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <strong>User:</strong> {safe_sign_up_name}
-            </div>
-
-            <p>Please log in to the Endurain admin panel to review and approve this request.</p>
-
+            <p>{review}</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{email_service.frontend_host}/settings?tab=users&username={safe_sign_up_username}" style="background-color: {core_email_templates.LINK_COLOR_SUCCESS}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Go to Admin Panel</a>
+                <a
+                    href="{safe_admin_link}"
+                    style="background-color: {color}; color: white;
+                    padding: 12px 30px; text-decoration: none;
+                    border-radius: 5px; display: inline-block;
+                    font-weight: bold;"
+                >{cta}</a>
             </div>
+            <p>{copy_link}</p>
+            <p style="word-break: break-all; color: {color};">{safe_admin_link}</p>"""
 
-            <p>If the button above doesn’t work, you can copy and paste the following link into your browser:</p>
-            <p style="word-break: break-all; color: #198754;">{email_service.frontend_host}/settings?tab=users&username={sign_up_user_username}</p>
-        </div>
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
+        sign_off_key="system",
+    )
 
-        <div style="text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p>Best regards,<br>The Endurain system</p>
-            <p>Visit Endurain at: <a style="color: #198754;" href="{email_service.frontend_host}">{email_service.frontend_host}</a> -
-                Source code at: <a style="color: #198754;"
-                    href="https://codeberg.org/endurain-project/endurain">Codeberg</a></p>
-        </div>
-    </div>
-</body>
-
-</html>
-    """.strip()
-
-    text_content = f"""
-    Hello {user_name},
-
-    A new user has signed up and is awaiting approval.
-
-    User: {sign_up_user_name}
-
-    Please log in to the Endurain admin panel to review and approve this request:
-    {email_service.frontend_host}/settings?tab=users&username={safe_sign_up_username}
-
-    Best regards,
-    The Endurain system
-    """.strip()
+    labels = core_i18n.common_labels(locale)
+    text_content = (
+        f"{tr('admin_signup.greeting', name=user_name)}\n\n"
+        f"{intro}\n"
+        f"{user_label} {sign_up_user_name}\n\n"
+        f"{review}\n"
+        f"{admin_link}\n\n"
+        f"{labels['best_regards']}\n"
+        f"{labels['system']}"
+    )
 
     return subject, html_content, text_content
 
 
-def get_user_signup_approved_email_en(
+def get_user_signup_approved_email(
     sign_up_user_name: str,
     sign_up_user_username: str,
     email_service: core_apprise.AppriseService,
+    locale: str | None = None,
 ) -> tuple[str, str, str]:
-    """
-    Build an English account-approved notification email for a newly approved
-    user.
+    """Build a localized account-approved notification email.
 
     Args:
         sign_up_user_name: Display name of the approved user.
-        sign_up_user_username: Username of the approved user, shown in the
-            email body.
+        sign_up_user_username: Username of the approved user.
         email_service: AppriseService for footer metadata.
+        locale: Preferred locale code for the approved user.
 
     Returns:
         A 3-tuple of (subject, html_content, text_content).
     """
     safe_name = html.escape(sign_up_user_name)
     safe_username = html.escape(sign_up_user_username)
-    subject = "Endurain - Your account has been approved"
 
-    html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
+    def tr(key: str, **kwargs: str) -> str:
+        return core_i18n.t(key, locale, **kwargs)
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{subject}</title>
-</head>
+    subject = tr("signup_approved.subject")
+    heading = tr("signup_approved.heading")
+    intro = tr("signup_approved.intro")
+    username_label = tr("signup_approved.username_label")
+    login_intro = tr("signup_approved.login_intro")
+    cta = tr("signup_approved.cta")
+    copy_link = tr("common.copy_link")
 
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
-    <div style="background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <div style="font-size: 34px; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                <img src="https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.svg"
-                    alt="Endurain logo" style="height: 32px; width: auto;">
-                <span>Endurain</span>
+    color = core_email_templates.LINK_COLOR_SUCCESS
+    login_link = f"{email_service.frontend_host}/login"
+    # Defense in depth: HTML-escape before insertion into HTML contexts.
+    safe_login_link = html.escape(login_link, quote=True)
+
+    body_inner = f"""
+            <p>{tr("signup_approved.greeting", name=safe_name)}</p>
+            <p>{intro}</p>
+            <div
+                style="background-color: #e9ecef;
+                border: 1px solid #ccc; padding: 15px;
+                border-radius: 5px; margin: 20px 0;"
+            >
+                <strong>{username_label}</strong> {safe_username}
             </div>
-            <h3 style="margin: 0;">Your account is now active</h3>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-            <p>Hello {sign_up_user_name},</p>
-
-            <p>Good news! Your account has been approved and is now active.</p>
-
-            <div style="background-color: #e9ecef; border: 1px solid #ccc; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <strong>Username:</strong> {safe_username}
-            </div>
-
-            <p>You can now log in and start using Endurain:</p>
-
+            <p>{login_intro}</p>
             <div style="text-align: center; margin: 30px 0;">
-                <a href="{email_service.frontend_host}/login" style="background-color: {core_email_templates.LINK_COLOR_SUCCESS}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Log in to Endurain</a>
+                <a
+                    href="{safe_login_link}"
+                    style="background-color: {color}; color: white;
+                    padding: 12px 30px; text-decoration: none;
+                    border-radius: 5px; display: inline-block;
+                    font-weight: bold;"
+                >{cta}</a>
             </div>
+            <p>{copy_link}</p>
+            <p style="word-break: break-all; color: {color};">{safe_login_link}</p>"""
 
-            <p>If the button above doesn’t work, you can copy and paste the following link into your browser:</p>
-            <p style="word-break: break-all; color: #198754;">{email_service.frontend_host}/login</p>
-        </div>
+    html_content = core_email_templates.wrap_email(
+        locale=locale,
+        subject=subject,
+        heading=heading,
+        body_inner=body_inner,
+        frontend_host=email_service.frontend_host,
+        link_color=color,
+    )
 
-        <div style="text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p>Best regards,<br>The Endurain team</p>
-            <p>Visit Endurain at: <a style="color: #198754;" href="{email_service.frontend_host}">{email_service.frontend_host}</a> -
-                Source code at: <a style="color: #198754;"
-                    href="https://codeberg.org/endurain-project/endurain">Codeberg</a></p>
-        </div>
-    </div>
-</body>
-
-</html>
-    """.strip()
-
-    text_content = f"""
-    Hello {sign_up_user_name},
-
-    Good news! Your account has been approved and is now active.
-
-    Username: {sign_up_user_username}
-
-    You can now log in and start using Endurain:
-    {email_service.frontend_host}/login
-
-    Best regards,
-    The Endurain team
-    """.strip()
+    labels = core_i18n.common_labels(locale)
+    text_content = (
+        f"{tr('signup_approved.greeting', name=sign_up_user_name)}\n\n"
+        f"{intro}\n"
+        f"{username_label} {sign_up_user_username}\n\n"
+        f"{login_intro}\n"
+        f"{login_link}\n\n"
+        f"{labels['best_regards']}\n"
+        f"{labels['team']}"
+    )
 
     return subject, html_content, text_content
