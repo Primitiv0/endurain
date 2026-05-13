@@ -30,7 +30,11 @@ def _parse_lap_power(
     """
     power_waypoints: list[dict] = []
     for trackpoint in lap.trackpoints:
-        if hasattr(trackpoint, "tpx_ext") and "Watts" in trackpoint.tpx_ext:
+        if (
+            hasattr(trackpoint, "tpx_ext")
+            and "Watts" in trackpoint.tpx_ext
+            and trackpoint.time is not None
+        ):
             power_waypoints.append(
                 {
                     "time": trackpoint.time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -133,6 +137,7 @@ def _extract_waypoints(
             "lon": tp["longitude"],
         }
         for tp in trackpoints
+        if tp.get("time") is not None
     ]
 
     hr_waypoints = [
@@ -141,7 +146,7 @@ def _extract_waypoints(
             "hr": tp["hr_value"],
         }
         for tp in trackpoints
-        if "hr_value" in tp
+        if "hr_value" in tp and tp.get("time") is not None
     ]
 
     cad_waypoints = [
@@ -150,7 +155,7 @@ def _extract_waypoints(
             "cad": tp["cadence"],
         }
         for tp in trackpoints
-        if tp.get("cadence") is not None
+        if tp.get("cadence") is not None and tp.get("time") is not None
     ]
     if not cad_waypoints:
         cad_waypoints = [
@@ -159,7 +164,11 @@ def _extract_waypoints(
                 "cad": tp.tpx_ext["RunCadence"],
             }
             for tp in tcx_file.trackpoints
-            if (hasattr(tp, "tpx_ext") and "RunCadence" in tp.tpx_ext)
+            if (
+                hasattr(tp, "tpx_ext")
+                and "RunCadence" in tp.tpx_ext
+                and tp.time is not None
+            )
         ]
 
     ele_waypoints = [
@@ -168,7 +177,7 @@ def _extract_waypoints(
             "ele": tp["elevation"],
         }
         for tp in trackpoints
-        if "elevation" in tp
+        if "elevation" in tp and tp.get("time") is not None
     ]
 
     power_waypoints = [
@@ -177,7 +186,11 @@ def _extract_waypoints(
             "power": tp.tpx_ext["Watts"],
         }
         for tp in tcx_file.trackpoints
-        if (hasattr(tp, "tpx_ext") and "Watts" in tp.tpx_ext)
+        if (
+            hasattr(tp, "tpx_ext")
+            and "Watts" in tp.tpx_ext
+            and tp.time is not None
+        )
     ]
 
     vel_waypoints: list[dict] = []
@@ -190,6 +203,10 @@ def _extract_waypoints(
         lat = tp["latitude"]
         lon = tp["longitude"]
         time_val = tp["time"]
+
+        if time_val is None:
+            continue
+
         timestamp = time_val.strftime(fmt)
 
         instant_speed = activities_utils.calculate_instant_speed(
@@ -275,7 +292,11 @@ def _build_activity(
         Populated Activity Pydantic schema.
     """
     fmt = "%Y-%m-%dT%H:%M:%S"
-    elapsed = (tcx_file.end_time - tcx_file.start_time).total_seconds()
+    elapsed = (
+        (tcx_file.end_time - tcx_file.start_time).total_seconds()
+        if tcx_file.start_time and tcx_file.end_time
+        else None
+    )
 
     privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(
         user_privacy_settings
@@ -287,8 +308,12 @@ def _build_activity(
         distance=distance,
         activity_type=activity_type,
         timezone=timezone,
-        start_time=tcx_file.start_time.strftime(fmt),
-        end_time=tcx_file.end_time.strftime(fmt),
+        start_time=(
+            tcx_file.start_time.strftime(fmt)
+            if tcx_file.start_time
+            else None
+        ),
+        end_time=(tcx_file.end_time.strftime(fmt) if tcx_file.end_time else None),
         total_elapsed_time=elapsed,
         total_timer_time=elapsed,
         city=city,
