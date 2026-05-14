@@ -131,10 +131,16 @@ async def initiate_login(
         # Validate redirect URL to prevent open redirect vulnerability
         idp_utils.validate_redirect_url(redirect)
 
-        # Detect client type from X-Client-Type header
-        client_type = request.headers.get("X-Client-Type", "web")
-        if client_type not in ["web", "mobile"]:
-            client_type = "web"  # Default to web if invalid
+        # Preserve mobile intent for custom-scheme redirects.
+        # The browser step of the flow cannot reliably carry X-Client-Type,
+        # so the validated redirect target is the authoritative signal for
+        # mobile handoff flows such as Gadgetbridge.
+        if idp_utils.is_custom_scheme_redirect(redirect):
+            client_type = "mobile"
+        else:
+            client_type = request.headers.get("X-Client-Type", "web")
+            if client_type not in ["web", "mobile"]:
+                client_type = "web"  # Default to web if invalid
 
         # Generate OAuth state and nonce
         state_id = secrets.token_urlsafe(32)

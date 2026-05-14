@@ -81,6 +81,24 @@ def validate_redirect_url(redirect: str | None) -> None:
         )
 
 
+def is_custom_scheme_redirect(redirect: str | None) -> bool:
+    """Return ``True`` when the redirect is a validated custom URI scheme.
+
+    This preserves mobile intent across the browser-based OAuth round trip.
+    The browser leg cannot reliably carry ``X-Client-Type``, so the validated
+    redirect target becomes the authoritative signal.
+    """
+    if not redirect or not redirect.strip():
+        return False
+
+    value = redirect.strip()
+
+    if value.startswith("http://") or value.startswith("https://"):
+        return False
+
+    return "://" in value
+
+
 def validate_pkce_challenge(code_challenge: str, code_challenge_method: str) -> None:
     """
     Validate PKCE code_challenge format according to RFC 7636.
