@@ -233,7 +233,7 @@ def _extract_extension_data(
                 heart_rate = value
             elif tag in ("cad", "cadence"):
                 cadence = value
-            elif tag == "power":
+            elif tag in ("power", "PowerInWatts"):
                 power = value
 
     return heart_rate, cadence, power
