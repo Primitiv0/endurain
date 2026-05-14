@@ -3,7 +3,6 @@
 import pytest
 
 import users.users_api_keys.utils as users_api_keys_utils
-import auth.constants as auth_constants
 
 
 class TestGenerateApiKey:
@@ -74,61 +73,50 @@ class TestValidateApiKeyScopes:
     """
 
     def test_validate_regular_user_with_valid_regular_scope(self):
-        """Test that a regular user can request a scope in REGULAR_ACCESS_SCOPE."""
-        # 'activities:upload' is in REGULAR_ACCESS_SCOPE
-        valid_scope = auth_constants.REGULAR_ACCESS_SCOPE[0]
-        # Should not raise
-        users_api_keys_utils.validate_api_key_scopes([valid_scope], "regular")
-
-    def test_validate_admin_user_with_admin_only_scope(self):
-        """Test that admin users can request any scope in ADMIN_ACCESS_SCOPE."""
-        admin_only = set(auth_constants.ADMIN_ACCESS_SCOPE) - set(
-            auth_constants.REGULAR_ACCESS_SCOPE
+        """Test that a regular user can request activities:upload."""
+        users_api_keys_utils.validate_api_key_scopes(
+            ["activities:upload"], "regular"
         )
-        if admin_only:
-            scope = next(iter(admin_only))
-            # Should not raise for admin
-            users_api_keys_utils.validate_api_key_scopes([scope], "admin")
+
+    def test_validate_admin_user_with_upload_scope(self):
+        """Test that admin users can request activities:upload."""
+        users_api_keys_utils.validate_api_key_scopes(["activities:upload"], "admin")
 
     def test_validate_regular_user_with_admin_scope_raises(self):
-        """Test that regular users cannot request admin-only scopes."""
-        admin_only = set(auth_constants.ADMIN_ACCESS_SCOPE) - set(
-            auth_constants.REGULAR_ACCESS_SCOPE
-        )
-        if admin_only:
-            scope = next(iter(admin_only))
-            with pytest.raises(ValueError, match="Scopes not permitted"):
-                users_api_keys_utils.validate_api_key_scopes([scope], "regular")
+        """Test that regular users cannot request JWT-only scopes."""
+        with pytest.raises(ValueError, match="Unsupported API key scopes"):
+            users_api_keys_utils.validate_api_key_scopes(["users:write"], "regular")
 
     def test_validate_unknown_scope_raises_for_regular_user(self):
         """Test that unrecognised scopes raise ValueError for a regular user."""
-        with pytest.raises(ValueError, match="Scopes not permitted"):
+        with pytest.raises(ValueError, match="Unsupported API key scopes"):
             users_api_keys_utils.validate_api_key_scopes(
                 ["totally:unknown_scope"], "regular"
             )
 
     def test_validate_unknown_scope_raises_for_admin_user(self):
         """Test that unrecognised scopes raise ValueError for an admin user."""
-        with pytest.raises(ValueError, match="Scopes not permitted"):
+        with pytest.raises(ValueError, match="Unsupported API key scopes"):
             users_api_keys_utils.validate_api_key_scopes(
                 ["totally:unknown_scope"], "admin"
             )
 
     def test_validate_activities_upload_allowed_for_regular(self):
         """Test that activities:upload is allowed for regular users."""
-        # Should not raise
-        users_api_keys_utils.validate_api_key_scopes(["activities:upload"], "regular")
+        users_api_keys_utils.validate_api_key_scopes(
+            ["activities:upload"], "regular"
+        )
 
     def test_validate_multiple_valid_regular_scopes(self):
-        """Test that multiple valid regular scopes are accepted."""
-        scopes = list(auth_constants.REGULAR_ACCESS_SCOPE[:2])
-        users_api_keys_utils.validate_api_key_scopes(scopes, "regular")
+        """Test that extra JWT scopes are rejected."""
+        scopes = ["activities:upload", "activities:read"]
+        with pytest.raises(ValueError, match="Unsupported API key scopes"):
+            users_api_keys_utils.validate_api_key_scopes(scopes, "regular")
 
     def test_validate_empty_list_raises_for_regular(self):
-        """Test that empty scope list is not disallowed by scope check itself (disallowed = empty set)."""
-        # Empty list means no requested scopes; no disallowed scopes either.
-        # Should NOT raise since disallowed set is empty.
-        users_api_keys_utils.validate_api_key_scopes([], "regular")
+        """Test that an empty scope list is rejected."""
+        with pytest.raises(ValueError, match="Unsupported API key scopes"):
+            users_api_keys_utils.validate_api_key_scopes([], "regular")
 
 
 class TestScopesJsonRoundTrip:

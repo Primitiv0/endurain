@@ -10,8 +10,6 @@ from pydantic import (
 )
 from datetime import datetime
 
-import auth.constants as auth_constants
-
 
 class UsersApiKeyCreate(BaseModel):
     """
@@ -29,7 +27,7 @@ class UsersApiKeyCreate(BaseModel):
 
     Attributes:
         name: User-friendly label for the key.
-        scopes: List of scope strings to grant.
+        scopes: List containing the supported API key scope.
         expires_at: Optional expiration datetime.
             None means the key never expires.
         current_password: Caller's existing password
@@ -76,7 +74,7 @@ class UsersApiKeyCreate(BaseModel):
     @classmethod
     def scopes_must_be_valid(cls, v: list[str]) -> list[str]:
         """
-        Validate all scopes exist in the known scope dict.
+        Validate API keys only grant activity upload access.
 
         Args:
             v: List of scope strings to validate.
@@ -85,12 +83,15 @@ class UsersApiKeyCreate(BaseModel):
             Validated list of scope strings.
 
         Raises:
-            ValueError: If any scope is not recognised.
+            ValueError: If any scope is not supported.
         """
-        known = set(auth_constants.SCOPE_DICT.keys())
-        unknown = set(v) - known
-        if unknown:
-            raise ValueError(f"Unknown scopes: {unknown}. " f"Valid scopes: {known}")
+        allowed = {"activities:upload"}
+        unsupported = set(v) - allowed
+        if unsupported:
+            raise ValueError(
+                "Unsupported API key scopes: "
+                f"{unsupported}. Valid scopes: {allowed}"
+            )
         return v
 
     model_config = ConfigDict(from_attributes=True)

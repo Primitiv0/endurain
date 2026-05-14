@@ -4,8 +4,6 @@ import hashlib
 import json
 import secrets
 
-import auth.constants as auth_constants
-
 
 def generate_api_key() -> str:
     """
@@ -41,33 +39,33 @@ def hash_api_key(raw_key: str) -> str:
 
 def validate_api_key_scopes(
     requested_scopes: list[str],
-    user_access_type: str,
+    _user_access_type: str,
 ) -> None:
     """
-    Validate requested scopes against the user's allowed scope.
+    Validate requested scopes against supported API-key scopes.
 
-    Regular users may only grant scopes within
-    ``REGULAR_ACCESS_SCOPE``. Admin users may grant scopes
-    within ``ADMIN_ACCESS_SCOPE``.
+    API keys currently support only activity uploads. Keeping this
+    allow-list separate from the full JWT scope set prevents API keys
+    from silently gaining access when new unified-auth endpoints are
+    added later.
 
     Args:
         requested_scopes: List of scopes the caller wants
             to assign to the new API key.
-        user_access_type: The ``access_type`` field of the
-            owning user (e.g. ``"regular"`` or ``"admin"``).
+        _user_access_type: The owner's access type. Accepted for
+            router compatibility but not used while API-key scopes
+            are restricted to activity uploads.
 
     Raises:
-        ValueError: If any requested scope is not permitted
-            for the user's access type.
+        ValueError: If any requested scope is not supported.
     """
-    if user_access_type == "admin":
-        allowed = set(auth_constants.ADMIN_ACCESS_SCOPE)
-    else:
-        allowed = set(auth_constants.REGULAR_ACCESS_SCOPE)
-
-    disallowed = set(requested_scopes) - allowed
-    if disallowed:
-        raise ValueError(f"Scopes not permitted for this user: " f"{disallowed}")
+    allowed = {"activities:upload"}
+    unsupported = set(requested_scopes) - allowed
+    if unsupported or not requested_scopes:
+        raise ValueError(
+            "Unsupported API key scopes: "
+            f"{unsupported}. Valid scopes: {allowed}"
+        )
 
 
 def scopes_to_json(scopes: list[str]) -> str:

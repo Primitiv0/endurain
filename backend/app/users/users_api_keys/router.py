@@ -70,7 +70,7 @@ async def create_user_api_key(
 
     The raw key is returned once in this response and
     cannot be retrieved again. Requested scopes must be
-    a subset of the user's own permissions.
+    supported by API-key authentication.
 
     Step-up verification is required (current password,
     plus MFA code when MFA is enabled). API keys grant
@@ -89,8 +89,7 @@ async def create_user_api_key(
 
     Raises:
         HTTPException: 401 if step-up verification fails.
-        HTTPException: 400 if scopes exceed the user's
-            own permissions.
+        HTTPException: 400 if scopes are not supported for API keys.
         HTTPException: 404 if the user is not found.
     """
     db_user = users_crud.get_user_by_id(token_user_id, db)

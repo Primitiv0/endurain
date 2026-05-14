@@ -66,29 +66,31 @@ class TestUsersApiKeyCreate:
             )
 
     def test_create_unknown_scope_fails(self):
-        """Test that an unrecognised scope string raises a ValueError."""
+        """Test that an unsupported scope string raises a ValueError."""
         with pytest.raises(ValidationError) as exc_info:
             users_api_keys_schema.UsersApiKeyCreate(
                 name="Test Key",
                 scopes=["totally:invalid_scope"],
             )
-        assert "Unknown scopes" in str(exc_info.value)
+        assert "Unsupported API key scopes" in str(exc_info.value)
 
-    def test_create_valid_profile_scope(self):
-        """Test that 'profile' is a valid scope for key creation."""
-        data = users_api_keys_schema.UsersApiKeyCreate(
-            name="Profile Key",
-            scopes=["profile"],
-        )
-        assert "profile" in data.scopes
+    def test_create_profile_scope_fails(self):
+        """Test that JWT-only scopes are rejected for API keys."""
+        with pytest.raises(ValidationError) as exc_info:
+            users_api_keys_schema.UsersApiKeyCreate(
+                name="Profile Key",
+                scopes=["profile"],
+            )
+        assert "Unsupported API key scopes" in str(exc_info.value)
 
-    def test_create_multiple_valid_scopes(self):
-        """Test that multiple valid scopes are accepted."""
-        data = users_api_keys_schema.UsersApiKeyCreate(
-            name="Multi-scope Key",
-            scopes=["activities:read", "activities:upload", "gears:read"],
-        )
-        assert len(data.scopes) == 3
+    def test_create_multiple_scopes_with_unsupported_fails(self):
+        """Test that only activities:upload is accepted for API keys."""
+        with pytest.raises(ValidationError) as exc_info:
+            users_api_keys_schema.UsersApiKeyCreate(
+                name="Multi-scope Key",
+                scopes=["activities:read", "activities:upload", "gears:read"],
+            )
+        assert "Unsupported API key scopes" in str(exc_info.value)
 
     def test_create_partial_invalid_scope_fails(self):
         """Test that a mix of valid and invalid scopes fails validation."""

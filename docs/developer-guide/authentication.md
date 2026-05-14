@@ -7,7 +7,7 @@ Endurain supports integration with other apps through a comprehensive OAuth 2.1 
 - **Client Type Header:** Most protected JWT requests must include an `X-Client-Type` header with either `web` or `mobile` as the value. Authentication, public, browser-redirect, API-key, and activity-upload unified-auth flows follow the endpoint-specific requirements below.
 - **OAuth/PKCE Client Type Binding:** For `/public/idp/login/{idp_slug}` and password PKCE login, the backend records a `client_type` on the PKCE/OAuth state. During `/public/idp/session/{session_id}/tokens`, that stored value controls the response shape. The token-exchange `X-Client-Type` header is optional, but if provided it must match the stored value; otherwise the exchange returns `400` with `client_type does not match the OAuth state`.
 - **Authorization:** Most protected JWT requests must include an `Authorization: Bearer <access token>` header with a valid access token. Login, MFA verification, OAuth initiation/callback/token exchange, password reset, sign-up, and activity uploads authenticated with an API key are exceptions.
-- **CSRF Protection (Web Only):** State-changing protected web requests (`POST`, `PUT`, `DELETE`, `PATCH`) must include an `X-CSRF-Token` header. `/auth/refresh` supports a bootstrap refresh without this header after page reload; if the header is provided and the session has a stored CSRF binding, it must be valid.
+- **CSRF Protection (Web Only):** State-changing protected web requests (`POST`, `PUT`, `DELETE`, `PATCH`) must include an `X-CSRF-Token` header. This custom header requirement prevents simple cross-site form submissions and is combined with short-lived in-memory access tokens, `SameSite=Strict` refresh cookies, and CORS controls. `/auth/refresh` supports a bootstrap refresh without this header after page reload; if the header is provided and the session has a stored CSRF binding, the token value must be valid.
 
 !!! note "API Key Authentication"
     Certain endpoints support API key authentication as an alternative to Bearer + `X-Client-Type` headers. API key requests do not require the `X-Client-Type` header or a CSRF token. See [API Key Authentication](#api-key-authentication) for details.
@@ -34,7 +34,7 @@ Endurain implements an OAuth 2.1 compliant hybrid token storage model that provi
 **Security Properties:**
 
 - **XSS Protection:** Access tokens stored in memory cannot be exfiltrated via XSS attacks
-- **CSRF Protection:** Refresh token in httpOnly cookie + CSRF token header prevents CSRF attacks
+- **CSRF Protection:** Refresh token in an httpOnly `SameSite=Strict` cookie plus the web-only CSRF header requirement prevents simple cross-site state changes. `/auth/refresh` also validates the CSRF token value when the client sends it and the session has a stored CSRF binding.
 - **Session Persistence:** Page reload triggers `/auth/refresh` with httpOnly cookie to restore tokens
 - **Multi-tab Support:** httpOnly cookie shared across browser tabs
 
@@ -185,8 +185,8 @@ The API is reachable under `/api/v1`. Below are the authentication-related endpo
 
 | What | Url | Expected Information |
 | ---- | --- | -------------------- |
-| **Get User Sessions** | `/sessions/user/{user_id}` | Headers: `Authorization: Bearer <Access Token>`, `X-Client-Type` |
-| **Delete Session** | `/sessions/{session_id}/user/{user_id}` | Headers: `Authorization: Bearer <Access Token>`, `X-Client-Type`; web clients must also include `X-CSRF-Token` |
+| **Get User Sessions** | `/sessions/user/{user_id}` | Headers: `Authorization: Bearer <Access Token>`, `X-Client-Type`; requires `sessions:read` scope |
+| **Delete Session** | `/sessions/{session_id}/user/{user_id}` | Headers: `Authorization: Bearer <Access Token>`, `X-Client-Type`; requires `sessions:write` scope; web clients must also include `X-CSRF-Token` |
 
 ### API Key Management Endpoints
 
@@ -455,9 +455,9 @@ The raw key is shown **once** at creation time and is never stored by the server
 
 ### Scopes
 
-API keys are granted one or more scopes at creation time. A key can only access operations covered by its granted scopes:
+API keys are granted one or more API-key scopes at creation time. Currently only `activities:upload` is accepted; JWT-only scopes such as `profile`, `activities:read`, or `users:write` cannot be granted to API keys.
 
-The key-management API validates requested scopes against the owning user's JWT scopes. API-key authentication is currently accepted by the upload endpoint below, so integrations should grant only the scopes their supported endpoint needs.
+The key-management API rejects any requested scope outside the API-key allow-list. This keeps long-lived API keys limited to the endpoint that currently supports API-key authentication.
 
 | Scope | Description |
 | ----- | ----------- |
@@ -530,7 +530,7 @@ Content-Type: application/json
 | Field | Required | Description |
 | ----- | -------- | ----------- |
 | `name` | Yes | Human-readable label (max 100 characters) |
-| `scopes` | Yes | Array of scope strings to grant |
+| `scopes` | Yes | Array of API-key scopes to grant. Currently only `activities:upload` is accepted |
 | `expires_at` | No | ISO 8601 expiry datetime. Omit or `null` for no expiry |
 | `current_password` | Conditionally | Required for accounts with a local password. Omit for SSO-only accounts |
 | `mfa_code` | Conditionally | Required when MFA is enabled on the account |
@@ -823,7 +823,7 @@ Then exchange for tokens as in Step 3 above.
 | ------- | ----------- |
 | **PKCE S256** | SHA256 challenge prevents code interception |
 | **One-time exchange** | Tokens can only be exchanged once per session |
-| **10-minute expiry** | Session expires after 10 minutes |
+| **10-minute exchange window** | The PKCE/OAuth state expires after 10 minutes; the pending session cannot be exchanged after that window |
 | **Rate limiting** | 10 token exchange requests per minute |
 | **Session binding** | Session is cryptographically bound to PKCE challenge |
 
@@ -1257,7 +1257,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 4. **Always include required headers:**
     - `Authorization: Bearer {access_token}` for all authenticated requests
     - `X-Client-Type: web` for all requests
-    - `X-CSRF-Token: {csrf_token}` for protected POST/PUT/DELETE/PATCH requests, except `/auth/refresh` bootstrap
+    - `X-CSRF-Token: {csrf_token}` for protected POST/PUT/DELETE/PATCH requests, except `/auth/refresh` bootstrap. Protected web writes require the header; `/auth/refresh` also validates the token value when supplied and bound to the session
 5. **Handle page reload gracefully** - Call `/auth/refresh` on app initialization to restore in-memory tokens
 6. **Clear tokens on logout** - The httpOnly cookie is cleared by the backend
 
@@ -1296,7 +1296,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 
 1. **Store the key securely** — use a secrets manager, environment variable, or encrypted config file. Never hardcode it in source code
 2. **Use the `X-API-Key` header** rather than the `?api_key=` query parameter to avoid key exposure in logs
-3. **Grant minimum scopes** — request only the scopes your integration needs (e.g., `activities:upload` for file upload scripts)
+3. **Grant only supported scopes** — API keys currently accept only `activities:upload`
 4. **Set an expiry date** when creating keys for temporary or one-off integrations
 5. **Rotate keys periodically** — delete the old key and create a new one; update any dependent services before deleting
 6. **Revoke immediately** if a key is suspected to be compromised — revocation takes effect instantly

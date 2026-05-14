@@ -72,10 +72,12 @@ class TestCreateUserApiKey:
 
     @patch("users.users_api_keys.router.users_api_keys_crud.create_api_key")
     @patch("users.users_api_keys.router.users_api_keys_utils.validate_api_key_scopes")
+    @patch("users.users_api_keys.router.users_utils.verify_step_up_credentials")
     @patch("users.users_api_keys.router.users_crud.get_user_by_id")
     def test_create_user_api_key_success(
         self,
         mock_get_user,
+        mock_verify_step_up,
         mock_validate_scopes,
         mock_create,
         fast_api_client,
@@ -88,6 +90,7 @@ class TestCreateUserApiKey:
         mock_user.access_type = "regular"
         mock_get_user.return_value = mock_user
 
+        mock_verify_step_up.return_value = None
         mock_validate_scopes.return_value = None
 
         mock_orm_key = MagicMock(spec=users_api_keys_models.UsersApiKeys)
@@ -144,17 +147,25 @@ class TestCreateUserApiKey:
         assert response.status_code == 404
 
     @patch("users.users_api_keys.router.users_api_keys_utils.validate_api_key_scopes")
+    @patch("users.users_api_keys.router.users_utils.verify_step_up_credentials")
     @patch("users.users_api_keys.router.users_crud.get_user_by_id")
     def test_create_user_api_key_scope_exceeds_permission_returns_400(
-        self, mock_get_user, mock_validate_scopes, fast_api_client, fast_api_app
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_validate_scopes,
+        fast_api_client,
+        fast_api_app,
     ):
         """Test that 400 is returned when requested scopes exceed the user's own permissions."""
         # Arrange
         mock_user = MagicMock()
         mock_user.access_type = "regular"
         mock_get_user.return_value = mock_user
+        mock_verify_step_up.return_value = None
         mock_validate_scopes.side_effect = ValueError(
-            "Scopes not permitted for this user: {'users:write'}"
+            "Unsupported API key scopes: {'users:write'}. "
+            "Valid scopes: {'activities:upload'}"
         )
 
         payload = {
@@ -176,7 +187,7 @@ class TestCreateUserApiKey:
         self, fast_api_client, fast_api_app
     ):
         """Test that 422 is returned for an unknown scope (Pydantic validation failure)."""
-        # Arrange — schema validator rejects unknown scopes before the endpoint runs
+        # Arrange: schema validator rejects unsupported scopes first
         payload = {
             "name": "FitoTrack",
             "scopes": ["fake:scope_that_does_not_exist"],
