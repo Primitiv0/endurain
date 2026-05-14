@@ -146,7 +146,7 @@ async def login_for_access_token(
     Handles user login and access token generation, including Multi-Factor Authentication (MFA) flow.
 
     Protection Mechanisms:
-    - Rate limiting: 3 requests per minute per IP (prevents DoS attacks)
+    - Rate limiting: 10 requests per minute per IP (SENSITIVE tier, prevents DoS attacks)
     - Progressive lockout: Per-username tracking prevents targeted brute-force:
       * 5 failures: 5 minute lockout
       * 10 failures: 30 minute lockout
