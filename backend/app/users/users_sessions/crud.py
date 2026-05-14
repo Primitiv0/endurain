@@ -140,7 +140,7 @@ def get_session_with_oauth_state(
     # Get OAuth state if linked
     oauth_state = None
     if db_session.oauth_state_id:
-        oauth_state = oauth_state_crud.get_oauth_state_by_id(
+        oauth_state = oauth_state_crud.get_oauth_state_by_id_not_expired(
             db_session.oauth_state_id, db
         )
 

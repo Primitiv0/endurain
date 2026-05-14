@@ -68,6 +68,39 @@ def get_oauth_state_by_id(
 
 
 @core_decorators.handle_db_errors
+def get_oauth_state_by_id_not_expired(
+    state_id: str, db: Session
+) -> oauth_state_models.OAuthState | None:
+    """Retrieve an OAuth state by ID if it is still unexpired.
+
+    Args:
+        state_id: The state parameter to lookup.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The matching OAuthState if found and unexpired,
+        None otherwise.
+
+    Raises:
+        HTTPException: 500 error if database query fails.
+    """
+    stmt = select(oauth_state_models.OAuthState).where(
+        oauth_state_models.OAuthState.id == state_id,
+        oauth_state_models.OAuthState.expires_at
+        > datetime.now(timezone.utc),
+    )
+    oauth_state = db.execute(stmt).scalar_one_or_none()
+
+    if not oauth_state:
+        core_logger.print_to_log(
+            f"OAuth state invalid or expired: {state_id[:8]}...",
+            "warning",
+        )
+
+    return oauth_state
+
+
+@core_decorators.handle_db_errors
 def get_oauth_state_by_session_id(
     session_id: str, db: Session
 ) -> oauth_state_models.OAuthState | None:

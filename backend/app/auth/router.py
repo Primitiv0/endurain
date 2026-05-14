@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import (
@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 
 import auth.security as auth_security
 import auth.utils as auth_utils
-import auth.constants as auth_constants
 import auth.password_hasher as auth_password_hasher
 import auth.token_manager as auth_token_manager
 import auth.schema as auth_schema
@@ -35,12 +34,48 @@ import users.users_sessions.rotated_refresh_tokens.utils as users_session_rotate
 import profile.utils as profile_utils
 
 import core.database as core_database
-import core.config as core_config
 import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 
 # Define the API router
 router = APIRouter()
+
+
+def _validate_pkce_query_params(
+    client_type: str,
+    code_challenge: str | None,
+    code_challenge_method: str | None,
+) -> None:
+    """
+    Reject malformed PKCE query-parameter combinations.
+
+    Args:
+        client_type: Client type supplied by the caller.
+        code_challenge: Optional PKCE code challenge.
+        code_challenge_method: Optional PKCE challenge method.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: If PKCE parameters are supplied partially.
+    """
+    if client_type != "mobile":
+        return
+
+    has_any_pkce_param = (
+        code_challenge is not None or code_challenge_method is not None
+    )
+    has_complete_pkce_params = bool(code_challenge and code_challenge_method)
+
+    if has_any_pkce_param and not has_complete_pkce_params:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "code_challenge and code_challenge_method must be "
+                "provided together"
+            ),
+        )
 
 
 def _raise_auth_security_store_unavailable(
@@ -150,6 +185,12 @@ async def login_for_access_token(
     Raises:
         HTTPException: If authentication fails, user is inactive, or account is locked
     """
+    _validate_pkce_query_params(
+        client_type,
+        code_challenge,
+        code_challenge_method,
+    )
+
     # Check if username is locked out from too many failed login attempts
     try:
         if failed_attempts.is_locked_out(form_data.username):
@@ -309,6 +350,12 @@ async def verify_mfa_and_login(
     Raises:
         HTTPException: If no pending login found, MFA code is invalid, or user not found
     """
+    _validate_pkce_query_params(
+        client_type,
+        code_challenge,
+        code_challenge_method,
+    )
+
     username_log_id = auth_security_stores.username_log_identifier(
         mfa_request.username
     )

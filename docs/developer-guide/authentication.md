@@ -4,8 +4,9 @@ Endurain supports integration with other apps through a comprehensive OAuth 2.1 
 
 ## API Requirements
 
-- **Client Type Header:** Protected JWT requests must include an `X-Client-Type` header with either `web` or `mobile` as the value. Authentication, public, browser-redirect, and API-key-only flows follow the endpoint-specific requirements below.
-- **Authorization:** Protected JWT requests must include an `Authorization: Bearer <access token>` header with a valid access token. Login, MFA verification, OAuth initiation/callback, password reset, sign-up, and API-key-authenticated upload requests are exceptions.
+- **Client Type Header:** Most protected JWT requests must include an `X-Client-Type` header with either `web` or `mobile` as the value. Authentication, public, browser-redirect, API-key, and activity-upload unified-auth flows follow the endpoint-specific requirements below.
+- **OAuth/PKCE Client Type Binding:** For `/public/idp/login/{idp_slug}` and password PKCE login, the backend records a `client_type` on the PKCE/OAuth state. During `/public/idp/session/{session_id}/tokens`, that stored value controls the response shape. The token-exchange `X-Client-Type` header is optional, but if provided it must match the stored value; otherwise the exchange returns `400` with `client_type does not match the OAuth state`.
+- **Authorization:** Most protected JWT requests must include an `Authorization: Bearer <access token>` header with a valid access token. Login, MFA verification, OAuth initiation/callback/token exchange, password reset, sign-up, and activity uploads authenticated with an API key are exceptions.
 - **CSRF Protection (Web Only):** State-changing protected web requests (`POST`, `PUT`, `DELETE`, `PATCH`) must include an `X-CSRF-Token` header. `/auth/refresh` supports a bootstrap refresh without this header after page reload; if the header is provided and the session has a stored CSRF binding, it must be valid.
 
 !!! note "API Key Authentication"
@@ -65,12 +66,12 @@ Endurain implements an OAuth 2.1 compliant hybrid token storage model that provi
 ### OAuth/SSO Flow
 
 1. Client requests list of enabled providers from `/public/idp`
-2. Client initiates OAuth by redirecting to `/public/idp/login/{idp_slug}` with PKCE challenge
+2. Client initiates OAuth at `/public/idp/login/{idp_slug}` with a PKCE challenge. Mobile clients should include `X-Client-Type: mobile`; if the header is absent or invalid, the backend records the flow as `web`.
 3. User authenticates with the OAuth provider
 4. Provider redirects back to `/public/idp/callback/{idp_slug}` with authorization code
 5. Backend exchanges code for provider tokens and user info
 6. Backend creates or links the user account, creates a session, and redirects the client with a `session_id`
-7. The client exchanges the session for tokens via the PKCE token exchange endpoint `/public/idp/session/{session_id}/tokens`:
+7. The client exchanges the session for tokens via the PKCE token exchange endpoint `/public/idp/session/{session_id}/tokens`. The exchange response follows the stored client type; an `X-Client-Type` header may be sent for clarity, but conflicting values are rejected:
   - **Web clients:** Access token + CSRF token in response body, refresh token as httpOnly cookie
   - **Mobile clients:** Access token + refresh token in response body
 
@@ -79,7 +80,7 @@ Endurain implements an OAuth 2.1 compliant hybrid token storage model that provi
 The token refresh flow implements OAuth 2.1 compliant refresh token rotation:
 
 1. When access token expires, client calls `POST /auth/refresh`:
-    - **Web clients:** Include `X-CSRF-Token` header with current CSRF token
+    - **Web clients:** Include `X-CSRF-Token` header with the current CSRF token, except bootstrap refresh after page reload may omit it
     - **Mobile clients:** Include refresh token in request
 2. Backend validates refresh token and session, checks for token reuse
     - **If token reuse detected:** Entire token family is invalidated (security breach response)
@@ -174,22 +175,22 @@ The API is reachable under `/api/v1`. Below are the authentication-related endpo
 | What | Url | Expected Information | Rate Limit |
 | ---- | --- | -------------------- | ---------- |
 | **Get Enabled Providers** | `/public/idp` | None (public endpoint) | - |
-| **Initiate OAuth Login** | `/public/idp/login/{idp_slug}` | Optional Header: `X-Client-Type`; query params: `redirect`, `code_challenge`, `code_challenge_method` | 10 requests/min per IP |
+| **Initiate OAuth Login** | `/public/idp/login/{idp_slug}` | Header: `X-Client-Type` (`web` or `mobile`). For mobile OAuth/PKCE this must be `mobile`; query params: `redirect`, `code_challenge`, `code_challenge_method` | 10 requests/min per IP |
 | **OAuth Callback** | `/public/idp/callback/{idp_slug}` | Query params: `code=<code>`, `state=<state>` | 10 requests/min per IP |
-| **Token Exchange (PKCE)** | `/public/idp/session/{session_id}/tokens` | Header: `X-Client-Type`; JSON: `{"code_verifier": "<verifier>"}` (password PKCE or SSO PKCE) | 10 requests/min |
-| **Create IdP Link Token** | `/profile/idp/{idp_id}/link/token` | Requires authenticated session; returns a 60-second one-time link token | 10 requests/min |
+| **Token Exchange (PKCE)** | `/public/idp/session/{session_id}/tokens` | JSON: `{"code_verifier": "<verifier>"}` (password PKCE or SSO PKCE). Optional Header: `X-Client-Type`; if present, it must match the client type stored on the PKCE/OAuth state. | 10 requests/min |
+| **Create IdP Link Token** | `/profile/idp/{idp_id}/link/token` | Requires authenticated session and step-up JSON body: `current_password` for local-password accounts; `mfa_code` when MFA is enabled. Returns a 60-second one-time link token | 10 requests/min |
 | **Link IdP to Account** | `/profile/idp/{idp_id}/link?link_token=<token>` | Browser redirect endpoint using the one-time link token | - |
 
 ### Session Management Endpoints
 
 | What | Url | Expected Information |
 | ---- | --- | -------------------- |
-| **Get User Sessions** | `/sessions/user/{user_id}` | Header: `Authorization: Bearer <Access Token>` |
-| **Delete Session** | `/sessions/{session_id}/user/{user_id}` | Header: `Authorization: Bearer <Access Token>` |
+| **Get User Sessions** | `/sessions/user/{user_id}` | Headers: `Authorization: Bearer <Access Token>`, `X-Client-Type` |
+| **Delete Session** | `/sessions/{session_id}/user/{user_id}` | Headers: `Authorization: Bearer <Access Token>`, `X-Client-Type`; web clients must also include `X-CSRF-Token` |
 
 ### API Key Management Endpoints
 
-Require JWT authentication. API keys cannot manage other API keys.
+Require JWT authentication with the standard `X-Client-Type` requirement; state-changing web requests must include `X-CSRF-Token`. API keys cannot manage other API keys.
 
 | Method | Url | Description |
 | ------ | --- | ----------- |
@@ -202,7 +203,7 @@ Require JWT authentication. API keys cannot manage other API keys.
 
 | What | Url | Expected Information |
 | ---- | --- | -------------------- |
-| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file. Accepts JWT **or** API key (`X-API-Key` header / `?api_key=` query param) with `activities:upload` scope |
+| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file. Accepts JWT **or** API key (`X-API-Key` header / `?api_key=` query param) with `activities:upload` scope. This unified-auth endpoint does not require `X-Client-Type` |
 | **Set Weight** | `/health/weight` | JSON `{'weight': <number>, 'created_at': 'yyyy-MM-dd'}` |
 
 ## Progressive Account Lockout
@@ -327,7 +328,7 @@ X-Client-Type: web|mobile
 
 ```json
 {
-  "detail": "Invalid MFA code, backup code or backup code already used. Failed attempts: 1."
+  "detail": "Invalid MFA code, backup code or backup code already used."
 }
 ```
 
@@ -359,14 +360,31 @@ Backup codes provide a recovery mechanism when users lose access to their authen
 ### When Backup Codes Are Generated
 
 1. **Automatically on MFA Enable**: When a user enables MFA, 10 backup codes are generated and returned in the response
-2. **Manual Regeneration**: Users can regenerate all backup codes via `POST /profile/mfa/backup-codes` (invalidates all previous codes)
+2. **Manual Regeneration**: Users can regenerate all backup codes via `POST /profile/mfa/backup-codes` (invalidates all previous codes). This endpoint requires step-up verification and MFA must already be enabled on the account.
 
 ### API Endpoints
 
 | What | URL | Method | Description |
 | ---- | --- | ------ | ----------- |
 | **Get Backup Code Status** | `/profile/mfa/backup-codes/status` | GET | Returns count of unused/used codes |
-| **Regenerate Backup Codes** | `/profile/mfa/backup-codes` | POST | Generates new codes (invalidates old) |
+| **Regenerate Backup Codes** | `/profile/mfa/backup-codes` | POST | Generates new codes (invalidates old). Requires step-up JSON body: `current_password` for local-password accounts and `mfa_code` when MFA is enabled |
+
+### Regenerate Backup Codes Request
+
+```http
+POST /api/v1/profile/mfa/backup-codes
+Authorization: Bearer {access_token}
+X-Client-Type: web
+X-CSRF-Token: {csrf_token}
+Content-Type: application/json
+
+{
+  "current_password": "current-password",
+  "mfa_code": "123456"
+}
+```
+
+For SSO-only accounts, `current_password` may be omitted because there is no local password to verify. If MFA is enabled, `mfa_code` is required.
 
 ### Backup Code Status Response
 
@@ -479,9 +497,17 @@ If both the `X-API-Key` header and the `?api_key=` query parameter are present, 
 | ------ | -------- | -------------- | ----------- |
 | `POST` | `/activities/create/upload` | `activities:upload` | Upload a .gpx, .tcx, .fit, or .gz activity file |
 
+The upload endpoint also accepts JWT authentication through the same unified-auth dependency. JWT upload requests still require `Authorization: Bearer <access token>` and the `activities:upload` scope, but this endpoint does not require `X-Client-Type`.
+
 ### Managing API Keys
 
 API keys are managed through the Endurain web UI (Settings → Security → API Keys) or via the REST API. All management endpoints require a valid JWT access token.
+
+Creating an API key also requires step-up verification because the key is a long-lived credential:
+
+- Local-password accounts must provide `current_password`
+- Accounts with MFA enabled must also provide `mfa_code`
+- SSO-only accounts may omit `current_password` because there is no local password to verify
 
 **Create API Key Request:**
 
@@ -489,12 +515,15 @@ API keys are managed through the Endurain web UI (Settings → Security → API 
 POST /api/v1/profile/api_keys
 Authorization: Bearer {access_token}
 X-Client-Type: web
+X-CSRF-Token: {csrf_token}
 Content-Type: application/json
 
 {
   "name": "Home Server Integration",
   "scopes": ["activities:upload"],
-  "expires_at": "2027-01-01T00:00:00Z"
+  "expires_at": "2027-01-01T00:00:00Z",
+  "current_password": "current-password",
+  "mfa_code": "123456"
 }
 ```
 
@@ -503,6 +532,8 @@ Content-Type: application/json
 | `name` | Yes | Human-readable label (max 100 characters) |
 | `scopes` | Yes | Array of scope strings to grant |
 | `expires_at` | No | ISO 8601 expiry datetime. Omit or `null` for no expiry |
+| `current_password` | Conditionally | Required for accounts with a local password. Omit for SSO-only accounts |
+| `mfa_code` | Conditionally | Required when MFA is enabled on the account |
 
 **Create API Key Response (HTTP 201):**
 
@@ -596,7 +627,7 @@ Identity providers must be configured with the following parameters:
 Users can link their Endurain account to an OAuth provider:
 
 1. User must be authenticated with a valid session
-2. Create a one-time link token with `POST /profile/idp/{idp_id}/link/token`
+2. Create a one-time link token with `POST /profile/idp/{idp_id}/link/token`. Local-password accounts must include `current_password`; accounts with MFA enabled must also include `mfa_code`. SSO-only accounts may omit `current_password`.
 3. Open `/profile/idp/{idp_id}/link?link_token=<token>` in the browser before the token expires (60 seconds)
 4. Authenticate with the identity provider
 5. Provider is linked to the existing account
@@ -709,6 +740,7 @@ X-Client-Type: mobile
 | Status | Error | Description |
 | ------ | ----- | ----------- |
 | 400 | Invalid code_verifier | Verifier doesn't match the challenge |
+| 400 | `client_type does not match the OAuth state` | `X-Client-Type` at token exchange differs from the value stored on the PKCE/OAuth state |
 | 404 | Session not found | Invalid session_id |
 | 409 | Tokens already exchanged | Replay attack prevention |
 | 429 | Rate limit exceeded | Max 10 requests/minute per IP |
@@ -863,9 +895,18 @@ code_challenge = BASE64URL(SHA256(code_verifier))
 
 #### Step 2: Initiate OAuth with PKCE Challenge
 
-Open a WebView with the SSO URL including PKCE parameters:
+Initiate OAuth from an app-controlled HTTP request so the backend records `X-Client-Type: mobile`, then open the returned redirect target in WebView.
 
-**URL to Load:**
+**Initiate Request:**
+
+```http
+GET /api/v1/public/idp/login/{idp_slug}?code_challenge={challenge}&code_challenge_method=S256&redirect=/dashboard
+X-Client-Type: mobile
+```
+
+The response is a redirect to the IdP authorization URL. Load that redirect target in WebView.
+
+**Direct Initiate URL (reference):**
 
 ```http
 https://your-endurain-instance.com/api/v1/public/idp/login/{idp_slug}?code_challenge={challenge}&code_challenge_method=S256&redirect=/dashboard
@@ -925,6 +966,7 @@ X-Client-Type: mobile
 | Status | Error | Description |
 | ------ | ----- | ----------- |
 | 400 | Invalid code_verifier | Verifier doesn't match the challenge |
+| 400 | `client_type does not match the OAuth state` | `X-Client-Type` at token exchange differs from the value stored on the PKCE/OAuth state |
 | 404 | Session not found | Invalid session_id or not a PKCE flow |
 | 409 | Tokens already exchanged | Replay attack prevention |
 | 429 | Rate limit exceeded | Max 10 requests/minute per IP |
@@ -1010,7 +1052,16 @@ embedded WebView. This follows [RFC 8252 - OAuth 2.0 for Native Apps](https://to
 
 **Step 1:** Mobile app generates PKCE pair (same as WebView — see [Step 1](#step-1-generate-pkce-code-verifier-and-challenge)).
 
-**Step 2:** Open system browser with a **custom URI scheme** as the redirect:
+**Step 2:** First call the initiate endpoint with `X-Client-Type: mobile`, then open the returned redirect target in the system browser.
+
+```http
+GET /api/v1/public/idp/login/{idp_slug}?code_challenge={challenge}&code_challenge_method=S256&redirect={custom_scheme}://callback
+X-Client-Type: mobile
+```
+
+If your mobile platform cannot attach custom headers when directly opening a browser URL, do not skip this initiate request. Opening the direct URL without `X-Client-Type: mobile` records the flow as `web`; a later mobile exchange header will fail with `client_type does not match the OAuth state`, while omitting the exchange header will produce a web-shaped response.
+
+**Direct Initiate URL (reference):**
 
 ```http
 https://your-endurain-instance.com/api/v1/public/idp/login/{idp_slug}?code_challenge={challenge}&code_challenge_method=S256&redirect={custom_scheme}://callback
@@ -1094,8 +1145,7 @@ The following environment variables control authentication behavior:
 
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
-| `ENVIRONMENT` | Controls direct login/refresh cookie security. `production` and `demo` set the refresh cookie `Secure` flag. | `production` | No |
-| `FRONTEND_PROTOCOL` | Controls refresh cookie security during OAuth/SSO session exchange. Set to `https` for secure cookies. | `http` | No |
+| `ENVIRONMENT` | Controls refresh cookie security for login, refresh, and OAuth/SSO token exchange. `production` and `demo` set the refresh cookie `Secure` flag. | `production` | No |
 | `ALLOWED_REDIRECT_SCHEMES` | Comma-separated custom URI schemes allowed as SSO redirect targets (e.g., `gadgetbridge,myapp`). Empty by default — only relative paths accepted. External `http`/`https` redirects are always rejected. | `` | No |
 
 ### Cookie Configuration
@@ -1105,7 +1155,7 @@ For web clients, the refresh token cookie is configured with:
 | Attribute | Value | Purpose |
 |-----------|-------|---------|
 | **HttpOnly** | `true` | Prevents JavaScript access (XSS protection) |
-| **Secure** | `true` for direct login/refresh when `ENVIRONMENT=production` or `demo`; `true` for OAuth/SSO exchange when `FRONTEND_PROTOCOL=https` | Only sent over HTTPS |
+| **Secure** | `true` when `ENVIRONMENT=production` or `demo`; applies consistently to login, refresh, and OAuth/SSO token exchange | Only sent over HTTPS |
 | **SameSite** | `Strict` | Prevents CSRF attacks |
 | **Path** | `/api/v1/auth` | Sent only to auth endpoints that need the refresh token |
 | **Expires** | 7 days (default) | Matches refresh token lifetime |

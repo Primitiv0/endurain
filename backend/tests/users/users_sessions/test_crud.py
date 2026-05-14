@@ -215,7 +215,10 @@ class TestGetSessionWithOauthState:
         mock_db.execute.return_value = mock_result
 
         with patch(
-            "users.users_sessions.crud.oauth_state_crud.get_oauth_state_by_id",
+            (
+                "users.users_sessions.crud."
+                "oauth_state_crud.get_oauth_state_by_id_not_expired"
+            ),
             return_value=mock_oauth_state,
         ):
             # Act
@@ -225,6 +228,30 @@ class TestGetSessionWithOauthState:
 
             # Assert
             assert result == (mock_session, mock_oauth_state)
+
+    def test_get_session_with_oauth_state_expired_oauth_state(self, mock_db):
+        """
+        Test retrieval with an expired linked OAuth state.
+        """
+        session_id = "test-session-id"
+        mock_session = MagicMock(spec=users_session_models.UsersSessions)
+        mock_session.oauth_state_id = "expired-oauth-state-123"
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_session
+        mock_db.execute.return_value = mock_result
+
+        with patch(
+            (
+                "users.users_sessions.crud."
+                "oauth_state_crud.get_oauth_state_by_id_not_expired"
+            ),
+            return_value=None,
+        ):
+            result = users_session_crud.get_session_with_oauth_state(
+                session_id, mock_db
+            )
+
+        assert result == (mock_session, None)
 
     def test_get_session_with_oauth_state_not_found(self, mock_db):
         """
