@@ -1,6 +1,6 @@
 """Gear schema definitions."""
 
-from datetime import date as datetime_date
+from datetime import datetime as datetime_type
 
 from pydantic import (
     BaseModel,
@@ -22,7 +22,7 @@ class GearBase(BaseModel):
         model: Gear model name.
         nickname: Gear display nickname.
         gear_type: Gear type identifier.
-        created_at: Gear creation date.
+        created_at: Gear creation timestamp.
         active: Whether the gear is active.
         initial_kms: Initial kilometers.
         purchase_value: Purchase value.
@@ -51,9 +51,9 @@ class GearBase(BaseModel):
         le=8,
         description="Gear type identifier",
     )
-    created_at: datetime_date | None = Field(
+    created_at: datetime_type | None = Field(
         default=None,
-        description="Gear creation date",
+        description="Gear creation timestamp",
     )
     active: StrictBool | None = Field(
         default=None,
