@@ -85,7 +85,7 @@ Endurain currently supports:
 
 ## Planned Features
 
-Please visit the [ROADMAP.md file on Codeberg](https://codeberg.org/endurain-project/endurain/blob/master/ROADMAP.md).
+Please visit the [ROADMAP.md file on Codeberg](https://codeberg.org/endurain-project/endurain/src/branch/master/ROADMAP.md).
 
 ## Sponsors
 
