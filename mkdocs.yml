@@ -59,12 +59,11 @@ nav:
       - Activity streams: reference/activities/activity_streams.md
       - Activity summaries: reference/activities/activity_summaries.md
       - Activity workout steps: reference/activities/activity_workout_steps.md
+      - Activity file import: reference/activities/activity_file_import.md
     - Gears:
-      - Gear: reference/gears/gear.md
+      - Gears: reference/gears/gears.md
       - Gear components: reference/gears/gear_components.md
-    - GPX: reference/gpx.md
     - Health:
-      - Health: reference/health.md
       - Health poop: reference/health/health_poop.md
       - Health sleep: reference/health/health_sleep.md
       - Health steps: reference/health/health_steps.md
@@ -77,7 +76,6 @@ nav:
     - Profile: reference/profile.md
     - Server settings: reference/server_settings.md
     - Sign up tokens: reference/sign_up_tokens.md
-    - TCX: reference/tcx.md
     - Users:
       - Users: reference/users/users.md
       - Users API keys: reference/users/users_api_keys.md

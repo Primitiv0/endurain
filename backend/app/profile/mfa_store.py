@@ -281,9 +281,6 @@ class MFASecretStore:
 
         Returns:
             None.
-
-        Raises:
-            None.
         """
         try:
             with self._lock:
@@ -339,9 +336,6 @@ class MFASecretStore:
 
         Returns:
             String showing active secrets and TTL.
-
-        Raises:
-            None.
         """
         stats = self.get_stats()
         active_secrets = stats.get("active_secrets", 0)
@@ -454,9 +448,6 @@ class RedisMFASecretStore:
         Args:
             redis_client: Redis client used for storage.
             ttl_seconds: Time-to-live for secrets in seconds.
-
-        Raises:
-            None.
         """
         self._redis = redis_client
         self._ttl_seconds = ttl_seconds
@@ -534,9 +525,6 @@ class RedisMFASecretStore:
 
         Returns:
             None.
-
-        Raises:
-            None.
         """
         try:
             self._redis.delete(self._secret_key(user_id))
@@ -588,9 +576,6 @@ class RedisMFASecretStore:
 
         Returns:
             Dictionary with total, expired, and active secret counts.
-
-        Raises:
-            None.
         """
         key_pattern = f"{_REDIS_MFA_SECRET_KEY_PREFIX}:*"
         try:
@@ -621,9 +606,6 @@ class RedisMFASecretStore:
 
         Returns:
             String showing active secrets and TTL.
-
-        Raises:
-            None.
         """
         stats = self.get_stats()
         active_secrets = stats.get("active_secrets", 0)
