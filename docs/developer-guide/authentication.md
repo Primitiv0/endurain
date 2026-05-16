@@ -1147,6 +1147,7 @@ The following environment variables control authentication behavior:
 | -------- | ----------- | ------- | -------- |
 | `ENVIRONMENT` | Controls refresh cookie security for login, refresh, and OAuth/SSO token exchange. `production` and `demo` set the refresh cookie `Secure` flag. | `production` | No |
 | `ALLOWED_REDIRECT_SCHEMES` | Comma-separated custom URI schemes allowed as SSO redirect targets (e.g., `gadgetbridge,myapp`). Empty by default — only relative paths accepted. External `http`/`https` redirects are always rejected. | `` | No |
+| `SSRF_ALLOWED_HOSTS` | SSRF allowlist for admin-configured outbound calls (currently OIDC discovery and JWKS fetch only). Comma-separated list of exact hostnames (case-insensitive) and/or explicit IP CIDR ranges. Supports self-hosted identity providers on private networks. Examples: `auth.internal.example.com` or `auth.internal.example.com,10.10.0.0/24,fd00::/64`. Wildcards are rejected. IPv4 prefix must be ≥ /8, IPv6 ≥ /32. Every allowlisted outbound call is logged at INFO level for audit. | `` | No |
 
 ### Cookie Configuration
 
