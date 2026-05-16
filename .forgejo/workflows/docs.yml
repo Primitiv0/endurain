@@ -47,5 +47,6 @@ jobs:
         uses: https://codeberg.org/git-pages/action@v2
         with:
           site: https://docs.endurain.com/
+          server: codeberg.page
           token: ${{ forge.token }}
           source: site/
