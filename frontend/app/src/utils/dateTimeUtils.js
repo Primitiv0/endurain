@@ -32,6 +32,23 @@ export function formatTime(dateString) {
   return date.toLocaleString(DateTime.TIME_SIMPLE)
 }
 
+export function formatDateTimeForLocalInput(dateValue) {
+  if (!dateValue) {
+    return ''
+  }
+
+  const dateTime =
+    typeof dateValue === 'string'
+      ? DateTime.fromISO(dateValue, { setZone: true })
+      : DateTime.fromJSDate(dateValue)
+
+  if (!dateTime.isValid) {
+    return ''
+  }
+
+  return dateTime.toLocal().toFormat("yyyy-LL-dd'T'HH:mm")
+}
+
 export function calculateTimeDifference(startTime, endTime) {
   // Create new Date objects from the timestamps
   const startDateTime = new Date(startTime)
