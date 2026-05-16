@@ -8,7 +8,7 @@
           ><font-awesome-icon :icon="['fas', 'fa-code-branch']"
         /></a>
         •
-        <a class="link-body-emphasis" href="https://endurain-project.codeberg.page/endurain"
+        <a class="link-body-emphasis" href="https://docs.endurain.com"
           ><font-awesome-icon :icon="['fas', 'book']"
         /></a>
         •

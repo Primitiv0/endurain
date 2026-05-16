@@ -29,9 +29,9 @@ Experience Endurain without installation:
 
 ## Table of Contents
 
-- [Endurain documentation](https://endurain-project.codeberg.page/endurain)
+- [Endurain documentation](https://docs.endurain.com)
 - [What is Endurain?](#what-is-endurain)
-- [Endurain screenshots](https://endurain-project.codeberg.page/endurain/gallery/)
+- [Endurain screenshots](https://docs.endurain.com/gallery/)
 - [Sponsors](#sponsors)
 - [Contributing](#contributing)
 - [Help Translate](#help-translate)
@@ -49,7 +49,7 @@ Endurain is a self-hosted fitness tracking service designed to give users full c
 
 To deploy Endurain, a Docker image is available, and a comprehensive example can be found in the "docker-compose.yml.example" file provided. Configuration is facilitated through environment variables, ensuring flexibility and ease of customization.
 
-For more information please see the Endurain's [documentation](https://endurain-project.codeberg.page/endurain).
+For more information please see the Endurain's [documentation](https://docs.endurain.com).
 
 ## Sponsors
 
