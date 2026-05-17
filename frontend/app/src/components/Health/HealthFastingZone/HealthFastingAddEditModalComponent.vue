@@ -171,6 +171,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 import { health_fasting } from '@/services/health_fastingService'
+import { formatDateTimeForLocalInput } from '@/utils/dateTimeUtils'
 
 const props = defineProps({
   action: {
@@ -188,7 +189,7 @@ const emit = defineEmits(['isLoadingNewFasting', 'createdFasting', 'editedFastin
 const { t } = useI18n()
 const newEditFastingType = ref('16:8')
 const customDurationHours = ref(16)
-const newEditFastingStartTime = ref(new Date().toISOString().slice(0, 16))
+const newEditFastingStartTime = ref(formatDateTimeForLocalInput(new Date()))
 const newEditFastingEndTime = ref('')
 const newEditFastingStatus = ref('in_progress')
 const newEditFastingNotes = ref('')
@@ -216,10 +217,10 @@ const targetDurationSeconds = computed(() => {
 if (props.userHealthFasting) {
   newEditFastingType.value = props.userHealthFasting.fasting_type || '16:8'
   newEditFastingStartTime.value = props.userHealthFasting.fast_start_time
-    ? new Date(props.userHealthFasting.fast_start_time).toISOString().slice(0, 16)
-    : new Date().toISOString().slice(0, 16)
+    ? formatDateTimeForLocalInput(props.userHealthFasting.fast_start_time)
+    : formatDateTimeForLocalInput(new Date())
   newEditFastingEndTime.value = props.userHealthFasting.fast_end_time
-    ? new Date(props.userHealthFasting.fast_end_time).toISOString().slice(0, 16)
+    ? formatDateTimeForLocalInput(props.userHealthFasting.fast_end_time)
     : ''
   newEditFastingStatus.value = props.userHealthFasting.status || 'in_progress'
   newEditFastingNotes.value = props.userHealthFasting.notes || ''
