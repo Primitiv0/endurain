@@ -180,7 +180,11 @@ class IdentityProviderService:
             # entry pointing at 127.0.0.1 or the cloud
             # metadata service would otherwise let an
             # attacker pivot via signed token replay.
-            core_network.reject_private_url(jwks_uri)
+            # Self-hosted IdPs on private networks can
+            # be opted in via SSRF_ALLOWED_HOSTS.
+            core_network.reject_private_url(
+                jwks_uri, purpose="oidc_jwks"
+            )
             client = await self._get_http_client()
             core_logger.print_to_log(f"Fetching JWKS from {jwks_uri}", "debug")
 
@@ -510,7 +514,9 @@ class IdentityProviderService:
         try:
             # SSRF guard for the admin-supplied issuer
             # URL: see jwks_uri rationale above.
-            core_network.reject_private_url(discovery_url)
+            core_network.reject_private_url(
+                discovery_url, purpose="oidc_discovery"
+            )
             # Fetch the configuration
             client = await self._get_http_client()
             response = await client.get(discovery_url)
@@ -542,6 +548,19 @@ class IdentityProviderService:
             core_logger.print_to_log(
                 f"Request error fetching OIDC discovery for {idp.name}. "
                 f"URL: {discovery_url}. Error: {err}",
+                "warning",
+            )
+            return None
+        except HTTPException as err:
+            # SSRF guard or other 4xx from reject_private_url.
+            # Log with an actionable hint for the operator
+            # so they know about the SSRF_ALLOWED_HOSTS
+            # escape hatch for self-hosted IdPs.
+            core_logger.print_to_log(
+                f"OIDC discovery for {idp.name} was rejected: "
+                f"{err.detail}. URL: {discovery_url}. If this is a "
+                f"self-hosted IdP on a private network, add its host "
+                f"or CIDR to SSRF_ALLOWED_HOSTS.",
                 "warning",
             )
             return None
@@ -672,8 +691,13 @@ class IdentityProviderService:
 
         if not token_endpoint:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Identity provider {idp.name} missing token endpoint configuration.",
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    f"Identity provider {idp.name} token endpoint could "
+                    "not be resolved. Verify the issuer URL is reachable; "
+                    "if it is on a private network, add its host or CIDR "
+                    "to SSRF_ALLOWED_HOSTS."
+                ),
             )
 
         return token_endpoint
@@ -750,8 +774,14 @@ class IdentityProviderService:
 
             if not authorization_endpoint:
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Identity provider not properly configured",
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        f"Identity provider {idp.name} authorization "
+                        "endpoint could not be resolved. Verify the "
+                        "issuer URL is reachable; if it is on a "
+                        "private network, add its host or CIDR to "
+                        "SSRF_ALLOWED_HOSTS."
+                    ),
                 )
 
             # Retrieve database-backed OAuth state (mandatory for all clients)
@@ -851,8 +881,14 @@ class IdentityProviderService:
 
             if not authorization_endpoint:
                 raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Identity provider not properly configured",
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        f"Identity provider {idp.name} authorization "
+                        "endpoint could not be resolved. Verify the "
+                        "issuer URL is reachable; if it is on a "
+                        "private network, add its host or CIDR to "
+                        "SSRF_ALLOWED_HOSTS."
+                    ),
                 )
 
             # Retrieve database-backed OAuth state (required for link mode)

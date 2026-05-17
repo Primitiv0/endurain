@@ -29,7 +29,7 @@ import core.logger as core_logger
 import core.redis as core_redis
 
 # Pure constants — neither env-driven nor derived from settings.
-API_VERSION = "v0.18.1"
+API_VERSION = "v0.18.2"
 LICENSE_NAME = "GNU Affero General Public License v3.0 or later"
 LICENSE_IDENTIFIER = "AGPL-3.0-or-later"
 LICENSE_URL = "https://spdx.org/licenses/AGPL-3.0-or-later.html"
@@ -49,6 +49,23 @@ SUPPORTED_FILE_FORMATS = [
     ".tcx",
     ".gz",
 ]  # used to screen bulk import files
+
+
+def _looks_like_ip(value: str) -> bool:
+    """Best-effort check that ``value`` is an IP literal.
+
+    Used by the ``SSRF_ALLOWED_HOSTS`` validator to decide
+    whether to parse an entry as an IP/CIDR or as a
+    hostname. Returns ``False`` for hostnames that may
+    happen to contain digits.
+    """
+    import ipaddress
+
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
 
 
 # Settings — every value driven by an environment variable.
@@ -81,6 +98,14 @@ class Settings(BaseSettings):
     # ``json.loads`` first and raise on plain strings.
     ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = set()
     TRUSTED_PROXIES: Annotated[list[str], NoDecode] = []
+    # Narrow SSRF exception list for admin-configured
+    # outbound calls (currently OIDC discovery / JWKS).
+    # Accepts exact hostnames (case-insensitive) and
+    # explicit IPv4/IPv6 CIDRs. Wildcards and overly
+    # broad ranges (IPv4 prefix < 8, IPv6 prefix < 32)
+    # are rejected at startup to prevent accidental
+    # neutering of the SSRF guard.
+    SSRF_ALLOWED_HOSTS: Annotated[list[str], NoDecode] = []
 
     # --- Filesystem layout ---
     FRONTEND_DIR: str = "/app/frontend/dist"
@@ -170,6 +195,99 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [ip.strip() for ip in v.split(",") if ip.strip()]
         return v
+
+    @field_validator("SSRF_ALLOWED_HOSTS", mode="before")
+    @classmethod
+    def _parse_ssrf_allowed_hosts(cls, v):
+        """Parse and validate the SSRF allowlist.
+
+        Accepts a comma-separated env value or an already
+        parsed iterable. Entries may be:
+
+        - Exact hostnames (e.g. ``auth.example.com``).
+          Lower-cased and stripped of any URL scheme,
+          path, or port (only the host label is kept).
+        - Explicit CIDRs (e.g. ``10.10.0.0/24`` or
+          ``fd00::/64``). The prefix length must be
+          tight enough to be auditable: IPv4 ``>= 8``
+          and IPv6 ``>= 32``.
+
+        Rejects:
+
+        - Wildcards (``*`` or empty entries).
+        - ``0.0.0.0/0`` / ``::/0`` and any range broader
+          than the limits above.
+
+        Invalid entries are dropped with a warning so a
+        single typo does not block startup, but at least
+        one valid entry must remain for the field to
+        take effect.
+        """
+        import ipaddress
+
+        if v is None or v == "":
+            return []
+        if isinstance(v, str):
+            raw_entries = [e.strip() for e in v.split(",")]
+        else:
+            raw_entries = [str(e).strip() for e in v]
+
+        cleaned: list[str] = []
+        for entry in raw_entries:
+            if not entry or entry == "*":
+                if entry == "*":
+                    core_logger.print_to_log_and_console(
+                        "Ignoring wildcard '*' entry in "
+                        "SSRF_ALLOWED_HOSTS (not permitted).",
+                        "warning",
+                    )
+                continue
+
+            # CIDR / IP entry
+            if "/" in entry or _looks_like_ip(entry):
+                try:
+                    network = ipaddress.ip_network(entry, strict=False)
+                except ValueError:
+                    core_logger.print_to_log_and_console(
+                        f"Ignoring invalid SSRF_ALLOWED_HOSTS entry "
+                        f"'{entry}': not a valid IP or CIDR.",
+                        "warning",
+                    )
+                    continue
+                min_prefix = 8 if network.version == 4 else 32
+                if network.prefixlen < min_prefix:
+                    core_logger.print_to_log_and_console(
+                        f"Ignoring overly broad SSRF_ALLOWED_HOSTS "
+                        f"entry '{entry}': prefix /{network.prefixlen} "
+                        f"is wider than the minimum /{min_prefix} for "
+                        f"IPv{network.version}.",
+                        "warning",
+                    )
+                    continue
+                cleaned.append(str(network))
+                continue
+
+            # Hostname entry — strip scheme/port/path
+            host = entry.lower()
+            if "://" in host:
+                host = host.split("://", 1)[1]
+            host = host.split("/", 1)[0]
+            if host.startswith("["):  # IPv6 literal w/ optional :port
+                bracket = host.find("]")
+                if bracket != -1:
+                    host = host[1:bracket]
+            elif ":" in host and host.count(":") == 1:
+                host = host.split(":", 1)[0]
+            if not host:
+                core_logger.print_to_log_and_console(
+                    f"Ignoring empty SSRF_ALLOWED_HOSTS hostname "
+                    f"from entry '{entry}'.",
+                    "warning",
+                )
+                continue
+            cleaned.append(host)
+
+        return cleaned
 
     @field_validator("REVERSE_GEO_RATE_LIMIT", mode="before")
     @classmethod

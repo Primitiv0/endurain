@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 from fastapi import HTTPException, Request, status
 
 import core.config as core_config
+import core.logger as core_logger
 
 
 def _is_trusted_peer(peer_ip: str) -> bool:
@@ -113,7 +114,47 @@ def _is_private_or_reserved(
     )
 
 
-def reject_private_url(url: str) -> None:
+def _load_ssrf_allowlist() -> tuple[
+    frozenset[str],
+    tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...],
+]:
+    """Split the configured allowlist into hostnames and IP networks.
+
+    Entries have already been validated by the
+    ``SSRF_ALLOWED_HOSTS`` field validator in
+    :mod:`core.config`. This helper just classifies them
+    for the lookup below.
+    """
+    hosts: set[str] = set()
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for entry in core_config.settings.SSRF_ALLOWED_HOSTS:
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            hosts.add(entry.lower())
+    return frozenset(hosts), tuple(networks)
+
+
+def _is_ssrf_allowlisted(
+    hostname: str,
+    addr: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """Return True if ``hostname`` or ``addr`` is allowlisted.
+
+    The allowlist is only consulted when the resolved
+    address would otherwise be rejected by
+    :func:`_is_private_or_reserved`. Both the hostname
+    (exact, case-insensitive) and the resolved IP (CIDR
+    membership) are checked so administrators can opt
+    in by either dimension.
+    """
+    hosts, networks = _load_ssrf_allowlist()
+    if hostname.lower() in hosts:
+        return True
+    return any(addr in network for network in networks)
+
+
+def reject_private_url(url: str, *, purpose: str | None = None) -> None:
     """Refuse to dial URLs that resolve to private/internal hosts.
 
     Mitigates Server-Side Request Forgery (SSRF) by
@@ -138,11 +179,19 @@ def reject_private_url(url: str) -> None:
     Args:
         url: The fully-qualified URL the caller intends
             to fetch.
+        purpose: Optional short tag identifying the
+            outbound call (e.g. ``"oidc_discovery"``).
+            Used only for audit logging when a private
+            destination is allowed via
+            ``SSRF_ALLOWED_HOSTS``; never trusted as a
+            security boundary.
 
     Raises:
         HTTPException: 400 if the URL is malformed,
             uses a forbidden scheme, has no hostname,
-            or resolves to any non-public address.
+            or resolves to any non-public address that
+            is not covered by the
+            ``SSRF_ALLOWED_HOSTS`` allowlist.
     """
     try:
         parsed = urlparse(url)
@@ -190,6 +239,19 @@ def reject_private_url(url: str) -> None:
                 detail="URL resolves to an unparseable address",
             )
         if _is_private_or_reserved(addr):
+            if _is_ssrf_allowlisted(hostname, addr):
+                # Audit trail: every allowlisted private
+                # destination is logged so operators can
+                # review what the SSRF exception is being
+                # used for.
+                core_logger.print_to_log(
+                    "SSRF allowlist hit: dialing private "
+                    f"address {ip_text} for host "
+                    f"{hostname} (purpose="
+                    f"{purpose or 'unspecified'})",
+                    "info",
+                )
+                continue
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="URL resolves to a non-public address",
