@@ -12,9 +12,9 @@ services:
       - RATE_LIMIT_STORAGE_URI=redis://redis:6379/0
       - AUTH_SECURITY_STORAGE_URI=redis://redis:6379/0
     volumes:
-    #  - <local_path>/endurain/backend/app:/app/backend # Configure volume if you want to edit the code locally by cloning the repo
-      - <local_path>/endurain/backend/data:/app/backend/data # necessary for activity files, user images and server images persistence on container image updates
-      - <local_path>/endurain/backend/logs:/app/backend/logs # log files for the backend
+    #  - ${LOCAL_PATH:-/var/opt/endurain}/backend/app:/app/backend # Configure volume if you want to edit the code locally by cloning the repo
+      - ${LOCAL_PATH:-/var/opt/endurain}/backend/data:/app/backend/data # necessary for activity files, user images and server images persistence on container image updates
+      - ${LOCAL_PATH:-/var/opt/endurain}/backend/logs:/app/backend/logs # log files for the backend
     ports:
       - "8080:8080" # Endurain port, change per your needs
     depends_on:
@@ -40,7 +40,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - <local_path>/endurain/postgres:/var/lib/postgresql
+      - ${LOCAL_PATH:-/var/opt/endurain}/postgres:/var/lib/postgresql
     restart: unless-stopped
 
   # redis for rate-limiting and auth security storage
@@ -54,7 +54,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - <local_path>/endurain/redis:/data
+      - ${LOCAL_PATH:-/var/opt/endurain}/redis:/data
     restart: unless-stopped
 
   # Jaeger for opentelemetry - optional

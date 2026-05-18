@@ -45,14 +45,16 @@ Nginx Proxy Manager comes as a pre-built Docker image. Please refer to the [docs
 
 ## Create directory structure
 
-Lets use `/opt/endurain/` as the root directory for our project.
+Data is stored on the host under `/var/opt/endurain/` by default. This location is controlled by the `LOCAL_PATH` variable in `.env` — uncomment it and set your own path if needed.
+
+Create the required directories:
 
 ```bash
-sudo mkdir /opt/endurain
-sudo chown 1000:1000 /opt/endurain
+sudo mkdir /var/opt/endurain
+sudo chown 1000:1000 /var/opt/endurain
 mkdir -p \
-  /opt/endurain/backend/{data,logs} \
-  /opt/endurain/postgres
+  /var/opt/endurain/backend/{data,logs} \
+  /var/opt/endurain/postgres
 ```
 
 ## Docker compose Deployment
@@ -72,7 +74,7 @@ To make it as easy as possible for selfhoster to get up and running examples of 
 * [.env.example](https://codeberg.org/endurain-project/endurain/raw/branch/master/.env.example)
 
 ```bash
-cd /opt/endurain
+cd /var/opt/endurain
 wget https://codeberg.org/endurain-project/endurain/raw/branch/master/docker-compose.yml.example
 wget https://codeberg.org/endurain-project/endurain/raw/branch/master/.env.example
 
@@ -80,12 +82,13 @@ mv docker-compose.yml.example docker-compose.yml
 mv .env.example .env
 ```
 
-Now we need to make changes to the files to reflect *your* environment. Inside docker-compose.yml there is not much we need to do. If you want to store the files another place then `/opt/endurain` this is the file you need to change.
+Now set the values in `.env` to match your environment. The data storage location is controlled by `LOCAL_PATH` — it is commented out by default and defaults to `/var/opt/endurain`. Uncomment and change it if you need a different path.
 
-Here is an explaination on what you can set in the `.env`:
+Here is an explanation of what you can set in the `.env`:
 
 Environment variable  | How to set it |
 | --- | --- |
+| LOCAL_PATH | Root directory for Docker volume mounts (activity files, images, logs, database data). Defaults to `/var/opt/endurain`. Set to any absolute path. |
 | DB_PASSWORD | Run `openssl rand -hex 32` on a terminal to get a secret |
 | POSTGRES_PASSWORD | Set the same value as DB_PASSWORD.|
 | SECRET_KEY | Run `openssl rand -hex 32` on a terminal to get a secret |
@@ -105,7 +108,7 @@ Environment variable  | How to set it |
 It is finally time to start the stack!
 
 ```bash
-cd /opt/endurain
+cd /var/opt/endurain
 sudo docker compose up -d
 ```
 
@@ -237,11 +240,11 @@ You should now be able to access your site on endurain.yourdomain.com
 * Take a backup of your files and db.
 * Check for new releases of the container image [here](https://codeberg.org/endurain-project/endurain). Read release notes carefully for breaking changes.
 * Log on your server and run:
-* Inside `/opt/endurain/docker-compose.yml`, change out the version tag (the version after `:`). If you are running `:latest` tag on the docker image, you do not have to edit anything in the docker-compose.yml file. 
+* In docker-compose.yml, update the image tag. If you are running the `:latest` tag, no changes are needed.
 
 
 ```bash
-cd /opt/endurain
+cd /var/opt/endurain
 sudo docker compose pull
 sudo docker compose up -d
 ```
@@ -256,11 +259,11 @@ The same is the case for Postgres. Check for breaking changes in release notes o
 You should implement backup strategy for the following directories:
 
 ```bash
-/opt/endurain/app/data
-/opt/endurain/app/logs
+/var/opt/endurain/backend/data
+/var/opt/endurain/backend/logs
 ```
 
-You also need to backup your postgres database. It is not good practice to just backup the volume `/opt/endurain/postgres` this might be corrupted if  the database is in the middle of a wright when the database goes down.
+You also need to backup your postgres database. It is not good practice to just backup the volume `/var/opt/endurain/postgres` — this might be corrupted if the database is in the middle of a write when it goes down.
 
 ## Default Credentials
 
