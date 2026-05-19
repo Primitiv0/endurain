@@ -82,8 +82,12 @@ export default {
     async function submitAddGearToActivityForm() {
       try {
         // Add the gear to the activity
-        const auxActivity = props.activity
-        auxActivity.gear_id = gearId.value
+        const auxActivity = {
+          id: props.activity.id,
+          name: props.activity.name,
+          activity_type: props.activity.activity_type,
+          gear_id: gearId.value
+        }
         await activities.editActivity(auxActivity)
 
         // Emit the gearId to the parent component
