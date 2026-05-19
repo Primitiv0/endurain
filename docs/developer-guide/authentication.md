@@ -150,7 +150,7 @@ See [API Key Authentication](#api-key-authentication) for the complete reference
 
 ## API Endpoints 
 
-The API is reachable under `/api/v1`. Below are the authentication-related endpoints. Complete API documentation is available on the backend docs (`http://localhost:98/api/v1/docs` or `http://ip_address:98/api/v1/docs` or `https://domain/api/v1/docs`):
+The API is reachable under `/api/v1`. Below are the authentication-related endpoints. Complete API documentation is available on the backend docs (`http://localhost:98/api/v1/docs` or `http://ip_address:98/api/v1/docs` or `https://domain/api/v1/docs`). You will need to change the ENV variable `ENVIRONMENT` to `development` in order for `/docs` endpoint to be served:
 
 ### Core Authentication Endpoints (Web)
 
