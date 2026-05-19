@@ -5,9 +5,9 @@ services:
     env_file:
       - .env
     volumes:
-    #  - ${LOCAL_PATH:-/var/opt/endurain}/backend/app:/app/backend # Configure volume if you want to edit the code locally by cloning the repo
-      - ${LOCAL_PATH:-/var/opt/endurain}/backend/data:/app/backend/data # necessary for activity files, user images and server images persistence on container image updates
-      - ${LOCAL_PATH:-/var/opt/endurain}/backend/logs:/app/backend/logs # log files for the backend
+    #  - ${LOCAL_PATH:-/var/opt/endurain}/backend/app:/app/backend:Z # Configure volume if you want to edit the code locally by cloning the repo
+      - ${LOCAL_PATH:-/var/opt/endurain}/backend/data:/app/backend/data:Z # necessary for activity files, user images and server images persistence on container image updates
+      - ${LOCAL_PATH:-/var/opt/endurain}/backend/logs:/app/backend/logs:Z # log files for the backend
     ports:
       - "8080:8080"
     depends_on:
@@ -29,7 +29,7 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ${LOCAL_PATH:-/var/opt/endurain}/postgres:/var/lib/postgresql/data
+      - ${LOCAL_PATH:-/var/opt/endurain}/postgres:/var/lib/postgresql/data:Z
     restart: unless-stopped
 
   # redis for rate-limiting and auth security storage
@@ -43,5 +43,5 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ${LOCAL_PATH:-/var/opt/endurain}/redis:/data
+      - ${LOCAL_PATH:-/var/opt/endurain}/redis:/data:Z
     restart: unless-stopped

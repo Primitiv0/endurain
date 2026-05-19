@@ -120,29 +120,28 @@ docker compose logs -f
 
 If you do not get any errors, continue to next step.
 
-#### Troubleshooting permission errors on SELinux-enabled distributions (Fedora, RHEL, CentOS, etc.)
+#### SELinux on Fedora, RHEL, CentOS, and other enforcing distributions
 
-On distributions with SELinux enforcing (check with `getenforce`), Docker bind-mounted directories inherit the host's SELinux context instead of the `container_file_t` context that containers require. Containers may fail to write to any bind-mounted volume with errors like:
+On distributions with SELinux enforcing (check with `getenforce`), Docker bind-mounted directories inherit the host's SELinux context instead of the `container_file_t` context that containers require. This can cause permission errors like:
 
 ```
 redis  | find: .: Permission denied
 endurain-postgres | mkdir: cannot create directory '/var/lib/postgresql/data/pgdata': Permission denied
 ```
 
-To fix this, apply the `container_file_t` context to the **host-side** directories that you mapped as volumes in your `docker-compose.yml`. The directories that typically need this are the postgres data directory and the redis data directory, but the same principle applies to any bind-mounted volume that a container needs to write to.
+The example docker-compose files include `:Z` and `:z` flags on all bind-mounted volumes to handle this automatically:
 
-For example, if your `docker-compose.yml` mounts:
-  - `<host_path>/postgres` → `/var/lib/postgresql/data`
-  - `<host_path>/redis` → `/data`
+- **`:Z`** (private) — labels the volume so only the mounting container can access it. Used for postgres, redis, backend data, and logs where a single container owns the volume.
+- **`:z`** (shared) — labels the volume so multiple containers can share it. Used in the multiple-backends example for shared data and logs.
 
-then run:
+If you are using the provided docker-compose files as-is, these flags should resolve SELinux permission errors automatically. If you have customized your volume structure or added new bind-mounted volumes, you may need to apply the `container_file_t` context manually:
 
 ```bash
 sudo chcon -Rt container_file_t <host_path>/postgres
 sudo chcon -Rt container_file_t <host_path>/redis
 ```
 
-Replace `<host_path>` with the actual path on your host machine (e.g., `/opt/endurain`, `/var/opt/endurain`, or a custom location you chose).
+Replace `<host_path>` with the actual path on your host machine (e.g., `/opt/endurain`, `/var/opt/endurain`, or a custom location you chose). The same principle applies to any bind-mounted volume that a container needs to write to.
 
 After applying the context, restart the stack:
 
@@ -150,7 +149,7 @@ After applying the context, restart the stack:
 sudo docker compose up -d
 ```
 
-> **Note:** This is a one-time configuration per directory. The SELinux context persists across container restarts and updates. If you recreate or move the directories, you will need to reapply the context.
+> **Note:** The SELinux context persists across container restarts and updates. If you recreate or move the directories, you will need to reapply the context.
 
 ### Visit the site
 
