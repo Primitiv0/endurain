@@ -72,6 +72,14 @@ services:
         restart: unless-stopped
 ```
 
+- In the same folder, create a `.env` file that sets the data storage location:
+
+```conf
+LOCAL_PATH=./endurain_data
+```
+
+This keeps postgres data inside your project folder. The `endurain_data/` directory is already gitignored.
+
 - Start your project based on the docker compose file created before:
 
 ```bash
