@@ -4,130 +4,56 @@ docker-compose.yml
 .env
 .venv/
 docker_forgejo_runner/data
+.DS_Store
 
 # aux folder
 .garminconnect
-aux_scripts/.garminconnect
 
 # Python
-backend/app/__pycache__/
-backend/app/*/__pycache__/
-backend/app/*/*/__pycache__/
-backend/app/*/*/*/__pycache__/
-backend/app/*.pyc
-backend/tests/__pycache__/
-backend/tests/*/__pycache__/
-backend/tests/*/*/__pycache__/
-backend/tests/*/*/*/__pycache__/
-backend/tests/*/*/*/*/__pycache__/
+__pycache__/
 
-# Tests
+# Tests, logs, coverage and distribution
+dev-dist/
+dist/
+dist-ssr/
+coverage/
+node_modules/
+*.local
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
 .coverage
-backend/.coverage
-backend/htmlcov/
-backend/coverage.xml
-backend/.pytest_cache/
+htmlcov/
+coverage.xml
+.pytest_cache/
+*.log
 
-# Logs
-backend/app/logs/*.log
-backend/app/*.log
-backend/logs/*.log
 
-# server image folder images
-backend/app/data/server_images/*.jpeg
-backend/app/data/server_images/*.png
-backend/app/data/server_images/*.jpg
 
-# user image folder images
-backend/app/data/user_images/*.jpeg
-backend/app/data/user_images/*.png
-backend/app/data/user_images/*.jpg
-
-# activity media folder images
-backend/app/data/activity_media/*.jpeg
-backend/app/data/activity_media/*.png
-backend/app/data/activity_media/*.jpg
-
-# activity thumbnail folder images
-backend/app/data/activity_thumbnails/*.jpeg
-backend/app/data/activity_thumbnails/*.png
-backend/app/data/activity_thumbnails/*.jpg
-
-# gpx and fit files
-backend/app/data/activity_files/*.gpx
-backend/app/data/activity_files/*.zip
-backend/app/data/activity_files/*.fit
-backend/app/data/activity_files/*.tcx
-backend/app/data/activity_files/bulk_import/*.gpx
-backend/app/data/activity_files/bulk_import/*.fit
-backend/app/data/activity_files/bulk_import/*.tcx
-backend/app/data/activity_files/bulk_import/*.gz
-backend/app/data/activity_files/bulk_import/*.csv
-backend/app/data/activity_files/bulk_import/import_errors/*.gpx
-backend/app/data/activity_files/bulk_import/import_errors/*.fit
-backend/app/data/activity_files/bulk_import/import_errors/*.tcx
-backend/app/data/activity_files/bulk_import/import_errors/*.gz
-backend/app/data/activity_files/bulk_import/import_errors/*.csv
-backend/app/data/activity_files/processed/*.gpx
-backend/app/data/activity_files/processed/*.fit
-backend/app/data/activity_files/processed/*.tcx
-backend/app/data/activity_files/processed/*.gz
-backend/app/data/activity_files/processed/*.csv
-backend/app/data/activity_files/strava_import/*.gpx
-backend/app/data/activity_files/strava_import/*.fit
-backend/app/data/activity_files/strava_import/*.tcx
-backend/app/data/activity_files/strava_import/*.gz
-backend/app/data/activity_files/strava_import/*.csv
-backend/data/activity_files/
-
-# Frontend
-frontend/app/img/users_img/*.*
-# Logs
-frontend/app/.gitignore
-frontend/app/logs
-frontend/app/*.log
-frontend/app/npm-debug.log*
-frontend/app/yarn-debug.log*
-frontend/app/yarn-error.log*
-frontend/app/pnpm-debug.log*
-frontend/app/lerna-debug.log*
-frontend/app/dev-dist
-frontend/app/node_modules
-frontend/app/.DS_Store
-frontend/app/dist
-frontend/app/dist-ssr
-frontend/app/coverage
-frontend/app/*.local
-frontend/app/README.md
-
-frontend/app/cypress/videos/
-frontend/app/cypress/screenshots/
 
 # Editor directories and files
-frontend/app/.vscode/*
-frontend/app/!.vscode/extensions.json
 .idea
-frontend/app/*.suo
-frontend/app/*.ntvs*
-frontend/app/*.njsproj
-frontend/app/*.sln
-frontend/app/*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-frontend/app/*.tsbuildinfo
-.DS_Store
-
-# site folder
-site/
 
 # LLM supporting files
 memory-bank/
 .clinerules
 
-# local postgres
-postgres/
 
 # local dev docs
 devdocs/
 
 #local dev scripts
 devscripts/
+
+# local data
+endurain_data/

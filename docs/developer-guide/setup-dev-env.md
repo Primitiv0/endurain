@@ -61,7 +61,7 @@ services:
             timeout: 5s
             retries: 5
         volumes:
-            - <path_to_container_folders>/postgres:/var/lib/postgresql/data
+            - ${LOCAL_PATH:-/var/opt/endurain}/postgres:/var/lib/postgresql/data
         restart: unless-stopped
 
     adminer:
@@ -71,6 +71,14 @@ services:
             - 8081:8080
         restart: unless-stopped
 ```
+
+- In the same folder, create a `.env` file that sets the data storage location:
+
+```conf
+LOCAL_PATH=./endurain_data
+```
+
+This keeps postgres data inside your project folder. The `endurain_data/` directory is already gitignored.
 
 - Start your project based on the docker compose file created before:
 
