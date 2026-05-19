@@ -62,154 +62,154 @@
               ><b>* {{ $t('editActivityModalComponent.modalEditActivityTypeLabel') }}</b></label
             >
             <select class="form-select" name="activityTypeEdit" v-model="editActivityType" required>
-              <option value="1">
+              <option :value="1">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption1') }}
               </option>
-              <option value="2">
+              <option :value="2">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption2') }}
               </option>
-              <option value="34">
+              <option :value="34">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption34') }}
               </option>
-              <option value="40">
+              <option :value="40">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption40') }}
               </option>
-              <option value="3">
+              <option :value="3">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption3') }}
               </option>
               <hr />
-              <option value="4">
+              <option :value="4">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption4') }}
               </option>
-              <option value="5">
+              <option :value="5">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption5') }}
               </option>
-              <option value="6">
+              <option :value="6">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption6') }}
               </option>
-              <option value="27">
+              <option :value="27">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption27') }}
               </option>
-              <option value="28">
+              <option :value="28">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption28') }}
               </option>
-              <option value="29">
+              <option :value="29">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption29') }}
               </option>
-              <option value="35">
+              <option :value="35">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption35') }}
               </option>
-              <option value="36">
+              <option :value="36">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption36') }}
               </option>
-              <option value="7">
+              <option :value="7">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption7') }}
               </option>
               <hr />
-              <option value="8">
+              <option :value="8">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption8') }}
               </option>
-              <option value="9">
+              <option :value="9">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption9') }}
               </option>
               <hr />
-              <option value="18">
+              <option :value="18">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption18') }}
               </option>
               <hr />
-              <option value="10">
+              <option :value="10">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption10') }}
               </option>
-              <option value="19">
+              <option :value="19">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption19') }}
               </option>
-              <option value="20">
+              <option :value="20">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption20') }}
               </option>
-              <option value="41">
+              <option :value="41">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption41') }}
               </option>
-              <option value="46">
+              <option :value="46">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption46') }}
               </option>
               <hr />
-              <option value="11">
+              <option :value="11">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption11') }}
               </option>
-              <option value="31">
+              <option :value="31">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption31') }}
               </option>
-              <option value="12">
+              <option :value="12">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption12') }}
               </option>
               <hr />
-              <option value="13">
+              <option :value="13">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption13') }}
               </option>
-              <option value="42">
+              <option :value="42">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption42') }}
               </option>
               <hr />
-              <option value="14">
+              <option :value="14">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption14') }}
               </option>
               <hr />
-              <option value="15">
+              <option :value="15">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption15') }}
               </option>
-              <option value="16">
+              <option :value="16">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption16') }}
               </option>
-              <option value="17">
+              <option :value="17">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption17') }}
               </option>
-              <option value="37">
+              <option :value="37">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption37') }}
               </option>
-              <option value="44">
+              <option :value="44">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption44') }}
               </option>
               <hr />
-              <option value="21">
+              <option :value="21">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption21') }}
               </option>
-              <option value="22">
+              <option :value="22">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption22') }}
               </option>
-              <option value="23">
+              <option :value="23">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption23') }}
               </option>
-              <option value="24">
+              <option :value="24">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption24') }}
               </option>
-              <option value="25">
+              <option :value="25">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption25') }}
               </option>
-              <option value="26">
+              <option :value="26">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption26') }}
               </option>
-              <option value="39">
+              <option :value="39">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption39') }}
               </option>
               <hr />
-              <option value="30">
+              <option :value="30">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption30') }}
               </option>
-              <option value="32">
+              <option :value="32">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption32') }}
               </option>
-              <option value="33">
+              <option :value="33">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption33') }}
               </option>
-              <option value="43">
+              <option :value="43">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption43') }}
               </option>
               <hr />
-              <option value="38">
+              <option :value="38">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption38') }}
               </option>
               <hr />
-              <option value="45">
+              <option :value="45">
                 {{ $t('editActivityModalComponent.modalEditActivityTypeOption45') }}
               </option>
             </select>
@@ -225,13 +225,13 @@
               v-model="editActivityVisibility"
               required
             >
-              <option value="0">
+              <option :value="0">
                 {{ $t('editActivityModalComponent.modalEditActivityVisibilityOption0') }}
               </option>
-              <option value="1">
+              <option :value="1">
                 {{ $t('editActivityModalComponent.modalEditActivityVisibilityOption1') }}
               </option>
-              <option value="2">
+              <option :value="2">
                 {{ $t('editActivityModalComponent.modalEditActivityVisibilityOption2') }}
               </option>
             </select>
