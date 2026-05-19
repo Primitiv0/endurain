@@ -1,3 +1,6 @@
+> [!NOTE]
+> **GitHub Mirror** — If you are viewing this on GitHub, please be aware that this repository is a read-only mirror. Issues, pull requests, and all project activity are tracked on Codeberg: [https://codeberg.org/endurain-project/endurain](https://codeberg.org/endurain-project/endurain)
+
 <div align="center">
   <img src="frontend/app/public/logo/logo.png" width="128" height="128">
 
