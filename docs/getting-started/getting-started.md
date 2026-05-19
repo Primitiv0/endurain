@@ -117,6 +117,38 @@ docker compose logs -f
 
 If you do not get any errors, continue to next step.
 
+#### Troubleshooting permission errors on SELinux-enabled distributions (Fedora, RHEL, CentOS, etc.)
+
+On distributions with SELinux enforcing (check with `getenforce`), Docker bind-mounted directories inherit the host's SELinux context instead of the `container_file_t` context that containers require. Containers may fail to write to any bind-mounted volume with errors like:
+
+```
+redis  | find: .: Permission denied
+endurain-postgres | mkdir: cannot create directory '/var/lib/postgresql/data/pgdata': Permission denied
+```
+
+To fix this, apply the `container_file_t` context to the **host-side** directories that you mapped as volumes in your `docker-compose.yml`. The directories that typically need this are the postgres data directory and the redis data directory, but the same principle applies to any bind-mounted volume that a container needs to write to.
+
+For example, if your `docker-compose.yml` mounts:
+  - `<host_path>/postgres` → `/var/lib/postgresql/data`
+  - `<host_path>/redis` → `/data`
+
+then run:
+
+```bash
+sudo chcon -Rt container_file_t <host_path>/postgres
+sudo chcon -Rt container_file_t <host_path>/redis
+```
+
+Replace `<host_path>` with the actual path on your host machine (e.g., `/opt/endurain`, `/var/opt/endurain`, or a custom location you chose).
+
+After applying the context, restart the stack:
+
+```bash
+sudo docker compose up -d
+```
+
+> **Note:** This is a one-time configuration per directory. The SELinux context persists across container restarts and updates. If you recreate or move the directories, you will need to reapply the context.
+
 ### Visit the site
 
 * Visit the site insecurly on `http://<IP-OF-YOUR-SERVER>:8080`
