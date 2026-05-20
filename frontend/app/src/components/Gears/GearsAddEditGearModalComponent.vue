@@ -81,28 +81,28 @@
               ></label
             >
             <select class="form-select" name="gearTypeAddEdit" v-model="newEditGearType" required>
-              <option value="1">
+              <option :value="1">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption1') }}
               </option>
-              <option value="2">
+              <option :value="2">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption2') }}
               </option>
-              <option value="3">
+              <option :value="3">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption3') }}
               </option>
-              <option value="4">
+              <option :value="4">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption4') }}
               </option>
-              <option value="5">
+              <option :value="5">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption5') }}
               </option>
-              <option value="6">
+              <option :value="6">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption6') }}
               </option>
-              <option value="7">
+              <option :value="7">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption7') }}
               </option>
-              <option value="8">
+              <option :value="8">
                 {{ $t('gearsAddEditGearModalComponent.addEditGearModalAddTypeOption8') }}
               </option>
             </select>
