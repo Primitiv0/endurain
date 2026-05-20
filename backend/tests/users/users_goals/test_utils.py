@@ -248,6 +248,44 @@ class TestCalculateGoalProgressByActivityType:
         # Assert
         assert result.percentage_completed == 100
 
+    @patch(
+        "users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types"
+    )
+    @patch("users.users_goals.utils.get_start_end_date_by_interval")
+    def test_calculate_progress_excludes_hidden_activities(
+        self, mock_get_dates, mock_get_activities
+    ):
+        """Test that hidden activities are excluded from goal progress."""
+        # Arrange
+        mock_db = MagicMock(spec=Session)
+        mock_goal = MagicMock(spec=user_goals_models.UsersGoal)
+        mock_goal.id = 1
+        mock_goal.user_id = 1
+        mock_goal.interval = "weekly"
+        mock_goal.activity_type = user_goals_schema.ActivityType.RUN
+        mock_goal.goal_type = user_goals_schema.GoalType.ACTIVITIES
+        mock_goal.goal_calories = None
+        mock_goal.goal_activities_number = 5
+        mock_goal.goal_distance = None
+        mock_goal.goal_elevation = None
+        mock_goal.goal_duration = None
+
+        mock_start = datetime(2024, 1, 15)
+        mock_end = datetime(2024, 1, 21)
+        mock_get_dates.return_value = (mock_start, mock_end)
+
+        mock_get_activities.return_value = [MagicMock()]
+
+        # Act
+        user_goals_utils.calculate_goal_progress_by_activity_type(
+            mock_goal, "2024-01-15", mock_db
+        )
+
+        # Assert - verify exclude_hidden=True is passed
+        mock_get_activities.assert_called_once()
+        call_kwargs = mock_get_activities.call_args
+        assert call_kwargs.kwargs.get("exclude_hidden") is True
+
 
 class TestGetStartEndDateByInterval:
     """

@@ -107,7 +107,8 @@ def calculate_goal_progress_by_activity_type(
             goal.activity_type, _DEFAULT_ACTIVITY_TYPES
         )
 
-        # Fetch all activities in a single query
+        # Fetch all activities in a single query (exclude hidden to avoid
+        # counting duplicate imports from multiple sources)
         activities = activity_crud.get_user_activities_per_timeframe_and_activity_types(
             goal.user_id,
             activity_types,
@@ -115,6 +116,7 @@ def calculate_goal_progress_by_activity_type(
             end_date,
             db,
             True,
+            exclude_hidden=True,
         )
 
         # Calculate totals based on goal type

@@ -657,6 +657,7 @@ def get_user_activities_per_timeframe_and_activity_types(
     db: Session,
     user_is_owner: bool = False,
     requester_user_id: int | None = None,
+    exclude_hidden: bool = False,
 ) -> list[activities_schema.Activity] | None:
     """Get a user's activities within a date range by types.
 
@@ -670,6 +671,8 @@ def get_user_activities_per_timeframe_and_activity_types(
             are excluded.
         requester_user_id: Requesting user ID used to authorize
             followers-only rows when ``user_is_owner`` is False.
+        exclude_hidden: When True, hidden activities are excluded
+            even for owner requests.
 
     Returns:
         List of activity schemas or None when empty.
@@ -692,6 +695,10 @@ def get_user_activities_per_timeframe_and_activity_types(
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
+        if exclude_hidden:
+            stmt = stmt.where(
+                activities_models.Activity.is_hidden.is_(False)
+            )
         stmt = _apply_activity_visibility_filter(
             stmt,
             user_is_owner=user_is_owner,
