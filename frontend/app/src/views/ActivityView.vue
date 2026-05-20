@@ -303,8 +303,12 @@ const isHiddenMessage = ref(null)
 async function submitDeleteGearFromActivity() {
   try {
     // Delete the gear from the activity
-    const auxActivity = activity.value
-    auxActivity.gear_id = null
+    const auxActivity = {
+      id: activity.value.id,
+      name: activity.value.name,
+      activity_type: activity.value.activity_type,
+      gear_id: null
+    }
     await activities.editActivity(auxActivity)
 
     // Show the success message
