@@ -134,6 +134,8 @@ The example docker-compose files include `:Z` and `:z` flags on all bind-mounted
 - **`:Z`** (private) — labels the volume so only the mounting container can access it. Used for postgres, redis, backend data, and logs where a single container owns the volume.
 - **`:z`** (shared) — labels the volume so multiple containers can share it. Used in the multiple-backends example for shared data and logs.
 
+> **Note for Debian, Ubuntu, and other non-SELinux distributions:** These flags are silently ignored by Docker and have no effect. No action is required on your part.
+
 If you are using the provided docker-compose files as-is, these flags should resolve SELinux permission errors automatically. If you have customized your volume structure or added new bind-mounted volumes, you may need to apply the `container_file_t` context manually:
 
 ```bash

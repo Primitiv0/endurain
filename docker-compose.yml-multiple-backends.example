@@ -12,7 +12,7 @@ services:
       - RATE_LIMIT_STORAGE_URI=redis://redis:6379/0
       - AUTH_SECURITY_STORAGE_URI=redis://redis:6379/0
     volumes:
-    #  - ${LOCAL_PATH:-/var/opt/endurain}/backend/app:/app/backend:z # Configure volume if you want to edit the code locally by cloning the repo
+    #  - ${LOCAL_PATH:-/var/opt/endurain}/backend/app:/app/backend:z # Configure volume if you want to edit the code locally by cloning the repo (shared across multiple backends)
       - ${LOCAL_PATH:-/var/opt/endurain}/backend/data:/app/backend/data:z # necessary for activity files, user images and server images persistence on container image updates (shared across multiple backends)
       - ${LOCAL_PATH:-/var/opt/endurain}/backend/logs:/app/backend/logs:z # log files for the backend (shared across multiple backends)
     ports:
