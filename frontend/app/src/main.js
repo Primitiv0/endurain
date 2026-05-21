@@ -96,8 +96,12 @@ async function initApp() {
     await serverSettingsStore.loadServerSettingsFromServer()
   } catch (error) {
     console.error('Failed to load server settings on app init:', error)
-    // App will still mount with default/cached settings
-    serverSettingsStore.loadServerSettingsFromStorage()
+    // Fall back to localStorage cache if available; otherwise the store's
+    // built-in defaults (defined in state()) are used as-is.
+    const cached = localStorage.getItem('serverSettings')
+    if (cached) {
+      serverSettingsStore.serverSettings = JSON.parse(cached)
+    }
   }
 
   // Setup router
