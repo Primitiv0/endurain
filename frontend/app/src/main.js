@@ -92,7 +92,13 @@ async function initApp() {
   themeStore.loadThemeFromStorage()
 
   const serverSettingsStore = useServerSettingsStore()
-  await serverSettingsStore.loadServerSettingsFromServer()
+  try {
+    await serverSettingsStore.loadServerSettingsFromServer()
+  } catch (error) {
+    console.error('Failed to load server settings on app init:', error)
+    // App will still mount with default/cached settings
+    serverSettingsStore.loadServerSettingsFromStorage()
+  }
 
   // Setup router
   app.use(router)
