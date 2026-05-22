@@ -1,6 +1,6 @@
 {
   "name": "endurain",
-  "version": "0.18.2",
+  "version": "0.18.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -54,7 +54,7 @@
     "eslint": "^10.0.2",
     "eslint-plugin-vue": "^10.3.0",
     "jsdom": "^29.0.2",
-    "npm-run-all2": "^8.0.4",
+    "npm-run-all2": "^9.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.10",
     "vite-plugin-pwa": "^1.0.0",
