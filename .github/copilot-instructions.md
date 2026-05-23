@@ -48,11 +48,24 @@ Endurain is a self-hosted fitness tracking application with:
 
 ### Commits logic
 
-Committing should use clear messages following [Conventional Commits](https://www.conventionalcommits.org/) format, e.g.:
+Committing should use clear messages following [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+**Format:** `<type>(<scope>)!: <description>` — `(<scope>)` and the breaking-change `!` are optional.
+
+The following rules are enforced automatically on every PR (against the PR title and every commit subject) by `.forgejo/workflows/conventional-commits.yml`. Generated commit messages must comply:
+
+- **Allowed types:** `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
+- **Description** must start with a lowercase letter and must not end with a period.
+- **Header length** (first line) must be 72 characters or fewer.
+- **Scope** (optional) must be lowercase and may contain letters, digits, `-`, `_`, `.`, `/`, `,` or spaces.
+- **Breaking changes** are marked with `!` after the type/scope (e.g. `feat(api)!: ...`) or a `BREAKING CHANGE:` footer in the commit body.
+
+Examples:
 - `feat: add GPX max speed parsing`
-- `fix: handle multi-segment GPX distance correctly`
+- `fix(garmin): handle multi-segment GPX distance correctly`
 - `docs: update development instructions`
-- `test: add regression test for GPX segment handling`
+- `test(activities): add regression test for GPX segment handling`
+- `refactor(api)!: rename Activity.distance to total_distance`
 
 ### Prerequisites
 - **Node.js:** v24 (for frontend development)
