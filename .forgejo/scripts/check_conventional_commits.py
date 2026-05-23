@@ -90,13 +90,12 @@ def _validate_message(message: str) -> list[str]:
     if description.endswith("."):
         errors.append("description must not end with a period")
 
-    if description[:1].isupper():
-        errors.append("description should start with a lowercase letter")
+    if re.match(r"[a-z]", description) is None:
+        errors.append("description must start with a lowercase letter")
 
     if len(header) > MAX_SUBJECT_LENGTH:
         errors.append(
-            f"header is {len(header)} characters long "
-            f"(max {MAX_SUBJECT_LENGTH})"
+            f"header is {len(header)} characters long (max {MAX_SUBJECT_LENGTH})"
         )
 
     return errors
