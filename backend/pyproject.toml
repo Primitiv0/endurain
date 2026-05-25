@@ -58,6 +58,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "httpx>=0.28.1",
     "faker>=40.15.0",
+    "import-linter>=2.1",
 ]
 
 [tool.pytest.ini_options]

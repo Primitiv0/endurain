@@ -25,15 +25,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+.import_linter_cache/
 .coverage
 htmlcov/
 coverage.xml
 .pytest_cache/
 *.log
-
-
-
 
 # Editor directories and files
 .idea
@@ -43,11 +40,9 @@ coverage.xml
 *.sln
 *.sw?
 
-
 # LLM supporting files
 memory-bank/
 .clinerules
-
 
 # local dev docs
 devdocs/
