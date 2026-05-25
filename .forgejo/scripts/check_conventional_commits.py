@@ -101,6 +101,11 @@ def _validate_message(message: str) -> list[str]:
     return errors
 
 
+def _safe_log_value(value: str) -> str:
+    """Return ``value`` escaped for safe CI log output."""
+    return value.encode("unicode_escape").decode("ascii")
+
+
 def _iter_messages(args: argparse.Namespace) -> Iterable[str]:
     if args.stdin:
         for line in sys.stdin:
@@ -135,13 +140,14 @@ def main(argv: list[str] | None = None) -> int:
     for message in _iter_messages(args):
         checked += 1
         errors = _validate_message(message)
+        safe_message = _safe_log_value(message)
         if errors:
             failures += 1
-            print(f"INVALID: {message}", file=sys.stderr)
+            print(f"INVALID: {safe_message}", file=sys.stderr)
             for err in errors:
                 print(f"  - {err}", file=sys.stderr)
         else:
-            print(f"OK: {message}")
+            print(f"OK: {safe_message}")
 
     if checked == 0:
         print("No messages to validate.", file=sys.stderr)
