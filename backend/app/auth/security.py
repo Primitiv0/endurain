@@ -7,10 +7,8 @@ Defines :class:`AuthContext`, the unified credential representation passed
 to endpoints that accept either auth method.
 """
 
-import hmac
 from dataclasses import dataclass
 from typing import Annotated
-from datetime import datetime, timezone
 from fastapi import (
     Depends,
     HTTPException,
@@ -26,21 +24,15 @@ from fastapi.security import (
     APIKeyHeader,
     APIKeyCookie,
 )
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 import auth.constants as auth_constants
+import auth.identity_service as auth_identity_service
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
 
+from auth.principal import AccessTokenCred, Principal
 from joserfc.errors import MissingClaimError
 
-import users.users.utils as users_utils
-
-import users.users_api_keys.crud as users_api_keys_crud
-import users.users_api_keys.utils as users_api_keys_utils
-
-import core.database as core_database
 import core.logger as core_logger
 
 # Define the OAuth2 scheme for handling bearer tokens
@@ -91,6 +83,43 @@ cookie_refresh_token_scheme = APIKeyCookie(
     name="endurain_refresh_token",
     auto_error=False,
 )
+
+
+def _resolve_and_cache_principal(
+    access_token: str,
+    request: Request,
+    identity_service: auth_identity_service.IdentityService,
+) -> Principal:
+    """Resolve and cache a Principal from a JWT access token.
+
+    Checks ``request.state.principal`` first so that multiple
+    dependencies in the same request share a single DB lookup.
+    On cache miss, delegates to
+    :meth:`~auth.identity_service.IdentityService.resolve_from_access_token`
+    and stores the result on ``request.state``.
+
+    Args:
+        access_token: Raw JWT access token string.
+        request: Current HTTP request used for caching.
+        identity_service: Per-request IdentityService.
+
+    Returns:
+        Principal: Cached or freshly-resolved principal.
+
+    Raises:
+        HTTPException: 401 if the token is invalid or
+            the user is not found.
+    """
+    cached: Principal | None = getattr(
+        request.state, "principal", None
+    )
+    if cached is not None:
+        return cached
+    principal = identity_service.resolve_from_access_token(
+        access_token
+    )
+    request.state.principal = principal
+    return principal
 
 
 def get_token(
@@ -275,118 +304,110 @@ def validate_access_token_for_browser_redirect(
     _validate_access_token_impl(access_token, token_manager)
 
 
-def _get_sub_from_access_token_impl(
-    access_token: str,
-    token_manager: auth_token_manager.TokenManager,
-) -> int:
-    """Shared implementation that extracts the integer ``sub`` claim.
-
-    Defence-in-depth: validates token type and expiration before
-    returning any claim. Without this, callers that use this
-    helper as their sole auth dependency would accept refresh
-    tokens or expired access tokens as credentials.
-
-    Args:
-        access_token: The access token to read.
-        token_manager: The configured token manager.
-
-    Returns:
-        The user ID encoded in the token's ``sub`` claim.
-
-    Raises:
-        HTTPException: 401 if the token is expired, of the wrong
-            type, or the claim is missing or not an integer.
-    """
-    _validate_access_token_impl(access_token, token_manager)
-    sub = token_manager.get_token_claim(access_token, "sub")
-    if not isinstance(sub, int):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: 'sub' claim must be an integer",
-        )
-    return sub
-
-
 def get_sub_from_access_token(
+    request: Request,
     access_token: Annotated[str, Depends(get_access_token)],
-    token_manager: Annotated[
-        auth_token_manager.TokenManager,
-        Depends(auth_token_manager.get_token_manager),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
 ) -> int:
-    """
-    Retrieves the user ID ('sub' claim) from the provided access token.
+    """Retrieve the user ID from the access token.
+
+    Resolves and caches the :class:`~auth.principal.Principal`
+    on ``request.state`` then returns ``principal.user_id``.
+    Subsequent calls within the same request hit the cache
+    instead of issuing another DB lookup.
 
     Args:
-        access_token (str): The access token from which to extract the claim.
-        token_manager (auth_token_manager.TokenManager): The token manager instance used to decode and validate the token.
+        request: Current HTTP request for state caching.
+        access_token: JWT from the Authorization header.
+        identity_service: Per-request IdentityService.
 
     Returns:
-        int: The user ID associated with the access token.
+        int: Authenticated user's primary key.
 
     Raises:
-        HTTPException: If the token is invalid or the 'sub' claim is missing.
+        HTTPException: 401 if the token is invalid,
+            expired, or the user is not found.
     """
-    return _get_sub_from_access_token_impl(access_token, token_manager)
+    principal = _resolve_and_cache_principal(
+        access_token, request, identity_service
+    )
+    return principal.user_id
 
 
 def get_sub_from_access_token_for_browser_redirect(
-    access_token: Annotated[str, Depends(get_access_token_for_browser_redirect)],
-    token_manager: Annotated[
-        auth_token_manager.TokenManager,
-        Depends(auth_token_manager.get_token_manager),
+    request: Request,
+    access_token: Annotated[
+        str, Depends(get_access_token_for_browser_redirect)
+    ],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
 ) -> int:
-    """
-    Retrieves the user ID ('sub' claim) from the provided access token for browser redirects.
+    """Retrieve the user ID from an access token for browser-redirect flows.
+
+    Resolves and caches the :class:`~auth.principal.Principal`
+    on ``request.state``; uses the browser-redirect token
+    extractor that tolerates a missing ``X-Client-Type`` header.
 
     Args:
-        access_token (str): The access token from which to extract the claim.
-        token_manager (auth_token_manager.TokenManager): The token manager instance used to decode and validate the token.
+        request: Current HTTP request for state caching.
+        access_token: JWT from the Authorization header or
+            browser-redirect flow.
+        identity_service: Per-request IdentityService.
 
     Returns:
-        int: The user ID associated with the access token.
+        int: Authenticated user's primary key.
 
     Raises:
-        HTTPException: If the token is invalid or the 'sub' claim is missing.
+        HTTPException: 401 if the token is invalid,
+            expired, or the user is not found.
     """
-    return _get_sub_from_access_token_impl(access_token, token_manager)
+    principal = _resolve_and_cache_principal(
+        access_token, request, identity_service
+    )
+    return principal.user_id
 
 
 def get_sid_from_access_token(
+    request: Request,
     access_token: Annotated[str, Depends(get_access_token)],
-    token_manager: Annotated[
-        auth_token_manager.TokenManager,
-        Depends(auth_token_manager.get_token_manager),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
 ) -> str:
-    """
-    Retrieves the session ID ('sid') from the provided access token.
+    """Retrieve the session ID from the access token.
 
-    Defence-in-depth: validates token type and expiration before
-    returning the claim, so callers cannot accidentally accept
-    refresh tokens or expired access tokens.
+    Resolves and caches the :class:`~auth.principal.Principal`
+    on ``request.state`` then extracts the session ID from the
+    :class:`~auth.principal.AccessTokenCred`.
 
     Args:
-        access_token (str): The access token from which to extract the session ID.
-        token_manager (auth_token_manager.TokenManager): The token manager used to validate and extract claims from the token.
+        request: Current HTTP request for state caching.
+        access_token: JWT from the Authorization header.
+        identity_service: Per-request IdentityService.
 
     Returns:
-        int: The session ID ('sid') associated with the access token.
+        str: Session ID (``sid`` claim) from the token.
 
     Raises:
-        HTTPException: 401 if the token is expired, of the wrong
-            type, or the 'sid' claim is missing or malformed.
+        HTTPException: 401 if the token is invalid,
+            expired, or the credential type is unexpected.
     """
-    _validate_access_token_impl(access_token, token_manager)
-    # Return the session ID associated with the token
-    sid = token_manager.get_token_claim(access_token, "sid")
-    if not isinstance(sid, str):
+    principal = _resolve_and_cache_principal(
+        access_token, request, identity_service
+    )
+    cred = principal.credential
+    if not isinstance(cred, AccessTokenCred):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token: 'sid' claim must be a string",
+            detail="Invalid credential type for session ID",
         )
-    return sid
+    return cred.session_id
 
 
 def get_and_return_access_token(
@@ -657,23 +678,22 @@ def check_scopes_for_browser_redirect(
 async def validate_api_key(
     raw_key: str,
     request: Request,
-    db,
+    identity_service: auth_identity_service.IdentityService,
 ) -> "AuthContext":
-    """
-    Validate a raw API key and return an AuthContext.
+    """Validate a raw API key and return an AuthContext.
 
-    Hashes the incoming key with SHA-256, looks it up
-    in the database, checks revocation and expiry, and
-    updates ``last_used_at``. Uses constant-time
-    comparison (``hmac.compare_digest``) to prevent
-    timing attacks.
+    Delegates to
+    :meth:`~auth.identity_service.IdentityService.resolve_from_api_key`
+    and wraps the returned
+    :class:`~auth.principal.Principal` in an
+    :class:`AuthContext` for backward compatibility.
 
     Args:
         raw_key: The plain-text API key from the
             request header or query parameter.
         request: The current HTTP request (for audit
-            logging).
-        db: SQLAlchemy database session.
+            logging and state caching).
+        identity_service: Per-request IdentityService.
 
     Returns:
         AuthContext with user_id, scopes, and
@@ -683,97 +703,41 @@ async def validate_api_key(
         HTTPException: 401 if the key is not found,
             revoked, or expired.
     """
-    computed_hash = users_api_keys_utils.hash_api_key(raw_key)
-    db_key = users_api_keys_crud.get_api_key_by_hash(computed_hash, db)
-
-    # Constant-time comparison to prevent timing attacks
-    # (protects even when key is not found)
-    stored_hash = db_key.key_hash if db_key else ("0" * 64)
-    if not hmac.compare_digest(stored_hash, computed_hash):
-        db_key = None
-
-    if db_key is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
-
-    db_user = users_utils.get_user_by_id_or_404(db_key.user_id, db)
-    users_utils.check_user_is_active(db_user)
-
-    if not db_key.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="API key has been revoked",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
-
-    if db_key.expires_at is not None:
-        if datetime.now(timezone.utc) > db_key.expires_at:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="API key has expired",
-                headers={"WWW-Authenticate": "ApiKey"},
-            )
-
-    # Update last_used_at (best-effort; don't fail the
-    # request if this errors)
-    try:
-        users_api_keys_crud.update_last_used(db_key.id, db)
-    except SQLAlchemyError as err:
-        core_logger.print_to_log(
-            f"Failed to update last_used_at for API key {db_key.id}: {err}",
-            "warning",
-            exc=err,
-        )
-
-    # Structured audit log
-    core_logger.print_to_log(
-        "API key authenticated",
-        "info",
-        context={
-            "key_prefix": db_key.key_prefix,
-            "user_id": db_key.user_id,
-            "endpoint": request.url.path,
-            "ip": (request.client.host if request.client else "unknown"),
-        },
-    )
-
-    scopes = users_api_keys_utils.json_to_scopes(db_key.scopes)
+    principal = identity_service.resolve_from_api_key(raw_key, request)
     return AuthContext(
-        user_id=db_key.user_id,
-        scopes=scopes,
+        user_id=principal.user_id,
+        scopes=list(principal.scopes),
         auth_type="api_key",
     )
 
 
 async def validate_access_token_or_api_key(
     request: Request,
-    token_manager: Annotated[
-        auth_token_manager.TokenManager,
-        Depends(auth_token_manager.get_token_manager),
-    ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     access_token: str | None = Depends(oauth2_scheme),
     api_key_header: str | None = Depends(header_api_key_scheme),
     api_key_query: str | None = Query(None, alias="api_key"),
 ) -> "AuthContext":
-    """
-    Accept either a JWT bearer token or an API key.
+    """Accept either a JWT bearer token or an API key.
 
-    Tries JWT first (Authorization: Bearer header). If
-    none is present, falls back to the ``X-API-Key``
-    header, then the ``?api_key=`` query parameter.
-    Raises 401 if neither is supplied.
+    Tries JWT first (Authorization: Bearer header). If none
+    is present, falls back to the ``X-API-Key`` header, then
+    the ``?api_key=`` query parameter. Raises 401 if neither
+    is supplied.
+
+    Delegates to :class:`~auth.identity_service.IdentityService`
+    for credential resolution and caches the resolved
+    :class:`~auth.principal.Principal` on
+    ``request.state.principal`` so that other dependencies in
+    the same request can share the result without a second DB
+    lookup.
 
     Args:
         request: The current HTTP request.
-        token_manager: JWT token manager dependency.
-        db: Database session dependency.
+        identity_service: Per-request IdentityService.
         access_token: Optional Bearer token from the
             Authorization header.
         api_key_header: Optional API key from the
@@ -789,45 +753,49 @@ async def validate_access_token_or_api_key(
         HTTPException: 401 if no valid credential is
             provided.
     """
+    # --- Cache check: return early if Principal already resolved ---
+    cached: Principal | None = getattr(
+        request.state, "principal", None
+    )
+    if cached is not None:
+        auth_type = "api_key" if cached.is_api_key() else "jwt"
+        return AuthContext(
+            user_id=cached.user_id,
+            scopes=list(cached.scopes),
+            auth_type=auth_type,
+        )
+
     # --- JWT path ---
     if access_token is not None:
-        try:
-            token_manager.validate_token_expiration(
-                access_token,
-                auth_token_manager.TokenType.ACCESS,
-            )
-        except HTTPException as http_err:
-            log_level = "debug" if "expired" in http_err.detail.lower() else "error"
-            core_logger.print_to_log(
-                f"Access token validation failed: {http_err.detail}",
-                log_level,
-                exc=http_err,
-                context={"access_token": "[REDACTED]"},
-            )
-            raise
-
-        sub = token_manager.get_token_claim(access_token, "sub")
-        if not isinstance(sub, int):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=("Invalid token: 'sub' claim must be an integer"),
-            )
-        scope = token_manager.get_token_claim(access_token, "scope")
-        if not isinstance(scope, list):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=("Invalid token: 'scope' claim must be a list"),
-            )
-        return AuthContext(user_id=sub, scopes=scope, auth_type="jwt")
+        principal = identity_service.resolve_from_access_token(
+            access_token
+        )
+        request.state.principal = principal
+        return AuthContext(
+            user_id=principal.user_id,
+            scopes=list(principal.scopes),
+            auth_type="jwt",
+        )
 
     # --- API key path ---
     raw_key = api_key_header or api_key_query
     if raw_key is not None:
-        return await validate_api_key(raw_key, request, db)
+        principal = identity_service.resolve_from_api_key(
+            raw_key, request
+        )
+        request.state.principal = principal
+        return AuthContext(
+            user_id=principal.user_id,
+            scopes=list(principal.scopes),
+            auth_type="api_key",
+        )
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=("Not authenticated. Provide a Bearer token or an API key."),
+        detail=(
+            "Not authenticated. "
+            "Provide a Bearer token or an API key."
+        ),
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -838,8 +806,7 @@ def get_user_id_from_auth(
         Depends(validate_access_token_or_api_key),
     ],
 ) -> int:
-    """
-    Extract the user ID from a unified AuthContext.
+    """Extract the user ID from a unified AuthContext.
 
     Use this in place of ``get_sub_from_access_token``
     on endpoints that accept both JWT and API key auth.
@@ -861,8 +828,7 @@ def check_auth_scopes(
     ],
     security_scopes: SecurityScopes,
 ) -> None:
-    """
-    Validate scopes from a unified AuthContext.
+    """Validate scopes from a unified AuthContext.
 
     Use this in place of ``check_scopes`` on endpoints
     that accept both JWT and API key auth.
@@ -881,8 +847,15 @@ def check_auth_scopes(
     if missing:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(f"Unauthorized Access - Missing permissions: {missing}"),
-            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
+            detail=(
+                f"Unauthorized Access - "
+                f"Missing permissions: {missing}"
+            ),
+            headers={
+                "WWW-Authenticate": (
+                    f'Bearer scope="{security_scopes.scopes}"'
+                )
+            },
         )
 
 

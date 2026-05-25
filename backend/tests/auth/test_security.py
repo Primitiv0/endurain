@@ -1,16 +1,69 @@
 """Tests for auth.security module."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import HTTPException, WebSocket, status, WebSocketException
+from fastapi import HTTPException, Request, WebSocket, status, WebSocketException
 from fastapi.security import SecurityScopes
 
 import auth.security as auth_security
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
 
+from auth.identity_service import IdentityService
+from auth.principal import AccessTokenCred, ApiKeyCred, Principal
 from joserfc.errors import MissingClaimError
+
+
+def _make_principal(
+    user_id: int = 1,
+    username: str = "testuser",
+    email: str = "test@example.com",
+    scopes: frozenset[str] | None = None,
+    credential=None,
+) -> Principal:
+    """Build a test Principal with sensible defaults.
+
+    Args:
+        user_id: User primary key.
+        username: Username string.
+        email: Email address.
+        scopes: Granted scopes (defaults to frozenset).
+        credential: Credential variant (defaults to
+            AccessTokenCred with session-id).
+
+    Returns:
+        Principal: Frozen principal for tests.
+    """
+    return Principal(
+        user_id=user_id,
+        username=username,
+        email=email,
+        is_active=True,
+        is_superuser=False,
+        scopes=scopes if scopes is not None else frozenset(["profile"]),
+        credential=(
+            credential
+            if credential is not None
+            else AccessTokenCred(session_id="session-id")
+        ),
+    )
+
+
+def _mock_request_with_state() -> MagicMock:
+    """Return a mock Request whose state has no cached principal.
+
+    Returns:
+        MagicMock: Mock request with a SimpleNamespace state.
+    """
+    req = MagicMock(spec=Request)
+    req.state = SimpleNamespace()
+    req.client = MagicMock()
+    req.client.host = "127.0.0.1"
+    req.url = MagicMock()
+    req.url.path = "/test"
+    return req
 
 
 class TestGetToken:
@@ -133,45 +186,104 @@ class TestAccessTokenValidation:
 class TestGetSubFromAccessToken:
     """Test extracting user ID from access token."""
 
-    def test_get_sub_from_valid_token(self, token_manager, sample_user_read):
-        """Test extracting user ID from valid access token."""
-        _, access_token = token_manager.create_token(
-            "session-id", sample_user_read, auth_token_manager.TokenType.ACCESS
+    def test_get_sub_from_valid_token(self, sample_user_read):
+        """Test extracting user ID via IdentityService."""
+        request = _mock_request_with_state()
+        principal = _make_principal(user_id=sample_user_read.id)
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.return_value = principal
+
+        result = auth_security.get_sub_from_access_token(
+            request, "fake_token", mock_service
         )
 
-        sub = auth_security.get_sub_from_access_token(access_token, token_manager)
-        assert sub == sample_user_read.id
-        assert isinstance(sub, int)
+        assert result == sample_user_read.id
+        assert isinstance(result, int)
+        assert request.state.principal is principal
 
-    def test_get_sub_from_invalid_token_raises_error(self, token_manager):
-        """Test that invalid token raises HTTPException."""
-        invalid_token = "invalid.token.here"
+    def test_get_sub_caches_principal_on_state(self, sample_user_read):
+        """Principal is cached; second call does not re-resolve."""
+        request = _mock_request_with_state()
+        principal = _make_principal(user_id=sample_user_read.id)
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.return_value = principal
+
+        auth_security.get_sub_from_access_token(
+            request, "fake_token", mock_service
+        )
+        # Second call should hit cache
+        result2 = auth_security.get_sub_from_access_token(
+            request, "fake_token", mock_service
+        )
+
+        assert result2 == sample_user_read.id
+        mock_service.resolve_from_access_token.assert_called_once()
+
+    def test_get_sub_from_invalid_token_raises_error(self):
+        """IdentityService 401 propagates to caller."""
+        request = _mock_request_with_state()
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sub_from_access_token(invalid_token, token_manager)
+            auth_security.get_sub_from_access_token(
+                request, "invalid.token", mock_service
+            )
         assert exc_info.value.status_code == 401
 
 
 class TestGetSidFromAccessToken:
     """Test extracting session ID from access token."""
 
-    def test_get_sid_from_valid_token(self, token_manager, sample_user_read):
-        """Test extracting session ID from valid access token."""
+    def test_get_sid_from_valid_token(self):
+        """Test extracting session ID via IdentityService."""
         session_id = "test-session-123"
-        _, access_token = token_manager.create_token(
-            session_id, sample_user_read, auth_token_manager.TokenType.ACCESS
+        request = _mock_request_with_state()
+        principal = _make_principal(
+            credential=AccessTokenCred(session_id=session_id)
+        )
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.return_value = principal
+
+        sid = auth_security.get_sid_from_access_token(
+            request, "fake_token", mock_service
         )
 
-        sid = auth_security.get_sid_from_access_token(access_token, token_manager)
         assert sid == session_id
         assert isinstance(sid, str)
 
-    def test_get_sid_from_invalid_token_raises_error(self, token_manager):
-        """Test that invalid token raises HTTPException."""
-        invalid_token = "invalid.token.here"
+    def test_get_sid_non_access_token_cred_raises_error(self):
+        """Non-AccessTokenCred credential raises 401."""
+        request = _mock_request_with_state()
+        principal = _make_principal(
+            credential=ApiKeyCred(api_key_id=1, key_prefix="prefix")
+        )
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.return_value = principal
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sid_from_access_token(invalid_token, token_manager)
+            auth_security.get_sid_from_access_token(
+                request, "fake_token", mock_service
+            )
+        assert exc_info.value.status_code == 401
+        assert "credential type" in exc_info.value.detail
+
+    def test_get_sid_from_invalid_token_raises_error(self):
+        """IdentityService 401 propagates to caller."""
+        request = _mock_request_with_state()
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            auth_security.get_sid_from_access_token(
+                request, "invalid.token", mock_service
+            )
         assert exc_info.value.status_code == 401
 
 
@@ -318,43 +430,51 @@ class TestGetAndReturnTokens:
         result = auth_security.get_and_return_refresh_token(test_token)
         assert result == test_token
 
-    def test_get_sub_from_access_token_non_integer_sub(self, token_manager):
-        """
-        Test that non-integer sub claim raises error.
-        """
-        # Create a mock token with string sub
-        with patch.object(
-            token_manager, "get_token_claim", return_value="not_an_integer"
-        ):
-            with pytest.raises(HTTPException) as exc_info:
-                auth_security.get_sub_from_access_token("fake_token", token_manager)
-            assert exc_info.value.status_code == 401
-            assert "must be an integer" in exc_info.value.detail
+    def test_get_sub_from_access_token_service_raises_401(self):
+        """IdentityService failure propagates as 401."""
+        request = _mock_request_with_state()
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: 'sub' claim must be an integer",
+        )
 
-    def test_get_sub_from_access_token_for_browser_redirect_non_integer(
-        self, token_manager
-    ):
-        """
-        Test browser redirect sub claim validation.
-        """
-        with patch.object(
-            token_manager, "get_token_claim", return_value="not_an_integer"
-        ):
-            with pytest.raises(HTTPException) as exc_info:
-                auth_security.get_sub_from_access_token_for_browser_redirect(
-                    "fake_token", token_manager
-                )
-            assert exc_info.value.status_code == 401
+        with pytest.raises(HTTPException) as exc_info:
+            auth_security.get_sub_from_access_token(
+                request, "fake_token", mock_service
+            )
+        assert exc_info.value.status_code == 401
 
-    def test_get_sid_from_access_token_non_string_sid(self, token_manager):
-        """
-        Test that non-string sid claim raises error.
-        """
-        with patch.object(token_manager, "get_token_claim", return_value=12345):
-            with pytest.raises(HTTPException) as exc_info:
-                auth_security.get_sid_from_access_token("fake_token", token_manager)
-            assert exc_info.value.status_code == 401
-            assert "must be a string" in exc_info.value.detail
+    def test_get_sub_from_access_token_for_browser_redirect_service_raises(self):
+        """Browser-redirect sub extraction propagates service 401."""
+        request = _mock_request_with_state()
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalid",
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            auth_security.get_sub_from_access_token_for_browser_redirect(
+                request, "fake_token", mock_service
+            )
+        assert exc_info.value.status_code == 401
+
+    def test_get_sid_from_access_token_wrong_cred_type(self):
+        """Non-AccessTokenCred raises 401 for SID extraction."""
+        request = _mock_request_with_state()
+        principal = _make_principal(
+            credential=ApiKeyCred(api_key_id=99, key_prefix="key_")
+        )
+        mock_service = MagicMock(spec=IdentityService)
+        mock_service.resolve_from_access_token.return_value = principal
+
+        with pytest.raises(HTTPException) as exc_info:
+            auth_security.get_sid_from_access_token(
+                request, "fake_token", mock_service
+            )
+        assert exc_info.value.status_code == 401
+        assert "credential type" in exc_info.value.detail
 
     def test_get_sub_from_refresh_token_non_integer(self, token_manager):
         """
@@ -627,15 +747,23 @@ class TestValidateAccessTokenExceptionPaths:
 class TestGetSubFromAccessTokenExceptionPath:
     """Test exception handling in get_sub_from_access_token."""
 
-    def test_get_sub_from_access_token_list_raises_error(self, token_manager):
-        """Test that list sub claim raises proper error."""
-        with patch.object(
-            token_manager, "get_token_claim", return_value=["user1", "user2"]
-        ):
-            with pytest.raises(HTTPException) as exc_info:
-                auth_security.get_sub_from_access_token("test_token", token_manager)
-            assert exc_info.value.status_code == 401
-            assert "must be an integer" in exc_info.value.detail
+    def test_get_sub_from_access_token_service_raises_401(self):
+        """IdentityService failure propagates as 401."""
+        from types import SimpleNamespace
+
+        request = MagicMock(spec=Request)
+        request.state = SimpleNamespace()
+        mock_svc = MagicMock(spec=IdentityService)
+        mock_svc.resolve_from_access_token.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: 'sub' claim must be an integer",
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            auth_security.get_sub_from_access_token(
+                request, "test_token", mock_svc
+            )
+        assert exc_info.value.status_code == 401
+        assert "must be an integer" in exc_info.value.detail
 
 
 class TestCheckScopesExceptionPaths:

@@ -370,10 +370,25 @@ class DefaultIdentityService:
             HTTPException: 401 if the token is expired,
                 invalid, or the user is not found.
         """
-        self._token_manager.validate_token_expiration(
-            access_token,
-            auth_token_manager.TokenType.ACCESS,
-        )
+        try:
+            self._token_manager.validate_token_expiration(
+                access_token,
+                auth_token_manager.TokenType.ACCESS,
+            )
+        except HTTPException as http_err:
+            log_level = (
+                "debug"
+                if "expired" in http_err.detail.lower()
+                else "error"
+            )
+            core_logger.print_to_log(
+                f"Access token validation failed: "
+                f"{http_err.detail}",
+                log_level,
+                exc=http_err,
+                context={"access_token": "[REDACTED]"},
+            )
+            raise
 
         sub = self._token_manager.get_token_claim(access_token, "sub")
         if not isinstance(sub, int):
