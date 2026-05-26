@@ -1,9 +1,64 @@
-"""Deprecated shim for rotated token models.
+"""Rotated refresh token database models for reuse detection."""
 
-Temporary Phase 3 shim for boundary migration PR.
-Canonical implementation remains in
-users.users_sessions.rotated_refresh_tokens.models until
-Phase 4 import burn-down.
-"""
+from datetime import datetime
+from typing import TYPE_CHECKING
+from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from core.database import Base
 
-from users.users_sessions.rotated_refresh_tokens.models import *
+if TYPE_CHECKING:
+    from auth.sessions.models import UsersSessions
+
+
+class RotatedRefreshToken(Base):
+    """
+    Rotated refresh token for token reuse detection.
+
+    Attributes:
+        id: Primary key.
+        token_family_id: UUID of the token family.
+        hashed_token: Hashed old refresh token.
+        rotation_count: Which rotation this token belonged to.
+        rotated_at: When this token was rotated.
+        expires_at: Cleanup marker (rotated_at + 60 seconds).
+        user_session: Relationship to UsersSessions model.
+    """
+
+    __tablename__ = "rotated_refresh_tokens"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        autoincrement=True,
+    )
+    token_family_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users_sessions.token_family_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="UUID of the token family",
+    )
+    hashed_token: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+        comment="Hashed old refresh token",
+    )
+    rotation_count: Mapped[int] = mapped_column(
+        nullable=False,
+        comment="Which rotation this token belonged to",
+    )
+    rotated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        comment="When this token was rotated",
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        comment="Cleanup marker (rotated_at + 60 seconds)",
+    )
+
+    # Relationship to UsersSessions model
+    users_session: Mapped["UsersSessions"] = relationship(
+        back_populates="rotated_refresh_tokens",
+    )

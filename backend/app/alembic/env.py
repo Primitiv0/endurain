@@ -28,8 +28,8 @@ import notifications.models
 import password_reset_tokens.models
 import sign_up_tokens.models
 import server_settings.models
-import users.users_sessions.models
-import users.users_sessions.rotated_refresh_tokens.models
+import auth.sessions.models
+import auth.sessions.rotated_refresh_tokens.models
 import users.users.models
 import users.users_api_keys.models
 import users.users_goals.models

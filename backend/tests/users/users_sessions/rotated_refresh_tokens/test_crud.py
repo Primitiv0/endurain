@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import users.users_sessions.rotated_refresh_tokens.crud as rotated_token_crud
 import users.users_sessions.rotated_refresh_tokens.schema as rotated_token_schema
 import users.users_sessions.rotated_refresh_tokens.models as rotated_token_models
+import auth.sessions.rotated_refresh_tokens.models as _auth_rotated_token_models
 
 
 class TestGetRotatedTokenByHash:
@@ -86,7 +87,7 @@ class TestCreateRotatedToken:
         mock_db_token = MagicMock(spec=rotated_token_models.RotatedRefreshToken)
 
         with patch.object(
-            rotated_token_models,
+            _auth_rotated_token_models,
             "RotatedRefreshToken",
             return_value=mock_db_token,
         ):

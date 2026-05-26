@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 import users.users_sessions.crud as users_session_crud
 import users.users_sessions.schema as users_session_schema
 import users.users_sessions.models as users_session_models
+import auth.sessions.models as _auth_sessions_models
 
 
 class TestGetUserSessions:
@@ -301,7 +302,7 @@ class TestCreateSession:
         mock_db_session = MagicMock(spec=users_session_models.UsersSessions)
 
         with patch.object(
-            users_session_models,
+            _auth_sessions_models,
             "UsersSessions",
             return_value=mock_db_session,
         ):

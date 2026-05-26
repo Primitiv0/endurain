@@ -9,7 +9,7 @@ import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.dependencies as users_dependencies
 import users.users.utils as users_utils
-import users.users_sessions.crud as users_sessions_crud
+import auth.sessions.crud as users_sessions_crud
 
 import users.users_identity_providers.crud as user_idp_crud
 

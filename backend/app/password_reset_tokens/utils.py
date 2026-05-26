@@ -18,7 +18,7 @@ import password_reset_tokens.schema as password_reset_tokens_schema
 import password_reset_tokens.crud as password_reset_tokens_crud
 
 import users.users.crud as users_crud
-import users.users_sessions.crud as users_sessions_crud
+import auth.sessions.crud as users_sessions_crud
 
 import auth.password_hasher as auth_password_hasher
 import auth.security_stores as auth_security_stores

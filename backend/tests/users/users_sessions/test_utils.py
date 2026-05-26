@@ -10,6 +10,7 @@ import users.users_sessions.utils as users_session_utils
 import users.users_sessions.schema as users_session_schema
 import users.users_sessions.models as users_session_models
 import users.users.schema as users_schema
+import auth.sessions.utils as _auth_sessions_utils
 
 
 class TestDeviceTypeEnum:
@@ -393,8 +394,8 @@ class TestVerifyCsrfToken:
         token = "some-csrf-token"
 
         # Act
-        digest1 = users_session_utils._hash_csrf_token(token)
-        digest2 = users_session_utils._hash_csrf_token(token)
+        digest1 = _auth_sessions_utils._hash_csrf_token(token)
+        digest2 = _auth_sessions_utils._hash_csrf_token(token)
 
         # Assert
         assert digest1 == digest2
@@ -413,13 +414,13 @@ class TestVerifyCsrfToken:
         """
         # Arrange
         token = "shared-token"
-        digest_key_a = users_session_utils._hash_csrf_token(token)
+        digest_key_a = _auth_sessions_utils._hash_csrf_token(token)
 
         with patch(
             "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
             "key-b",
         ):
-            digest_key_b = users_session_utils._hash_csrf_token(
+            digest_key_b = _auth_sessions_utils._hash_csrf_token(
                 token
             )
 

@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from users.users_identity_providers.models import UsersIdentityProvider
     from users.users_integrations.models import UsersIntegrations
     from users.users_privacy_settings.models import UsersPrivacySettings
-    from users.users_sessions.models import UsersSessions
+    from auth.sessions.models import UsersSessions
 
 
 class Users(Base):
