@@ -237,6 +237,495 @@ class TestCreateUserApiKey:
 
         assert response.status_code == 422
 
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_create_user_api_key_missing_password_returns_401(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        Step-up with missing password propagates 401.
+
+        When the account has a local password and none is
+        supplied, verify_step_up_credentials raises 401
+        and create_api_key must not be called.
+        """
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Step-up verification failed",
+        )
+
+        payload = {
+            "name": "FitoTrack",
+            "scopes": ["activities:upload"],
+        }
+
+        response = fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 401
+        mock_create.assert_not_called()
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_create_user_api_key_wrong_password_returns_401(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        Step-up with wrong password propagates 401.
+
+        When the caller supplies an incorrect password,
+        verify_step_up_credentials raises 401 and
+        create_api_key must not be called.
+        """
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Step-up verification failed",
+        )
+
+        payload = {
+            "name": "FitoTrack",
+            "scopes": ["activities:upload"],
+            "current_password": "definitely_wrong",
+        }
+
+        response = fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 401
+        mock_create.assert_not_called()
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_create_user_api_key_mfa_missing_code_returns_401(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        MFA required but no code supplied propagates 401.
+
+        When MFA is enabled and mfa_code is absent,
+        verify_step_up_credentials raises 401 and
+        create_api_key must not be called.
+        """
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Step-up verification failed",
+        )
+
+        payload = {
+            "name": "FitoTrack",
+            "scopes": ["activities:upload"],
+            "current_password": "correct_password",
+        }
+
+        response = fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 401
+        mock_create.assert_not_called()
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_create_user_api_key_mfa_invalid_code_returns_401(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        MFA with invalid code propagates 401.
+
+        When MFA is enabled and an incorrect mfa_code is
+        supplied, verify_step_up_credentials raises 401
+        and create_api_key must not be called.
+        """
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Step-up verification failed",
+        )
+
+        payload = {
+            "name": "FitoTrack",
+            "scopes": ["activities:upload"],
+            "current_password": "correct_password",
+            "mfa_code": "000000",
+        }
+
+        response = fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 401
+        mock_create.assert_not_called()
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_step_up_failure_does_not_call_create_api_key(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        When step-up fails, create_api_key is never called.
+
+        Asserts the database write is skipped entirely on
+        any step-up 401.
+        """
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Step-up verification failed",
+        )
+
+        payload = {
+            "name": "Unwanted Key",
+            "scopes": ["activities:upload"],
+            "current_password": "bad",
+        }
+
+        fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        mock_create.assert_not_called()
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_create_passes_password_and_mfa_code_to_step_up(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        Password and mfa_code from schema are forwarded to
+        verify_step_up_credentials.
+
+        Validates that step-up receives the exact values the
+        caller placed in the request body.
+        """
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        # Cause a controlled 401 so we can inspect the call
+        mock_verify_step_up.side_effect = HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Step-up verification failed",
+        )
+
+        payload = {
+            "name": "MyKey",
+            "scopes": ["activities:upload"],
+            "current_password": "s3cr3t!",
+            "mfa_code": "123456",
+        }
+
+        fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        mock_verify_step_up.assert_called_once()
+        _call_kwargs = mock_verify_step_up.call_args
+        positional = _call_kwargs.args
+        # verify_step_up_credentials(user_id, password, mfa, …)
+        assert positional[1] == "s3cr3t!"
+        assert positional[2] == "123456"
+
+
+class TestApiKeyResponseSafety:
+    """
+    Response schema safety tests for API key endpoints.
+
+    Ensures raw key material and internal hashes never
+    appear in list or single-key responses, and that the
+    raw key is returned exactly once in the creation
+    response.
+    """
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.get_api_keys_by_user_id"
+    )
+    def test_list_response_excludes_key_and_key_hash(
+        self,
+        mock_get_keys,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        List response must not leak raw key or key_hash.
+
+        Even if the ORM model carries key_hash, the
+        UsersApiKeyRead schema must exclude it.
+        """
+        now = datetime.now(timezone.utc)
+        mock_key = MagicMock(
+            spec=users_api_keys_models.UsersApiKeys
+        )
+        mock_key.id = "some-uuid"
+        mock_key.user_id = 1
+        mock_key.name = "FitoTrack"
+        mock_key.key_prefix = "abcdefgh"
+        mock_key.key_hash = "deadbeef" * 8  # ORM has it
+        mock_key.scopes = '["activities:upload"]'
+        mock_key.expires_at = None
+        mock_key.last_used_at = None
+        mock_key.created_at = now
+        mock_key.is_active = True
+        mock_get_keys.return_value = [mock_key]
+
+        response = fast_api_client.get(
+            "/api_keys",
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) == 1
+        item = data[0]
+        assert "key" not in item, (
+            "Raw key must not appear in list response"
+        )
+        assert "key_hash" not in item, (
+            "key_hash must not appear in list response"
+        )
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_utils.validate_api_key_scopes"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_created_response_includes_raw_key_once(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_validate_scopes,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        Creation response includes the raw key exactly once.
+
+        The key must be in the top-level response body and
+        must not be duplicated under any other field name.
+        """
+        now = datetime.now(timezone.utc)
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.return_value = None
+        mock_validate_scopes.return_value = None
+
+        mock_orm_key = MagicMock(
+            spec=users_api_keys_models.UsersApiKeys
+        )
+        mock_orm_key.id = "new-uuid"
+        mock_orm_key.user_id = 1
+        mock_orm_key.name = "FitoTrack"
+        mock_orm_key.key_prefix = "abcdefgh"
+        mock_orm_key.key_hash = "deadbeef" * 8
+        mock_orm_key.scopes = '["activities:upload"]'
+        mock_orm_key.expires_at = None
+        mock_orm_key.last_used_at = None
+        mock_orm_key.created_at = now
+        mock_orm_key.is_active = True
+        mock_create.return_value = (
+            mock_orm_key,
+            "endurain_rawsecretkey",
+        )
+
+        payload = {
+            "name": "FitoTrack",
+            "scopes": ["activities:upload"],
+        }
+
+        response = fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data.get("key") == "endurain_rawsecretkey", (
+            "Raw key must appear in creation response"
+        )
+        # Count occurrences across all values, not just keys
+        raw_key_occurrences = sum(
+            1 for v in data.values()
+            if v == "endurain_rawsecretkey"
+        )
+        assert raw_key_occurrences == 1, (
+            "Raw key must appear exactly once"
+        )
+
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_crud.create_api_key"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_api_keys_utils.validate_api_key_scopes"
+    )
+    @patch(
+        "users.users_api_keys.router"
+        ".users_utils.verify_step_up_credentials"
+    )
+    @patch("users.users_api_keys.router.users_crud.get_user_by_id")
+    def test_created_response_excludes_key_hash(
+        self,
+        mock_get_user,
+        mock_verify_step_up,
+        mock_validate_scopes,
+        mock_create,
+        fast_api_client,
+        fast_api_app,
+    ):
+        """
+        Creation response must not expose key_hash.
+
+        The ORM model stores key_hash but the response
+        schema must never include it.
+        """
+        now = datetime.now(timezone.utc)
+        mock_user = MagicMock()
+        mock_user.access_type = "regular"
+        mock_get_user.return_value = mock_user
+        mock_verify_step_up.return_value = None
+        mock_validate_scopes.return_value = None
+
+        mock_orm_key = MagicMock(
+            spec=users_api_keys_models.UsersApiKeys
+        )
+        mock_orm_key.id = "new-uuid"
+        mock_orm_key.user_id = 1
+        mock_orm_key.name = "FitoTrack"
+        mock_orm_key.key_prefix = "abcdefgh"
+        mock_orm_key.key_hash = "deadbeef" * 8
+        mock_orm_key.scopes = '["activities:upload"]'
+        mock_orm_key.expires_at = None
+        mock_orm_key.last_used_at = None
+        mock_orm_key.created_at = now
+        mock_orm_key.is_active = True
+        mock_create.return_value = (
+            mock_orm_key,
+            "endurain_rawsecretkey",
+        )
+
+        payload = {
+            "name": "FitoTrack",
+            "scopes": ["activities:upload"],
+        }
+
+        response = fast_api_client.post(
+            "/api_keys",
+            json=payload,
+            headers={"Authorization": "Bearer mock_token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert "key_hash" not in data, (
+            "key_hash must never appear in API response"
+        )
+
 
 class TestRevokeUserApiKey:
     """

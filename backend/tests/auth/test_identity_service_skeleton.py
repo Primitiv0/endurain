@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException, Request
+from sqlalchemy.exc import SQLAlchemyError
 
 from auth.identity_service import (
     DefaultIdentityService,
@@ -261,6 +262,41 @@ class TestResolveFromAccessToken:
 
         assert exc_info.value.status_code == 401
 
+    def test_non_list_scope_claim_raises_401(
+        self,
+        service: DefaultIdentityService,
+        mock_token_manager: MagicMock,
+    ):
+        """Raises 401 when 'scope' claim is not a list."""
+        mock_token_manager.get_token_claim.side_effect = (
+            lambda token, claim: {
+                "sub": 1,
+                "scope": "not-a-list",
+            }[claim]
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            service.resolve_from_access_token("bad_token")
+
+        assert exc_info.value.status_code == 401
+
+    def test_non_string_sid_claim_raises_401(
+        self,
+        service: DefaultIdentityService,
+        mock_token_manager: MagicMock,
+    ):
+        """Raises 401 when 'sid' claim is not a string."""
+        mock_token_manager.get_token_claim.side_effect = (
+            lambda token, claim: {
+                "sub": 1,
+                "scope": ["profile"],
+                "sid": 99,
+            }[claim]
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            service.resolve_from_access_token("bad_token")
+
+        assert exc_info.value.status_code == 401
+
 
 # ---------------------------------------------------------------------------
 # resolve_from_api_key
@@ -385,6 +421,102 @@ class TestResolveFromApiKey:
 
         assert exc_info.value.status_code == 401
 
+    def test_expired_key_raises_401(
+        self,
+        service: DefaultIdentityService,
+    ):
+        """Raises 401 when the API key has expired."""
+        mock_db_key = MagicMock()
+        mock_db_key.key_hash = "d" * 64
+        mock_db_key.user_id = 1
+        mock_db_key.is_active = True
+        mock_db_key.expires_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+
+        mock_request = MagicMock(spec=Request)
+
+        with (
+            patch(
+                "auth.identity_service.users_api_keys_utils"
+                ".hash_api_key",
+                return_value="d" * 64,
+            ),
+            patch(
+                "auth.identity_service.users_api_keys_crud"
+                ".get_api_key_by_hash",
+                return_value=mock_db_key,
+            ),
+            patch(
+                "auth.identity_service.users_utils"
+                ".get_user_by_id_or_404",
+                return_value=_mock_user(),
+            ),
+            patch(
+                "auth.identity_service.users_utils.check_user_is_active"
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                service.resolve_from_api_key(
+                    "expired_key", mock_request
+                )
+
+        assert exc_info.value.status_code == 401
+
+    def test_update_last_used_error_does_not_fail_request(
+        self,
+        service: DefaultIdentityService,
+    ):
+        """SQLAlchemyError in update_last_used is swallowed; succeeds."""
+        mock_db_key = MagicMock()
+        mock_db_key.key_hash = "e" * 64
+        mock_db_key.user_id = 1
+        mock_db_key.is_active = True
+        mock_db_key.expires_at = None
+        mock_db_key.id = "key-uuid-2"
+        mock_db_key.key_prefix = "endurain"
+        mock_db_key.scopes = '["profile"]'
+
+        mock_user = _mock_user()
+        mock_request = MagicMock(spec=Request)
+        mock_request.url.path = "/api/v1/health"
+        mock_request.client.host = "10.0.0.1"
+
+        with (
+            patch(
+                "auth.identity_service.users_api_keys_utils"
+                ".hash_api_key",
+                return_value="e" * 64,
+            ),
+            patch(
+                "auth.identity_service.users_api_keys_crud"
+                ".get_api_key_by_hash",
+                return_value=mock_db_key,
+            ),
+            patch(
+                "auth.identity_service.users_utils"
+                ".get_user_by_id_or_404",
+                return_value=mock_user,
+            ),
+            patch(
+                "auth.identity_service.users_utils.check_user_is_active"
+            ),
+            patch(
+                "auth.identity_service.users_api_keys_crud"
+                ".update_last_used",
+                side_effect=SQLAlchemyError("db down"),
+            ),
+            patch(
+                "auth.identity_service.users_api_keys_utils"
+                ".json_to_scopes",
+                return_value=["profile"],
+            ),
+        ):
+            result = service.resolve_from_api_key(
+                "endurain_raw_key2", mock_request
+            )
+
+        assert isinstance(result, Principal)
+        assert result.is_api_key() is True
+
 
 # ---------------------------------------------------------------------------
 # resolve_from_session_cookie
@@ -473,6 +605,32 @@ class TestIssueTokenPair:
         )
         assert result == expected
 
+    def test_delegates_without_session_id_passes_none(
+        self,
+        service: DefaultIdentityService,
+    ):
+        """Passes None as session_id when the argument is omitted."""
+        mock_user = MagicMock()
+        expected = (
+            "new-sid",
+            datetime.now(timezone.utc),
+            "access_token",
+            datetime.now(timezone.utc),
+            "refresh_token",
+            "csrf",
+        )
+
+        with patch(
+            "auth.identity_service.auth_utils.create_tokens",
+            return_value=expected,
+        ) as mock_create:
+            result = service.issue_token_pair(mock_user)
+
+        mock_create.assert_called_once_with(
+            mock_user, service._token_manager, None
+        )
+        assert result == expected
+
 
 # ---------------------------------------------------------------------------
 # revoke_session
@@ -494,6 +652,22 @@ class TestRevokeSession:
 
         mock_delete.assert_called_once_with("sess-1", 42, service._db)
 
+    def test_propagates_404_from_crud(
+        self,
+        service: DefaultIdentityService,
+    ):
+        """Propagates HTTPException(404) raised by delete_session."""
+        with patch(
+            "auth.identity_service.users_sessions_crud.delete_session",
+            side_effect=HTTPException(
+                status_code=404, detail="not found"
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                service.revoke_session("missing-sess", user_id=1)
+
+        assert exc_info.value.status_code == 404
+
 
 # ---------------------------------------------------------------------------
 # revoke_api_key
@@ -514,6 +688,22 @@ class TestRevokeApiKey:
             service.revoke_api_key("key-uuid", user_id=7)
 
         mock_revoke.assert_called_once_with("key-uuid", 7, service._db)
+
+    def test_propagates_404_from_crud(
+        self,
+        service: DefaultIdentityService,
+    ):
+        """Propagates HTTPException(404) raised by revoke_api_key CRUD."""
+        with patch(
+            "auth.identity_service.users_api_keys_crud.revoke_api_key",
+            side_effect=HTTPException(
+                status_code=404, detail="not found"
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                service.revoke_api_key("missing-key", user_id=5)
+
+        assert exc_info.value.status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -569,6 +759,20 @@ class TestCheckScope:
         """No exception when required_scopes is empty."""
         p = self._principal(frozenset())
         service.check_scope(p, frozenset())
+
+    def test_multiple_required_scopes_partial_miss_raises_403(
+        self,
+        service: DefaultIdentityService,
+    ):
+        """Raises 403 when principal satisfies some but not all scopes."""
+        p = self._principal(frozenset({"profile", "users:read"}))
+        with pytest.raises(HTTPException) as exc_info:
+            service.check_scope(
+                p,
+                frozenset({"profile", "users:read", "users:write"}),
+            )
+
+        assert exc_info.value.status_code == 403
 
 
 # ---------------------------------------------------------------------------

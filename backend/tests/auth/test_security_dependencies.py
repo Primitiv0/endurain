@@ -384,6 +384,62 @@ class TestValidateAccessTokenOrApiKey:
         assert exc.value.status_code == 401
 
     @pytest.mark.asyncio
+    async def test_jwt_takes_precedence_over_api_key(self):
+        """JWT wins when both Bearer token and X-API-Key are present.
+
+        The JWT path must run and the API key resolver
+        must not be called.
+        """
+        request = _fresh_request()
+        principal = _make_principal(user_id=20)
+        mock_svc = MagicMock(spec=IdentityService)
+        mock_svc.resolve_from_access_token.return_value = principal
+
+        ctx = await auth_security.validate_access_token_or_api_key(
+            request,
+            mock_svc,
+            access_token="valid_jwt",
+            api_key_header="some-api-key",
+            api_key_query=None,
+        )
+
+        assert ctx.auth_type == "jwt"
+        assert ctx.user_id == 20
+        mock_svc.resolve_from_api_key.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_header_api_key_wins_over_query_param(self):
+        """X-API-Key header is preferred over ?api_key= query.
+
+        When both api_key_header and api_key_query are
+        provided, the header value must be passed to
+        resolve_from_api_key.
+        """
+        request = _fresh_request()
+        principal = _make_principal(
+            user_id=30,
+            credential=ApiKeyCred(
+                api_key_id=1, key_prefix="hdr_"
+            ),
+        )
+        mock_svc = MagicMock(spec=IdentityService)
+        mock_svc.resolve_from_api_key.return_value = principal
+
+        ctx = await auth_security.validate_access_token_or_api_key(
+            request,
+            mock_svc,
+            access_token=None,
+            api_key_header="header-key",
+            api_key_query="query-key",
+        )
+
+        assert ctx.auth_type == "api_key"
+        assert ctx.user_id == 30
+        mock_svc.resolve_from_api_key.assert_called_once_with(
+            "header-key", request
+        )
+
+    @pytest.mark.asyncio
     async def test_api_key_failure_raises_401(self):
         """IdentityService API key failure propagates 401."""
         request = _fresh_request()

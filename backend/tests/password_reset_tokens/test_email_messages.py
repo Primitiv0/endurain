@@ -126,6 +126,31 @@ class TestGetPasswordResetEmail:
         )
         assert "Alice & Bob" in text_body
 
+    def test_html_escapes_attribute_breaking_name(self):
+        """
+        HTML body neutralises attribute-breaking injection in name.
+
+        Tests a different XSS vector: a payload that attempts to
+        break out of an HTML attribute context using a quote
+        followed by an event-handler tag.
+
+        html.escape escapes '<' and '>' (breaking the tag boundary)
+        so 'onerror=alert(1)' may appear as harmless plain text
+        inside the entity-escaped string; the important guarantee
+        is that no raw '<img' tag is injected into the DOM.
+        """
+        malicious = '"><img src=x onerror=alert(1)>'
+        _, html_body, _ = email_messages.get_password_reset_email(
+            malicious,
+            "https://example.com/reset",
+            _make_service(),
+            locale="us",
+        )
+        # The '<' of '<img' must be escaped to '&lt;'
+        # so the raw tag boundary is never present.
+        assert "<img src=x" not in html_body
+        assert "&lt;img src=x" in html_body
+
     def test_pt_subject_differs_from_us(self, monkeypatch, tmp_path):
         """Translated catalogs produce locale-specific subjects."""
         # Drive the test off isolated on-disk catalogs so we do not

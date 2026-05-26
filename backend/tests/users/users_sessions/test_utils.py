@@ -1,8 +1,11 @@
+import hashlib
+import hmac
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
 
+import core.network as core_network
 import users.users_sessions.utils as users_session_utils
 import users.users_sessions.schema as users_session_schema
 import users.users_sessions.models as users_session_models
@@ -188,70 +191,240 @@ class TestGetUserAgent:
 
 class TestGetIpAddress:
     """
-    Test suite for get_ip_address function.
+    Test suite for core_network.get_ip_address.
+
+    Tests are retargeted from the stale
+    ``users_session_utils.get_ip_address`` alias (which no
+    longer exists) to the canonical
+    ``core.network.get_ip_address`` implementation that the
+    session utilities call internally.
     """
 
     def test_get_ip_address_from_forwarded_for(self):
         """
-        Test extracting IP from X-Forwarded-For header.
+        Test extracting IP from X-Forwarded-For when peer
+        is trusted (TRUSTED_PROXIES = ["*"]).
         """
         # Arrange
         mock_request = MagicMock()
+        mock_request.client.host = "10.0.0.1"
         mock_request.headers.get.side_effect = lambda h: (
-            "192.168.1.1, 10.0.0.1" if h == "X-Forwarded-For" else None
+            "192.168.1.1, 10.0.0.1"
+            if h == "X-Forwarded-For"
+            else None
         )
 
-        # Act
-        result = users_session_utils.get_ip_address(mock_request)
+        with patch.object(
+            core_network.core_config.settings,
+            "TRUSTED_PROXIES",
+            ["*"],
+        ):
+            # Act
+            result = core_network.get_ip_address(mock_request)
 
         # Assert
         assert result == "192.168.1.1"
 
     def test_get_ip_address_from_real_ip(self):
         """
-        Test extracting IP from X-Real-IP header.
+        Test extracting IP from X-Real-IP when
+        X-Forwarded-For absent and peer is trusted.
         """
         # Arrange
         mock_request = MagicMock()
+        mock_request.client.host = "10.0.0.1"
         mock_request.headers.get.side_effect = lambda h: (
-            "10.0.0.1" if h == "X-Real-IP" else None
+            "172.16.0.5" if h == "X-Real-IP" else None
         )
 
-        # Act
-        result = users_session_utils.get_ip_address(mock_request)
+        with patch.object(
+            core_network.core_config.settings,
+            "TRUSTED_PROXIES",
+            ["*"],
+        ):
+            # Act
+            result = core_network.get_ip_address(mock_request)
 
         # Assert
-        assert result == "10.0.0.1"
+        assert result == "172.16.0.5"
 
     def test_get_ip_address_from_client(self):
         """
-        Test extracting IP from request client.
+        Test that direct peer IP is returned when no
+        forwarded headers are present.
         """
         # Arrange
         mock_request = MagicMock()
-        mock_request.headers.get.return_value = None
         mock_request.client.host = "127.0.0.1"
+        mock_request.headers.get.return_value = None
 
-        # Act
-        result = users_session_utils.get_ip_address(mock_request)
+        with patch.object(
+            core_network.core_config.settings,
+            "TRUSTED_PROXIES",
+            ["*"],
+        ):
+            # Act
+            result = core_network.get_ip_address(mock_request)
 
         # Assert
         assert result == "127.0.0.1"
 
     def test_get_ip_address_no_client(self):
         """
-        Test extracting IP when no client available.
+        Test that "unknown" is returned when request has
+        no client info.
         """
         # Arrange
         mock_request = MagicMock()
-        mock_request.headers.get.return_value = None
         mock_request.client = None
+        mock_request.headers.get.return_value = None
 
         # Act
-        result = users_session_utils.get_ip_address(mock_request)
+        result = core_network.get_ip_address(mock_request)
 
         # Assert
         assert result == "unknown"
+
+    def test_create_session_object_propagates_ip_from_core_network(
+        self,
+    ):
+        """
+        Test IP address from core_network is stored in the
+        session object built by create_session_object.
+        """
+        # Arrange
+        session_id = "test-session-id"
+        mock_user = MagicMock(spec=users_schema.UsersRead)
+        mock_user.id = 1
+        mock_request = MagicMock()
+        mock_request.client.host = "203.0.113.5"
+        mock_request.headers.get.side_effect = (
+            lambda h, d=None: "Mozilla/5.0"
+            if h == "user-agent"
+            else None
+        )
+
+        exp = datetime.now(timezone.utc) + timedelta(days=7)
+
+        with patch.object(
+            core_network.core_config.settings,
+            "TRUSTED_PROXIES",
+            ["*"],
+        ):
+            # Act
+            result = users_session_utils.create_session_object(
+                session_id,
+                mock_user,
+                mock_request,
+                "hashed-token",
+                exp,
+            )
+
+        # Assert
+        assert result.ip_address == "203.0.113.5"
+
+
+class TestVerifyCsrfToken:
+    """
+    Test suite for verify_csrf_token and _hash_csrf_token utilities.
+    """
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        "test-secret-key",
+    )
+    def test_verify_csrf_token_valid_returns_true(self):
+        """
+        Test verify_csrf_token returns True when the candidate
+        token matches the stored HMAC-SHA256 digest.
+        """
+        # Arrange
+        token = "csrf-plaintext-value"
+        stored_hmac = hmac.new(
+            b"test-secret-key",
+            token.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        # Act
+        result = users_session_utils.verify_csrf_token(
+            token, stored_hmac
+        )
+
+        # Assert
+        assert result is True
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        "test-secret-key",
+    )
+    def test_verify_csrf_token_wrong_candidate_returns_false(self):
+        """
+        Test verify_csrf_token returns False when the candidate
+        does not match the stored HMAC.
+        """
+        # Arrange
+        real_token = "correct-csrf-token"
+        stored_hmac = hmac.new(
+            b"test-secret-key",
+            real_token.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        wrong_candidate = "tampered-csrf-token"
+
+        # Act
+        result = users_session_utils.verify_csrf_token(
+            wrong_candidate, stored_hmac
+        )
+
+        # Assert
+        assert result is False
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        "test-secret-key",
+    )
+    def test_hash_csrf_token_deterministic(self):
+        """
+        Test _hash_csrf_token produces the same digest for
+        identical inputs (deterministic HMAC).
+        """
+        # Arrange
+        token = "some-csrf-token"
+
+        # Act
+        digest1 = users_session_utils._hash_csrf_token(token)
+        digest2 = users_session_utils._hash_csrf_token(token)
+
+        # Assert
+        assert digest1 == digest2
+        assert len(digest1) == 64  # SHA-256 hex = 64 chars
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        "key-a",
+    )
+    def test_hash_csrf_token_different_keys_produce_different_digests(
+        self,
+    ):
+        """
+        Test that different JWT_SECRET_KEY values produce
+        different HMAC digests for the same token.
+        """
+        # Arrange
+        token = "shared-token"
+        digest_key_a = users_session_utils._hash_csrf_token(token)
+
+        with patch(
+            "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+            "key-b",
+        ):
+            digest_key_b = users_session_utils._hash_csrf_token(
+                token
+            )
+
+        # Assert
+        assert digest_key_a != digest_key_b
 
 
 class TestParseUserAgent:
@@ -581,3 +754,235 @@ class TestCleanupIdleSessions:
 
         # Assert
         mock_logger.assert_called()
+
+
+_TEST_SECRET = (
+    "test-secret-key-for-testing-purposes-minimum-32-characters-long"
+)
+
+
+class TestCreateSessionUtilsCsrf:
+    """
+    Test suite verifying CSRF-token hashing inside the
+    util-layer create_session function.
+    """
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        _TEST_SECRET,
+    )
+    @patch(
+        "users.users_sessions.utils.users_session_crud"
+        ".create_session"
+    )
+    def test_create_session_hashes_csrf_token_before_persistence(
+        self, mock_crud_create, mock_db
+    ):
+        """
+        Test that create_session computes an HMAC-SHA256 of the
+        plain csrf_token and passes the digest (not the plain
+        value) to the CRUD layer.
+        """
+        # Arrange
+        session_id = "sess-csrf-test"
+        mock_user = MagicMock(spec=users_schema.UsersRead)
+        mock_user.id = 42
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers.get.side_effect = (
+            lambda h, d=None: "Mozilla/5.0"
+            if h == "user-agent"
+            else d
+        )
+        mock_hasher = MagicMock()
+        mock_hasher.hash_password.return_value = "hashed-rt"
+        csrf_token = "plain-csrf-token-value"
+        expected_hash = hmac.new(
+            _TEST_SECRET.encode(),
+            csrf_token.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        # Act
+        users_session_utils.create_session(
+            session_id,
+            mock_user,
+            mock_request,
+            "refresh-token",
+            mock_hasher,
+            mock_db,
+            csrf_token=csrf_token,
+        )
+
+        # Assert — CRUD was called with the hashed value
+        mock_crud_create.assert_called_once()
+        persisted_session = mock_crud_create.call_args[0][0]
+        assert persisted_session.csrf_token_hash == expected_hash
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        _TEST_SECRET,
+    )
+    @patch(
+        "users.users_sessions.utils.users_session_crud"
+        ".create_session"
+    )
+    def test_create_session_none_csrf_token_stores_none(
+        self, mock_crud_create, mock_db
+    ):
+        """
+        Test that create_session stores None for csrf_token_hash
+        when no csrf_token is provided.
+        """
+        # Arrange
+        mock_user = MagicMock(spec=users_schema.UsersRead)
+        mock_user.id = 1
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers.get.side_effect = (
+            lambda h, d=None: "Mozilla/5.0"
+            if h == "user-agent"
+            else d
+        )
+        mock_hasher = MagicMock()
+        mock_hasher.hash_password.return_value = "hashed-rt"
+
+        # Act
+        users_session_utils.create_session(
+            "sess-no-csrf",
+            mock_user,
+            mock_request,
+            "refresh-token",
+            mock_hasher,
+            mock_db,
+        )
+
+        # Assert
+        persisted_session = mock_crud_create.call_args[0][0]
+        assert persisted_session.csrf_token_hash is None
+
+
+class TestEditSessionUtilsCsrf:
+    """
+    Test suite verifying CSRF-token hashing inside the
+    util-layer edit_session function.
+    """
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        _TEST_SECRET,
+    )
+    @patch(
+        "users.users_sessions.utils.users_session_crud.edit_session"
+    )
+    def test_edit_session_hashes_new_csrf_token_before_persistence(
+        self, mock_crud_edit, mock_db
+    ):
+        """
+        Test that edit_session computes an HMAC-SHA256 of the
+        plain new_csrf_token and passes the digest to the CRUD
+        layer rather than the plain value.
+        """
+        # Arrange
+        now = datetime.now(timezone.utc)
+        existing_session = users_session_schema.UsersSessionsInternal(
+            id="sess-edit-csrf",
+            user_id=1,
+            refresh_token="old-token",
+            ip_address="127.0.0.1",
+            device_type="PC",
+            operating_system="Linux",
+            operating_system_version="5.15",
+            browser="Firefox",
+            browser_version="120.0",
+            created_at=now - timedelta(hours=1),
+            last_activity_at=now - timedelta(minutes=5),
+            expires_at=now + timedelta(days=6),
+            token_family_id="family-edit",
+            rotation_count=0,
+        )
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers.get.side_effect = (
+            lambda h, d=None: "Mozilla/5.0"
+            if h == "user-agent"
+            else d
+        )
+        mock_hasher = MagicMock()
+        mock_hasher.hash_password.return_value = "new-hashed-rt"
+        new_csrf_token = "new-plain-csrf-token"
+        expected_hash = hmac.new(
+            _TEST_SECRET.encode(),
+            new_csrf_token.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        # Act
+        users_session_utils.edit_session(
+            existing_session,
+            mock_request,
+            "new-refresh-token",
+            mock_hasher,
+            mock_db,
+            new_csrf_token=new_csrf_token,
+        )
+
+        # Assert — CRUD was called with the hashed value
+        mock_crud_edit.assert_called_once()
+        updated_session = mock_crud_edit.call_args[0][0]
+        assert updated_session.csrf_token_hash == expected_hash
+
+    @patch(
+        "users.users_sessions.utils.auth_constants.JWT_SECRET_KEY",
+        _TEST_SECRET,
+    )
+    @patch(
+        "users.users_sessions.utils.users_session_crud.edit_session"
+    )
+    def test_edit_session_none_csrf_token_stores_none(
+        self, mock_crud_edit, mock_db
+    ):
+        """
+        Test that edit_session stores None for csrf_token_hash
+        when no new_csrf_token is supplied.
+        """
+        # Arrange
+        now = datetime.now(timezone.utc)
+        existing_session = users_session_schema.UsersSessionsInternal(
+            id="sess-edit-no-csrf",
+            user_id=1,
+            refresh_token="old-token",
+            ip_address="127.0.0.1",
+            device_type="PC",
+            operating_system="Linux",
+            operating_system_version="5.15",
+            browser="Firefox",
+            browser_version="120.0",
+            created_at=now - timedelta(hours=1),
+            last_activity_at=now - timedelta(minutes=5),
+            expires_at=now + timedelta(days=6),
+            token_family_id="family-edit-no-csrf",
+            rotation_count=0,
+        )
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers.get.side_effect = (
+            lambda h, d=None: "Mozilla/5.0"
+            if h == "user-agent"
+            else d
+        )
+        mock_hasher = MagicMock()
+        mock_hasher.hash_password.return_value = "new-hashed-rt"
+
+        # Act
+        users_session_utils.edit_session(
+            existing_session,
+            mock_request,
+            "new-refresh-token",
+            mock_hasher,
+            mock_db,
+        )
+
+        # Assert
+        updated_session = mock_crud_edit.call_args[0][0]
+        assert updated_session.csrf_token_hash is None

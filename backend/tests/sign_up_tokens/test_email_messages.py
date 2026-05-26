@@ -164,6 +164,24 @@ class TestGetAdminSignupNotificationEmail:
         )
         assert "<script>" not in html_body
 
+    def test_html_escapes_admin_name_with_script_tag(self):
+        """
+        HTML body escapes <script> tags in the admin recipient name.
+
+        Both `user_name` (admin) and `sign_up_user_name` pass through
+        html.escape(); this test specifically validates that a
+        malicious admin name cannot inject raw HTML.
+        """
+        _, html_body, _ = email_messages.get_admin_signup_notification_email(
+            "<script>alert(1)</script>",
+            "New User",
+            "newuser",
+            _make_service(),
+            locale="us",
+        )
+        assert "<script>" not in html_body
+        assert "&lt;script&gt;" in html_body
+
     def test_uses_admin_locale_not_new_user_locale(
         self, monkeypatch, tmp_path
     ):
