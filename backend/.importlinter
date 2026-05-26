@@ -1,3 +1,43 @@
+# Forbid imports of users_sessions outside itself (sessions now owned by auth)
+[importlinter:contract:users-sessions-boundary]
+name = Users sessions boundary: only users_sessions itself may import its modules (deprecated, to be removed)
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    auth
+    activities
+    core
+    followers
+    garmin
+    gears
+    health
+    notifications
+    password_reset_tokens
+    profile
+    server_settings
+    sign_up_tokens
+    strava
+    websocket
+forbidden_modules =
+    users.users_sessions
+    users.users_sessions.rotated_refresh_tokens
+ignore_imports =
+    # Phase 3 baseline: existing call sites, to be removed in Phase 4.
+    auth.sessions.crud -> users.users_sessions.crud
+    auth.sessions.models -> users.users_sessions.models
+    auth.sessions.router -> users.users_sessions.router
+    auth.sessions.schema -> users.users_sessions.schema
+    auth.sessions.utils -> users.users_sessions.utils
+    auth.sessions.rotated_refresh_tokens.crud -> users.users_sessions.rotated_refresh_tokens.crud
+    auth.sessions.rotated_refresh_tokens.models -> users.users_sessions.rotated_refresh_tokens.models
+    auth.sessions.rotated_refresh_tokens.schema -> users.users_sessions.rotated_refresh_tokens.schema
+    auth.sessions.rotated_refresh_tokens.utils -> users.users_sessions.rotated_refresh_tokens.utils
+    core.routes -> users.users_sessions.router
+    core.scheduler -> users.users_sessions.utils
+    core.scheduler -> users.users_sessions.rotated_refresh_tokens.utils
+    password_reset_tokens.utils -> users.users_sessions.crud
+    profile.router -> users.users_sessions.crud
+    profile.router -> users.users_sessions.schema
 [importlinter]
 # Run from backend/ with: PYTHONPATH=app uv run lint-imports
 root_packages =

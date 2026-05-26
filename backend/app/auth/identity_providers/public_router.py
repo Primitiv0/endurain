@@ -13,8 +13,8 @@ import core.rate_limit as core_rate_limit
 import auth.password_hasher as auth_password_hasher
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
-import users.users_sessions.utils as users_session_utils
-import users.users_sessions.crud as users_session_crud
+import auth.sessions.utils as users_session_utils
+import auth.sessions.crud as users_session_crud
 import users.users.utils as users_utils
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.schema as idp_schema

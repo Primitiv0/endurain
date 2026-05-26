@@ -12,7 +12,7 @@ from core.database import Base
 if TYPE_CHECKING:
     from auth.identity_providers.models import IdentityProvider
     from users.users.models import Users
-    from users.users_sessions.models import UsersSessions
+    from auth.sessions.models import UsersSessions
 
 
 class OAuthState(Base):

@@ -43,7 +43,7 @@ import users.users.schema as users_schema
 import users.users.utils as users_utils
 import users.users_api_keys.crud as users_api_keys_crud
 import users.users_api_keys.utils as users_api_keys_utils
-import users.users_sessions.crud as users_sessions_crud
+import auth.sessions.crud as users_sessions_crud
 
 import core.database as core_database
 import core.logger as core_logger

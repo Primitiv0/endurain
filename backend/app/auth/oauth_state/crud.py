@@ -6,7 +6,7 @@ from sqlalchemy import delete as sa_delete, select, update as sa_update
 from sqlalchemy.orm import Session
 
 import auth.oauth_state.models as oauth_state_models
-import users.users_sessions.models as users_session_models
+import auth.sessions.models as users_session_models
 
 import core.decorators as core_decorators
 import core.logger as core_logger
