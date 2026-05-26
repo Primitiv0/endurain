@@ -31,7 +31,7 @@ import server_settings.models
 import auth.sessions.models
 import auth.sessions.rotated_refresh_tokens.models
 import users.users.models
-import users.users_api_keys.models
+import auth.api_keys.models
 import users.users_goals.models
 import users.users_default_gear.models
 import users.users_identity_providers.models

@@ -57,7 +57,7 @@ import auth.sessions.router as users_session_router
 import sign_up_tokens.router as sign_up_tokens_router
 import strava.router as strava_router
 import users.users.router as users_router
-import users.users_api_keys.router as users_api_keys_router
+import auth.api_keys.router as users_api_keys_router
 import users.users_goals.router as user_goals_router
 import users.users_identity_providers.router as user_identity_providers_router
 import users.users.public_router as users_public_router

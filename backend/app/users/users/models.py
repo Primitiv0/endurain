@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from notifications.models import Notification
     from password_reset_tokens.models import PasswordResetToken
     from sign_up_tokens.models import SignUpToken
-    from users.users_api_keys.models import UsersApiKeys
+    from auth.api_keys.models import UsersApiKeys
     from users.users_default_gear.models import UsersDefaultGear
     from users.users_goals.models import UsersGoal
     from users.users_identity_providers.models import UsersIdentityProvider

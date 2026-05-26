@@ -22,6 +22,30 @@ source_modules =
 forbidden_modules =
     users.users_sessions
     users.users_sessions.rotated_refresh_tokens
+
+# Forbid imports of users_api_keys outside itself (api_keys now owned by auth)
+[importlinter:contract:users-api-keys-boundary]
+name = Users api_keys boundary: only users_api_keys itself may import its modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    users.users
+    auth
+    activities
+    core
+    followers
+    garmin
+    gears
+    health
+    notifications
+    password_reset_tokens
+    profile
+    server_settings
+    sign_up_tokens
+    strava
+    websocket
+forbidden_modules =
+    users.users_api_keys
 [importlinter]
 # Run from backend/ with: PYTHONPATH=app uv run lint-imports
 root_packages =
@@ -93,7 +117,6 @@ ignore_imports =
     users.users_identity_providers.router -> auth.security
     users.users_default_gear.router -> auth.security
     users.users.router -> auth.security
-    users.users_api_keys.router -> auth.security
     activities.activity_laps.router -> auth.security
     activities.activity_media.router -> auth.security
     activities.activity.router -> auth.security
@@ -115,5 +138,4 @@ ignore_imports =
     profile.router -> auth.password_hasher
     users.users.utils -> auth.password_hasher
     users.users.router -> auth.password_hasher
-    users.users_api_keys.router -> auth.password_hasher
     users.users.crud -> auth.password_hasher
