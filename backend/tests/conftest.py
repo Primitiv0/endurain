@@ -18,7 +18,8 @@ load_dotenv(dotenv_path=env_test_path)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 import auth.sessions.router as users_session_router
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
+import auth.dependencies as auth_dependencies
 import auth.token_manager as auth_token_manager
 import auth.security as auth_security
 import users.users.schema as user_schema
@@ -40,14 +41,14 @@ PUBLIC_ROUTER_MODULES = [
 
 
 @pytest.fixture
-def password_hasher() -> auth_password_hasher.PasswordHasher:
+def password_hasher() -> auth_passwords.PasswordHasher:
     """
-    Creates and returns an instance of auth_password_hasher.PasswordHasher using the get_password_hasher function.
+    Creates and returns an instance of auth_passwords.PasswordHasher using the get_password_hasher function.
 
     Returns:
-        auth_password_hasher.PasswordHasher: An instance of the password hasher utility.
+        auth_passwords.PasswordHasher: An instance of the password hasher utility.
     """
-    return auth_password_hasher.get_password_hasher()
+    return auth_passwords.get_password_hasher()
 
 
 @pytest.fixture
@@ -441,24 +442,44 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
     except Exception:
         pass
 
-    # Override auth_security for health_weight router
+    # Override public auth dependencies used by non-auth routers
     try:
         app.dependency_overrides[auth_security.check_scopes] = _mock_check_scopes
         app.dependency_overrides[auth_security.get_sub_from_access_token] = (
             _mock_get_sub_from_access_token
         )
+        app.dependency_overrides[auth_dependencies.check_scopes] = _mock_check_scopes
+        app.dependency_overrides[auth_dependencies.get_sub_from_access_token] = (
+            _mock_get_sub_from_access_token
+        )
+        app.dependency_overrides[
+            auth_dependencies.validate_access_token
+        ] = _mock_validate_access_token
+        app.dependency_overrides[
+            auth_dependencies.validate_access_token_or_api_key
+        ] = lambda: auth_dependencies.AuthContext(
+            user_id=app.state.mock_user_id,
+            scopes=["*"],
+            auth_type="jwt",
+        )
+        app.dependency_overrides[
+            auth_dependencies.get_user_id_from_auth
+        ] = _mock_get_sub_from_access_token
+        app.dependency_overrides[
+            auth_dependencies.check_auth_scopes
+        ] = _mock_check_scopes
     except Exception:
         pass
 
     # Generic overrides
     _override_if_exists(
-        app, "auth.password_hasher", "get_password_hasher", lambda: password_hasher
-    )
-    _override_if_exists(
         app,
-        "session.auth_password_hasher",
+        "auth.password_hasher",
         "get_password_hasher",
         lambda: password_hasher,
+    )
+    _override_if_exists(
+        app, "auth.passwords", "get_password_hasher", lambda: password_hasher
     )
     _override_if_exists(
         app, "auth.token_manager", "get_token_manager", lambda: token_manager
@@ -545,7 +566,13 @@ def fast_api_app_public(password_hasher, token_manager, mock_db) -> FastAPI:
 
     # Generic overrides
     _override_if_exists(
-        app, "auth.password_hasher", "get_password_hasher", lambda: password_hasher
+        app,
+        "auth.password_hasher",
+        "get_password_hasher",
+        lambda: password_hasher,
+    )
+    _override_if_exists(
+        app, "auth.passwords", "get_password_hasher", lambda: password_hasher
     )
     _override_if_exists(
         app, "auth.token_manager", "get_token_manager", lambda: token_manager

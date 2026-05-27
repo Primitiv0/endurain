@@ -11,7 +11,7 @@ import activities.activity_streams.dependencies as activity_streams_dependencies
 
 import activities.activity.dependencies as activities_dependencies
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -40,14 +40,14 @@ async def read_activities_streams_for_activity_all(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["activities:read"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token
         ),
     ],
@@ -105,14 +105,14 @@ async def read_activities_streams_for_activity_stream_type(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["activities:read"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token
         ),
     ],

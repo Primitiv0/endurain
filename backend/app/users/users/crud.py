@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from urllib.parse import unquote
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 import auth.mfa.models as auth_mfa_models
 
 import users.users.schema as users_schema
@@ -231,7 +231,7 @@ def get_users_admin(db: Session) -> list[users_models.Users]:
 @core_decorators.handle_db_errors
 def create_user(
     user: users_schema.UsersCreate,
-    password_hasher: auth_password_hasher.PasswordHasher,
+    password_hasher: auth_passwords.PasswordHasher,
     db: Session,
 ) -> users_models.Users:
     """
@@ -301,7 +301,7 @@ def create_user(
 def create_signup_user(
     user: users_schema.UsersSignup,
     server_settings: server_settings_schema.ServerSettingsRead,
-    password_hasher: auth_password_hasher.PasswordHasher,
+    password_hasher: auth_passwords.PasswordHasher,
     db: Session,
 ) -> users_models.Users:
     """
@@ -665,7 +665,7 @@ def verify_user_email(
 def edit_user_password(
     user_id: int,
     password: str,
-    password_hasher: auth_password_hasher.PasswordHasher,
+    password_hasher: auth_passwords.PasswordHasher,
     db: Session,
     is_hashed: bool = False,
     commit: bool = True,

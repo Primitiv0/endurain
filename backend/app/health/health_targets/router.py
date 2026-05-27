@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import health.health_targets.schema as health_targets_schema
 import health.health_targets.crud as health_targets_crud
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -21,11 +21,11 @@ router = APIRouter()
 )
 async def read_health_targets_all(
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -67,11 +67,11 @@ async def read_health_targets_all(
 async def update_health_targets(
     health_targets: health_targets_schema.HealthTargetsUpdate,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,

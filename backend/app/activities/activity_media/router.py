@@ -12,7 +12,7 @@ import activities.activity_media.crud as activity_media_crud
 import activities.activity_media.dependencies as activities_media_dependencies
 import activities.activity_media.schema as activity_media_schema
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.config as core_config
 import core.database as core_database
@@ -70,11 +70,11 @@ async def read_activities_media_user(
         Callable, Depends(activities_dependencies.validate_activity_id)
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -111,7 +111,7 @@ async def upload_media(
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["activities:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["activities:write"]),
     ],
     db: Annotated[
         Session,
@@ -173,11 +173,11 @@ async def delete_activity_media(
         Callable, Depends(activities_media_dependencies.validate_media_id)
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,

@@ -11,7 +11,7 @@ from functools import partial
 
 from stravalib.exc import AccessUnauthorized
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import users.users_integrations.crud as user_integrations_crud
 
@@ -118,15 +118,15 @@ async def strava_retrieve_activities_days(
     end_date: date,
     _validate_access_token: Annotated[
         Callable,
-        Depends(auth_security.validate_access_token),
+        Depends(auth_dependencies.validate_access_token),
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["profile"]),
+        Security(auth_dependencies.check_scopes, scopes=["profile"]),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     websocket_manager: Annotated[
         websocket_manager.WebSocketManager,
@@ -162,15 +162,15 @@ async def strava_retrieve_activities_days(
 async def strava_retrieve_gear(
     _validate_access_token: Annotated[
         Callable,
-        Depends(auth_security.validate_access_token),
+        Depends(auth_dependencies.validate_access_token),
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["profile"]),
+        Security(auth_dependencies.check_scopes, scopes=["profile"]),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     background_tasks: BackgroundTasks,
 ):
@@ -193,7 +193,7 @@ async def strava_retrieve_gear(
 async def import_bikes_from_strava_export(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -249,7 +249,7 @@ async def import_bikes_from_strava_export(
 async def import_shoes_from_strava_export(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -309,9 +309,9 @@ async def import_shoes_from_strava_export(
 
 @router.post("/import/activities", status_code=201)
 async def import_activities_and_media_from_strava_export(
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["activities:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
     ],
     db: Annotated[
         Session,
@@ -354,7 +354,7 @@ async def import_activities_and_media_from_strava_export(
             )
 
             # Log a success message that explains processing will continue elsewhere.
-            core_logger.print_to_log_and_console(f"Strava bulk import initiated. Processing of files will continue in the background.")
+            core_logger.print_to_log_and_console("Strava bulk import initiated. Processing of files will continue in the background.")
         else:
             core_logger.print_to_log_and_console("ABORTING IMPORT: Aborting strava bulk import due to failure in creating gear nickname to id dictionary.", "error")
 
@@ -378,15 +378,15 @@ async def strava_set_user_client(
     client: strava_schema.StravaClient,
     _validate_access_token: Annotated[
         Callable,
-        Depends(auth_security.validate_access_token),
+        Depends(auth_dependencies.validate_access_token),
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["profile"]),
+        Security(auth_dependencies.check_scopes, scopes=["profile"]),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ):
@@ -406,15 +406,15 @@ async def strava_set_user_unique_state(
     state: str | None,
     _validate_access_token: Annotated[
         Callable,
-        Depends(auth_security.validate_access_token),
+        Depends(auth_dependencies.validate_access_token),
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["profile"]),
+        Security(auth_dependencies.check_scopes, scopes=["profile"]),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ):
@@ -429,15 +429,15 @@ async def strava_set_user_unique_state(
 async def strava_unlink(
     _validate_access_token: Annotated[
         Callable,
-        Depends(auth_security.validate_access_token),
+        Depends(auth_dependencies.validate_access_token),
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["profile"]),
+        Security(auth_dependencies.check_scopes, scopes=["profile"]),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -455,7 +455,7 @@ async def strava_unlink(
             strava_client.deauthorize()
         except (AccessUnauthorized, Exception) as err:
             core_logger.print_to_log(
-                f"Unable to deauthorize Strava account, using stravalib deauthorize logic. Will unlink forcibly",
+                "Unable to deauthorize Strava account, using stravalib deauthorize logic. Will unlink forcibly",
                 "info",
                 exc=err,
             )

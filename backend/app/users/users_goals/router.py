@@ -10,7 +10,7 @@ import users.users_goals.schema as user_goals_schema
 import users.users_goals.crud as user_goals_crud
 import users.users_goals.utils as user_goals_utils
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -24,7 +24,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def get_user_goals(
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     db: Annotated[Session, Depends(core_database.get_db)],
     interval: Annotated[
         user_goals_schema.Interval | None,
@@ -68,7 +68,7 @@ async def get_user_goals(
     status_code=status.HTTP_200_OK,
 )
 async def get_user_goals_results(
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[user_goals_schema.UsersGoalProgress] | None:
     """
@@ -91,7 +91,7 @@ async def get_user_goals_results(
 )
 async def create_user_goal(
     user_goal: user_goals_schema.UsersGoalCreate,
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> user_goals_schema.UsersGoalRead:
     """
@@ -115,7 +115,7 @@ async def create_user_goal(
 )
 async def update_user_goal(
     user_goal: user_goals_schema.UsersGoalUpdate,
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> user_goals_schema.UsersGoalRead:
     """
@@ -137,7 +137,7 @@ async def update_user_goal(
 )
 async def delete_user_goal(
     goal_id: int,
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     db: Annotated[Session, Depends(core_database.get_db)],
     _: None = Depends(user_goals_dependencies.validate_goal_id),
 ) -> None:

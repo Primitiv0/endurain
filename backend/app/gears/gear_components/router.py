@@ -11,7 +11,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import gears.gear_components.crud as gc_crud
 import gears.gear_components.dependencies as gc_deps
@@ -33,7 +33,7 @@ async def read_gear_component_types(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["gears:read"],
         ),
     ],
@@ -73,14 +73,14 @@ async def read_gear_components(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["gears:read"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token,
         ),
     ],
@@ -126,14 +126,14 @@ async def read_gear_components_gear_id(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["gears:read"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token,
         ),
     ],
@@ -204,7 +204,7 @@ async def create_gear_component(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["gears:write"],
         ),
     ],
@@ -218,7 +218,7 @@ async def create_gear_component(
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token,
         ),
     ],
@@ -259,14 +259,14 @@ async def edit_gear_component(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["gears:write"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token,
         ),
     ],
@@ -362,14 +362,14 @@ async def delete_component_gear(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["gears:write"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token,
         ),
     ],

@@ -10,7 +10,7 @@ import activities.activity_workout_steps.crud as activity_workout_steps_crud
 
 import activities.activity.dependencies as activities_dependencies
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -40,14 +40,14 @@ async def read_activity_workout_steps_all(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["activities:read"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token
         ),
     ],

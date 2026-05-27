@@ -14,8 +14,8 @@ import auth.sessions.crud as users_sessions_crud
 import auth.identity_links.crud as user_idp_crud
 
 import sign_up_tokens.utils as sign_up_tokens_utils
-import auth.security as auth_security
-import auth.password_hasher as auth_password_hasher
+import auth.dependencies as auth_dependencies
+import auth.passwords as auth_passwords
 import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
@@ -36,7 +36,7 @@ async def read_users_all_pagination(
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[
         Session,
@@ -132,7 +132,7 @@ async def read_users_all_pagination(
 async def read_users_contain_username(
     username: str,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[
         Session,
@@ -161,7 +161,7 @@ async def read_users_contain_username(
 async def read_users_username(
     username: str,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[
         Session,
@@ -190,7 +190,7 @@ async def read_users_username(
 async def read_users_email(
     email: str,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[
         Session,
@@ -220,7 +220,7 @@ async def read_users_id(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[
         Session,
@@ -248,11 +248,11 @@ async def read_users_id(
 async def create_user(
     user: users_schema.UsersCreate,
     _check_scope: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -290,7 +290,7 @@ async def upload_user_image(
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     file: UploadFile,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     db: Annotated[
         Session,
@@ -322,7 +322,7 @@ async def edit_user(
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     user_attributtes: users_schema.UsersRead,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     db: Annotated[
         Session,
@@ -361,7 +361,7 @@ async def approve_user(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     email_service: Annotated[
         core_apprise.AppriseService,
@@ -402,11 +402,11 @@ async def edit_user_password(
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     user_attributes: users_schema.UsersAdminEditPassword,
     _check_scope: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -444,7 +444,7 @@ async def delete_user_photo(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     db: Annotated[
         Session,
@@ -475,7 +475,7 @@ async def delete_user(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
     db: Annotated[
         Session,

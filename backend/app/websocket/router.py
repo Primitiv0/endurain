@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 import websocket.manager as websocket_manager
 
 import core.logger as core_logger
@@ -15,7 +15,7 @@ router = APIRouter()
 async def websocket_endpoint(
     websocket: WebSocket,
     token_user_id: Annotated[
-        int, Depends(auth_security.validate_websocket_access_token)
+        int, Depends(auth_dependencies.validate_websocket_access_token)
     ],
     websocket_manager: Annotated[
         websocket_manager.WebSocketManager,

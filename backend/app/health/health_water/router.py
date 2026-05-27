@@ -22,7 +22,7 @@ import health.constants as health_constants
 import health.health_water.schema as health_water_schema
 import health.health_water.crud as health_water_crud
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 import core.dependencies as core_dependencies
@@ -42,7 +42,7 @@ async def read_health_water_all_pagination(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["health:read"],
         ),
     ],
@@ -55,7 +55,7 @@ async def read_health_water_all_pagination(
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -128,13 +128,13 @@ async def create_health_water(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["health:write"],
         ),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -206,13 +206,13 @@ async def edit_health_water(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["health:write"],
         ),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -249,13 +249,13 @@ async def delete_health_water(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["health:write"],
         ),
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,

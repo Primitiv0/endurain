@@ -21,7 +21,7 @@ import activities.activity.utils as activities_utils
 import activities.activity.models as activities_models
 import activities.activity_media.crud as activity_media_crud
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import websocket.manager as websocket_manager
 
@@ -95,7 +95,7 @@ def iterate_over_activities_csv() -> dict | None:
 
 
 def create_gear_dictionary_for_bulk_import(
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -127,7 +127,7 @@ def create_gear_dictionary_for_bulk_import(
     return None
 
 def queue_bulk_export_activities_for_import(
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     websocket_manager: websocket_manager.WebSocketManager,
     db: Annotated[
         Session,

@@ -33,7 +33,7 @@ import auth.identity_links.crud as user_idp_crud
 import auth.identity_links.schema as user_idp_schema
 import auth.identity_links.utils as user_idp_utils
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 import auth.security_stores as auth_security_stores
 
 import auth.identity_providers.crud as idp_crud
@@ -52,7 +52,7 @@ import profile.import_service as profile_import_service
 import profile.exceptions as profile_exceptions
 import profile.mfa_store as profile_mfa_store
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import auth.mfa_backup_codes.schema as mfa_backup_codes_schema
 import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
@@ -102,7 +102,7 @@ def _raise_mfa_secret_store_unavailable(
 async def read_users_me(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -201,7 +201,7 @@ async def read_users_me(
 async def read_sessions_me(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -241,11 +241,11 @@ async def generate_link_token(
     request: Request,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -342,7 +342,7 @@ async def upload_profile_image(
     file: UploadFile,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -371,7 +371,7 @@ async def edit_user(
     user_attributtes: users_schema.ProfileUpdate,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -405,7 +405,7 @@ async def edit_profile_privacy_settings(
     user_privacy_settings: users_privacy_settings_schema.UsersPrivacySettingsUpdate,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -437,11 +437,11 @@ async def edit_profile_password(
     user_attributtes: users_schema.UsersEditPassword,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -497,7 +497,7 @@ async def edit_profile_password(
 async def delete_profile_photo(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -527,7 +527,7 @@ async def delete_profile_session(
     session_id: str,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -556,7 +556,7 @@ async def delete_profile_session(
 async def export_profile_data(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -652,7 +652,7 @@ async def import_profile_data(
     file: UploadFile,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     websocket_manager: Annotated[
@@ -789,7 +789,7 @@ async def import_profile_data(
 async def get_mfa_status(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> profile_schema.MFAStatusResponse:
@@ -815,7 +815,7 @@ async def get_mfa_status(
 async def get_backup_code_status(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -864,7 +864,7 @@ async def get_backup_code_status(
 async def setup_mfa(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
@@ -899,11 +899,11 @@ async def enable_mfa(
     request: profile_schema.MFASetupRequest,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
@@ -1009,11 +1009,11 @@ async def disable_mfa(
     request: profile_schema.MFADisableRequest,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> dict:
@@ -1063,11 +1063,11 @@ async def verify_mfa(
     request: profile_schema.MFARequest,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> dict:
@@ -1108,11 +1108,11 @@ async def generate_mfa_backup_codes(
     step_up: users_schema.StepUpVerification,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,
@@ -1190,7 +1190,7 @@ async def generate_mfa_backup_codes(
 async def get_my_identity_providers(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -1250,11 +1250,11 @@ async def delete_my_identity_provider(
     request: Request,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,

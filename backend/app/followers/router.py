@@ -10,7 +10,7 @@ import followers.crud as followers_crud
 
 import users.users.dependencies as users_dependencies
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -29,7 +29,7 @@ async def get_user_follower_all(
     user_id: int,
     _validate_user_id: Annotated[None, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[followers_schema.Follower]:
@@ -46,7 +46,7 @@ async def get_user_follower_count_all(
     user_id: int,
     _validate_user_id: Annotated[None, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> int:
@@ -63,7 +63,7 @@ async def get_user_follower_count(
     user_id: int,
     _validate_user_id: Annotated[None, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> int:
@@ -80,7 +80,7 @@ async def get_user_following_all(
     user_id: int,
     _validate_user_id: Annotated[None, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[followers_schema.Follower]:
@@ -97,7 +97,7 @@ async def get_user_following_count_all(
     user_id: int,
     _validate_user_id: Annotated[None, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> int:
@@ -114,7 +114,7 @@ async def get_user_following_count(
     user_id: int,
     _validate_user_id: Annotated[None, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> int:
@@ -135,7 +135,7 @@ async def read_followers_user_specific_user(
         None, Depends(users_dependencies.validate_target_user_id)
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["users:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> followers_schema.Follower | None:
@@ -155,9 +155,9 @@ async def create_follow(
     _validate_target_user_id: Annotated[
         None, Depends(users_dependencies.validate_target_user_id)
     ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["profile"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["profile"])
     ],
     websocket_mgr: Annotated[
         websocket_manager.WebSocketManager,
@@ -181,9 +181,9 @@ async def accept_follow(
     _validate_target_user_id: Annotated[
         None, Depends(users_dependencies.validate_target_user_id)
     ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["profile"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["profile"])
     ],
     websocket_mgr: Annotated[
         websocket_manager.WebSocketManager,
@@ -208,9 +208,9 @@ async def delete_follower(
     _validate_target_user_id: Annotated[
         None, Depends(users_dependencies.validate_target_user_id)
     ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["profile"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["profile"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> followers_schema.MessageResponse:
@@ -231,9 +231,9 @@ async def delete_following(
     _validate_target_user_id: Annotated[
         None, Depends(users_dependencies.validate_target_user_id)
     ],
-    token_user_id: Annotated[int, Depends(auth_security.get_sub_from_access_token)],
+    token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["profile"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["profile"])
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> followers_schema.MessageResponse:

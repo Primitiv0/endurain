@@ -3,7 +3,7 @@ import os
 from fastapi import HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 
 import users.users.crud as users_crud
 import users.users.schema as users_schema
@@ -52,7 +52,7 @@ def verify_step_up_credentials(
     user_id: int,
     current_password: str | None,
     mfa_code: str | None,
-    password_hasher: auth_password_hasher.PasswordHasher,
+    password_hasher: auth_passwords.PasswordHasher,
     db: Session,
 ) -> None:
     """
@@ -158,7 +158,7 @@ def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
 
 def check_password_and_hash(
     password: str,
-    password_hasher: auth_password_hasher.PasswordHasher,
+    password_hasher: auth_passwords.PasswordHasher,
     server_settings: (
         server_settings_models.ServerSettings
         | server_settings_schema.ServerSettingsRead
@@ -191,7 +191,7 @@ def check_password_and_hash(
         password_hasher.validate_password(
             password, min_length, str(server_settings.password_type)
         )
-    except auth_password_hasher.PasswordPolicyError as err:
+    except auth_passwords.PasswordPolicyError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(err),

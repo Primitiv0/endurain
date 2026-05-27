@@ -13,7 +13,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 import core.database as core_database
 
 import activities.activity_summaries.crud as summary_crud
@@ -76,14 +76,14 @@ async def read_activity_summary(
     _check_scopes: Annotated[
         Callable,
         Security(
-            auth_security.check_scopes,
+            auth_dependencies.check_scopes,
             scopes=["activities:read"],
         ),
     ],
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security.get_sub_from_access_token
+            auth_dependencies.get_sub_from_access_token
         ),
     ],
     db: Annotated[

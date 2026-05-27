@@ -10,7 +10,7 @@ import activities.activity_laps.crud as activity_laps_crud
 
 import activities.activity.dependencies as activities_dependencies
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -28,10 +28,10 @@ async def read_activities_laps_for_activity_all(
     ],
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["activities:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["activities:read"]),
     ],
     token_user_id: Annotated[
-        int, Depends(auth_security.get_sub_from_access_token)
+        int, Depends(auth_dependencies.get_sub_from_access_token)
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[activity_laps_schema.ActivityLapsRead] | None:

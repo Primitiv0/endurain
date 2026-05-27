@@ -8,7 +8,7 @@ import health.constants as health_constants
 import health.health_weight.schema as health_weight_schema
 import health.health_weight.crud as health_weight_crud
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 import core.dependencies as core_dependencies
@@ -24,14 +24,14 @@ router = APIRouter()
 )
 async def read_health_weight_all_pagination(
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
     ],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -106,11 +106,11 @@ async def read_health_weight_all_pagination(
 async def create_health_weight(
     health_weight: health_weight_schema.HealthWeightCreate,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -171,11 +171,11 @@ async def create_health_weight(
 async def edit_health_weight(
     health_weight: health_weight_schema.HealthWeightUpdate,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -214,11 +214,11 @@ async def edit_health_weight(
 async def delete_health_weight(
     health_weight_id: int,
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["health:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,

@@ -20,7 +20,7 @@ import password_reset_tokens.crud as password_reset_tokens_crud
 import users.users.crud as users_crud
 import auth.sessions.crud as users_sessions_crud
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
@@ -124,7 +124,7 @@ async def send_password_reset_email(
 def use_password_reset_token(
     token: str,
     new_password: str,
-    password_hasher: auth_password_hasher.PasswordHasher,
+    password_hasher: auth_passwords.PasswordHasher,
     db: Session,
 ) -> None:
     """

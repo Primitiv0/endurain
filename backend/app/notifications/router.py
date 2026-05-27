@@ -5,7 +5,7 @@ from typing import Annotated, Callable
 from fastapi import APIRouter, Depends, status, Security
 from sqlalchemy.orm import Session
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import notifications.dependencies as notifications_dependencies
 import notifications.crud as notifications_crud
@@ -24,11 +24,11 @@ router = APIRouter()
 )
 async def read_notifications_number(
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["notifications:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -62,11 +62,11 @@ async def read_notifications_by_id(
         Depends(notifications_dependencies.validate_notification_id),
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["notifications:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -105,11 +105,11 @@ async def read_notifications_user_pagination(
         Depends(core_dependencies.validate_pagination_values),
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["notifications:read"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -151,11 +151,11 @@ async def mark_notification_as_read(
         Depends(notifications_dependencies.validate_notification_id),
     ],
     _check_scopes: Annotated[
-        Callable, Security(auth_security.check_scopes, scopes=["notifications:write"])
+        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:write"])
     ],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,

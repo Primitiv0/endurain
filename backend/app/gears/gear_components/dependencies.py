@@ -5,7 +5,7 @@ from typing import Annotated
 from sqlalchemy.orm import Session
 from fastapi import Depends, HTTPException, status
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 import core.dependencies as core_dependencies
@@ -41,7 +41,7 @@ def validate_gear_component_type(
     token_user_id: Annotated[
         int,
         Depends(
-            auth_security
+            auth_dependencies
             .get_sub_from_access_token
         ),
     ],

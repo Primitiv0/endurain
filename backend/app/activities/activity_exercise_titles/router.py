@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 
@@ -23,7 +23,7 @@ router = APIRouter()
 async def read_activities_exercise_titles_all(
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["activities:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["activities:read"]),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[activity_exercise_titles_schema.ActivityExerciseTitles] | None:

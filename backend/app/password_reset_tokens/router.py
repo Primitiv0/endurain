@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 import password_reset_tokens.schema as password_reset_tokens_schema
 import password_reset_tokens.utils as password_reset_tokens_utils
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 
 import core.database as core_database
 import core.apprise as core_apprise
@@ -88,8 +88,8 @@ async def confirm_password_reset(
     request: Request,
     confirm_data: password_reset_tokens_schema.PasswordResetConfirm,
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,

@@ -20,7 +20,7 @@ import notifications.utils as notifications_utils
 import sign_up_tokens.utils as sign_up_tokens_utils
 import sign_up_tokens.schema as sign_up_tokens_schema
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 
 import server_settings.utils as server_settings_utils
 
@@ -48,8 +48,8 @@ async def signup(
         Depends(core_apprise.get_email_service),
     ],
     password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+        auth_passwords.PasswordHasher,
+        Depends(auth_passwords.get_password_hasher),
     ],
     db: Annotated[
         Session,

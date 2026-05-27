@@ -21,7 +21,7 @@ import server_settings.schema as server_settings_schema
 import server_settings.crud as server_settings_crud
 import server_settings.utils as server_settings_utils
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 
 import core.database as core_database
 import core.logger as core_logger
@@ -42,7 +42,7 @@ router = APIRouter()
 async def read_server_settings(
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["server_settings:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["server_settings:read"]),
     ],
     db: Annotated[
         Session,
@@ -68,7 +68,7 @@ async def read_server_settings(
 async def list_tile_maps_templates(
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["server_settings:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["server_settings:read"]),
     ],
 ) -> list[server_settings_schema.TileMapsTemplate]:
     """
@@ -98,7 +98,7 @@ async def edit_server_settings(
     server_settings_attributes: server_settings_schema.ServerSettingsEdit,
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["server_settings:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["server_settings:write"]),
     ],
     db: Annotated[
         Session,
@@ -163,7 +163,7 @@ async def upload_login_photo(
     file: UploadFile,
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["server_settings:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["server_settings:write"]),
     ],
     db: Annotated[
         Session,
@@ -202,7 +202,7 @@ async def upload_login_photo(
 async def delete_login_photo(
     _check_scopes: Annotated[
         Callable,
-        Security(auth_security.check_scopes, scopes=["server_settings:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["server_settings:write"]),
     ],
     db: Annotated[
         Session,

@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-import auth.password_hasher as auth_password_hasher
+import auth.passwords as auth_passwords
 import core.apprise as core_apprise
 import core.database as core_database
 import sign_up_tokens.router as sign_up_tokens_router
@@ -87,7 +87,7 @@ def signup_app(
         websocket_manager.get_websocket_manager
     ] = lambda: mock_ws_manager
     app.dependency_overrides[
-        auth_password_hasher.get_password_hasher
+        auth_passwords.get_password_hasher
     ] = lambda: password_hasher
 
     return app
