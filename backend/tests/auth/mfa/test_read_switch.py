@@ -5,15 +5,13 @@ Verifies that MFA logic in ``profile.utils`` reads
 (the ``users_mfa`` row) and not from the legacy ``users``
 columns.
 
-Also covers the ``Users.mfa`` compat property as a
-deprecated alias for ``auth_mfa``.
 """
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 import auth.mfa.models as auth_mfa_models
 import profile.utils as profile_utils
@@ -55,7 +53,7 @@ def _make_user(
     return user
 
 
-def _patch_get_user(user: MagicMock) -> patch:
+def _patch_get_user(user: MagicMock) -> Any:
     """Patch users_crud.get_user_by_id to return the given user."""
     return patch(
         "profile.utils.users_crud.get_user_by_id",
@@ -279,33 +277,3 @@ class TestIsMFAEnabledForUserReadSwitch:
 
         assert result is False
 
-
-# ---------------------------------------------------------------------------
-# Users.mfa compat property (Step 10.2)
-# ---------------------------------------------------------------------------
-
-
-class TestUsersMFACompatProperty:
-    """Users.mfa property returns the auth_mfa row."""
-
-    def test_mfa_property_returns_auth_mfa(self):
-        """
-        user.mfa returns the same object as user.auth_mfa.
-        """
-        user = MagicMock(spec=users_models.Users)
-        mfa_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
-        user.auth_mfa = mfa_row
-
-        # Invoke the property directly via the descriptor protocol
-        result = users_models.Users.mfa.fget(user)
-
-        assert result is mfa_row
-
-    def test_mfa_property_returns_none_when_no_row(self):
-        """user.mfa is None when auth_mfa is None."""
-        user = MagicMock(spec=users_models.Users)
-        user.auth_mfa = None
-
-        result = users_models.Users.mfa.fget(user)
-
-        assert result is None

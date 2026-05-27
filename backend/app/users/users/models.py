@@ -316,13 +316,3 @@ class Users(Base):
             self.auth_mfa and self.auth_mfa.mfa_enabled
         )
 
-    @property
-    def mfa(self) -> "AuthUserMFA":
-        """
-        Compat accessor for the auth_mfa row.
-
-        Deprecated:
-            Non-auth modules must not use this property.
-            Auth code should use ``auth_mfa`` directly.
-        """
-        return self.auth_mfa
