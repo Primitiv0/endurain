@@ -317,3 +317,16 @@ class Users(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def mfa(self) -> "AuthUserMFA | None":
+        """
+        Compat accessor for the auth_user_mfa row.
+
+        Deprecated:
+            Non-auth modules must not use this property.
+            Auth code should use ``auth_mfa`` directly.
+            This shim will be removed in PR 11 once the
+            old MFA columns are dropped.
+        """
+        return self.auth_mfa
