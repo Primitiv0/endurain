@@ -76,9 +76,10 @@ class TestUpdateUserMFADualWrite:
     # Enable MFA — existing users_mfa row present
     # ------------------------------------------------------------------
 
-    def test_enable_writes_to_legacy_columns(self, mock_db):
+    def test_enable_does_not_write_to_legacy_columns(self, mock_db):
         """
-        Legacy columns are updated when enabling MFA.
+        After PR 11, legacy user columns must NOT be touched
+        by update_user_mfa — only users_mfa is written.
         """
         user = _make_mock_user()
         mfa_row = _make_mock_mfa_row()
@@ -86,8 +87,9 @@ class TestUpdateUserMFADualWrite:
 
         users_crud.update_user_mfa(1, mock_db, "enc_secret")
 
-        assert user.mfa_enabled is True
-        assert user.mfa_secret == "enc_secret"
+        # user mock attributes stay at their initial values
+        assert user.mfa_enabled is False
+        assert user.mfa_secret is None
 
     def test_enable_writes_to_users_mfa_row(self, mock_db):
         """
@@ -116,9 +118,10 @@ class TestUpdateUserMFADualWrite:
     # Disable MFA — existing users_mfa row present
     # ------------------------------------------------------------------
 
-    def test_disable_clears_legacy_columns(self, mock_db):
+    def test_disable_does_not_touch_legacy_columns(self, mock_db):
         """
-        Legacy columns are cleared when disabling MFA.
+        After PR 11, legacy user columns must NOT be cleared by
+        update_user_mfa — only users_mfa is written.
         """
         user = _make_mock_user()
         user.mfa_enabled = True
@@ -130,8 +133,9 @@ class TestUpdateUserMFADualWrite:
 
         users_crud.update_user_mfa(1, mock_db)
 
-        assert user.mfa_enabled is False
-        assert user.mfa_secret is None
+        # user mock attributes stay at their initial values
+        assert user.mfa_enabled is True
+        assert user.mfa_secret == "old_enc_secret"
 
     def test_disable_clears_users_mfa_row(self, mock_db):
         """
@@ -219,19 +223,19 @@ class TestUpdateUserMFADualWrite:
     # Consistency between both stores
     # ------------------------------------------------------------------
 
-    def test_both_stores_consistent_after_enable(self, mock_db):
-        """Legacy columns and users_mfa row are consistent after enable."""
+    def test_users_mfa_row_correct_after_enable(self, mock_db):
+        """users_mfa row holds enabled=True, secret after enable."""
         user = _make_mock_user()
         mfa_row = _make_mock_mfa_row()
         self._setup_db(mock_db, user, mfa_row)
 
         users_crud.update_user_mfa(1, mock_db, "sec")
 
-        assert user.mfa_enabled == mfa_row.mfa_enabled
-        assert user.mfa_secret == mfa_row.mfa_secret
+        assert mfa_row.mfa_enabled is True
+        assert mfa_row.mfa_secret == "sec"
 
-    def test_both_stores_consistent_after_disable(self, mock_db):
-        """Legacy columns and users_mfa row are consistent after disable."""
+    def test_users_mfa_row_correct_after_disable(self, mock_db):
+        """users_mfa row holds enabled=False, secret=None after disable."""
         user = _make_mock_user()
         user.mfa_enabled = True
         user.mfa_secret = "sec"
@@ -242,5 +246,5 @@ class TestUpdateUserMFADualWrite:
 
         users_crud.update_user_mfa(1, mock_db)
 
-        assert user.mfa_enabled == mfa_row.mfa_enabled
-        assert user.mfa_secret == mfa_row.mfa_secret
+        assert mfa_row.mfa_enabled is False
+        assert mfa_row.mfa_secret is None

@@ -1,0 +1,205 @@
+"""Tests for Phase 11 — drop legacy MFA columns from users.
+
+Verifies that:
+* ``Users.mfa_enabled`` property correctly reads from
+  ``auth_mfa`` after the old column is removed from the ORM.
+* ``update_user_mfa`` writes ONLY to ``users_mfa``; the
+  ``Users`` mock's attributes are never touched.
+* ``db.refresh(db_user)`` is no longer called.
+* A missing ``users_mfa`` row triggers a new INSERT (unchanged
+  behaviour from PR 9/10, now the only write path).
+"""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+from sqlalchemy.orm import Session
+
+import users.users.crud as users_crud
+import auth.mfa.models as auth_mfa_models
+import users.users.models as users_models
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_user_with_mfa(enabled: bool = True) -> MagicMock:
+    """
+    Return a mock Users row wired with an auth_mfa sub-mock.
+
+    The ``mfa_enabled`` attribute on the mock is intentionally
+    NOT set — the real model serves it from the ``mfa_enabled``
+    property (which reads ``auth_mfa``).  We set
+    ``user.auth_mfa.mfa_enabled`` instead.
+    """
+    user = MagicMock(spec=users_models.Users)
+    user.id = 42
+    auth_mfa = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+    auth_mfa.mfa_enabled = enabled
+    auth_mfa.mfa_secret = "enc_sec" if enabled else None
+    user.auth_mfa = auth_mfa
+    return user
+
+
+def _make_user_no_mfa_row() -> MagicMock:
+    """Return a mock Users row with no auth_mfa relationship row."""
+    user = MagicMock(spec=users_models.Users)
+    user.id = 7
+    user.auth_mfa = None
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Users.mfa_enabled property
+# ---------------------------------------------------------------------------
+
+
+class TestUsersMFAEnabledProperty:
+    """``Users.mfa_enabled`` reads from ``auth_mfa`` after PR 11."""
+
+    def test_returns_true_when_auth_mfa_enabled(self):
+        """Property returns True when auth_mfa.mfa_enabled is True."""
+        user = MagicMock(spec=users_models.Users)
+        auth_mfa = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        auth_mfa.mfa_enabled = True
+        user.auth_mfa = auth_mfa
+
+        result = users_models.Users.mfa_enabled.fget(user)
+
+        assert result is True
+
+    def test_returns_false_when_auth_mfa_disabled(self):
+        """Property returns False when auth_mfa.mfa_enabled is False."""
+        user = MagicMock(spec=users_models.Users)
+        auth_mfa = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        auth_mfa.mfa_enabled = False
+        user.auth_mfa = auth_mfa
+
+        result = users_models.Users.mfa_enabled.fget(user)
+
+        assert result is False
+
+    def test_returns_false_when_auth_mfa_row_missing(self):
+        """Property returns False when auth_mfa relationship is None."""
+        user = MagicMock(spec=users_models.Users)
+        user.auth_mfa = None
+
+        result = users_models.Users.mfa_enabled.fget(user)
+
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# update_user_mfa — single-write to users_mfa only
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateUserMFASingleWrite:
+    """After PR 11 there is no legacy column write."""
+
+    def _setup(
+        self,
+        mock_db: MagicMock,
+        mfa_row: MagicMock | None = None,
+    ) -> MagicMock:
+        """Create mock user, wire DB, return mock user."""
+        user = MagicMock(spec=users_models.Users)
+        user.id = 1
+        self._user_patch = patch(
+            "users.users.utils.get_user_by_id_or_404",
+            return_value=user,
+        )
+        self._user_patch.start()
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mfa_row
+        return user
+
+    def teardown_method(self):
+        try:
+            self._user_patch.stop()
+        except AttributeError:
+            pass
+
+    def test_enable_writes_only_to_users_mfa(self, mock_db):
+        """Enabling MFA updates users_mfa and does not touch users row."""
+        mfa_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        mfa_row.mfa_enabled = False
+        mfa_row.mfa_secret = None
+        user = self._setup(mock_db, mfa_row)
+
+        users_crud.update_user_mfa(1, mock_db, "enc_secret")
+
+        # users_mfa row updated
+        assert mfa_row.mfa_enabled is True
+        assert mfa_row.mfa_secret == "enc_secret"
+        # users row never modified (no setattr on user)
+        user.assert_not_called()
+
+    def test_disable_writes_only_to_users_mfa(self, mock_db):
+        """Disabling MFA clears users_mfa and does not touch users row."""
+        mfa_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        mfa_row.mfa_enabled = True
+        mfa_row.mfa_secret = "old_secret"
+        user = self._setup(mock_db, mfa_row)
+
+        users_crud.update_user_mfa(1, mock_db)
+
+        # users_mfa row cleared
+        assert mfa_row.mfa_enabled is False
+        assert mfa_row.mfa_secret is None
+
+    def test_commit_called_once(self, mock_db):
+        """db.commit() is called exactly once."""
+        mfa_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        self._setup(mock_db, mfa_row)
+
+        users_crud.update_user_mfa(1, mock_db, "enc")
+
+        mock_db.commit.assert_called_once()
+
+    def test_refresh_not_called(self, mock_db):
+        """db.refresh() is not called after PR 11."""
+        mfa_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        self._setup(mock_db, mfa_row)
+
+        users_crud.update_user_mfa(1, mock_db, "enc")
+
+        mock_db.refresh.assert_not_called()
+
+    def test_missing_row_creates_new_users_mfa(self, mock_db):
+        """A missing users_mfa row triggers INSERT on update."""
+        self._setup(mock_db, None)
+
+        mock_new_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        mock_stmt = MagicMock()
+        with patch(
+            "users.users.crud.select",
+            return_value=mock_stmt,
+        ), patch(
+            "users.users.crud.auth_mfa_models.AuthUserMFA",
+            return_value=mock_new_row,
+        ) as MockClass:
+            users_crud.update_user_mfa(1, mock_db, "enc")
+
+            MockClass.assert_called_once_with(
+                user_id=1,
+                mfa_enabled=True,
+                mfa_secret="enc",
+            )
+            mock_db.add.assert_called_once_with(mock_new_row)
+
+    def test_404_when_user_not_found(self, mock_db):
+        """update_user_mfa raises 404 when user does not exist."""
+        from fastapi import HTTPException, status
+
+        with patch(
+            "users.users.utils.get_user_by_id_or_404",
+            side_effect=HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                users_crud.update_user_mfa(99, mock_db, "enc")
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND

@@ -56,10 +56,6 @@ class Users(Base):
         first_day_of_week: First day of the week
             (sunday, monday, etc.).
         currency: Currency preference (euro, dollar, pound).
-        mfa_enabled: Whether multi-factor authentication is
-            enabled.
-        mfa_secret: MFA secret for TOTP generation
-            (encrypted at rest).
         email_verified: Whether the user's email address has
             been verified.
         pending_admin_approval: Whether the user is pending
@@ -91,8 +87,10 @@ class Users(Base):
         oauth_states: List of OAuth states for the user.
         mfa_backup_codes: List of MFA backup codes.
         auth_mfa: 1:1 MFA state row in ``users_mfa``
-            (None when the row has not been created yet
-            during the PR 9-11 migration window).
+            (None only on fresh installs before the
+            PR 9 backfill migration has run).
+        mfa_enabled: Computed property — ``True`` when
+            ``auth_mfa.mfa_enabled`` is set.
     """
 
     __tablename__ = "users"
@@ -185,16 +183,6 @@ class Users(Base):
         default="euro",
         nullable=False,
         comment="User currency (euro, dollar, pound)",
-    )
-    mfa_enabled: Mapped[bool] = mapped_column(
-        default=False,
-        nullable=False,
-        comment="Whether MFA is enabled for this user",
-    )
-    mfa_secret: Mapped[str | None] = mapped_column(
-        String(512),
-        nullable=True,
-        comment=("User MFA secret for TOTP generation " "(encrypted at rest)"),
     )
     email_verified: Mapped[bool] = mapped_column(
         default=False,
@@ -319,14 +307,25 @@ class Users(Base):
     )
 
     @property
+    def mfa_enabled(self) -> bool:
+        """
+        Return whether MFA is active for this user.
+
+        Reads from ``auth_mfa`` (PR 11 — old column removed).
+        Used by Pydantic schemas (``from_attributes=True``) and
+        any caller that checks MFA status on the profile row.
+        """
+        return bool(
+            self.auth_mfa and self.auth_mfa.mfa_enabled
+        )
+
+    @property
     def mfa(self) -> "AuthUserMFA | None":
         """
-        Compat accessor for the auth_user_mfa row.
+        Compat accessor for the auth_mfa row.
 
         Deprecated:
             Non-auth modules must not use this property.
             Auth code should use ``auth_mfa`` directly.
-            This shim will be removed in PR 11 once the
-            old MFA columns are dropped.
         """
         return self.auth_mfa

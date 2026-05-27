@@ -1,4 +1,4 @@
-"""v0.19.0 migration
+"""1: move MFA columns to separate users_mfa table
 
 Revision ID: a1b2c3d4e5f6
 Revises: 895a29b12c8c
@@ -84,6 +84,9 @@ def upgrade() -> None:
             """
         )
     )
+    """Drop mfa_enabled and mfa_secret columns from users."""
+    op.drop_column("users", "mfa_secret")
+    op.drop_column("users", "mfa_enabled")
 
 
 def downgrade() -> None:
@@ -93,3 +96,36 @@ def downgrade() -> None:
         table_name="users_mfa",
     )
     op.drop_table("users_mfa")
+    """Re-add nullable MFA columns and copy data from users_mfa."""
+    op.add_column(
+        "users",
+        sa.Column(
+            "mfa_secret",
+            sa.String(512),
+            nullable=True,
+            comment=(
+                "User MFA secret for TOTP generation "
+                "(encrypted at rest) — restored by downgrade"
+            ),
+        ),
+    )
+    op.add_column(
+        "users",
+        sa.Column(
+            "mfa_enabled",
+            sa.Boolean(),
+            nullable=True,
+            comment=("Whether MFA is enabled — restored by downgrade"),
+        ),
+    )
+    op.execute(
+        sa.text(
+            """
+            UPDATE users
+            SET mfa_enabled = um.mfa_enabled,
+                mfa_secret  = um.mfa_secret
+            FROM users_mfa AS um
+            WHERE users.id = um.user_id
+            """
+        )
+    )

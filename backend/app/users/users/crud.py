@@ -761,10 +761,9 @@ def update_user_mfa(
     """
     Update a user's MFA settings.
 
-    Dual-writes to both the legacy ``users`` columns and the
-    new ``users_mfa`` table introduced in PR 9.  Reads
-    still come from the legacy columns until PR 10 switches
-    the read path.
+    Writes exclusively to ``users_mfa``.  The legacy
+    ``users.mfa_enabled`` / ``users.mfa_secret`` columns were
+    removed in PR 11.
 
     Args:
         user_id: ID of user to update MFA for.
@@ -782,21 +781,17 @@ def update_user_mfa(
     mfa_enabled = bool(encrypted_secret)
     mfa_secret_value = encrypted_secret if encrypted_secret else None
 
-    # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
+    # Verify the user exists (raises 404 if not found).
+    users_utils.get_user_by_id_or_404(user_id, db)
 
-    # --- Legacy columns (source of truth until PR 10) ---
-    db_user.mfa_enabled = mfa_enabled
-    db_user.mfa_secret = mfa_secret_value
-
-    # --- Dual-write: users_mfa (new table, PR 9-11) ---
+    # Write to users_mfa — sole source of truth from PR 11.
     stmt = select(auth_mfa_models.AuthUserMFA).where(
         auth_mfa_models.AuthUserMFA.user_id == user_id
     )
     mfa_row = db.execute(stmt).scalar_one_or_none()
     if mfa_row is None:
-        # Row may be missing on fresh installs before migration
-        # backfill has run; create it on first write.
+        # Row may be missing on fresh installs before the PR 9
+        # backfill migration has run; create it on first write.
         mfa_row = auth_mfa_models.AuthUserMFA(
             user_id=user_id,
             mfa_enabled=mfa_enabled,
@@ -808,7 +803,6 @@ def update_user_mfa(
         mfa_row.mfa_secret = mfa_secret_value
 
     db.commit()
-    db.refresh(db_user)
 
 
 @core_decorators.handle_db_errors
