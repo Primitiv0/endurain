@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from urllib.parse import unquote
 
 import auth.password_hasher as auth_password_hasher
+import auth.mfa.models as auth_mfa_models
 
 import users.users.schema as users_schema
 import users.users.utils as users_utils
@@ -760,10 +761,16 @@ def update_user_mfa(
     """
     Update a user's MFA settings.
 
+    Dual-writes to both the legacy ``users`` columns and the
+    new ``users_mfa`` table introduced in PR 9.  Reads
+    still come from the legacy columns until PR 10 switches
+    the read path.
+
     Args:
         user_id: ID of user to update MFA for.
         db: SQLAlchemy database session.
-        encrypted_secret: Encrypted MFA secret. If None, disables MFA.
+        encrypted_secret: Encrypted MFA secret.
+            If None, disables MFA.
 
     Returns:
         None
@@ -772,15 +779,33 @@ def update_user_mfa(
         HTTPException: 404 if user not found.
         HTTPException: 500 if database error occurs.
     """
+    mfa_enabled = bool(encrypted_secret)
+    mfa_secret_value = encrypted_secret if encrypted_secret else None
+
     # Get the user from the database
     db_user = users_utils.get_user_by_id_or_404(user_id, db)
 
-    if encrypted_secret:
-        db_user.mfa_enabled = True
-        db_user.mfa_secret = encrypted_secret
+    # --- Legacy columns (source of truth until PR 10) ---
+    db_user.mfa_enabled = mfa_enabled
+    db_user.mfa_secret = mfa_secret_value
+
+    # --- Dual-write: users_mfa (new table, PR 9-11) ---
+    stmt = select(auth_mfa_models.AuthUserMFA).where(
+        auth_mfa_models.AuthUserMFA.user_id == user_id
+    )
+    mfa_row = db.execute(stmt).scalar_one_or_none()
+    if mfa_row is None:
+        # Row may be missing on fresh installs before migration
+        # backfill has run; create it on first write.
+        mfa_row = auth_mfa_models.AuthUserMFA(
+            user_id=user_id,
+            mfa_enabled=mfa_enabled,
+            mfa_secret=mfa_secret_value,
+        )
+        db.add(mfa_row)
     else:
-        db_user.mfa_enabled = False
-        db_user.mfa_secret = None
+        mfa_row.mfa_enabled = mfa_enabled
+        mfa_row.mfa_secret = mfa_secret_value
 
     db.commit()
     db.refresh(db_user)

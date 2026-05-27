@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from auth.identity_links.models import UsersIdentityProvider
     from users.users_integrations.models import UsersIntegrations
     from users.users_privacy_settings.models import UsersPrivacySettings
+    from auth.mfa.models import AuthUserMFA
     from auth.sessions.models import UsersSessions
 
 
@@ -89,6 +90,9 @@ class Users(Base):
             linked to the user.
         oauth_states: List of OAuth states for the user.
         mfa_backup_codes: List of MFA backup codes.
+        auth_mfa: 1:1 MFA state row in ``users_mfa``
+            (None when the row has not been created yet
+            during the PR 9-11 migration window).
     """
 
     __tablename__ = "users"
@@ -302,6 +306,11 @@ class Users(Base):
     )
     mfa_backup_codes: Mapped[list["MFABackupCode"]] = relationship(
         back_populates="users",
+        cascade="all, delete-orphan",
+    )
+    auth_mfa: Mapped["AuthUserMFA | None"] = relationship(
+        back_populates="users",
+        uselist=False,
         cascade="all, delete-orphan",
     )
     users_api_keys: Mapped[list["UsersApiKeys"]] = relationship(
