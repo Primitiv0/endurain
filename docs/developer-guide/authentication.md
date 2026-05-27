@@ -1052,14 +1052,20 @@ embedded WebView. This follows [RFC 8252 - OAuth 2.0 for Native Apps](https://to
 
 **Step 1:** Mobile app generates PKCE pair (same as WebView — see [Step 1](#step-1-generate-pkce-code-verifier-and-challenge)).
 
-**Step 2:** First call the initiate endpoint with `X-Client-Type: mobile`, then open the returned redirect target in the system browser.
+**Step 2:** First call the initiate endpoint with the custom scheme redirect target, then open the returned redirect target in the system browser.
 
 ```http
 GET /api/v1/public/idp/login/{idp_slug}?code_challenge={challenge}&code_challenge_method=S256&redirect={custom_scheme}://callback
 X-Client-Type: mobile
 ```
 
-If your mobile platform cannot attach custom headers when directly opening a browser URL, do not skip this initiate request. Opening the direct URL without `X-Client-Type: mobile` records the flow as `web`; a later mobile exchange header will fail with `client_type does not match the OAuth state`, while omitting the exchange header will produce a web-shaped response.
+!!! note "Custom Scheme Auto-Detection"
+    When using a custom URI scheme redirect (e.g., `gadgetbridge://callback`), the backend automatically detects this as a mobile flow and sets the client type to `mobile`. This means the `X-Client-Type: mobile` header is optional for custom scheme redirects. However, including it is still recommended for clarity and consistency.
+
+    If your mobile platform cannot attach custom headers when directly opening a browser URL, you can still use the direct URL without the header and rely on the custom scheme for auto-detection:
+    ```http
+    https://your-endurain-instance.com/api/v1/public/idp/login/{idp_slug}?code_challenge={challenge}&code_challenge_method=S256&redirect={custom_scheme}://callback
+    ```
 
 **Direct Initiate URL (reference):**
 
@@ -1101,7 +1107,7 @@ X-Client-Type: mobile
 | -------------- | ------- | ----- |
 | `/dashboard` | ✅ | Relative paths always allowed |
 | `/settings?tab=devices` | ✅ | Query strings OK in relative paths |
-| `gadgetbridge://callback` | ✅ | If `gadgetbridge` in `ALLOWED_REDIRECT_SCHEMES` |
+| `gadgetbridge://callback` | ✅ | If `gadgetbridge` in `ALLOWED_REDIRECT_SCHEMES`; automatically detected as mobile client type |
 | `myapp://callback` | ❌ | If `myapp` not configured — 400 returned |
 | `https://evil.com` | ❌ | External HTTP URLs always rejected |
 | `http://localhost` | ❌ | External HTTP URLs always rejected |
