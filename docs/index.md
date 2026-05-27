@@ -22,7 +22,7 @@
       Endurain
   </h2>
   <p>
-    A self-hosted fitness tracking service - <a href="https://fosstodon.org/@endurain">Mastodon profile</a> - <a href="https://discord.gg/6VUjUq2uZR">Discord server</a>
+    A self-hosted fitness tracking service - <a href="https://fosstodon.org/@endurain">Mastodon profile</a> - <a href="https://discord.gg/6VUjUq2uZR">Discord server</a> - <a href="#newsletter">Newsletter</a>
   </p>
 </div>
 
@@ -50,7 +50,7 @@ Endurain is a self-hosted fitness tracking service designed to give users full c
 
 To deploy Endurain, a Docker image is available, and a comprehensive example can be found in the "docker-compose.yml.example" file provided in the project repository. Configuration is facilitated through environment variables, ensuring flexibility and ease of customization.
 
-## Developer's Note
+## Developer's note
 
 As a non-professional developer, my journey with Endurain involved learning and implementing new technologies and concepts, with invaluable assistance from GitHub Copilot and ChatGPT. The primary motivation behind this project was to gain hands-on experience and expand my understanding of modern development practices. Second motivation is that I'm an amateur triathlete and I want to keep track of my gear and gear components usage.
 
@@ -83,7 +83,7 @@ Endurain currently supports:
 - Sign-up with configurable email verification and admin approva
 - SSO support (OIDC/SAML)
 
-## Planned Features
+## Planned features
 
 Please visit the [ROADMAP.md file on Codeberg](https://codeberg.org/endurain-project/endurain/src/branch/master/ROADMAP.md).
 
@@ -106,7 +106,7 @@ Contributions are welcomed! Please open an issue to discuss any changes or impro
 
 This project is licensed under the AGPL-3.0 or later License.
 
-## Help Translate
+## Help translate
 
 Endurain has multi-language support, and you can help translate it into more languages via [Codeberg Translate](https://translate.codeberg.org/projects/endurain/). 
 
@@ -124,7 +124,7 @@ Currently supported in:
  - Spanish (ES) [@rgmelkor](https://github.com/rgmelkor) and [@tinchodin](https://github.com/tinchodin)
  - English (US)
 
-## Trademark Notice
+## Trademark notice
 
 Endurain® is a trademark of João Vitória Silva.  
 
@@ -132,6 +132,10 @@ You are welcome to self-host Endurain and use the name and logo, including for p
 Commercial use of the Endurain name or logos (such as offering paid hosting, products, or services) is **not permitted without prior written permission**.
 
 See [`TRADEMARK.md`](https://codeberg.org/endurain-project/endurain/blob/master/TRADEMARK.md) for full details.
+
+## Newsletter
+
+--8<-- "_snippets/newsletter.html"
 
 <div align="center">
   <sub>Built with ❤️ from Portugal | Part of the <a href="https://codeberg.org/endurain-project">Endurain</a> ecosystem</sub>

@@ -97,3 +97,7 @@ If you were planning a larger feature contribution, please open an issue first s
 ## Thank you note
 
 Thank you to everyone who uses, tests, reports issues, translates, sponsors, or contributes to Endurain.
+
+## Newsletter
+
+--8<-- "_snippets/newsletter.html"
