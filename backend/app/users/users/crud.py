@@ -761,10 +761,6 @@ def update_user_mfa(
     """
     Update a user's MFA settings.
 
-    Writes exclusively to the ``users_mfa`` table; the
-    legacy ``users.mfa_enabled`` / ``users.mfa_secret``
-    columns no longer exist.
-
     Args:
         user_id: ID of user to update MFA for.
         db: SQLAlchemy database session.
@@ -784,7 +780,6 @@ def update_user_mfa(
     # Verify the user exists (raises 404 if not found).
     users_utils.get_user_by_id_or_404(user_id, db)
 
-    # Write to users_mfa — sole source of truth for MFA state.
     stmt = select(auth_mfa_models.AuthUserMFA).where(
         auth_mfa_models.AuthUserMFA.user_id == user_id
     )

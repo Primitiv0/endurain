@@ -59,18 +59,12 @@ class AuthUserMFA(Base):
     mfa_enabled: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
-        comment=(
-            "Whether TOTP MFA is active for this user "
-            "(mirrors users.mfa_enabled during dual-write)"
-        ),
+        comment="Whether TOTP MFA is active for this user",
     )
     mfa_secret: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True,
-        comment=(
-            "Fernet-encrypted TOTP secret "
-            "(mirrors users.mfa_secret during dual-write)"
-        ),
+        comment="Fernet-encrypted TOTP secret",
     )
 
     # Relationships

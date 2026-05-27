@@ -87,8 +87,6 @@ class Users(Base):
         oauth_states: List of OAuth states for the user.
         mfa_backup_codes: List of MFA backup codes.
         auth_mfa: 1:1 MFA state row in ``users_mfa``
-            (None only when the backfill migration has not
-            yet created a row for this user).
         mfa_enabled: Computed property — ``True`` when
             ``auth_mfa.mfa_enabled`` is set.
     """
@@ -296,7 +294,7 @@ class Users(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    auth_mfa: Mapped["AuthUserMFA | None"] = relationship(
+    auth_mfa: Mapped["AuthUserMFA"] = relationship(
         back_populates="users",
         uselist=False,
         cascade="all, delete-orphan",
@@ -311,8 +309,6 @@ class Users(Base):
         """
         Return whether MFA is active for this user.
 
-        Reads from the ``auth_mfa`` relationship (the legacy
-        ``users.mfa_enabled`` column no longer exists).
         Used by Pydantic schemas (``from_attributes=True``) and
         any caller that checks MFA status on the profile row.
         """
@@ -321,7 +317,7 @@ class Users(Base):
         )
 
     @property
-    def mfa(self) -> "AuthUserMFA | None":
+    def mfa(self) -> "AuthUserMFA":
         """
         Compat accessor for the auth_mfa row.
 

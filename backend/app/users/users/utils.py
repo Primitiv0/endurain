@@ -13,6 +13,7 @@ import users.users_integrations.crud as user_integrations_crud
 import users.users_default_gear.crud as user_default_gear_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 import health.health_targets.crud as health_targets_crud
+import auth.mfa.crud as auth_mfa_crud
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
 
@@ -248,6 +249,9 @@ def create_user_default_data(user_id: int, db: Session) -> None:
 
     # Create the user default gear
     user_default_gear_crud.create_user_default_gear(user_id, db)
+
+    # Create the user's MFA row (disabled by default)
+    auth_mfa_crud.create_users_mfa_row(user_id, db)
 
 
 _ALLOWED_USER_IMAGE_EXTENSIONS: frozenset[str] = frozenset(
