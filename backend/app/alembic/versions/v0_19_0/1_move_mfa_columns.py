@@ -84,13 +84,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop users_mfa table (legacy columns untouched)."""
-    op.drop_index(
-        "ix_users_mfa_user_id",
-        table_name="users_mfa",
-    )
-    op.drop_table("users_mfa")
-    """Re-add nullable MFA columns and copy data from users_mfa."""
+    """Re-add legacy MFA columns and copy data from users_mfa."""
     op.add_column(
         "users",
         sa.Column(
@@ -123,3 +117,8 @@ def downgrade() -> None:
             """
         )
     )
+    op.drop_index(
+        "ix_users_mfa_user_id",
+        table_name="users_mfa",
+    )
+    op.drop_table("users_mfa")
