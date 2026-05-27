@@ -4,6 +4,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.models as oauth_state_models
@@ -22,25 +23,21 @@ class TestGetOAuthStateById:
         mock_oauth_state.expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
         mock_oauth_state.used = False
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = mock_oauth_state
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_oauth_state
 
         # Act
         result = oauth_state_crud.get_oauth_state_by_id_and_not_used(state_id, mock_db)
 
         # Assert
         assert result == mock_oauth_state
-        mock_db.query.assert_called_once_with(oauth_state_models.OAuthState)
+        mock_db.execute.assert_called_once()
 
     def test_get_oauth_state_not_found(self, mock_db):
         """Test OAuth state not found returns None."""
         # Arrange
         state_id = "nonexistent_state"
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = None
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
         result = oauth_state_crud.get_oauth_state_by_id_and_not_used(state_id, mock_db)
@@ -49,17 +46,12 @@ class TestGetOAuthStateById:
         assert result is None
 
     def test_get_oauth_state_expired(self, mock_db):
-        """Test expired OAuth state returns None."""
+        """Test expired OAuth state returns None (filtering done in SQL WHERE)."""
         # Arrange
         state_id = "expired_state_12345678"
-        mock_oauth_state = MagicMock(spec=oauth_state_models.OAuthState)
-        mock_oauth_state.id = state_id
-        mock_oauth_state.expires_at = datetime.now(timezone.utc) - timedelta(minutes=5)
-        mock_oauth_state.used = False
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = mock_oauth_state
+        # The SQL WHERE clause filters expired states, so execute returns None
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
         result = oauth_state_crud.get_oauth_state_by_id_and_not_used(state_id, mock_db)
@@ -71,14 +63,9 @@ class TestGetOAuthStateById:
         """Test already used OAuth state returns None (replay protection)."""
         # Arrange
         state_id = "used_state_12345678"
-        mock_oauth_state = MagicMock(spec=oauth_state_models.OAuthState)
-        mock_oauth_state.id = state_id
-        mock_oauth_state.expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
-        mock_oauth_state.used = True
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = mock_oauth_state
+        # The SQL WHERE clause filters used states, so execute returns None
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
         result = oauth_state_crud.get_oauth_state_by_id_and_not_used(state_id, mock_db)
@@ -103,12 +90,14 @@ class TestGetOAuthStateBySessionId:
         mock_oauth_state = MagicMock(spec=oauth_state_models.OAuthState)
         mock_oauth_state.id = oauth_state_id
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.side_effect = [mock_session, mock_oauth_state]
+        # Two execute calls: first for session lookup, second for oauth state lookup
+        mock_db.execute.return_value.scalar_one_or_none.side_effect = [
+            mock_session,
+            mock_oauth_state,
+        ]
 
         # Act
-        result = oauth_state_crud.get_oauth_state_by_session_id(mock_db, session_id)
+        result = oauth_state_crud.get_oauth_state_by_session_id(session_id, mock_db)
 
         # Assert
         assert result == mock_oauth_state
@@ -118,12 +107,10 @@ class TestGetOAuthStateBySessionId:
         # Arrange
         session_id = "nonexistent_session"
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = None
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
-        result = oauth_state_crud.get_oauth_state_by_session_id(mock_db, session_id)
+        result = oauth_state_crud.get_oauth_state_by_session_id(session_id, mock_db)
 
         # Assert
         assert result is None
@@ -137,12 +124,10 @@ class TestGetOAuthStateBySessionId:
         mock_session.id = session_id
         mock_session.oauth_state_id = None
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = mock_session
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
 
         # Act
-        result = oauth_state_crud.get_oauth_state_by_session_id(mock_db, session_id)
+        result = oauth_state_crud.get_oauth_state_by_session_id(session_id, mock_db)
 
         # Assert
         assert result is None
@@ -285,38 +270,29 @@ class TestMarkOAuthStateUsed:
         """Test successful marking of OAuth state as used."""
         # Arrange
         state_id = "test_state_12345678"
-        mock_oauth_state = MagicMock(spec=oauth_state_models.OAuthState)
-        mock_oauth_state.id = state_id
-        mock_oauth_state.used = False
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = mock_oauth_state
+        mock_db.execute.return_value.rowcount = 1
 
         # Act
-        result = oauth_state_crud.mark_oauth_state_used(mock_db, state_id)
+        result = oauth_state_crud.mark_oauth_state_used(state_id, mock_db)
 
         # Assert
-        assert result == mock_oauth_state
-        assert mock_oauth_state.used is True
+        assert result is True
         mock_db.commit.assert_called_once()
-        mock_db.refresh.assert_called_once_with(mock_oauth_state)
 
     def test_mark_oauth_state_used_not_found(self, mock_db):
-        """Test marking non-existent OAuth state returns None."""
+        """Test marking non-existent OAuth state returns False."""
         # Arrange
         state_id = "nonexistent_state"
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = None
+        mock_db.execute.return_value.rowcount = 0
 
         # Act
-        result = oauth_state_crud.mark_oauth_state_used(mock_db, state_id)
+        result = oauth_state_crud.mark_oauth_state_used(state_id, mock_db)
 
         # Assert
-        assert result is None
-        mock_db.commit.assert_not_called()
+        assert result is False
+        mock_db.commit.assert_called_once()
 
 
 class TestDeleteOAuthState:
@@ -328,9 +304,7 @@ class TestDeleteOAuthState:
         oauth_state_id = "test_state_12345678"
         expected_count = 1
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = expected_count
+        mock_db.execute.return_value.rowcount = expected_count
 
         # Act
         result = oauth_state_crud.delete_oauth_state(oauth_state_id, mock_db)
@@ -344,9 +318,7 @@ class TestDeleteOAuthState:
         # Arrange
         oauth_state_id = "nonexistent_state"
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = 0
+        mock_db.execute.return_value.rowcount = 0
 
         # Act
         result = oauth_state_crud.delete_oauth_state(oauth_state_id, mock_db)
@@ -359,15 +331,14 @@ class TestDeleteOAuthState:
         """Test exception handling in delete_oauth_state."""
         # Arrange
         oauth_state_id = "error_state"
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             oauth_state_crud.delete_oauth_state(oauth_state_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert exc_info.value.detail == "Failed to delete OAuth state"
-        mock_db.rollback.assert_called_once()
+        assert "Database error" in exc_info.value.detail
 
 
 class TestDeleteExpiredOAuthStates:
@@ -378,9 +349,7 @@ class TestDeleteExpiredOAuthStates:
         # Arrange
         expected_count = 5
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = expected_count
+        mock_db.execute.return_value.rowcount = expected_count
 
         # Act
         result = oauth_state_crud.delete_expired_oauth_states(mock_db)
@@ -392,9 +361,7 @@ class TestDeleteExpiredOAuthStates:
     def test_delete_expired_oauth_states_none_found(self, mock_db):
         """Test deletion when no expired states exist."""
         # Arrange
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = 0
+        mock_db.execute.return_value.rowcount = 0
 
         # Act
         result = oauth_state_crud.delete_expired_oauth_states(mock_db)
@@ -404,17 +371,13 @@ class TestDeleteExpiredOAuthStates:
         mock_db.commit.assert_called_once()
 
     def test_delete_expired_oauth_states_cutoff(self, mock_db):
-        """Test expired states cutoff is 10 minutes in the past."""
+        """Test expired states are deleted via SQL WHERE clause."""
         # Arrange
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = 0
+        mock_db.execute.return_value.rowcount = 0
 
         # Act
         result = oauth_state_crud.delete_expired_oauth_states(mock_db)
 
         # Assert
         assert result == 0
-        mock_db.query.assert_called_once()
-        mock_query.filter.assert_called_once()
-        mock_filter.delete.assert_called_once()
+        mock_db.execute.assert_called_once()

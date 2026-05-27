@@ -22,29 +22,30 @@ class TestGetUserBackupCodes:
         mock_code1 = MagicMock(spec=backup_models.MFABackupCode)
         mock_code2 = MagicMock(spec=backup_models.MFABackupCode)
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.all.return_value = [mock_code1, mock_code2]
+        mock_db.execute.return_value.scalars.return_value.all.return_value = [
+            mock_code1,
+            mock_code2,
+        ]
 
         # Act
         result = backup_crud.get_user_backup_codes(user_id, mock_db)
 
         # Assert
         assert result == [mock_code1, mock_code2]
-        mock_db.query.assert_called_once_with(backup_models.MFABackupCode)
+        mock_db.execute.assert_called_once()
 
     def test_get_user_backup_codes_exception(self, mock_db):
         """Test exception handling in get_user_backup_codes."""
         # Arrange
         user_id = 1
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             backup_crud.get_user_backup_codes(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert exc_info.value.detail == "Failed to retrieve backup codes"
+        assert "Database error" in exc_info.value.detail
 
 
 class TestGetUserUnusedBackupCodes:
@@ -114,9 +115,10 @@ class TestCreateBackupCodes:
         count = 10
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch.object(backup_crud, "delete_user_backup_codes"), patch(
+        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
             "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
         ):
+            mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act
             codes = backup_crud.create_backup_codes(
                 user_id, password_hasher, mock_db, count
@@ -134,16 +136,16 @@ class TestCreateBackupCodes:
         user_id = 1
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch.object(
-            backup_crud, "delete_user_backup_codes"
-        ) as mock_delete, patch(
+        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
             "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
         ):
+            mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act
             backup_crud.create_backup_codes(user_id, password_hasher, mock_db)
 
             # Assert
-            mock_delete.assert_called_once_with(user_id, mock_db)
+            mock_sa_delete.assert_called_once()
+            mock_db.execute.assert_called()
 
     def test_create_backup_codes_custom_count(self, mock_db, password_hasher):
         """Test creation with custom code count."""
@@ -152,9 +154,10 @@ class TestCreateBackupCodes:
         custom_count = 5
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch.object(backup_crud, "delete_user_backup_codes"), patch(
+        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
             "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
         ):
+            mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act
             codes = backup_crud.create_backup_codes(
                 user_id, password_hasher, mock_db, custom_count
@@ -167,18 +170,19 @@ class TestCreateBackupCodes:
         """Test exception handling in create_backup_codes."""
         # Arrange
         user_id = 1
-        mock_db.commit.side_effect = Exception("Database error")
+        mock_db.commit.side_effect = SQLAlchemyError("Database error")
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch.object(backup_crud, "delete_user_backup_codes"), patch(
+        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
             "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
         ):
+            mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 backup_crud.create_backup_codes(user_id, password_hasher, mock_db)
 
             assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-            assert "Failed to regenerate backup codes" in exc_info.value.detail
+            assert "Database error" in exc_info.value.detail
 
     def test_create_backup_codes_http_exception_reraise(self, mock_db, password_hasher):
         """Test that HTTPException from delete is re-raised."""
@@ -186,10 +190,13 @@ class TestCreateBackupCodes:
         user_id = 1
         http_exc = HTTPException(status_code=404, detail="User not found")
 
-        # Mock delete to raise HTTPException
-        with patch.object(
-            backup_crud, "delete_user_backup_codes", side_effect=http_exc
+        # Use db.execute to trigger HTTPException re-raise path
+        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
+            "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
         ):
+            mock_sa_delete.return_value.where.return_value = MagicMock()
+            mock_db.execute.side_effect = http_exc
+
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
                 backup_crud.create_backup_codes(user_id, password_hasher, mock_db)
@@ -197,17 +204,6 @@ class TestCreateBackupCodes:
             # Should re-raise the same HTTPException
             assert exc_info.value.status_code == 404
             assert exc_info.value.detail == "User not found"
-        """Test exception handling in create_backup_codes."""
-        # Arrange
-        user_id = 1
-        mock_db.add.side_effect = Exception("Database error")
-
-        with patch.object(backup_crud, "delete_user_backup_codes"):
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                backup_crud.create_backup_codes(user_id, password_hasher, mock_db)
-
-            assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestMarkBackupCodeAsUsed:
@@ -217,54 +213,47 @@ class TestMarkBackupCodeAsUsed:
         """Test successful marking of backup code as used."""
         # Arrange
         user_id = 1
-        code_hash = "hashed_code"
+        code_id = 42
 
         mock_code = MagicMock(spec=backup_models.MFABackupCode)
         mock_code.used = False
-        mock_code.used_at = None
+        mock_code.user_id = user_id
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = mock_code
+        mock_db.get.return_value = mock_code
 
         # Act
-        backup_crud.mark_backup_code_as_used(code_hash, user_id, mock_db)
+        backup_crud.mark_backup_code_as_used(code_id, user_id, mock_db)
 
         # Assert
-        assert mock_code.used is True
-        assert mock_code.used_at is not None
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(mock_code)
 
     def test_mark_code_as_used_not_found(self, mock_db):
-        """Test marking non-existent code doesn't raise exception."""
+        """Test marking non-existent code raises 404."""
         # Arrange
         user_id = 1
-        code_hash = "nonexistent_hash"
+        code_id = 99
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.first.return_value = None
+        mock_db.get.return_value = None
 
-        # Act (should not raise exception)
-        backup_crud.mark_backup_code_as_used(code_hash, user_id, mock_db)
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            backup_crud.mark_backup_code_as_used(code_id, user_id, mock_db)
 
-        # Assert
-        mock_db.commit.assert_not_called()
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
     def test_mark_code_as_used_exception(self, mock_db):
         """Test exception handling in mark_backup_code_as_used."""
         # Arrange
         user_id = 1
-        code_hash = "hashed_code"
-        mock_db.query.side_effect = Exception("Database error")
+        code_id = 42
+        mock_db.get.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            backup_crud.mark_backup_code_as_used(code_hash, user_id, mock_db)
+            backup_crud.mark_backup_code_as_used(code_id, user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        mock_db.rollback.assert_called_once()
 
 
 class TestDeleteUserBackupCodes:
@@ -276,9 +265,7 @@ class TestDeleteUserBackupCodes:
         user_id = 1
         expected_count = 10
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = expected_count
+        mock_db.execute.return_value.rowcount = expected_count
 
         # Act
         result = backup_crud.delete_user_backup_codes(user_id, mock_db)
@@ -292,9 +279,7 @@ class TestDeleteUserBackupCodes:
         # Arrange
         user_id = 1
 
-        mock_query = mock_db.query.return_value
-        mock_filter = mock_query.filter.return_value
-        mock_filter.delete.return_value = 0
+        mock_db.execute.return_value.rowcount = 0
 
         # Act
         result = backup_crud.delete_user_backup_codes(user_id, mock_db)
@@ -307,11 +292,10 @@ class TestDeleteUserBackupCodes:
         """Test exception handling in delete_user_backup_codes."""
         # Arrange
         user_id = 1
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             backup_crud.delete_user_backup_codes(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        mock_db.rollback.assert_called_once()

@@ -124,6 +124,18 @@ class TokenManager:
         except HTTPException:
             # decode_token already raised a properly-formed 401; re-raise as-is.
             raise
+        except Exception as err:
+            core_logger.print_to_log(
+                f"Unexpected error retrieving claim: {type(err).__name__}",
+                "error",
+                exc=err,
+                context={"token": "[REDACTED]"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unable to retrieve claim",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from err
 
     def decode_token(self, token: str) -> Token:
         """
@@ -171,6 +183,18 @@ class TokenManager:
                 detail="Unable to decode token",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from decode_err
+        except Exception as err:
+            core_logger.print_to_log(
+                f"Unexpected error decoding token: {type(err).__name__}",
+                "error",
+                exc=err,
+                context={"token": "[REDACTED]"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unable to decode token",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from err
 
     def validate_token_expiration(
         self,
@@ -281,6 +305,18 @@ class TokenManager:
         except HTTPException:
             # decode_token already raised a properly-formed 401; re-raise as-is.
             raise
+        except Exception as err:
+            core_logger.print_to_log(
+                f"Unexpected error validating token: {type(err).__name__}",
+                "error",
+                exc=err,
+                context={"token": "[REDACTED]"},
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token expired or invalid.",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from err
 
     def create_token(
         self,

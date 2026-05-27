@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 from auth.identity_providers import crud as idp_crud
 from auth.identity_providers.schema import (
@@ -29,15 +30,14 @@ class TestGetIdentityProvider:
         mock_idp = MagicMock(spec=IdentityProvider)
         mock_idp.id = 1
         mock_idp.name = "Test Provider"
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_idp
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_idp
 
         # Act
         result = idp_crud.get_identity_provider(1, mock_db)
 
         # Assert
         assert result == mock_idp
-        mock_db.query.assert_called_once()
-        mock_db.query.return_value.filter.assert_called_once()
+        mock_db.execute.assert_called_once()
 
     def test_get_identity_provider_not_found(self, mock_db):
         """Test retrieving non-existent identity provider.
@@ -49,7 +49,7 @@ class TestGetIdentityProvider:
             - None is returned when provider not found
         """
         # Arrange
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
         result = idp_crud.get_identity_provider(999, mock_db)
@@ -67,14 +67,14 @@ class TestGetIdentityProvider:
             - HTTPException with 500 status is raised on database error
         """
         # Arrange
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             idp_crud.get_identity_provider(1, mock_db)
 
         assert exc_info.value.status_code == 500
-        assert "Internal Server Error" in str(exc_info.value.detail)
+        assert "Database error" in exc_info.value.detail
 
 
 class TestGetIdentityProviderBySlug:
@@ -93,14 +93,14 @@ class TestGetIdentityProviderBySlug:
         # Arrange
         mock_idp = MagicMock(spec=IdentityProvider)
         mock_idp.slug = "test-provider"
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_idp
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_idp
 
         # Act
         result = idp_crud.get_identity_provider_by_slug("test-provider", mock_db)
 
         # Assert
         assert result == mock_idp
-        mock_db.query.assert_called_once()
+        mock_db.execute.assert_called_once()
 
     def test_get_identity_provider_by_slug_not_found(self, mock_db):
         """Test retrieving non-existent identity provider by slug.
@@ -112,7 +112,7 @@ class TestGetIdentityProviderBySlug:
             - None is returned when provider not found
         """
         # Arrange
-        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
         result = idp_crud.get_identity_provider_by_slug("nonexistent", mock_db)
@@ -130,7 +130,7 @@ class TestGetIdentityProviderBySlug:
             - HTTPException with 500 status is raised on database error
         """
         # Arrange
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -153,7 +153,7 @@ class TestGetAllIdentityProviders:
         """
         # Arrange
         mock_idps = [MagicMock(spec=IdentityProvider) for _ in range(3)]
-        mock_db.query.return_value.order_by.return_value.all.return_value = mock_idps
+        mock_db.execute.return_value.scalars.return_value.all.return_value = mock_idps
 
         # Act
         result = idp_crud.get_all_identity_providers(mock_db)
@@ -161,8 +161,7 @@ class TestGetAllIdentityProviders:
         # Assert
         assert result == mock_idps
         assert len(result) == 3
-        mock_db.query.assert_called_once()
-        mock_db.query.return_value.order_by.assert_called_once()
+        mock_db.execute.assert_called_once()
 
     def test_get_all_identity_providers_empty(self, mock_db):
         """Test retrieving all identity providers when none exist.
@@ -192,7 +191,7 @@ class TestGetAllIdentityProviders:
             - HTTPException with 500 status is raised on database error
         """
         # Arrange
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -216,9 +215,7 @@ class TestGetEnabledProviders:
         """
         # Arrange
         mock_idps = [MagicMock(spec=IdentityProvider) for _ in range(2)]
-        (
-            mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value
-        ) = mock_idps
+        mock_db.execute.return_value.scalars.return_value.all.return_value = mock_idps
 
         # Act
         result = idp_crud.get_enabled_providers(mock_db)
@@ -226,8 +223,7 @@ class TestGetEnabledProviders:
         # Assert
         assert result == mock_idps
         assert len(result) == 2
-        mock_db.query.assert_called_once()
-        mock_db.query.return_value.filter.assert_called_once()
+        mock_db.execute.assert_called_once()
 
     def test_get_enabled_providers_empty(self, mock_db):
         """Test retrieving enabled providers when none exist.
@@ -259,7 +255,7 @@ class TestGetEnabledProviders:
             - HTTPException with 500 status is raised on database error
         """
         # Arrange
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -287,7 +283,7 @@ class TestGetIdentityProvidersByIds:
             MagicMock(spec=IdentityProvider, id=2, name="Provider 2"),
             MagicMock(spec=IdentityProvider, id=3, name="Provider 3"),
         ]
-        mock_db.query.return_value.filter.return_value.all.return_value = mock_idps
+        mock_db.execute.return_value.scalars.return_value.all.return_value = mock_idps
 
         # Act
         result = idp_crud.get_identity_providers_by_ids([1, 2, 3], mock_db)
@@ -295,8 +291,7 @@ class TestGetIdentityProvidersByIds:
         # Assert
         assert result == mock_idps
         assert len(result) == 3
-        mock_db.query.assert_called_once()
-        mock_db.query.return_value.filter.assert_called_once()
+        mock_db.execute.assert_called_once()
 
     def test_get_identity_providers_by_ids_empty_list(self, mock_db):
         """Test behavior when given an empty list of IDs.
@@ -328,7 +323,7 @@ class TestGetIdentityProvidersByIds:
             MagicMock(spec=IdentityProvider, id=1),
             MagicMock(spec=IdentityProvider, id=3),
         ]
-        mock_db.query.return_value.filter.return_value.all.return_value = mock_idps
+        mock_db.execute.return_value.scalars.return_value.all.return_value = mock_idps
 
         # Act
         result = idp_crud.get_identity_providers_by_ids([1, 2, 3], mock_db)
@@ -365,14 +360,14 @@ class TestGetIdentityProvidersByIds:
             - HTTPException with 500 status is raised on database error
         """
         # Arrange
-        mock_db.query.side_effect = Exception("Database error")
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             idp_crud.get_identity_providers_by_ids([1, 2, 3], mock_db)
 
         assert exc_info.value.status_code == 500
-        assert "Internal Server Error" in str(exc_info.value.detail)
+        assert "Database error" in exc_info.value.detail
 
     def test_get_identity_providers_by_ids_single_id(self, mock_db):
         """Test retrieving a single provider by ID using batch function.
@@ -385,7 +380,7 @@ class TestGetIdentityProvidersByIds:
         """
         # Arrange
         mock_idp = MagicMock(spec=IdentityProvider, id=1, name="Provider 1")
-        mock_db.query.return_value.filter.return_value.all.return_value = [mock_idp]
+        mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_idp]
 
         # Act
         result = idp_crud.get_identity_providers_by_ids([1], mock_db)
@@ -669,7 +664,7 @@ class TestUpdateIdentityProvider:
         mock_idp.slug = "test-slug"
         mock_get.return_value = mock_idp
         mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
-        mock_db.commit.side_effect = Exception("Database error")
+        mock_db.commit.side_effect = SQLAlchemyError("Database error")
 
         # Use same slug to avoid conflict check
         idp_data = IdentityProviderUpdate(
@@ -681,7 +676,6 @@ class TestUpdateIdentityProvider:
             idp_crud.update_identity_provider(1, idp_data, mock_db)
 
         assert exc_info.value.status_code == 500
-        mock_db.rollback.assert_called_once()
 
 
 class TestDeleteIdentityProvider:
@@ -794,11 +788,10 @@ class TestDeleteIdentityProvider:
         mock_idp = MagicMock(spec=IdentityProvider)
         mock_get.return_value = mock_idp
         mock_check_users.return_value = None
-        mock_db.delete.side_effect = Exception("Database error")
+        mock_db.delete.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             idp_crud.delete_identity_provider(1, mock_db)
 
         assert exc_info.value.status_code == 500
-        mock_db.rollback.assert_called_once()

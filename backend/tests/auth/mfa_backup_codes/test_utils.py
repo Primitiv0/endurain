@@ -80,7 +80,7 @@ class TestVerifyAndConsumeBackupCode:
             # Assert
             assert result is True
             mock_mark_used.assert_called_once_with(
-                mock_code_obj.code_hash, user_id, mock_db
+                mock_code_obj.id, user_id, mock_db
             )
 
     def test_verify_invalid_code_failure(self, mock_db, password_hasher):

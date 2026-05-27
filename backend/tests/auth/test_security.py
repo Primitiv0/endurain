@@ -543,7 +543,8 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(token_manager, "get_token_claim", return_value="not_a_list"):
+        with patch.object(token_manager, "validate_token_expiration"), \
+             patch.object(token_manager, "get_token_claim", return_value="not_a_list"):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.check_scopes("fake_token", token_manager, security_scopes)
             assert exc_info.value.status_code == 403
@@ -558,7 +559,8 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(
+        with patch.object(token_manager, "validate_token_expiration"), \
+             patch.object(
             token_manager, "get_token_claim", return_value=["profile", "invalid"]
         ):
             # Trigger the exception handling path by providing valid scope
@@ -576,7 +578,8 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(token_manager, "get_token_claim", return_value="not_a_list"):
+        with patch.object(token_manager, "validate_token_expiration"), \
+             patch.object(token_manager, "get_token_claim", return_value="not_a_list"):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.check_scopes_for_browser_redirect(
                     "fake_token", token_manager, security_scopes
@@ -592,7 +595,8 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(
+        with patch.object(token_manager, "validate_token_expiration"), \
+             patch.object(
             token_manager, "get_token_claim", return_value=["profile", "invalid"]
         ):
             # Trigger the exception handling path
@@ -775,7 +779,7 @@ class TestCheckScopesExceptionPaths:
 
         with patch.object(
             token_manager, "get_token_claim", return_value="invalid scope format"
-        ):
+        ), patch.object(token_manager, "validate_token_expiration"):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.check_scopes("test_token", token_manager, security_scopes)
             assert exc_info.value.status_code == 403

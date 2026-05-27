@@ -192,7 +192,7 @@ class TestTokenManagerSecurity:
 
         # Should not raise an exception
         try:
-            token_manager.validate_token_expiration(token)
+            token_manager.validate_token_expiration(token, auth_token_manager.TokenType.ACCESS)
         except HTTPException:
             pytest.fail("Valid token should not raise HTTPException")
 
@@ -212,7 +212,7 @@ class TestTokenManagerSecurity:
         token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzaWQiOiJzZXNzaW9uLWlkIiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwiYXVkIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgwIiwic3ViIjoxLCJzY29wZSI6WyJwcm9maWxlIiwidXNlcnM6cmVhZCIsImdlYXJzOnJlYWQiLCJnZWFyczp3cml0ZSIsImFjdGl2aXRpZXM6cmVhZCIsImFjdGl2aXRpZXM6d3JpdGUiLCJoZWFsdGg6cmVhZCIsImhlYWx0aDp3cml0ZSIsImhlYWx0aF90YXJnZXRzOnJlYWQiLCJoZWFsdGhfdGFyZ2V0czp3cml0ZSJdLCJpYXQiOjE3NTk5NTMxODUsIm5iZiI6MTc1OTk1MzE4NSwiZXhwIjoxNzU5OTU0MDg1LCJqdGkiOiI3OWY2NDJlZC00NzNkLTQxMGYtYWMyNS0yMjYxMDU5YTM4NjIifQ.VSizGzvIIi_EJYD_YmfZBEBE_9aJbhLW-25cD1kEOeM"
 
         with pytest.raises(HTTPException) as excinfo:
-            token_manager.validate_token_expiration(token)
+            token_manager.validate_token_expiration(token, auth_token_manager.TokenType.ACCESS)
 
         assert excinfo.value.status_code == 401
 
@@ -498,7 +498,7 @@ class TestTokenManagerSecurity:
 
             # Should raise HTTPException with 401 status
             with pytest.raises(HTTPException) as exc_info:
-                token_manager.validate_token_expiration(token)
+                token_manager.validate_token_expiration(token, auth_token_manager.TokenType.ACCESS)
             assert exc_info.value.status_code == 401
             assert "insecure claims" in exc_info.value.detail.lower()
 
@@ -516,7 +516,7 @@ class TestTokenManagerSecurity:
             token_manager, "decode_token", side_effect=RuntimeError("Test error")
         ):
             with pytest.raises(HTTPException) as exc_info:
-                token_manager.validate_token_expiration(token)
+                token_manager.validate_token_expiration(token, auth_token_manager.TokenType.ACCESS)
             assert exc_info.value.status_code == 401
             assert "expired or invalid" in exc_info.value.detail
 
@@ -537,7 +537,7 @@ class TestTokenManagerSecurity:
             mock_registry.return_value = mock_instance
 
             with pytest.raises(HTTPException) as exc_info:
-                token_manager.validate_token_expiration(token)
+                token_manager.validate_token_expiration(token, auth_token_manager.TokenType.ACCESS)
             assert exc_info.value.status_code == 401
             assert "missing required claims" in exc_info.value.detail
 
@@ -562,7 +562,7 @@ class TestTokenManagerSecurity:
             mock_registry.return_value = mock_instance
 
             with pytest.raises(HTTPException) as exc_info:
-                token_manager.validate_token_expiration(token)
+                token_manager.validate_token_expiration(token, auth_token_manager.TokenType.ACCESS)
             assert exc_info.value.status_code == 401
             assert "not valid yet" in exc_info.value.detail
 

@@ -262,6 +262,17 @@ def _validate_access_token_impl(
             context={"access_token": "[REDACTED]"},
         )
         raise
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Unexpected error during access token validation: {type(err).__name__}",
+            "error",
+            exc=err,
+            context={"access_token": "[REDACTED]"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during token validation",
+        ) from err
 
 
 def validate_access_token(
@@ -500,6 +511,17 @@ def validate_refresh_token(
                 headers=http_err.headers,
             ) from http_err
         raise
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Unexpected error during refresh token validation: {type(err).__name__}",
+            "error",
+            exc=err,
+            context={"refresh_token": "[REDACTED]"},
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during token validation",
+        ) from err
 
 
 def get_sub_from_refresh_token(
@@ -602,27 +624,40 @@ def _check_scopes_impl(
             type. 403 if the ``scope`` claim is malformed or any
             required scope is missing.
     """
-    _validate_access_token_impl(access_token, token_manager)
-    scope = token_manager.get_token_claim(access_token, "scope")
+    try:
+        _validate_access_token_impl(access_token, token_manager)
+        scope = token_manager.get_token_claim(access_token, "scope")
 
-    if not isinstance(scope, list):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized Access - Invalid scope format",
-            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
-        )
+        if not isinstance(scope, list):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Unauthorized Access - Invalid scope format",
+                headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
+            )
 
-    missing_scopes = set(security_scopes.scopes) - set(scope)
-    if missing_scopes:
+        missing_scopes = set(security_scopes.scopes) - set(scope)
+        if missing_scopes:
+            core_logger.print_to_log(
+                f"Scope validation failed: missing {missing_scopes}",
+                "error",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Unauthorized Access - Missing permissions: {missing_scopes}",
+                headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
+            )
+    except HTTPException:
+        raise
+    except Exception as err:
         core_logger.print_to_log(
-            f"Scope validation failed: missing {missing_scopes}",
+            f"Unexpected error during scope validation: {type(err).__name__}",
             "error",
+            exc=err,
         )
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Unauthorized Access - Missing permissions: {missing_scopes}",
-            headers={"WWW-Authenticate": f'Bearer scope="{security_scopes.scopes}"'},
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during scope validation",
+        ) from err
 
 
 def check_scopes(
@@ -917,3 +952,13 @@ async def validate_websocket_access_token(
             code=status.WS_1008_POLICY_VIOLATION,
             reason="Invalid or expired token",
         ) from http_err
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Unexpected error during WebSocket token validation: {type(err).__name__}",
+            "warning",
+            exc=err,
+        )
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Unexpected validation error",
+        ) from err

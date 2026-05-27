@@ -35,12 +35,10 @@ class TestMFABackupCodesResponse:
         assert response.codes[9] == "CODE00009ABC"
 
     def test_backup_codes_response_empty_list(self):
-        """Test backup codes response with empty list."""
+        """Test backup codes response with empty list raises validation error."""
         now = datetime.now(timezone.utc)
-        response = mfa_schema.MFABackupCodesResponse(codes=[], created_at=now)
-
-        assert response.codes == []
-        assert len(response.codes) == 0
+        with pytest.raises(ValidationError):
+            mfa_schema.MFABackupCodesResponse(codes=[], created_at=now)
 
 
 class TestMFABackupCodeStatus:
