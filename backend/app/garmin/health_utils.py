@@ -145,6 +145,7 @@ def fetch_and_process_ds_by_dates(
 
     if (
         garmin_ds is None
+        or len(garmin_ds) == 0
         or "totalSteps" not in garmin_ds[0]
         or not garmin_ds[0]["totalSteps"]
     ):
