@@ -7,9 +7,10 @@ from external callers and makes them mockable in isolation.
 
 Transaction contract
 --------------------
-``IdentityService`` methods do **not** commit the database session.
-The caller (FastAPI dependency / outer handler) owns the transaction
-lifecycle; rollback on failure is the caller's responsibility.
+``IdentityService`` owns no transaction policy of its own. It delegates
+database work to auth CRUD helpers, and those helpers own their module's
+commit/refresh behaviour. Callers that need a multi-step atomic workflow
+must use or introduce CRUD helpers designed for that workflow.
 
 Request-state caching
 ---------------------
@@ -76,8 +77,8 @@ class IdentityService(Protocol):
 
     All methods except :meth:`check_scope` may raise
     :class:`~fastapi.HTTPException` on invalid or expired
-    credentials.  None of the methods commit the database
-    session — that is the caller's responsibility.
+    credentials. Methods delegate database operations to auth
+    CRUD helpers, including those helpers' commit behaviour.
     """
 
     def authenticate_password(
@@ -287,9 +288,9 @@ class DefaultIdentityService:
     Constructor injects all per-request dependencies explicitly so that
     each method is testable in isolation.
 
-    Transaction contract: none of the methods call ``db.commit()``.
-    The caller (FastAPI dependency or outer handler) is responsible for
-    committing or rolling back the session.
+    Transaction contract: this service does not mutate ORM state
+    directly. It delegates database work to auth CRUD helpers, which
+    own their module-level commit and refresh behaviour.
 
     Attributes:
         _db: SQLAlchemy database session for this request.
