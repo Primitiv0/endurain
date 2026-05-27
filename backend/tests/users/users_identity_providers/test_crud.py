@@ -378,7 +378,7 @@ class TestUpdateUserIdentityProviderLastLogin:
         mock_link.idp_id = 1
 
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = mock_link
@@ -408,7 +408,7 @@ class TestUpdateUserIdentityProviderLastLogin:
         """
         # Arrange
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = None
@@ -447,7 +447,7 @@ class TestStoreUserIdentityProviderTokens:
         encrypted_token = "encrypted_refresh_token_xyz"
 
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = mock_link
@@ -480,7 +480,7 @@ class TestStoreUserIdentityProviderTokens:
         expires_at = datetime.now(timezone.utc)
 
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = None
@@ -517,7 +517,7 @@ class TestClearUserIdentityProviderRefreshToken:
         mock_link.idp_refresh_token_updated_at = datetime.now(timezone.utc)
 
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = mock_link
@@ -547,7 +547,7 @@ class TestClearUserIdentityProviderRefreshToken:
         """
         # Arrange
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = None
@@ -583,7 +583,7 @@ class TestDeleteUserIdentityProvider:
         mock_link.idp_refresh_token = "token"
 
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = mock_link
@@ -611,7 +611,7 @@ class TestDeleteUserIdentityProvider:
         """
         # Arrange
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = None
@@ -638,7 +638,7 @@ class TestDeleteUserIdentityProvider:
         mock_link.id = 1
 
         with patch(
-            "users.users_identity_providers.crud"
+            "auth.identity_links.crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = mock_link

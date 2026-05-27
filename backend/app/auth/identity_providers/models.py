@@ -11,7 +11,7 @@ from core.database import Base
 
 if TYPE_CHECKING:
     from auth.oauth_state.models import OAuthState
-    from users.users_identity_providers.models import UsersIdentityProvider
+    from auth.identity_links.models import UsersIdentityProvider
 
 
 class IdentityProvider(Base):

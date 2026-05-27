@@ -34,7 +34,7 @@ import users.users.models
 import auth.api_keys.models
 import users.users_goals.models
 import users.users_default_gear.models
-import users.users_identity_providers.models
+import auth.identity_links.models
 import users.users_integrations.models
 import users.users_privacy_settings.models
 

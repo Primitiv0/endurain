@@ -44,8 +44,8 @@ import users.users_default_gear.schema as user_default_gear_schema
 import users.users_goals.crud as user_goals_crud
 import users.users_goals.schema as user_goals_schema
 
-import users.users_identity_providers.crud as user_identity_providers_crud
-import users.users_identity_providers.schema as user_identity_providers_schema
+import auth.identity_links.crud as user_identity_providers_crud
+import auth.identity_links.schema as user_identity_providers_schema
 
 import auth.identity_providers.crud as identity_providers_crud
 

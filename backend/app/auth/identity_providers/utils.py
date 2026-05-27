@@ -13,7 +13,7 @@ import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
 import core.config as core_config
 import core.logger as core_logger
-import users.users_identity_providers.crud as user_idp_crud
+import auth.identity_links.crud as user_idp_crud
 
 
 def validate_redirect_url(redirect: str | None) -> None:

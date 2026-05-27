@@ -11,7 +11,7 @@ import users.users.dependencies as users_dependencies
 import users.users.utils as users_utils
 import auth.sessions.crud as users_sessions_crud
 
-import users.users_identity_providers.crud as user_idp_crud
+import auth.identity_links.crud as user_idp_crud
 
 import sign_up_tokens.utils as sign_up_tokens_utils
 import auth.security as auth_security

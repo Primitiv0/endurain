@@ -9,7 +9,7 @@ import auth.identity_providers.schema as idp_schema
 import core.cryptography as core_cryptography
 import core.decorators as core_decorators
 import core.logger as core_logger
-import users.users_identity_providers.crud as user_identity_providers_crud
+import auth.identity_links.crud as user_identity_providers_crud
 
 
 @core_decorators.handle_db_errors

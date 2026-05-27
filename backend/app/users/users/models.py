@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from auth.api_keys.models import UsersApiKeys
     from users.users_default_gear.models import UsersDefaultGear
     from users.users_goals.models import UsersGoal
-    from users.users_identity_providers.models import UsersIdentityProvider
+    from auth.identity_links.models import UsersIdentityProvider
     from users.users_integrations.models import UsersIntegrations
     from users.users_privacy_settings.models import UsersPrivacySettings
     from auth.sessions.models import UsersSessions

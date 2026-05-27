@@ -1,12 +1,33 @@
 """
-Backward-compat shim: canonical path is auth.identity_links.
+Auth identity links module for SSO/OAuth account linking.
 
-This module re-exports everything from auth.identity_links so that
-existing import sites continue to work while migration to the new
-canonical path is in progress.
+This module provides CRUD operations and data models for managing
+user-to-identity-provider associations, including token storage
+and last login tracking.
+
+This is the canonical location for identity link data; the old
+``users.users_identity_providers`` path is a backward-compat shim.
+
+Exports:
+    - CRUD: check_user_identity_providers_by_idp_id,
+      get_user_identity_providers_by_user_id,
+      get_user_identity_provider_by_user_id_and_idp_id,
+      get_user_identity_provider_by_subject_and_idp_id,
+      create_user_identity_provider,
+      update_user_identity_provider_last_login,
+      store_user_identity_provider_tokens,
+      clear_user_identity_provider_refresh_token_by_user_id_and_idp_id,
+      delete_user_identity_provider
+    - Schemas: UsersIdentityProviderBase, UsersIdentityProviderCreate,
+      UsersIdentityProviderRead, UsersIdentityProviderResponse,
+      UsersIdentityProviderTokenUpdate
+    - Models: UsersIdentityProvider (ORM model)
+    - Utils:
+      get_user_identity_provider_refresh_token_by_user_id_and_idp_id,
+      enrich_user_identity_providers
 """
 
-from auth.identity_links import (  # noqa: F401
+from .crud import (
     check_user_identity_providers_by_idp_id,
     get_user_identity_providers_by_user_id,
     get_user_identity_provider_by_user_id_and_idp_id,
@@ -16,12 +37,16 @@ from auth.identity_links import (  # noqa: F401
     store_user_identity_provider_tokens,
     clear_user_identity_provider_refresh_token_by_user_id_and_idp_id,
     delete_user_identity_provider,
-    UsersIdentityProvider as UserIdentityProviderModel,
+)
+from .models import UsersIdentityProvider
+from .schema import (
     UsersIdentityProviderBase,
     UsersIdentityProviderCreate,
     UsersIdentityProviderRead,
     UsersIdentityProviderResponse,
     UsersIdentityProviderTokenUpdate,
+)
+from .utils import (
     get_user_identity_provider_refresh_token_by_user_id_and_idp_id,
     enrich_user_identity_providers,
 )
@@ -38,7 +63,7 @@ __all__ = [
     "clear_user_identity_provider_refresh_token_by_user_id_and_idp_id",
     "delete_user_identity_provider",
     # Database model
-    "UserIdentityProviderModel",
+    "UsersIdentityProvider",
     # Pydantic schemas
     "UsersIdentityProviderBase",
     "UsersIdentityProviderCreate",

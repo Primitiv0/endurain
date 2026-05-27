@@ -43,6 +43,7 @@ import users.users.schema as users_schema
 import users.users.utils as users_utils
 import auth.api_keys.crud as users_api_keys_crud
 import auth.api_keys.utils as users_api_keys_utils
+import auth.identity_links.crud as auth_identity_links_crud
 import auth.sessions.crud as users_sessions_crud
 
 import core.database as core_database
@@ -217,6 +218,42 @@ class IdentityService(Protocol):
         Raises:
             HTTPException: 404 if the key is not found
                 for this user.
+        """
+        ...
+
+    def link_external_identity(
+        self,
+        user_id: int,
+        idp_id: int,
+        idp_subject: str,
+    ) -> None:
+        """Create a link between a user and an identity provider.
+
+        Args:
+            user_id: The ID of the user to link.
+            idp_id: The ID of the identity provider.
+            idp_subject: Subject identifier from the IdP.
+
+        Raises:
+            HTTPException: 409 if link already exists.
+            HTTPException: 500 if database operation fails.
+        """
+        ...
+
+    def unlink_external_identity(
+        self,
+        user_id: int,
+        idp_id: int,
+    ) -> None:
+        """Remove a user-to-identity-provider link.
+
+        Args:
+            user_id: The ID of the user.
+            idp_id: The ID of the identity provider to unlink.
+
+        Raises:
+            HTTPException: 404 if the link is not found.
+            HTTPException: 500 if database operation fails.
         """
         ...
 
@@ -616,6 +653,59 @@ class DefaultIdentityService:
         users_api_keys_crud.revoke_api_key(
             api_key_id, user_id, self._db
         )
+
+    def link_external_identity(
+        self,
+        user_id: int,
+        idp_id: int,
+        idp_subject: str,
+    ) -> None:
+        """Create a link between a user and an identity provider.
+
+        Args:
+            user_id: The ID of the user to link.
+            idp_id: The ID of the identity provider.
+            idp_subject: Subject identifier from the IdP.
+
+        Raises:
+            HTTPException: 409 if link already exists.
+            HTTPException: 500 if database operation fails.
+        """
+        auth_identity_links_crud.create_user_identity_provider(
+            user_id,
+            idp_id,
+            idp_subject,
+            self._db,
+        )
+
+    def unlink_external_identity(
+        self,
+        user_id: int,
+        idp_id: int,
+    ) -> None:
+        """Remove a user-to-identity-provider link.
+
+        Args:
+            user_id: The ID of the user.
+            idp_id: The ID of the identity provider to unlink.
+
+        Raises:
+            HTTPException: 404 if the link is not found.
+            HTTPException: 500 if database operation fails.
+        """
+        deleted = auth_identity_links_crud.delete_user_identity_provider(
+            user_id,
+            idp_id,
+            self._db,
+        )
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"Identity link not found for user "
+                    f"{user_id} and IdP {idp_id}"
+                ),
+            )
 
     def check_scope(
         self,

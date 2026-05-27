@@ -44,7 +44,7 @@ import health.health_targets.crud as health_targets_crud
 import notifications.crud as notifications_crud
 import users.users_default_gear.crud as user_default_gear_crud
 import users.users_goals.crud as user_goals_crud
-import users.users_identity_providers.crud as user_identity_providers_crud
+import auth.identity_links.crud as user_identity_providers_crud
 import users.users_integrations.crud as user_integrations_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 

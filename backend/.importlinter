@@ -46,6 +46,34 @@ source_modules =
     websocket
 forbidden_modules =
     users.users_api_keys
+
+# Forbid imports of users_identity_providers data modules outside itself
+# (identity links now owned by auth.identity_links)
+[importlinter:contract:users-identity-providers-boundary]
+name = Users identity_providers boundary: only users_identity_providers itself may import its modules
+type = forbidden
+allow_indirect_imports = True
+source_modules =
+    users.users
+    auth
+    activities
+    core
+    followers
+    garmin
+    gears
+    health
+    notifications
+    password_reset_tokens
+    profile
+    server_settings
+    sign_up_tokens
+    strava
+    websocket
+forbidden_modules =
+    users.users_identity_providers.crud
+    users.users_identity_providers.models
+    users.users_identity_providers.schema
+    users.users_identity_providers.utils
 [importlinter]
 # Run from backend/ with: PYTHONPATH=app uv run lint-imports
 root_packages =

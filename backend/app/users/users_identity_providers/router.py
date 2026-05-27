@@ -24,9 +24,9 @@ from sqlalchemy.orm import Session
 import core.database as core_database
 import core.logger as core_logger
 import auth.security as auth_security
-import users.users_identity_providers.crud as user_idp_crud
-import users.users_identity_providers.schema as user_idp_schema
-import users.users_identity_providers.utils as user_idp_utils
+import auth.identity_links.crud as user_idp_crud
+import auth.identity_links.schema as user_idp_schema
+import auth.identity_links.utils as user_idp_utils
 import users.users.schema as users_schema
 import users.users.crud as users_crud
 import auth.identity_providers.crud as idp_crud

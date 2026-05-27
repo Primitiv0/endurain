@@ -36,9 +36,9 @@ import users.users.crud as users_crud
 import users.users.models as users_models
 import users.users.schema as users_schema
 import users.users.utils as users_utils
-import users.users_identity_providers.crud as user_idp_crud
-import users.users_identity_providers.models as user_idp_models
-import users.users_identity_providers.utils as user_idp_utils
+import auth.identity_links.crud as user_idp_crud
+import auth.identity_links.models as user_idp_models
+import auth.identity_links.utils as user_idp_utils
 
 
 # Constants for token rotation policy

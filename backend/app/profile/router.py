@@ -29,9 +29,9 @@ import users.users.schema as users_schema
 import users.users.crud as users_crud
 import users.users.utils as users_utils
 
-import users.users_identity_providers.crud as user_idp_crud
-import users.users_identity_providers.schema as user_idp_schema
-import users.users_identity_providers.utils as user_idp_utils
+import auth.identity_links.crud as user_idp_crud
+import auth.identity_links.schema as user_idp_schema
+import auth.identity_links.utils as user_idp_utils
 
 import auth.password_hasher as auth_password_hasher
 import auth.security_stores as auth_security_stores
