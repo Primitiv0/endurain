@@ -26,9 +26,7 @@ import core.cryptography as core_cryptography
 import core.logger as core_logger
 import profile.schema as profile_schema
 import users.users.crud as users_crud
-import auth.passwords as auth_passwords
 import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
-import auth.mfa_backup_codes.utils as mfa_backup_codes_utils
 from profile.exceptions import (
     MemoryAllocationError,
 )
@@ -206,7 +204,7 @@ def enable_user_mfa(
     user_id: int,
     secret: str,
     mfa_code: str,
-    password_hasher: auth_passwords.PasswordHasher,
+    identity_service: object,
     db: Session,
 ) -> list[str]:
     """
@@ -216,7 +214,7 @@ def enable_user_mfa(
         user_id: User ID to enable MFA for.
         secret: TOTP secret to verify.
         mfa_code: MFA code to verify.
-        password_hasher: Password hasher instance for backup code generation.
+        identity_service: Identity service dependency.
         db: Database session.
 
     Returns:
@@ -257,9 +255,7 @@ def enable_user_mfa(
     # Update user with MFA enabled and secret
     users_crud.update_user_mfa(user_id, db, encrypted_secret=encrypted_secret)
 
-    backup_codes = mfa_backup_codes_crud.create_backup_codes(
-        user_id, password_hasher, db
-    )
+    backup_codes = identity_service.create_mfa_backup_codes(user_id)
 
     return backup_codes
 
@@ -306,7 +302,7 @@ def disable_user_mfa(user_id: int, db: Session) -> None:
 def verify_user_mfa(
     user_id: int,
     mfa_code: str,
-    password_hasher: auth_passwords.PasswordHasher,
+    identity_service: object,
     db: Session,
 ) -> bool:
     """
@@ -315,7 +311,7 @@ def verify_user_mfa(
     Args:
         user_id: User ID to verify MFA for.
         mfa_code: MFA code to verify (6-digit TOTP or 8-character backup code).
-        password_hasher: Password hasher instance for backup code verification.
+        identity_service: Identity service dependency.
         db: Database session.
 
     Returns:
@@ -369,8 +365,9 @@ def verify_user_mfa(
     # Try backup code (9 alphanumeric characters with dash XXXX-XXXX)
     elif len(normalized_code) == 9 and normalized_code[4] == "-":
         try:
-            if mfa_backup_codes_utils.verify_and_consume_backup_code(
-                user_id, normalized_code, password_hasher, db
+            if identity_service.verify_and_consume_mfa_backup_code(
+                user_id,
+                normalized_code,
             ):
                 return True
         except Exception as err:

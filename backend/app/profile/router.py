@@ -33,7 +33,7 @@ import auth.identity_links.crud as user_idp_crud
 import auth.identity_links.schema as user_idp_schema
 import auth.identity_links.utils as user_idp_utils
 
-import auth.passwords as auth_passwords
+import auth.identity_service as auth_identity_service
 import auth.security_stores as auth_security_stores
 
 import auth.identity_providers.crud as idp_crud
@@ -243,9 +243,9 @@ async def generate_link_token(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -276,7 +276,7 @@ async def generate_link_token(
         link_request (IdpLinkTokenRequest): Request with step-up credentials.
         request (Request): The FastAPI request object.
         token_user_id (int): The authenticated user's ID extracted from the access token.
-        password_hasher (PasswordHasher): Password hasher dependency.
+        identity_service: Identity service dependency.
         db (Session): The database session.
 
     Returns:
@@ -295,7 +295,7 @@ async def generate_link_token(
         token_user_id,
         link_request.current_password,
         link_request.mfa_code,
-        password_hasher,
+        identity_service,
         db,
     )
 
@@ -439,9 +439,9 @@ async def edit_profile_password(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -462,7 +462,7 @@ async def edit_profile_password(
             password, and optional MFA code.
         token_user_id: ID of the user extracted from the access
             token.
-        password_hasher: Password hasher dependency.
+        identity_service: Identity service dependency.
         db: Database session dependency.
 
     Returns:
@@ -476,12 +476,12 @@ async def edit_profile_password(
         token_user_id,
         user_attributtes.current_password,
         user_attributtes.mfa_code,
-        password_hasher,
+        identity_service,
         db,
     )
 
     users_crud.edit_user_password(
-        token_user_id, user_attributtes.password, password_hasher, db
+        token_user_id, user_attributtes.password, identity_service, db
     )
 
     auth_security_stores.clear_pending_mfa_for_user(token_user_id)
@@ -901,9 +901,9 @@ async def enable_mfa(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
     mfa_secret_store: Annotated[
@@ -930,7 +930,7 @@ async def enable_mfa(
         request: MFA setup request with TOTP code and (when the
             account has a local password) current password.
         token_user_id: User ID from access token.
-        password_hasher: Password hasher instance for backup code
+        identity_service: Identity service instance for backup code
             generation and step-up verification.
         db: Database session.
         mfa_secret_store: Temporary secret storage.
@@ -950,7 +950,7 @@ async def enable_mfa(
         # MFA is not yet enabled here, so the MFA branch of
         # step-up is a no-op; pass None to make that explicit.
         None,
-        password_hasher,
+        identity_service,
         db,
     )
 
@@ -967,7 +967,7 @@ async def enable_mfa(
 
     try:
         backup_codes = profile_utils.enable_user_mfa(
-            token_user_id, secret, request.mfa_code, password_hasher, db
+            token_user_id, secret, request.mfa_code, identity_service, db
         )
         # Clean up the temporary secret
         mfa_secret_store.delete_secret(token_user_id)
@@ -1011,9 +1011,9 @@ async def disable_mfa(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> dict:
@@ -1033,7 +1033,7 @@ async def disable_mfa(
         request: MFA disable request with current password and
             MFA code.
         token_user_id: User ID from access token.
-        password_hasher: Password hasher dependency.
+        identity_service: Identity service dependency.
         db: Database session.
 
     Returns:
@@ -1048,7 +1048,7 @@ async def disable_mfa(
         token_user_id,
         request.current_password,
         request.mfa_code,
-        password_hasher,
+        identity_service,
         db,
     )
     profile_utils.disable_user_mfa(token_user_id, db)
@@ -1065,9 +1065,9 @@ async def verify_mfa(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> dict:
@@ -1077,7 +1077,7 @@ async def verify_mfa(
     Args:
         request: MFA request with code to verify.
         token_user_id: User ID from access token.
-        password_hasher: Password hasher instance for backup code verification.
+        identity_service: Identity service instance for backup code verification.
         db: Database session.
 
     Returns:
@@ -1087,7 +1087,7 @@ async def verify_mfa(
         HTTPException: If MFA code is invalid.
     """
     is_valid = profile_utils.verify_user_mfa(
-        token_user_id, request.mfa_code, password_hasher, db
+        token_user_id, request.mfa_code, identity_service, db
     )
     if not is_valid:
         raise HTTPException(
@@ -1110,9 +1110,9 @@ async def generate_mfa_backup_codes(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -1133,7 +1133,7 @@ async def generate_mfa_backup_codes(
         request: FastAPI request object for rate limiting.
         step_up: Step-up verification payload.
         token_user_id: User ID from access token.
-        password_hasher: Password hasher for code generation.
+        identity_service: Identity service for code generation.
         db: Database session.
 
     Returns:
@@ -1160,13 +1160,13 @@ async def generate_mfa_backup_codes(
         token_user_id,
         step_up.current_password,
         step_up.mfa_code,
-        password_hasher,
+        identity_service,
         db,
     )
 
     # Generate codes (invalidates old codes)
     codes = mfa_backup_codes_crud.create_backup_codes(
-        token_user_id, password_hasher, db
+        token_user_id, identity_service, db
     )
 
     # Log event
@@ -1252,9 +1252,9 @@ async def delete_my_identity_provider(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -1276,7 +1276,7 @@ async def delete_my_identity_provider(
         step_up (StepUpVerification): Step-up verification payload.
         request (Request): The FastAPI request object.
         token_user_id (int): User ID extracted from the access token.
-        password_hasher (PasswordHasher): Password hasher dependency.
+        identity_service: Identity service dependency.
         db (Session): Database session dependency.
 
     Returns:
@@ -1302,7 +1302,7 @@ async def delete_my_identity_provider(
         token_user_id,
         step_up.current_password,
         step_up.mfa_code,
-        password_hasher,
+        identity_service,
         db,
     )
 

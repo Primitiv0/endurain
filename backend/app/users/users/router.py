@@ -15,7 +15,7 @@ import auth.identity_links.crud as user_idp_crud
 
 import sign_up_tokens.utils as sign_up_tokens_utils
 import auth.dependencies as auth_dependencies
-import auth.passwords as auth_passwords
+import auth.identity_service as auth_identity_service
 import auth.security_stores as auth_security_stores
 
 import core.apprise as core_apprise
@@ -250,9 +250,9 @@ async def create_user(
     _check_scope: Annotated[
         Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -265,13 +265,13 @@ async def create_user(
     Args:
         user: User creation data.
         _check_scope: Authorization check.
-        password_hasher: Password hasher dependency.
+        identity_service: Identity service dependency.
         db: Database session dependency.
 
     Returns:
         Created user data.
     """
-    created_user = users_crud.create_user(user, password_hasher, db)
+    created_user = users_crud.create_user(user, identity_service, db)
 
     # Create default data for the user
     users_utils.create_user_default_data(created_user.id, db)
@@ -404,9 +404,9 @@ async def edit_user_password(
     _check_scope: Annotated[
         Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -421,14 +421,14 @@ async def edit_user_password(
         _validate_id: User ID validation dependency.
         user_attributes: New password data.
         _check_scope: Authorization check.
-        password_hasher: Password hasher dependency.
+        identity_service: Identity service dependency.
         db: Database session dependency.
 
     Returns:
         Success message.
     """
     users_crud.edit_user_password(
-        user_id, user_attributes.password, password_hasher, db
+        user_id, user_attributes.password, identity_service, db
     )
     users_sessions_crud.delete_sessions_by_user(user_id, db)
     auth_security_stores.clear_pending_mfa_for_user(user_id)

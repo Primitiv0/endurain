@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 import password_reset_tokens.schema as password_reset_tokens_schema
 import password_reset_tokens.utils as password_reset_tokens_utils
 
-import auth.passwords as auth_passwords
+import auth.identity_service as auth_identity_service
 
 import core.database as core_database
 import core.apprise as core_apprise
@@ -87,9 +87,9 @@ async def request_password_reset(
 async def confirm_password_reset(
     request: Request,
     confirm_data: password_reset_tokens_schema.PasswordResetConfirm,
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -102,7 +102,7 @@ async def confirm_password_reset(
     Args:
         request: The HTTP request object.
         confirm_data: Token and new password data.
-        password_hasher: Dependency-injected password hasher.
+        identity_service: Dependency-injected identity service.
         db: Dependency-injected database session.
 
     Returns:
@@ -114,7 +114,7 @@ async def confirm_password_reset(
     """
     # Use the token to reset password
     password_reset_tokens_utils.use_password_reset_token(
-        confirm_data.token, confirm_data.new_password, password_hasher, db
+        confirm_data.token, confirm_data.new_password, identity_service, db
     )
 
     return password_reset_tokens_schema.PasswordResetResponse(

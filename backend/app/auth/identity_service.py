@@ -276,6 +276,86 @@ class IdentityService(Protocol):
         """
         ...
 
+    def validate_and_hash_password(
+        self,
+        password: str,
+        min_length: int,
+        password_type: str,
+    ) -> str:
+        """Validate password policy and return a secure hash.
+
+        Args:
+            password: Plaintext password to validate and hash.
+            min_length: Minimum configured password length.
+            password_type: Configured password policy type.
+
+        Returns:
+            Secure password hash.
+
+        Raises:
+            HTTPException: 400 if the password policy fails.
+        """
+        ...
+
+    def hash_password(self, password: str) -> str:
+        """Return a secure hash for a trusted generated secret.
+
+        Args:
+            password: Plaintext password or generated secret.
+
+        Returns:
+            Secure hash.
+        """
+        ...
+
+    def verify_password(
+        self,
+        password: str,
+        password_hash: str,
+    ) -> bool:
+        """Verify a plaintext password against a stored hash.
+
+        Args:
+            password: Plaintext password supplied by the caller.
+            password_hash: Stored password hash.
+
+        Returns:
+            True if the password matches, False otherwise.
+        """
+        ...
+
+    def create_mfa_backup_codes(
+        self,
+        user_id: int,
+        count: int = 10,
+    ) -> list[str]:
+        """Create and persist MFA backup codes for a user.
+
+        Args:
+            user_id: User ID to create backup codes for.
+            count: Number of codes to create.
+
+        Returns:
+            Plaintext backup codes to show once.
+        """
+        ...
+
+    def verify_and_consume_mfa_backup_code(
+        self,
+        user_id: int,
+        code: str,
+    ) -> bool:
+        """Verify and consume an MFA backup code.
+
+        Args:
+            user_id: User ID to verify the backup code for.
+            code: Plaintext backup code supplied by the user.
+
+        Returns:
+            True if the backup code matched and was consumed.
+        """
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Default implementation
@@ -733,6 +813,111 @@ class DefaultIdentityService:
                     f"Missing permissions: {missing}"
                 ),
             )
+
+    def validate_and_hash_password(
+        self,
+        password: str,
+        min_length: int,
+        password_type: str,
+    ) -> str:
+        """Validate password policy and return a secure hash.
+
+        Args:
+            password: Plaintext password to validate and hash.
+            min_length: Minimum configured password length.
+            password_type: Configured password policy type.
+
+        Returns:
+            Secure password hash.
+
+        Raises:
+            HTTPException: 400 if the password policy fails.
+        """
+        try:
+            self._password_hasher.validate_password(
+                password,
+                min_length,
+                password_type,
+            )
+        except auth_password_hasher.PasswordPolicyError as err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(err),
+            ) from err
+        return self._password_hasher.hash_password(password)
+
+    def hash_password(self, password: str) -> str:
+        """Return a secure hash for a trusted generated secret.
+
+        Args:
+            password: Plaintext password or generated secret.
+
+        Returns:
+            Secure hash.
+        """
+        return self._password_hasher.hash_password(password)
+
+    def verify_password(
+        self,
+        password: str,
+        password_hash: str,
+    ) -> bool:
+        """Verify a plaintext password against a stored hash.
+
+        Args:
+            password: Plaintext password supplied by the caller.
+            password_hash: Stored password hash.
+
+        Returns:
+            True if the password matches, False otherwise.
+        """
+        return self._password_hasher.verify(password, password_hash)
+
+    def create_mfa_backup_codes(
+        self,
+        user_id: int,
+        count: int = 10,
+    ) -> list[str]:
+        """Create and persist MFA backup codes for a user.
+
+        Args:
+            user_id: User ID to create backup codes for.
+            count: Number of codes to create.
+
+        Returns:
+            Plaintext backup codes to show once.
+        """
+        import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
+
+        return mfa_backup_codes_crud.create_backup_codes(
+            user_id,
+            self._password_hasher,
+            self._db,
+            count,
+        )
+
+    def verify_and_consume_mfa_backup_code(
+        self,
+        user_id: int,
+        code: str,
+    ) -> bool:
+        """Verify and consume an MFA backup code.
+
+        Args:
+            user_id: User ID to verify the backup code for.
+            code: Plaintext backup code supplied by the user.
+
+        Returns:
+            True if the backup code matched and was consumed.
+        """
+        import auth.mfa_backup_codes.utils as mfa_backup_codes_utils
+
+        return mfa_backup_codes_utils.verify_and_consume_backup_code(
+            user_id,
+            code,
+            self._password_hasher,
+            self._db,
+        )
 
 
 # ---------------------------------------------------------------------------

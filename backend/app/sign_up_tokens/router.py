@@ -20,7 +20,7 @@ import notifications.utils as notifications_utils
 import sign_up_tokens.utils as sign_up_tokens_utils
 import sign_up_tokens.schema as sign_up_tokens_schema
 
-import auth.passwords as auth_passwords
+import auth.identity_service as auth_identity_service
 
 import server_settings.utils as server_settings_utils
 
@@ -47,9 +47,9 @@ async def signup(
         core_apprise.AppriseService,
         Depends(core_apprise.get_email_service),
     ],
-    password_hasher: Annotated[
-        auth_passwords.PasswordHasher,
-        Depends(auth_passwords.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     db: Annotated[
         Session,
@@ -63,7 +63,7 @@ async def signup(
         request: Incoming HTTP request.
         user: Sign-up payload with user info.
         email_service: Injected email service.
-        password_hasher: Injected password hasher.
+        identity_service: Injected identity service.
         db: Database session.
 
     Returns:
@@ -84,7 +84,7 @@ async def signup(
 
     # Create the user in the database
     created_user = users_crud.create_signup_user(
-        user, server_settings, password_hasher, db
+        user, server_settings, identity_service, db
     )
 
     # Create default data for the user

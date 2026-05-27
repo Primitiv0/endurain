@@ -3,8 +3,6 @@ import os
 from fastapi import HTTPException, status, UploadFile
 from sqlalchemy.orm import Session
 
-import auth.passwords as auth_passwords
-
 import users.users.crud as users_crud
 import users.users.schema as users_schema
 import users.users.models as users_models
@@ -52,7 +50,7 @@ def verify_step_up_credentials(
     user_id: int,
     current_password: str | None,
     mfa_code: str | None,
-    password_hasher: auth_passwords.PasswordHasher,
+    identity_service: object,
     db: Session,
 ) -> None:
     """
@@ -81,7 +79,7 @@ def verify_step_up_credentials(
             password.
         mfa_code: TOTP or backup code, required when MFA is
             enabled. Ignored when MFA is disabled.
-        password_hasher: Password hasher dependency.
+        identity_service: Identity service dependency.
         db: SQLAlchemy database session.
 
     Raises:
@@ -106,7 +104,10 @@ def verify_step_up_credentials(
                 detail="Step-up verification failed",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if not password_hasher.verify(current_password, db_user.password):
+        if not identity_service.verify_password(
+            current_password,
+            db_user.password,
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Step-up verification failed",
@@ -123,7 +124,7 @@ def verify_step_up_credentials(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         if not profile_utils.verify_user_mfa(
-            user_id, mfa_code, password_hasher, db
+            user_id, mfa_code, identity_service, db
         ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -158,7 +159,7 @@ def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
 
 def check_password_and_hash(
     password: str,
-    password_hasher: auth_passwords.PasswordHasher,
+    identity_service: object,
     server_settings: (
         server_settings_models.ServerSettings
         | server_settings_schema.ServerSettingsRead
@@ -170,7 +171,7 @@ def check_password_and_hash(
 
     Args:
         password (str): The password to validate and hash.
-        password_hasher (PasswordHasher): The password hasher instance.
+        identity_service: Identity service dependency.
         server_settings (ServerSettings | ServerSettingsRead): The server settings containing password policies.
         user_access_type (str): The access type of the user (e.g., "regular" or "admin").
 
@@ -187,18 +188,11 @@ def check_password_and_hash(
         else server_settings.password_length_regular_users
     )
     # Check if password meets requirements
-    try:
-        password_hasher.validate_password(
-            password, min_length, str(server_settings.password_type)
-        )
-    except auth_passwords.PasswordPolicyError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(err),
-        ) from err
-
-    # Hash the password
-    hashed_password = password_hasher.hash_password(password)
+    hashed_password = identity_service.validate_and_hash_password(
+        password,
+        min_length,
+        str(server_settings.password_type),
+    )
 
     # Return the hashed password
     return hashed_password

@@ -18,7 +18,7 @@ load_dotenv(dotenv_path=env_test_path)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 import auth.sessions.router as users_session_router
-import auth.passwords as auth_passwords
+import auth.password_hasher as auth_password_hasher
 import auth.dependencies as auth_dependencies
 import auth.token_manager as auth_token_manager
 import auth.security as auth_security
@@ -41,14 +41,14 @@ PUBLIC_ROUTER_MODULES = [
 
 
 @pytest.fixture
-def password_hasher() -> auth_passwords.PasswordHasher:
+def password_hasher() -> auth_password_hasher.PasswordHasher:
     """
-    Creates and returns an instance of auth_passwords.PasswordHasher using the get_password_hasher function.
+    Creates and returns an instance of auth_password_hasher.PasswordHasher using the get_password_hasher function.
 
     Returns:
-        auth_passwords.PasswordHasher: An instance of the password hasher utility.
+        auth_password_hasher.PasswordHasher: An instance of the password hasher utility.
     """
-    return auth_passwords.get_password_hasher()
+    return auth_password_hasher.get_password_hasher()
 
 
 @pytest.fixture
@@ -479,9 +479,6 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         lambda: password_hasher,
     )
     _override_if_exists(
-        app, "auth.passwords", "get_password_hasher", lambda: password_hasher
-    )
-    _override_if_exists(
         app, "auth.token_manager", "get_token_manager", lambda: token_manager
     )
     _override_if_exists(
@@ -570,9 +567,6 @@ def fast_api_app_public(password_hasher, token_manager, mock_db) -> FastAPI:
         "auth.password_hasher",
         "get_password_hasher",
         lambda: password_hasher,
-    )
-    _override_if_exists(
-        app, "auth.passwords", "get_password_hasher", lambda: password_hasher
     )
     _override_if_exists(
         app, "auth.token_manager", "get_token_manager", lambda: token_manager

@@ -27,7 +27,7 @@ class TestEditUserPassword:
         """
         user_id = 42
         new_password = "new-secure-password"
-        password_hasher = MagicMock()
+        identity_service = MagicMock()
         user_attributes = users_schema.UsersAdminEditPassword(
             password=new_password
         )
@@ -37,14 +37,14 @@ class TestEditUserPassword:
             _validate_id=MagicMock(),
             user_attributes=user_attributes,
             _check_scope=MagicMock(),
-            password_hasher=password_hasher,
+            identity_service=identity_service,
             db=mock_db,
         )
 
         mock_edit_password.assert_called_once_with(
             user_id,
             new_password,
-            password_hasher,
+            identity_service,
             mock_db,
         )
         mock_delete_sessions.assert_called_once_with(user_id, mock_db)
