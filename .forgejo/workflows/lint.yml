@@ -1,0 +1,63 @@
+name: Lint and Format
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ forgejo.workflow }}-${{ forgejo.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  backend:
+    name: Backend (ruff)
+    runs-on: codeberg-small
+    steps:
+      - name: Checkout code
+        uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Install ruff
+        run: |
+          curl -LsSf https://astral.sh/ruff/install.sh | sh
+          echo "$HOME/.local/bin" >> "$FORGEJO_PATH"
+
+      - name: Check formatting
+        working-directory: backend
+        run: ruff format --check .
+
+      - name: Check linting
+        working-directory: backend
+        run: ruff check .
+
+  frontend:
+    name: Frontend (eslint + prettier + type-check)
+    runs-on: codeberg-small
+    steps:
+      - name: Checkout code
+        uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        working-directory: frontend/app
+        run: npm ci
+
+      - name: Check formatting (Prettier)
+        working-directory: frontend/app
+        run: npm run format:check
+
+      - name: Check linting (ESLint)
+        working-directory: frontend/app
+        run: npm run lint:check
+
+      - name: Type check (vue-tsc)
+        working-directory: frontend/app
+        run: npm run type-check

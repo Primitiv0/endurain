@@ -80,13 +80,13 @@ Fast iteration workflow for frontend-only development:
 - Format code: `npm run format` (≈5 seconds)
 
 **Notes:**
-- ESLint configuration pending migration to flat config format (lint fails currently)
+- ESLint uses flat config (`eslint.config.ts`) with Vue + TypeScript support
 - Unit tests not yet implemented (`npm run test:unit` exits with "No test files found")
 
 **Pre-commit validation:**
-- Run `npm run format` before commits
+- Run `npm run format` and `npm run lint` before commits
 - Confirm successful `npm run build`
-- Ensure `npm run dev` runs without warnings/errors
+- CI checks: `npm run format:check`, `npm run lint:check`, `npm run type-check`
 
 ### Docker Development (Full Stack)
 
@@ -107,6 +107,10 @@ Python development without Docker (requires Python 3.13):
 - Install uv: `pip install uv`
 - Install dependencies: `uv sync`
 - Backend codebase in `backend/app/` with `pyproject.toml`
+- **Linting/Formatting:** Uses `ruff` (configured in `pyproject.toml`)
+  - Format: `ruff format .`
+  - Lint: `ruff check .` (auto-fix: `ruff check --fix .`)
+  - CI checks: `ruff format --check .` and `ruff check .`
 - **Use Docker if system Python < 3.13**
 
 ---
@@ -164,7 +168,6 @@ Repository root:
 
 ## Known Issues
 
-- ESLint migration to flat config pending
 - Docker builds may fail with SSL issues in CI
 - Backend Python 3.13 required
 - No frontend test coverage yet
