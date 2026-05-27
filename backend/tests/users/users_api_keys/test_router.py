@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException, status
 
-import users.users_api_keys.models as users_api_keys_models
-import users.users_api_keys.schema as users_api_keys_schema
+import auth.api_keys.models as users_api_keys_models
+import auth.api_keys.schema as users_api_keys_schema
 
 
 class TestGetUserApiKeys:

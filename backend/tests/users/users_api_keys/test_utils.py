@@ -2,7 +2,7 @@
 
 import pytest
 
-import users.users_api_keys.utils as users_api_keys_utils
+import auth.api_keys.utils as users_api_keys_utils
 
 
 class TestGenerateApiKey:
