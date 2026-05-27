@@ -28,6 +28,7 @@ Always reference these instructions first and fallback to search or bash command
 - Do not create README files, summary documents, quick reference guides, or completion reports unless explicitly requested.
 - When implementing changes, focus on the code implementation itself, not supplementary documentation.
 - Ask for clarification if the scope is unclear rather than assuming additional deliverables are wanted.
+- **Do NOT run `git commit` (or any other commit-creating command) unless the user explicitly asks for it.** Stage changes if needed for inspection (`git add`), but leave the actual commit to the user. This applies even when finishing a multi-step task, when tests pass, or when changes feel "done" — wait for explicit instruction.
 
 ---
 

@@ -185,7 +185,7 @@ def setup_user_mfa(user_id: int, db: Session) -> profile_schema.MFASetupResponse
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    if user.mfa_enabled:
+    if user.auth_mfa and user.auth_mfa.mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="MFA is already enabled for this user",
@@ -232,7 +232,7 @@ def enable_user_mfa(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    if user.mfa_enabled:
+    if user.auth_mfa and user.auth_mfa.mfa_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="MFA is already enabled for this user",
@@ -290,7 +290,7 @@ def disable_user_mfa(user_id: int, db: Session) -> None:
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    if not user.mfa_enabled:
+    if not (user.auth_mfa and user.auth_mfa.mfa_enabled):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="MFA is not enabled for this user",
@@ -335,7 +335,8 @@ def verify_user_mfa(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
-    if not user.mfa_enabled or not user.mfa_secret:
+    mfa_row = user.auth_mfa
+    if not mfa_row or not mfa_row.mfa_enabled or not mfa_row.mfa_secret:
         return False
 
     # Normalize code (remove whitespaces in the beginning and end, uppercase)
@@ -344,7 +345,7 @@ def verify_user_mfa(
     # Try TOTP first (6 digits)
     if len(normalized_code) == 6 and normalized_code.isdigit():
         try:
-            secret = core_cryptography.decrypt_token_fernet(user.mfa_secret)
+            secret = core_cryptography.decrypt_token_fernet(mfa_row.mfa_secret)
             if not secret:
                 core_logger.print_to_log("Failed to decrypt MFA secret", "error")
                 return False
@@ -396,7 +397,12 @@ def is_mfa_enabled_for_user(user_id: int, db: Session) -> bool:
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
         return False
-    return bool(user.mfa_enabled == 1 and user.mfa_secret is not None)
+    mfa_row = user.auth_mfa
+    return bool(
+        mfa_row
+        and mfa_row.mfa_enabled
+        and mfa_row.mfa_secret is not None
+    )
 
 
 # Export utility functions

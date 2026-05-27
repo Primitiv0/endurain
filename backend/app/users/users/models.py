@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from auth.identity_links.models import UsersIdentityProvider
     from users.users_integrations.models import UsersIntegrations
     from users.users_privacy_settings.models import UsersPrivacySettings
+    from auth.mfa.models import AuthUserMFA
     from auth.sessions.models import UsersSessions
 
 
@@ -55,10 +56,6 @@ class Users(Base):
         first_day_of_week: First day of the week
             (sunday, monday, etc.).
         currency: Currency preference (euro, dollar, pound).
-        mfa_enabled: Whether multi-factor authentication is
-            enabled.
-        mfa_secret: MFA secret for TOTP generation
-            (encrypted at rest).
         email_verified: Whether the user's email address has
             been verified.
         pending_admin_approval: Whether the user is pending
@@ -89,6 +86,9 @@ class Users(Base):
             linked to the user.
         oauth_states: List of OAuth states for the user.
         mfa_backup_codes: List of MFA backup codes.
+        auth_mfa: 1:1 MFA state row in ``users_mfa``
+        mfa_enabled: Computed property — ``True`` when
+            ``auth_mfa.mfa_enabled`` is set.
     """
 
     __tablename__ = "users"
@@ -181,16 +181,6 @@ class Users(Base):
         default="euro",
         nullable=False,
         comment="User currency (euro, dollar, pound)",
-    )
-    mfa_enabled: Mapped[bool] = mapped_column(
-        default=False,
-        nullable=False,
-        comment="Whether MFA is enabled for this user",
-    )
-    mfa_secret: Mapped[str | None] = mapped_column(
-        String(512),
-        nullable=True,
-        comment=("User MFA secret for TOTP generation " "(encrypted at rest)"),
     )
     email_verified: Mapped[bool] = mapped_column(
         default=False,
@@ -304,7 +294,25 @@ class Users(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
+    auth_mfa: Mapped["AuthUserMFA"] = relationship(
+        back_populates="users",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
     users_api_keys: Mapped[list["UsersApiKeys"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def mfa_enabled(self) -> bool:
+        """
+        Return whether MFA is active for this user.
+
+        Used by Pydantic schemas (``from_attributes=True``) and
+        any caller that checks MFA status on the profile row.
+        """
+        return bool(
+            self.auth_mfa and self.auth_mfa.mfa_enabled
+        )
+

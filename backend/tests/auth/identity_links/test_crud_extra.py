@@ -7,8 +7,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
-from users.users_identity_providers import crud as user_idp_crud
-from users.users_identity_providers.models import UsersIdentityProvider
+from auth.identity_links import crud as user_idp_crud
+from auth.identity_links.models import UsersIdentityProvider
 
 
 class TestCheckUserIdentityProvidersByIdpId:
@@ -321,7 +321,7 @@ class TestCreateUserIdentityProvider:
 
         # Patch the UsersIdentityProvider constructor
         with patch(
-            "users.users_identity_providers.crud.user_idp_models.UsersIdentityProvider"
+            "auth.identity_links.crud.user_idp_models.UsersIdentityProvider"
         ) as mock_constructor:
             mock_constructor.return_value = mock_link
 

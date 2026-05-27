@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from urllib.parse import unquote
 
 import auth.password_hasher as auth_password_hasher
+import auth.mfa.models as auth_mfa_models
 
 import users.users.schema as users_schema
 import users.users.utils as users_utils
@@ -763,7 +764,8 @@ def update_user_mfa(
     Args:
         user_id: ID of user to update MFA for.
         db: SQLAlchemy database session.
-        encrypted_secret: Encrypted MFA secret. If None, disables MFA.
+        encrypted_secret: Encrypted MFA secret.
+            If None, disables MFA.
 
     Returns:
         None
@@ -772,18 +774,31 @@ def update_user_mfa(
         HTTPException: 404 if user not found.
         HTTPException: 500 if database error occurs.
     """
-    # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
+    mfa_enabled = bool(encrypted_secret)
+    mfa_secret_value = encrypted_secret if encrypted_secret else None
 
-    if encrypted_secret:
-        db_user.mfa_enabled = True
-        db_user.mfa_secret = encrypted_secret
+    # Verify the user exists (raises 404 if not found).
+    users_utils.get_user_by_id_or_404(user_id, db)
+
+    stmt = select(auth_mfa_models.AuthUserMFA).where(
+        auth_mfa_models.AuthUserMFA.user_id == user_id
+    )
+    mfa_row = db.execute(stmt).scalar_one_or_none()
+    if mfa_row is None:
+        # Row may be missing if the backfill migration has
+        # not yet created one for this user; create it on
+        # first write.
+        mfa_row = auth_mfa_models.AuthUserMFA(
+            user_id=user_id,
+            mfa_enabled=mfa_enabled,
+            mfa_secret=mfa_secret_value,
+        )
+        db.add(mfa_row)
     else:
-        db_user.mfa_enabled = False
-        db_user.mfa_secret = None
+        mfa_row.mfa_enabled = mfa_enabled
+        mfa_row.mfa_secret = mfa_secret_value
 
     db.commit()
-    db.refresh(db_user)
 
 
 @core_decorators.handle_db_errors

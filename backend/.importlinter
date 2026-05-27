@@ -1,79 +1,3 @@
-# Forbid imports of users_sessions outside itself (sessions now owned by auth)
-[importlinter:contract:users-sessions-boundary]
-name = Users sessions boundary: only users_sessions itself may import its modules
-type = forbidden
-allow_indirect_imports = True
-source_modules =
-    users.users
-    auth
-    activities
-    core
-    followers
-    garmin
-    gears
-    health
-    notifications
-    password_reset_tokens
-    profile
-    server_settings
-    sign_up_tokens
-    strava
-    websocket
-forbidden_modules =
-    users.users_sessions
-    users.users_sessions.rotated_refresh_tokens
-
-# Forbid imports of users_api_keys outside itself (api_keys now owned by auth)
-[importlinter:contract:users-api-keys-boundary]
-name = Users api_keys boundary: only users_api_keys itself may import its modules
-type = forbidden
-allow_indirect_imports = True
-source_modules =
-    users.users
-    auth
-    activities
-    core
-    followers
-    garmin
-    gears
-    health
-    notifications
-    password_reset_tokens
-    profile
-    server_settings
-    sign_up_tokens
-    strava
-    websocket
-forbidden_modules =
-    users.users_api_keys
-
-# Forbid imports of users_identity_providers data modules outside itself
-# (identity links now owned by auth.identity_links)
-[importlinter:contract:users-identity-providers-boundary]
-name = Users identity_providers boundary: only users_identity_providers itself may import its modules
-type = forbidden
-allow_indirect_imports = True
-source_modules =
-    users.users
-    auth
-    activities
-    core
-    followers
-    garmin
-    gears
-    health
-    notifications
-    password_reset_tokens
-    profile
-    server_settings
-    sign_up_tokens
-    strava
-    websocket
-forbidden_modules =
-    users.users_identity_providers.crud
-    users.users_identity_providers.models
-    users.users_identity_providers.schema
-    users.users_identity_providers.utils
 [importlinter]
 # Run from backend/ with: PYTHONPATH=app uv run lint-imports
 root_packages =
@@ -117,12 +41,10 @@ forbidden_modules =
     auth.password_hasher
     auth.token_manager
 ignore_imports =
-    # ---------------------------------------------------------------
-    # PR 1 baseline - report-only mode
-    # Each subsequent PR removes entries as call sites are migrated
-    # to IdentityService. When all entries are removed the contract
-    # flips to fully-enforcing mode (Phase 12).
-    # ---------------------------------------------------------------
+    # Known violations: call sites that still import auth internals
+    # directly. Each entry is removed as the call site is migrated to
+    # IdentityService; the contract becomes fully-enforcing once this
+    # list is empty.
 
     # auth.security violations
     followers.router -> auth.security
@@ -142,7 +64,6 @@ ignore_imports =
     garmin.router -> auth.security
     profile.router -> auth.security
     users.users_goals.router -> auth.security
-    users.users_identity_providers.router -> auth.security
     users.users_default_gear.router -> auth.security
     users.users.router -> auth.security
     activities.activity_laps.router -> auth.security
