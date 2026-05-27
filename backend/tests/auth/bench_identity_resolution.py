@@ -1,6 +1,6 @@
 """Micro-benchmark for resolve_from_access_token latency.
 
-Records baseline numbers for PR 2 performance gate.
+Records baseline numbers for the identity-resolution performance gate.
 Asserts that the operation completes within an acceptable
 wall-clock threshold and makes no more DB roundtrips
 than expected.

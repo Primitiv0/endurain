@@ -5,9 +5,6 @@ This module provides CRUD operations and data models for managing
 user-to-identity-provider associations, including token storage
 and last login tracking.
 
-This is the canonical location for identity link data; the old
-``users.users_identity_providers`` path is a backward-compat shim.
-
 Exports:
     - CRUD: check_user_identity_providers_by_idp_id,
       get_user_identity_providers_by_user_id,

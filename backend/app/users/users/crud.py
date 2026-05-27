@@ -761,9 +761,9 @@ def update_user_mfa(
     """
     Update a user's MFA settings.
 
-    Writes exclusively to ``users_mfa``.  The legacy
-    ``users.mfa_enabled`` / ``users.mfa_secret`` columns were
-    removed in PR 11.
+    Writes exclusively to the ``users_mfa`` table; the
+    legacy ``users.mfa_enabled`` / ``users.mfa_secret``
+    columns no longer exist.
 
     Args:
         user_id: ID of user to update MFA for.
@@ -784,14 +784,15 @@ def update_user_mfa(
     # Verify the user exists (raises 404 if not found).
     users_utils.get_user_by_id_or_404(user_id, db)
 
-    # Write to users_mfa — sole source of truth from PR 11.
+    # Write to users_mfa — sole source of truth for MFA state.
     stmt = select(auth_mfa_models.AuthUserMFA).where(
         auth_mfa_models.AuthUserMFA.user_id == user_id
     )
     mfa_row = db.execute(stmt).scalar_one_or_none()
     if mfa_row is None:
-        # Row may be missing on fresh installs before the PR 9
-        # backfill migration has run; create it on first write.
+        # Row may be missing if the backfill migration has
+        # not yet created one for this user; create it on
+        # first write.
         mfa_row = auth_mfa_models.AuthUserMFA(
             user_id=user_id,
             mfa_enabled=mfa_enabled,

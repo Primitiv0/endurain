@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime, timezone
 from sqlalchemy import inspect
 
-from users.users_identity_providers.models import UsersIdentityProvider
+from auth.identity_links.models import UsersIdentityProvider
 
 
 class TestUserIdentityProviderModel:

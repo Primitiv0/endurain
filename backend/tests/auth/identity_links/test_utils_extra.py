@@ -4,8 +4,8 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from users.users_identity_providers import utils as user_idp_utils
-from users.users_identity_providers.schema import UsersIdentityProviderResponse
+from auth.identity_links import utils as user_idp_utils
+from auth.identity_links.schema import UsersIdentityProviderResponse
 
 
 class TestEnrichUserIdentityProviders:
@@ -78,7 +78,7 @@ class TestEnrichUserIdentityProviders:
         mock_idp2.provider_type = "oauth2"
 
         with patch(
-            "users.users_identity_providers.utils.idp_crud"
+            "auth.identity_links.utils.idp_crud"
             ".get_identity_providers_by_ids"
         ) as mock_get_idps:
             mock_get_idps.return_value = [mock_idp1, mock_idp2]
@@ -134,11 +134,11 @@ class TestEnrichUserIdentityProviders:
         mock_idp1.provider_type = "oauth2"
 
         with patch(
-            "users.users_identity_providers.utils.idp_crud"
+            "auth.identity_links.utils.idp_crud"
             ".get_identity_providers_by_ids"
         ) as mock_get_idps:
             with patch(
-                "users.users_identity_providers.utils.core_logger.print_to_log"
+                "auth.identity_links.utils.core_logger.print_to_log"
             ) as mock_logger:
                 mock_get_idps.return_value = [mock_idp1]
 
@@ -171,11 +171,11 @@ class TestEnrichUserIdentityProviders:
         mock_link.linked_at = now
 
         with patch(
-            "users.users_identity_providers.utils.idp_crud"
+            "auth.identity_links.utils.idp_crud"
             ".get_identity_providers_by_ids"
         ) as mock_get_idps:
             with patch(
-                "users.users_identity_providers.utils.core_logger.print_to_log"
+                "auth.identity_links.utils.core_logger.print_to_log"
             ) as mock_logger:
                 mock_get_idps.return_value = []
 
@@ -204,7 +204,7 @@ class TestGetUserIdentityProviderRefreshTokenByUserIdAndIdpId:
         """
         # Arrange
         with patch(
-            "users.users_identity_providers.utils.user_idp_crud"
+            "auth.identity_links.utils.user_idp_crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_link = MagicMock()
@@ -230,7 +230,7 @@ class TestGetUserIdentityProviderRefreshTokenByUserIdAndIdpId:
         """
         # Arrange
         with patch(
-            "users.users_identity_providers.utils.user_idp_crud"
+            "auth.identity_links.utils.user_idp_crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = None
@@ -254,7 +254,7 @@ class TestGetUserIdentityProviderRefreshTokenByUserIdAndIdpId:
         """
         # Arrange
         with patch(
-            "users.users_identity_providers.utils.user_idp_crud"
+            "auth.identity_links.utils.user_idp_crud"
             ".get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_link = MagicMock()

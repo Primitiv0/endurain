@@ -1,13 +1,12 @@
-"""Tests for Phase 11 — drop legacy MFA columns from users.
+"""Tests verifying the legacy MFA columns are absent from the ORM.
 
 Verifies that:
-* ``Users.mfa_enabled`` property correctly reads from
-  ``auth_mfa`` after the old column is removed from the ORM.
+* ``Users.mfa_enabled`` reads from ``auth_mfa`` (the legacy
+  column is no longer present on the ORM).
 * ``update_user_mfa`` writes ONLY to ``users_mfa``; the
   ``Users`` mock's attributes are never touched.
-* ``db.refresh(db_user)`` is no longer called.
-* A missing ``users_mfa`` row triggers a new INSERT (unchanged
-  behaviour from PR 9/10, now the only write path).
+* ``db.refresh(db_user)`` is not called.
+* A missing ``users_mfa`` row triggers a new INSERT.
 """
 
 from unittest.mock import MagicMock, patch
@@ -56,7 +55,7 @@ def _make_user_no_mfa_row() -> MagicMock:
 
 
 class TestUsersMFAEnabledProperty:
-    """``Users.mfa_enabled`` reads from ``auth_mfa`` after PR 11."""
+    """``Users.mfa_enabled`` reads from ``auth_mfa``."""
 
     def test_returns_true_when_auth_mfa_enabled(self):
         """Property returns True when auth_mfa.mfa_enabled is True."""
@@ -96,7 +95,7 @@ class TestUsersMFAEnabledProperty:
 
 
 class TestUpdateUserMFASingleWrite:
-    """After PR 11 there is no legacy column write."""
+    """Legacy column writes are never performed."""
 
     def _setup(
         self,
@@ -158,7 +157,7 @@ class TestUpdateUserMFASingleWrite:
         mock_db.commit.assert_called_once()
 
     def test_refresh_not_called(self, mock_db):
-        """db.refresh() is not called after PR 11."""
+        """db.refresh() is not called."""
         mfa_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
         self._setup(mock_db, mfa_row)
 

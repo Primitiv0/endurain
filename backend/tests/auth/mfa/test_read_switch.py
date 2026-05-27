@@ -1,12 +1,12 @@
-"""Tests for PR 10: MFA read paths now served from auth_user_mfa.
+"""Tests for MFA reads sourced from the ``users_mfa`` table.
 
-Verifies that after the read switch all MFA logic in
-``profile.utils`` reads ``mfa_enabled`` and ``mfa_secret``
-from ``user.auth_mfa`` (the ``auth_user_mfa`` row) rather
-than directly from the legacy ``users`` columns.
+Verifies that MFA logic in ``profile.utils`` reads
+``mfa_enabled`` and ``mfa_secret`` from ``user.auth_mfa``
+(the ``users_mfa`` row) and not from the legacy ``users``
+columns.
 
-Also covers the ``Users.mfa`` compat property introduced in
-PR 10 as a deprecated alias for ``auth_mfa``.
+Also covers the ``Users.mfa`` compat property as a
+deprecated alias for ``auth_mfa``.
 """
 
 from unittest.mock import MagicMock, patch
@@ -47,7 +47,7 @@ def _make_user(
     user = MagicMock(spec=users_models.Users)
     user.id = user_id
     user.username = "testuser"
-    # Legacy columns (must NOT be read after PR 10)
+    # Legacy columns (must NOT be read — source of truth is auth_mfa)
     user.mfa_enabled = False
     user.mfa_secret = None
     # New source of truth

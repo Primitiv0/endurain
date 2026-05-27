@@ -1,9 +1,9 @@
-"""Tests for dual-write behaviour introduced in PR 9.
+"""Tests for ``users.users.crud.update_user_mfa``.
 
-Verifies that ``users.users.crud.update_user_mfa`` writes MFA
-state to both the legacy ``users`` columns and the new
-``users_mfa`` table.  Tests use a mock DB session — no live
-database required.
+Verifies that ``update_user_mfa`` writes MFA state
+exclusively to the ``users_mfa`` table and never touches
+the legacy ``users`` profile columns. Tests use a mock DB
+session — no live database required.
 """
 
 from unittest.mock import MagicMock, call, patch
@@ -78,7 +78,7 @@ class TestUpdateUserMFADualWrite:
 
     def test_enable_does_not_write_to_legacy_columns(self, mock_db):
         """
-        After PR 11, legacy user columns must NOT be touched
+        Legacy user columns must NOT be touched
         by update_user_mfa — only users_mfa is written.
         """
         user = _make_mock_user()
@@ -120,7 +120,7 @@ class TestUpdateUserMFADualWrite:
 
     def test_disable_does_not_touch_legacy_columns(self, mock_db):
         """
-        After PR 11, legacy user columns must NOT be cleared by
+        Legacy user columns must NOT be cleared by
         update_user_mfa — only users_mfa is written.
         """
         user = _make_mock_user()

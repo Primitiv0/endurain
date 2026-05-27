@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime, timezone
 from pydantic import ValidationError
 
-from users.users_identity_providers.schema import (
+from auth.identity_links.schema import (
     UsersIdentityProviderBase,
     UsersIdentityProviderCreate,
     UsersIdentityProviderRead,

@@ -1,12 +1,10 @@
-"""SQLAlchemy ORM model for the users_mfa table.
+"""SQLAlchemy ORM model for the ``users_mfa`` table.
 
-This module defines the 1:1 companion table that will own
-MFA state once the three-phase extraction (PRs 9-11) is
-complete.  During PR 9 the table is populated by a backfill
-migration and kept in sync via dual-write in
-``users.users.crud.update_user_mfa``.  Reads still come from
-the legacy ``users.mfa_enabled`` / ``users.mfa_secret``
-columns until PR 10 switches the read path.
+This module defines the 1:1 companion table that owns MFA
+state for a user. Rows are written and read exclusively by
+``users.users.crud.update_user_mfa`` and the ``Users``
+relationship; the legacy ``users.mfa_enabled`` /
+``users.mfa_secret`` columns no longer exist.
 """
 
 from typing import TYPE_CHECKING
@@ -24,9 +22,8 @@ class AuthUserMFA(Base):
     """
     1:1 MFA state table keyed by user_id.
 
-    Stores ``mfa_enabled`` and ``mfa_secret`` that currently
-    live on the ``users`` profile table.  This table is the
-    target of the PR 9-11 extraction sequence.
+    Stores ``mfa_enabled`` and ``mfa_secret`` as the sole
+    source of truth for a user's MFA state.
 
     Attributes:
         id: Surrogate primary key.

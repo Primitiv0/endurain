@@ -1,4 +1,4 @@
-"""Regression tests for PR 2: security dependencies via IdentityService.
+"""Regression tests for security dependencies via IdentityService.
 
 Covers:
 - JWT happy path via get_sub_from_access_token.

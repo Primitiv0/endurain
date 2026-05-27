@@ -38,19 +38,13 @@ def upgrade() -> None:
             "mfa_enabled",
             sa.Boolean(),
             nullable=False,
-            comment=(
-                "Whether TOTP MFA is active for this user "
-                "(mirrors users.mfa_enabled during dual-write)"
-            ),
+            comment="Whether TOTP MFA is active for this user",
         ),
         sa.Column(
             "mfa_secret",
             sa.String(512),
             nullable=True,
-            comment=(
-                "Fernet-encrypted TOTP secret "
-                "(mirrors users.mfa_secret during dual-write)"
-            ),
+            comment="Fernet-encrypted TOTP secret",
         ),
         sa.ForeignKeyConstraint(
             ["user_id"],

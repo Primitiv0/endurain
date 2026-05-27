@@ -87,8 +87,8 @@ class Users(Base):
         oauth_states: List of OAuth states for the user.
         mfa_backup_codes: List of MFA backup codes.
         auth_mfa: 1:1 MFA state row in ``users_mfa``
-            (None only on fresh installs before the
-            PR 9 backfill migration has run).
+            (None only when the backfill migration has not
+            yet created a row for this user).
         mfa_enabled: Computed property — ``True`` when
             ``auth_mfa.mfa_enabled`` is set.
     """
@@ -311,7 +311,8 @@ class Users(Base):
         """
         Return whether MFA is active for this user.
 
-        Reads from ``auth_mfa`` (PR 11 — old column removed).
+        Reads from the ``auth_mfa`` relationship (the legacy
+        ``users.mfa_enabled`` column no longer exists).
         Used by Pydantic schemas (``from_attributes=True``) and
         any caller that checks MFA status on the profile row.
         """
