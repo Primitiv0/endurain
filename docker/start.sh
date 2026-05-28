@@ -10,23 +10,11 @@ echo_error_log() {
     echo "ERROR:     $1" >&2
 }
 
-validate_id() {
-    case "$1" in
-        ''|*[!0-9]*)
-            echo_error_log "Invalid ID: $1. Must be a non-negative integer."
-            exit 1
-            ;;
-    esac
-}
+# Log the container's UID for troubleshooting
+current_uid=$(id -u)
+echo_info_log "Container running as UID $current_uid"
 
-validate_id "$UID"
-validate_id "$GID"
-
-echo_info_log "UID=$UID, GID=$GID"
-
-# Create required directories with correct ownership
-# These directories are created as root before switching to the non-root user
-# to ensure proper permissions on fresh volume mounts
+# Create required directories
 BACKEND_FOLDER="${BACKEND_DIR:-/app/backend}"
 DATA_FOLDER="${DATA_DIR:-$BACKEND_FOLDER/data}"
 LOGS_FOLDER="${LOGS_DIR:-$BACKEND_FOLDER/logs}"
@@ -52,10 +40,25 @@ $LOGS_FOLDER
 for dir in $REQUIRED_DIRS; do
     if [ ! -d "$dir" ]; then
         echo_info_log "Creating directory: $dir"
-        mkdir -p "$dir"
+        if ! mkdir -p "$dir" 2>/dev/null; then
+            echo_error_log "Cannot create $dir - permission denied."
+            echo_error_log "Container UID: $current_uid"
+            if echo "$dir" | grep -q "^$LOGS_FOLDER"; then
+                mount_root="$LOGS_FOLDER"
+            else
+                mount_root="$DATA_FOLDER"
+            fi
+            if [ -d "$mount_root" ]; then
+                echo_error_log "Mount point: $(stat -c '%A  owner=%u  group=%g  path=%n' "$mount_root" 2>/dev/null || true)"
+            fi
+            echo_error_log "The bind mount on the host is not writable by container UID $current_uid."
+            echo_error_log "Fix on the host - run once:"
+            echo_error_log "  sudo chown -R $current_uid:$current_uid /var/opt/endurain/backend"
+            echo_error_log "(Replace /var/opt/endurain with your LOCAL_PATH if set.)"
+            echo_error_log "See docs.endurain.com/getting-started#create-directory-structure"
+            exit 1
+        fi
     fi
-    echo_info_log "Setting ownership recursively of $dir to $UID:$GID"
-    chown -R "$UID:$GID" "$dir"
 done
 
 if [ -n "$ENDURAIN_HOST" ]; then
@@ -85,4 +88,4 @@ if [ "$BEHIND_PROXY" = "true" ]; then
     CMD="$CMD --proxy-headers"
 fi
 
-exec gosu "$UID:$GID" $CMD
+exec $CMD

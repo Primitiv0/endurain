@@ -27,7 +27,7 @@ Confirm your user has the id 1000:
 id
 ```
 
-If you are not the user 1000, you need to set the `UID` and `GID` to your id in the .env file. But to keep this guide as easy to follow as possible, we will assume that you are user 1000.
+The container runs as a non-root user. The default container UID is 1000, matching the most common host user. If your host user has a different UID, use `user: '<UID>:<GID>'` in `docker-compose.yml` and ensure your bind-mounted directories are writable by that user.
 
 ## Installing Caddy reverse proxy
 
@@ -50,12 +50,11 @@ Data is stored on the host under `/var/opt/endurain/` by default. This location 
 Create the required directories:
 
 ```bash
-sudo mkdir /var/opt/endurain
-sudo chown 1000:1000 /var/opt/endurain
-mkdir -p \
-  /var/opt/endurain/backend/{data,logs} \
-  /var/opt/endurain/postgres
+sudo mkdir -p /var/opt/endurain/backend/{data,logs}
+sudo chown -R 1000:1000 /var/opt/endurain/backend
 ```
+
+> **Note:** The `chown` above assumes your container UID is 1000 (default). If you use a different UID via `user:` in docker-compose, change the `chown` to match. For bind mounts, Docker auto-creates only the mount root (`backend`) as root — the `data` and `logs` subdirectories must be created in advance on the host so they inherit the parent's ownership.
 
 ## Docker compose Deployment
 
