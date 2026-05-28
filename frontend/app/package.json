@@ -10,8 +10,10 @@
     "preview": "vite preview",
     "test:unit": "vitest",
     "type-check": "vue-tsc --build --force",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx --fix --ignore-path .gitignore",
-    "format": "prettier --write src/"
+    "lint": "eslint . --fix",
+    "lint:check": "eslint .",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
@@ -53,6 +55,7 @@
     "@vue/tsconfig": "^0.9.1",
     "eslint": "^10.0.2",
     "eslint-plugin-vue": "^10.3.0",
+    "jiti": "^2.7.0",
     "jsdom": "^29.0.2",
     "npm-run-all2": "^9.0.0",
     "typescript": "^6.0.3",

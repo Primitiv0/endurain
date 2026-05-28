@@ -26,6 +26,11 @@ PRs that are too large to review efficiently will be asked to be split before th
  
 **Excluded from the line count:** `package-lock.json`, `uv.lock`, migration files, and other generated or vendored files.
 
+## Prerequisites
+
+- **Python 3.13+**
+- **Hatch** — install it: `pip install hatch` or `uv tool install hatch`
+
 ## How to Contribute
  
 ### Bug Fixes
@@ -77,7 +82,14 @@ PRs that are too large to review efficiently will be asked to be split before th
    feat: add GPX export for activities
    docs: clarify Docker environment variables
    ```
-5. **Push and open a PR** against the `master` branch, filling in the PR template completely
+5. **Validate changes before pushing:**
+   - **Backend:** `cd backend && hatch run validate` (or any individual script from `[tool.hatch.envs.default.scripts]` in `pyproject.toml`)
+   - **Frontend:** `cd frontend/app && npm run format:check && npm run lint:check && npm run type-check`
+
+   Hatch manages the virtual environment and dependencies automatically on first run. It also supports composite scripts — for example, `hatch run validate` runs lint, format, test, and typecheck sequentially in one command, which `uv run` does not yet offer. See `pyproject.toml` for the full list of available scripts.
+
+   CI will enforce these checks on all PRs.
+6. **Push and open a PR** against the `master` branch, filling in the PR template completely
 
 ## Response Time Expectations
  
