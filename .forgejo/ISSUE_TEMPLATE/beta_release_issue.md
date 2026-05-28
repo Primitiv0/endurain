@@ -2,7 +2,7 @@
 name: 🧪 Beta Release Feedback
 about: Report bugs or feedback specific to the beta version
 title: "[BETA]: "
-labels: beta-feedback
+labels: [beta-feedback]
 assignees: ''
 ---
 
