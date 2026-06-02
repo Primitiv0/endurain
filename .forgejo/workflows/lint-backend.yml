@@ -1,0 +1,44 @@
+name: Lint Backend
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - backend/**
+      - .forgejo/workflows/lint-backend.yml
+  pull_request:
+    paths:
+      - backend/**
+      - .forgejo/workflows/lint-backend.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ forgejo.workflow }}-${{ forgejo.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  backend:
+    name: Backend (ruff)
+    runs-on: codeberg-small
+    steps:
+      - name: Checkout code
+        uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Install ruff
+        run: |
+          curl -LsSf https://astral.sh/ruff/install.sh | sh
+          echo "$HOME/.local/bin" >> "$FORGEJO_PATH"
+
+      - name: Check formatting
+        working-directory: backend
+        run: ruff format --check .
+
+      - name: Check linting
+        working-directory: backend
+        run: ruff check .
