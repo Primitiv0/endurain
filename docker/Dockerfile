@@ -27,12 +27,16 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 COPY backend/pyproject.toml backend/uv.lock ./
 
 # Export production dependencies to requirements.txt
-RUN uv export --no-dev --no-hashes -o requirements.txt
+RUN uv export --no-emit-project --no-dev --no-hashes -o requirements.txt
 
 # Stage 3: Build FastAPI app
 FROM python:3.13-alpine
 
-# Install dependencies
+ARG UID=1000
+ARG GID=1000
+ARG APP_USER=appuser
+
+# Install dependencies (privileged — must run before USER)
 RUN apk add --no-cache \
     build-base \
     pkgconfig \
@@ -44,45 +48,40 @@ RUN apk add --no-cache \
     curl \
     ca-certificates
 
-# Install the latest gosu
-RUN set -eux; \
-    arch="$(uname -m)"; \
-    case "$arch" in \
-        x86_64) gosu_arch='amd64' ;; \
-        aarch64) gosu_arch='arm64' ;; \
-        *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
-    esac; \
-    latest_version="$(curl -sSL https://api.github.com/repos/tianon/gosu/releases/latest | grep '"tag_name"' | head -n 1 | cut -d '"' -f4)"; \
-    curl -o /usr/local/bin/gosu -SL "https://github.com/tianon/gosu/releases/download/${latest_version}/gosu-${gosu_arch}"; \
-    chmod +x /usr/local/bin/gosu; \
-    gosu nobody true
+# Create configurable non-root user
+# Alpine's adduser does not create sparse /var/log/faillog files,
+# so --no-log-init (Debian-specific) is not needed here.
+RUN addgroup -S -g ${GID} ${APP_USER} \
+ && adduser -S -u ${UID} -G ${APP_USER} -h /app -s /sbin/nologin ${APP_USER}
+
+# Pre-create /app and set ownership so the non-root user can write to it
+RUN mkdir -p /app && chown -R ${APP_USER}:${APP_USER} /app
 
 # Define environment variables
-ENV UID=1000 \
-    GID=1000 \
-    BEHIND_PROXY=false
+ENV BEHIND_PROXY=false
 
-# Set the working directory to /app/frontend
+# --- Frontend ---
 WORKDIR /app/frontend
 
-# Copy the directory app contents to /app
-COPY --from=frontend-build /tmp/frontend/dist ./dist
+COPY --from=frontend-build --chown=${UID}:${GID} /tmp/frontend/dist ./dist
 
-# Set the working directory to /app/backend
+# env.js is created world-writable (666) so the file can be overwritten at
+# runtime even when docker-compose overrides the container user via `user:`
+# to a UID different from the one baked in at build time (ARG UID).
+RUN touch /app/frontend/dist/env.js && chmod 666 /app/frontend/dist/env.js
+
+# --- Backend ---
 WORKDIR /app/backend
 
-# Copy requirements.txt from requirements-stage to /app/backend
-COPY --from=requirements-stage /tmp/backend/requirements.txt ./requirements.txt
+COPY --from=requirements-stage --chown=${UID}:${GID} /tmp/backend/requirements.txt ./
 
-# Install dependencies
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --upgrade -r ./requirements.txt
 
-# Copy the directory app contents to /app
-COPY backend/app ./
+COPY --chown=${UID}:${GID} backend/app ./
 
-# Copy the entrypoint script for starting the FastAPI app
-COPY docker/start.sh /docker-entrypoint.d/start.sh
+# --- Entrypoint ---
+COPY --chown=${UID}:${GID} docker/start.sh /docker-entrypoint.d/start.sh
 
 # Normalize line endings and make the script executable.
 # This avoids '/bin/sh\r: no such file or directory' when the file
@@ -95,6 +94,9 @@ EXPOSE 8080
 
 # Add a healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=5 CMD curl -f http://localhost:8080/api/v1/about || exit 1
+
+# Switch to non-root user - all privileged RUN commands above
+USER ${APP_USER}
 
 # Run the FastAPI app
 ENTRYPOINT ["/docker-entrypoint.d/start.sh"]

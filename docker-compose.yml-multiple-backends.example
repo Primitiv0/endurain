@@ -12,6 +12,12 @@ services:
       - RATE_LIMIT_STORAGE_URI=redis://redis:6379/0
       - AUTH_SECURITY_STORAGE_URI=redis://redis:6379/0
     volumes:
+      # The container runs as a non-root user (default UID 1000).
+      # Ensure the bind mount directories exist on the host (see getting-started docs).
+      # For Linux, run this once before first start:
+      #   sudo chown -R 1000:1000 /var/opt/endurain/backend
+      # If you set LOCAL_PATH in .env, replace /var/opt/endurain with that path.
+      # To run with a custom UID, add `user: "<UID>:<GID>"` and chown to match.
     #  - ${LOCAL_PATH:-/var/opt/endurain}/backend/app:/app/backend:z # Configure volume if you want to edit the code locally by cloning the repo (shared across multiple backends)
       - ${LOCAL_PATH:-/var/opt/endurain}/backend/data:/app/backend/data:z # necessary for activity files, user images and server images persistence on container image updates (shared across multiple backends)
       - ${LOCAL_PATH:-/var/opt/endurain}/backend/logs:/app/backend/logs:z # log files for the backend (shared across multiple backends)
