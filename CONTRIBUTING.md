@@ -77,11 +77,22 @@ PRs that are too large to review efficiently will be asked to be split before th
    git checkout -b feat/gpx-export
    ```
 4. **Make your changes**, committing with clear messages following [Conventional Commits](https://www.conventionalcommits.org/):
-   ```
-   fix: handle timeout on Garmin sync
-   feat: add GPX export for activities
-   docs: clarify Docker environment variables
-   ```
+
+   **Format:** `<type>(<scope>)!: <description>` - `(<scope>)` and the breaking-change `!` are optional.
+
+   The following rules are enforced automatically on every PR (against the PR title and every commit subject) by the *Conventional Commits* workflow in `.forgejo/workflows/conventional-commits.yml`:
+
+   - **Allowed types:** `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
+   - **Description** must start with a lowercase letter and must not end with a period.
+   - **Header length** (the first line) must be 72 characters or fewer.
+   - **Scope** (optional) must be lowercase and may contain letters, digits, `-`, `_`, `.`, `/`, `,` or spaces — e.g. `feat(api): ...`, `fix(garmin): ...`.
+   - **Breaking changes** are marked with `!` after the type/scope (e.g. `feat(api)!: ...`) or a `BREAKING CHANGE:` footer in the commit body.
+
+   Examples:
+   - `feat(api): add GPX export endpoint`
+   - `fix(garmin): handle timeout on sync`
+   - `refactor(activities)!: rename Activity.distance to total_distance`
+
 5. **Validate changes before pushing:**
    - **Backend:** `cd backend && hatch run validate` (or any individual script from `[tool.hatch.envs.default.scripts]` in `pyproject.toml`)
    - **Frontend:** `cd frontend/app && npm run format:check && npm run lint:check && npm run type-check`
@@ -89,7 +100,8 @@ PRs that are too large to review efficiently will be asked to be split before th
    Hatch manages the virtual environment and dependencies automatically on first run. It also supports composite scripts — for example, `hatch run validate` runs lint, format, test, and typecheck sequentially in one command, which `uv run` does not yet offer. See `pyproject.toml` for the full list of available scripts.
 
    CI will enforce these checks on all PRs.
-6. **Push and open a PR** against the `master` branch, filling in the PR template completely
+
+6. **Push and open a PR** against the `master` branch, filling in the PR template completely. The PR title must also follow the rules above — the *Conventional Commits* workflow validates it on every edit.
 
 ## Response Time Expectations
  
