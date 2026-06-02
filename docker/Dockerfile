@@ -27,7 +27,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 COPY backend/pyproject.toml backend/uv.lock ./
 
 # Export production dependencies to requirements.txt
-RUN uv export --no-dev --no-hashes -o requirements.txt
+RUN uv export --no-emit-project --no-dev --no-hashes -o requirements.txt
 
 # Stage 3: Build FastAPI app
 FROM python:3.13-alpine
