@@ -4,20 +4,18 @@ Covers all Principal helper methods, credential variant
 construction, and the discriminated-union round-trip.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
 from auth.principal import (
     AccessTokenCred,
-    ApiKeyCred,
     AnyCredential,
+    ApiKeyCred,
     OAuthCred,
     PasswordCred,
     Principal,
     SessionCookieCred,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -66,7 +64,7 @@ class TestCredentialVariants:
 
     def test_access_token_cred_optional_fields(self):
         """AccessTokenCred stores optional jti and issued_at."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cred = AccessTokenCred(
             session_id="sid-456",
             jti="jti-abc",
@@ -201,9 +199,7 @@ class TestCredentialId:
 
     def test_oauth_cred_returns_composite_string(self):
         """credential_id() returns 'provider:external_id' for OAuthCred."""
-        p = _make_principal(
-            OAuthCred(provider="google", external_id="uid-001")
-        )
+        p = _make_principal(OAuthCred(provider="google", external_id="uid-001"))
         assert p.credential_id() == "google:uid-001"
 
     def test_password_cred_returns_none(self):

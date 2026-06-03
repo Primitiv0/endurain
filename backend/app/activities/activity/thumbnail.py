@@ -7,16 +7,14 @@ at activity import time and served as static files.
 
 import re
 from pathlib import Path
-from staticmap import CircleMarker, Line, StaticMap
 
 import core.config as core_config
 import core.logger as core_logger
+from staticmap import CircleMarker, Line, StaticMap
 
 # Fallback tile URL used when server settings are unavailable.
 # Uses a fixed subdomain; staticmap does not support {s} rotation.
-_DEFAULT_TILE_URL = (
-    "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-)
+_DEFAULT_TILE_URL = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
 _DEFAULT_BG_COLOR = "#dddddd"
 
 # Visual constants matching the Leaflet map renderer
@@ -100,24 +98,22 @@ def generate_activity_thumbnail(
     """
     if not waypoints or len(waypoints) < 2:
         core_logger.print_to_log_and_console(
-            f"Activity {activity_id}: skipping thumbnail "
-            f"(fewer than 2 waypoints)",
+            f"Activity {activity_id}: skipping thumbnail (fewer than 2 waypoints)",
             "debug",
         )
         return None
 
     try:
         # staticmap expects (longitude, latitude) order
-        coords = [
-            (float(wp["lon"]), float(wp["lat"]))
-            for wp in waypoints
-        ]
+        coords = [(float(wp["lon"]), float(wp["lat"])) for wp in waypoints]
 
         normalised_url = _normalise_tile_url(tile_url)
 
         # Build request headers; inject Authorization when an API
         # key is present (e.g. Stadia Maps requires backend auth).
-        headers: dict[str, str] = {"User-Agent": f"Endurain {core_config.API_VERSION} - StaticMap backend thumbnail generator"}
+        headers: dict[str, str] = {
+            "User-Agent": f"Endurain {core_config.API_VERSION} - StaticMap backend thumbnail generator"
+        }
         if not api_key and "stadiamaps.com" in normalised_url:
             core_logger.print_to_log_and_console(
                 f"Activity {activity_id}: warning — tile URL looks like "
@@ -144,20 +140,12 @@ def generate_activity_thumbnail(
         static_map.add_line(Line(coords, _LINE_COLOR, _LINE_WIDTH))
 
         # Start marker: white outer ring + green inner dot
-        static_map.add_marker(
-            CircleMarker(coords[0], _MARKER_OUTER_COLOR, _MARKER_OUTER_RADIUS)
-        )
-        static_map.add_marker(
-            CircleMarker(coords[0], _START_COLOR, _MARKER_INNER_RADIUS)
-        )
+        static_map.add_marker(CircleMarker(coords[0], _MARKER_OUTER_COLOR, _MARKER_OUTER_RADIUS))
+        static_map.add_marker(CircleMarker(coords[0], _START_COLOR, _MARKER_INNER_RADIUS))
 
         # End marker: white outer ring + red inner dot
-        static_map.add_marker(
-            CircleMarker(coords[-1], _MARKER_OUTER_COLOR, _MARKER_OUTER_RADIUS)
-        )
-        static_map.add_marker(
-            CircleMarker(coords[-1], _END_COLOR, _MARKER_INNER_RADIUS)
-        )
+        static_map.add_marker(CircleMarker(coords[-1], _MARKER_OUTER_COLOR, _MARKER_OUTER_RADIUS))
+        static_map.add_marker(CircleMarker(coords[-1], _END_COLOR, _MARKER_INNER_RADIUS))
 
         image = static_map.render()
 
@@ -166,8 +154,7 @@ def generate_activity_thumbnail(
         image.save(str(output_path), "PNG")
 
         core_logger.print_to_log_and_console(
-            f"Activity {activity_id}: thumbnail saved to "
-            f"{output_path}",
+            f"Activity {activity_id}: thumbnail saved to {output_path}",
             "info",
         )
 
@@ -175,8 +162,7 @@ def generate_activity_thumbnail(
 
     except (OSError, ValueError, KeyError, RuntimeError) as exc:
         core_logger.print_to_log_and_console(
-            f"Activity {activity_id}: thumbnail generation "
-            f"failed — {type(exc).__name__}: {exc}",
+            f"Activity {activity_id}: thumbnail generation failed — {type(exc).__name__}: {exc}",
             "warning",
         )
         return None

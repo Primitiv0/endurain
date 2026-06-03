@@ -1,19 +1,19 @@
 """Tests for identity_providers.schema module."""
 
-import pytest
-from pydantic import ValidationError
 from datetime import datetime
 
+import pytest
 from auth.identity_providers.schema import (
+    IdentityProvider,
     IdentityProviderBase,
     IdentityProviderCreate,
-    IdentityProviderUpdate,
-    IdentityProvider,
     IdentityProviderPublic,
     IdentityProviderTemplate,
+    IdentityProviderUpdate,
     TokenExchangeRequest,
     TokenExchangeResponse,
 )
+from pydantic import ValidationError
 
 
 class TestIdentityProviderBase:
@@ -84,9 +84,7 @@ class TestIdentityProviderBase:
             - Lowercase letters, numbers, and hyphens are accepted
         """
         # Arrange & Act
-        idp = IdentityProviderBase(
-            name="Test", slug="test-provider-123", client_id="client-123"
-        )
+        idp = IdentityProviderBase(name="Test", slug="test-provider-123", client_id="client-123")
 
         # Assert
         assert idp.slug == "test-provider-123"
@@ -99,9 +97,7 @@ class TestIdentityProviderBase:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            IdentityProviderBase(
-                name="Test", slug="Test-Provider", client_id="client-123"
-            )
+            IdentityProviderBase(name="Test", slug="Test-Provider", client_id="client-123")
 
         assert "Slug must contain only lowercase letters" in str(exc_info.value)
 
@@ -113,9 +109,7 @@ class TestIdentityProviderBase:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            IdentityProviderBase(
-                name="Test", slug="test_provider", client_id="client-123"
-            )
+            IdentityProviderBase(name="Test", slug="test_provider", client_id="client-123")
 
         assert "Slug must contain only lowercase letters" in str(exc_info.value)
 
@@ -126,9 +120,7 @@ class TestIdentityProviderBase:
             - 'oidc' is accepted as valid provider type
         """
         # Arrange & Act
-        idp = IdentityProviderBase(
-            name="Test", slug="test", provider_type="oidc", client_id="client-123"
-        )
+        idp = IdentityProviderBase(name="Test", slug="test", provider_type="oidc", client_id="client-123")
 
         # Assert
         assert idp.provider_type == "oidc"
@@ -140,9 +132,7 @@ class TestIdentityProviderBase:
             - 'oauth2' is accepted as valid provider type
         """
         # Arrange & Act
-        idp = IdentityProviderBase(
-            name="Test", slug="test", provider_type="oauth2", client_id="client-123"
-        )
+        idp = IdentityProviderBase(name="Test", slug="test", provider_type="oauth2", client_id="client-123")
 
         # Assert
         assert idp.provider_type == "oauth2"
@@ -154,9 +144,7 @@ class TestIdentityProviderBase:
             - 'saml' is accepted as valid provider type
         """
         # Arrange & Act
-        idp = IdentityProviderBase(
-            name="Test", slug="test", provider_type="saml", client_id="client-123"
-        )
+        idp = IdentityProviderBase(name="Test", slug="test", provider_type="saml", client_id="client-123")
 
         # Assert
         assert idp.provider_type == "saml"
@@ -366,9 +354,7 @@ class TestIdentityProviderUpdate:
             - client_secret can be set to None
         """
         # Arrange & Act
-        idp = IdentityProviderUpdate(
-            name="Test", slug="test", client_id="client-123", client_secret=None
-        )
+        idp = IdentityProviderUpdate(name="Test", slug="test", client_id="client-123", client_secret=None)
 
         # Assert
         assert idp.client_secret is None
@@ -455,9 +441,7 @@ class TestIdentityProvider:
         with pytest.raises(ValidationError) as exc_info:
             IdentityProvider(id=1, name="Test", slug="test", client_id="client-123")
 
-        assert "created_at" in str(exc_info.value) or "updated_at" in str(
-            exc_info.value
-        )
+        assert "created_at" in str(exc_info.value) or "updated_at" in str(exc_info.value)
 
     def test_serialize_client_id_decrypts_encrypted_value(self):
         """Test serialize_client_id decrypts encrypted client_id.
@@ -539,9 +523,7 @@ class TestIdentityProviderPublic:
             - Only public fields are present
         """
         # Arrange & Act
-        idp = IdentityProviderPublic(
-            id=1, name="Test Provider", slug="test-provider", icon="test-icon"
-        )
+        idp = IdentityProviderPublic(id=1, name="Test Provider", slug="test-provider", icon="test-icon")
 
         # Assert
         assert idp.id == 1
@@ -699,9 +681,7 @@ class TestTokenExchangeRequest:
             - Valid base64url characters (A-Z, a-z, 0-9, -, _) are accepted
         """
         # Arrange
-        valid_verifier = (
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-        )
+        valid_verifier = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
         # Act
         request = TokenExchangeRequest(code_verifier=valid_verifier)
@@ -717,9 +697,7 @@ class TestTokenExchangeRequest:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            TokenExchangeRequest(
-                code_verifier="a" * 43 + "!"
-            )  # ! is not valid base64url
+            TokenExchangeRequest(code_verifier="a" * 43 + "!")  # ! is not valid base64url
 
         assert "code_verifier must be valid base64url" in str(exc_info.value)
 

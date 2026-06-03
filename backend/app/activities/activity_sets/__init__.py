@@ -14,10 +14,10 @@ Exports:
 """
 
 from .crud import (
-    get_activity_sets,
-    get_activities_sets,
-    get_public_activity_sets,
     create_activity_sets,
+    get_activities_sets,
+    get_activity_sets,
+    get_public_activity_sets,
 )
 from .models import ActivitySets as ActivitySetsModel
 from .schema import (
@@ -27,15 +27,15 @@ from .schema import (
 )
 
 __all__ = [
-    # CRUD operations
-    "get_activity_sets",
-    "get_activities_sets",
-    "get_public_activity_sets",
-    "create_activity_sets",
-    # Database model
-    "ActivitySetsModel",
     # Pydantic schemas
     "ActivitySetsBase",
     "ActivitySetsCreate",
+    # Database model
+    "ActivitySetsModel",
     "ActivitySetsRead",
+    "create_activity_sets",
+    "get_activities_sets",
+    # CRUD operations
+    "get_activity_sets",
+    "get_public_activity_sets",
 ]

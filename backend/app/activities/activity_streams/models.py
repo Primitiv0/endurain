@@ -2,14 +2,13 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, JSON
+from core.database import Base
+from sqlalchemy import JSON, ForeignKey
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
     relationship,
 )
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity.models import Activity
@@ -40,27 +39,18 @@ class ActivityStreams(Base):
         ),
         nullable=False,
         index=True,
-        comment=(
-            "Activity ID that the activity"
-            " stream belongs"
-        ),
+        comment=("Activity ID that the activity stream belongs"),
     )
     stream_type: Mapped[int] = mapped_column(
         nullable=False,
-        comment=(
-            "Stream type (1-HR, 2-Power,"
-            " 3-Cadence, 4-Elevation,"
-            " 5-Velocity, 6-Pace, 7-lat/lon)"
-        ),
+        comment=("Stream type (1-HR, 2-Power, 3-Cadence, 4-Elevation, 5-Velocity, 6-Pace, 7-lat/lon)"),
     )
     stream_waypoints: Mapped[list] = mapped_column(
         JSON,
         nullable=False,
         comment="Store waypoints data",
     )
-    strava_activity_stream_id: Mapped[
-        int | None
-    ] = mapped_column(
+    strava_activity_stream_id: Mapped[int | None] = mapped_column(
         nullable=True,
         comment="Strava activity stream ID",
     )

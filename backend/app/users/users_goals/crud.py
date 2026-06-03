@@ -1,13 +1,11 @@
 """CRUD operations for user goals."""
 
+import core.decorators as core_decorators
+import users.users_goals.models as user_goals_models
+import users.users_goals.schema as user_goals_schema
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-import users.users_goals.schema as user_goals_schema
-import users.users_goals.models as user_goals_models
-
-import core.decorators as core_decorators
 
 
 @core_decorators.handle_db_errors
@@ -34,16 +32,12 @@ def get_user_goals_by_user_id(
     Raises:
         HTTPException: If database error occurs.
     """
-    stmt = select(user_goals_models.UsersGoal).where(
-        user_goals_models.UsersGoal.user_id == user_id
-    )
+    stmt = select(user_goals_models.UsersGoal).where(user_goals_models.UsersGoal.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(user_goals_models.UsersGoal.interval == interval.value)
     if activity_type is not None:
-        stmt = stmt.where(
-            user_goals_models.UsersGoal.activity_type == activity_type.value
-        )
+        stmt = stmt.where(user_goals_models.UsersGoal.activity_type == activity_type.value)
     if goal_type is not None:
         stmt = stmt.where(user_goals_models.UsersGoal.goal_type == goal_type.value)
 
@@ -51,9 +45,7 @@ def get_user_goals_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_user_goal_by_user_and_goal_id(
-    user_id: int, goal_id: int, db: Session
-) -> user_goals_models.UsersGoal | None:
+def get_user_goal_by_user_and_goal_id(user_id: int, goal_id: int, db: Session) -> user_goals_models.UsersGoal | None:
     """
     Retrieve a specific goal by user ID and goal ID.
 
@@ -109,10 +101,7 @@ def create_user_goal(
         if existing_goal:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "User already has a goal for this activity type, "
-                    "interval, and goal type."
-                ),
+                detail=("User already has a goal for this activity type, interval, and goal type."),
             )
 
         db_user_goal = user_goals_models.UsersGoal(

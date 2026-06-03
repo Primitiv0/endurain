@@ -6,20 +6,17 @@ the legacy ``users`` profile columns. Tests use a mock DB
 session — no live database required.
 """
 
-from unittest.mock import MagicMock, call, patch
+import contextlib
+from unittest.mock import MagicMock, patch
 
-import pytest
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-
-import users.users.crud as users_crud
 import auth.mfa.models as auth_mfa_models
+import users.users.crud as users_crud
 import users.users.models as users_models
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_mock_user(user_id: int = 1) -> MagicMock:
     """Return a mock Users row with bare minimum attributes."""
@@ -67,10 +64,8 @@ class TestUpdateUserMFADualWrite:
 
     def teardown_method(self):
         """Stop all patches after each test."""
-        try:
+        with contextlib.suppress(AttributeError):
             self._user_patch.stop()
-        except AttributeError:
-            pass
 
     # ------------------------------------------------------------------
     # Enable MFA — existing users_mfa row present
@@ -177,16 +172,19 @@ class TestUpdateUserMFADualWrite:
 
         mock_new_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
         mock_stmt = MagicMock()
-        with patch(
-            "users.users.crud.select",
-            return_value=mock_stmt,
-        ), patch(
-            "users.users.crud.auth_mfa_models.AuthUserMFA",
-            return_value=mock_new_row,
-        ) as MockClass:
+        with (
+            patch(
+                "users.users.crud.select",
+                return_value=mock_stmt,
+            ),
+            patch(
+                "users.users.crud.auth_mfa_models.AuthUserMFA",
+                return_value=mock_new_row,
+            ) as mock_class,
+        ):
             users_crud.update_user_mfa(1, mock_db, "enc_secret")
 
-            MockClass.assert_called_once_with(
+            mock_class.assert_called_once_with(
                 user_id=1,
                 mfa_enabled=True,
                 mfa_secret="enc_secret",
@@ -203,16 +201,19 @@ class TestUpdateUserMFADualWrite:
 
         mock_new_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
         mock_stmt = MagicMock()
-        with patch(
-            "users.users.crud.select",
-            return_value=mock_stmt,
-        ), patch(
-            "users.users.crud.auth_mfa_models.AuthUserMFA",
-            return_value=mock_new_row,
-        ) as MockClass:
+        with (
+            patch(
+                "users.users.crud.select",
+                return_value=mock_stmt,
+            ),
+            patch(
+                "users.users.crud.auth_mfa_models.AuthUserMFA",
+                return_value=mock_new_row,
+            ) as mock_class,
+        ):
             users_crud.update_user_mfa(1, mock_db)
 
-            MockClass.assert_called_once_with(
+            mock_class.assert_called_once_with(
                 user_id=1,
                 mfa_enabled=False,
                 mfa_secret=None,

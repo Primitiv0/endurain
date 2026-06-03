@@ -3,10 +3,10 @@
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     StrictFloat,
     StrictInt,
     StrictStr,
-    Field,
 )
 
 
@@ -61,9 +61,7 @@ class DaySummary(SummaryMetrics):
 
     day_of_week: StrictInt = Field(
         ...,
-        description=(
-            "Day of week (0=Monday, 6=Sunday)"
-        ),
+        description=("Day of week (0=Monday, 6=Sunday)"),
     )
 
 
@@ -124,9 +122,7 @@ class TypeBreakdownItem(SummaryMetrics):
     )
     activity_type: StrictStr = Field(
         ...,
-        description=(
-            "Human-readable activity type name"
-        ),
+        description=("Human-readable activity type name"),
     )
 
 
@@ -143,13 +139,9 @@ class WeeklySummaryResponse(SummaryMetrics):
         ...,
         description="List of daily summaries",
     )
-    type_breakdown: (
-        list[TypeBreakdownItem] | None
-    ) = Field(
+    type_breakdown: list[TypeBreakdownItem] | None = Field(
         default=None,
-        description=(
-            "Optional breakdown by activity type"
-        ),
+        description=("Optional breakdown by activity type"),
     )
 
 
@@ -166,13 +158,9 @@ class MonthlySummaryResponse(SummaryMetrics):
         ...,
         description="List of weekly summaries",
     )
-    type_breakdown: (
-        list[TypeBreakdownItem] | None
-    ) = Field(
+    type_breakdown: list[TypeBreakdownItem] | None = Field(
         default=None,
-        description=(
-            "Optional breakdown by activity type"
-        ),
+        description=("Optional breakdown by activity type"),
     )
 
 
@@ -189,13 +177,9 @@ class YearlySummaryResponse(SummaryMetrics):
         ...,
         description="List of monthly summaries",
     )
-    type_breakdown: (
-        list[TypeBreakdownItem] | None
-    ) = Field(
+    type_breakdown: list[TypeBreakdownItem] | None = Field(
         default=None,
-        description=(
-            "Optional breakdown by activity type"
-        ),
+        description=("Optional breakdown by activity type"),
     )
 
 
@@ -212,11 +196,7 @@ class LifetimeSummaryResponse(SummaryMetrics):
         ...,
         description="List of yearly summaries",
     )
-    type_breakdown: (
-        list[TypeBreakdownItem] | None
-    ) = Field(
+    type_breakdown: list[TypeBreakdownItem] | None = Field(
         default=None,
-        description=(
-            "Optional breakdown by activity type"
-        ),
+        description=("Optional breakdown by activity type"),
     )

@@ -1,11 +1,9 @@
 """User default gear utility functions."""
 
+import core.logger as core_logger
+import users.users_default_gear.crud as user_default_gear_crud
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-
-import core.logger as core_logger
-
-import users.users_default_gear.crud as user_default_gear_crud
 
 # Activity type to gear attribute mapping
 ACTIVITY_TYPE_TO_GEAR_ATTR: dict[int, str] = {
@@ -50,9 +48,7 @@ def get_user_default_gear_by_activity_type(
             database error occurs.
     """
     try:
-        user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(
-            user_id, db
-        )
+        user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(user_id, db)
 
         if user_default_gear is None:
             return None

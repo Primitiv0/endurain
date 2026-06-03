@@ -5,27 +5,24 @@ This module defines the API endpoints for managing water intake
 records, including CRUD operations with pagination and filtering.
 """
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
+import auth.dependencies as auth_dependencies
+import core.database as core_database
+import core.dependencies as core_dependencies
+import health.constants as health_constants
+import health.health_water.crud as health_water_crud
+import health.health_water.schema as health_water_schema
 from fastapi import (
     APIRouter,
     Depends,
-    Security,
     HTTPException,
-    status,
     Query,
+    Security,
+    status,
 )
 from sqlalchemy.orm import Session
-
-import health.constants as health_constants
-
-import health.health_water.schema as health_water_schema
-import health.health_water.crud as health_water_crud
-
-import auth.dependencies as auth_dependencies
-
-import core.database as core_database
-import core.dependencies as core_dependencies
 
 # Define the API router
 router = APIRouter()
@@ -33,9 +30,7 @@ router = APIRouter()
 
 @router.get(
     "",
-    response_model=(
-        health_water_schema.HealthWaterListResponse
-    ),
+    response_model=(health_water_schema.HealthWaterListResponse),
     status_code=status.HTTP_200_OK,
 )
 async def read_health_water_all_pagination(
@@ -48,10 +43,7 @@ async def read_health_water_all_pagination(
     ],
     _validate_pagination_values_on_query: Annotated[
         Callable,
-        Depends(
-            core_dependencies
-            .validate_pagination_values_on_query
-        ),
+        Depends(core_dependencies.validate_pagination_values_on_query),
     ],
     token_user_id: Annotated[
         int,
@@ -97,11 +89,7 @@ async def read_health_water_all_pagination(
         HTTPException: If the user lacks required scope or
             pagination values are invalid.
     """
-    total = (
-        health_water_crud.get_health_water_number_by_user_id(
-            token_user_id, db, interval
-        )
-    )
+    total = health_water_crud.get_health_water_number_by_user_id(token_user_id, db, interval)
     records = health_water_crud.get_health_water_by_user_id(
         token_user_id,
         db,
@@ -167,33 +155,20 @@ async def create_health_water(
 
     date_str = health_water.date.isoformat()
 
-    water_for_date = (
-        health_water_crud
-        .get_health_water_by_date_and_user_id(
-            token_user_id, date_str, db
-        )
-    )
+    water_for_date = health_water_crud.get_health_water_by_date_and_user_id(token_user_id, date_str, db)
 
     if water_for_date:
-        accumulated_ml = float(
-            water_for_date.amount_ml
-        ) + (health_water.amount_ml or 0)
-        health_water_update = (
-            health_water_schema.HealthWaterUpdate(
-                id=water_for_date.id,
-                user_id=token_user_id,
-                amount_ml=accumulated_ml,
-                date=health_water.date,
-                source=health_water.source,
-            )
+        accumulated_ml = float(water_for_date.amount_ml) + (health_water.amount_ml or 0)
+        health_water_update = health_water_schema.HealthWaterUpdate(
+            id=water_for_date.id,
+            user_id=token_user_id,
+            amount_ml=accumulated_ml,
+            date=health_water.date,
+            source=health_water.source,
         )
-        return health_water_crud.edit_health_water(
-            token_user_id, health_water_update, db
-        )
+        return health_water_crud.edit_health_water(token_user_id, health_water_update, db)
     else:
-        return health_water_crud.create_health_water(
-            token_user_id, health_water, db
-        )
+        return health_water_crud.create_health_water(token_user_id, health_water, db)
 
 
 @router.put(
@@ -234,9 +209,7 @@ async def edit_health_water(
     Raises:
         HTTPException: If record not found or unauthorized.
     """
-    return health_water_crud.edit_health_water(
-        token_user_id, health_water, db
-    )
+    return health_water_crud.edit_health_water(token_user_id, health_water, db)
 
 
 @router.delete(
@@ -274,6 +247,4 @@ async def delete_health_water(
     Raises:
         HTTPException: If record not found or unauthorized.
     """
-    health_water_crud.delete_health_water(
-        token_user_id, health_water_id, db
-    )
+    health_water_crud.delete_health_water(token_user_id, health_water_id, db)

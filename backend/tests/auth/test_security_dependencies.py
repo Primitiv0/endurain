@@ -11,16 +11,14 @@ Covers:
 """
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
-from fastapi import HTTPException, Request, status
-from fastapi.security import SecurityScopes
+from unittest.mock import MagicMock
 
 import auth.security as auth_security
+import pytest
 from auth.identity_service import IdentityService
 from auth.principal import AccessTokenCred, ApiKeyCred, Principal
-
+from fastapi import HTTPException, Request, status
+from fastapi.security import SecurityScopes
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -52,16 +50,8 @@ def _make_principal(
         email=email,
         is_active=True,
         is_superuser=False,
-        scopes=(
-            scopes
-            if scopes is not None
-            else frozenset(["profile"])
-        ),
-        credential=(
-            credential
-            if credential is not None
-            else AccessTokenCred(session_id="sid-abc")
-        ),
+        scopes=(scopes if scopes is not None else frozenset(["profile"])),
+        credential=(credential if credential is not None else AccessTokenCred(session_id="sid-abc")),
     )
 
 
@@ -95,9 +85,7 @@ class TestResolvePrincipalCaching:
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
-        result = auth_security._resolve_and_cache_principal(
-            "tok", request, mock_svc
-        )
+        result = auth_security._resolve_and_cache_principal("tok", request, mock_svc)
 
         assert result is principal
         assert request.state.principal is principal
@@ -110,9 +98,7 @@ class TestResolvePrincipalCaching:
         request.state.principal = principal  # pre-populate cache
         mock_svc = MagicMock(spec=IdentityService)
 
-        result = auth_security._resolve_and_cache_principal(
-            "tok", request, mock_svc
-        )
+        result = auth_security._resolve_and_cache_principal("tok", request, mock_svc)
 
         assert result is principal
         mock_svc.resolve_from_access_token.assert_not_called()
@@ -127,9 +113,7 @@ class TestResolvePrincipalCaching:
         )
 
         with pytest.raises(HTTPException) as exc:
-            auth_security._resolve_and_cache_principal(
-                "bad", request, mock_svc
-            )
+            auth_security._resolve_and_cache_principal("bad", request, mock_svc)
         assert exc.value.status_code == 401
         assert not hasattr(request.state, "principal")
 
@@ -149,9 +133,7 @@ class TestGetSubFromAccessTokenDependency:
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
-        result = auth_security.get_sub_from_access_token(
-            request, "valid_jwt", mock_svc
-        )
+        result = auth_security.get_sub_from_access_token(request, "valid_jwt", mock_svc)
 
         assert result == 42
         assert request.state.principal is principal
@@ -160,14 +142,10 @@ class TestGetSubFromAccessTokenDependency:
         """Invalid token propagates 401."""
         request = _fresh_request()
         mock_svc = MagicMock(spec=IdentityService)
-        mock_svc.resolve_from_access_token.side_effect = HTTPException(
-            status_code=401, detail="Token expired"
-        )
+        mock_svc.resolve_from_access_token.side_effect = HTTPException(status_code=401, detail="Token expired")
 
         with pytest.raises(HTTPException) as exc:
-            auth_security.get_sub_from_access_token(
-                request, "bad.token", mock_svc
-            )
+            auth_security.get_sub_from_access_token(request, "bad.token", mock_svc)
         assert exc.value.status_code == 401
 
     def test_cache_hit_no_extra_db_roundtrip(self):
@@ -177,12 +155,8 @@ class TestGetSubFromAccessTokenDependency:
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
-        first = auth_security.get_sub_from_access_token(
-            request, "tok", mock_svc
-        )
-        second = auth_security.get_sub_from_access_token(
-            request, "tok", mock_svc
-        )
+        first = auth_security.get_sub_from_access_token(request, "tok", mock_svc)
+        second = auth_security.get_sub_from_access_token(request, "tok", mock_svc)
 
         assert first == second == 7
         mock_svc.resolve_from_access_token.assert_called_once()
@@ -199,31 +173,23 @@ class TestGetSidFromAccessTokenDependency:
     def test_session_cookie_happy_path(self):
         """Valid JWT with AccessTokenCred returns session_id."""
         request = _fresh_request()
-        principal = _make_principal(
-            credential=AccessTokenCred(session_id="sess-xyz")
-        )
+        principal = _make_principal(credential=AccessTokenCred(session_id="sess-xyz"))
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
-        sid = auth_security.get_sid_from_access_token(
-            request, "tok", mock_svc
-        )
+        sid = auth_security.get_sid_from_access_token(request, "tok", mock_svc)
 
         assert sid == "sess-xyz"
 
     def test_wrong_credential_type_raises_401(self):
         """Principal with non-AccessTokenCred raises 401."""
         request = _fresh_request()
-        principal = _make_principal(
-            credential=ApiKeyCred(api_key_id=1, key_prefix="key_")
-        )
+        principal = _make_principal(credential=ApiKeyCred(api_key_id=1, key_prefix="key_"))
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
         with pytest.raises(HTTPException) as exc:
-            auth_security.get_sid_from_access_token(
-                request, "tok", mock_svc
-            )
+            auth_security.get_sid_from_access_token(request, "tok", mock_svc)
         assert exc.value.status_code == 401
         assert "credential type" in exc.value.detail
 
@@ -237,12 +203,8 @@ class TestGetSidFromAccessTokenDependency:
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
-        sub = auth_security.get_sub_from_access_token(
-            request, "tok", mock_svc
-        )
-        sid = auth_security.get_sid_from_access_token(
-            request, "tok", mock_svc
-        )
+        sub = auth_security.get_sub_from_access_token(request, "tok", mock_svc)
+        sid = auth_security.get_sid_from_access_token(request, "tok", mock_svc)
 
         assert sub == 3
         assert sid == "shared-sid"
@@ -262,9 +224,7 @@ class TestValidateAccessTokenOrApiKey:
     async def test_jwt_path_happy(self):
         """JWT bearer token resolves to AuthContext."""
         request = _fresh_request()
-        principal = _make_principal(
-            user_id=5, scopes=frozenset(["profile", "activities"])
-        )
+        principal = _make_principal(user_id=5, scopes=frozenset(["profile", "activities"]))
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_access_token.return_value = principal
 
@@ -309,9 +269,7 @@ class TestValidateAccessTokenOrApiKey:
     async def test_api_key_from_query_param(self):
         """API key from ?api_key= query param is also accepted."""
         request = _fresh_request()
-        principal = _make_principal(
-            credential=ApiKeyCred(api_key_id=3, key_prefix="pfx_")
-        )
+        principal = _make_principal(credential=ApiKeyCred(api_key_id=3, key_prefix="pfx_"))
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_api_key.return_value = principal
 
@@ -324,9 +282,7 @@ class TestValidateAccessTokenOrApiKey:
         )
 
         assert ctx.auth_type == "api_key"
-        mock_svc.resolve_from_api_key.assert_called_once_with(
-            "raw-api-key", request
-        )
+        mock_svc.resolve_from_api_key.assert_called_once_with("raw-api-key", request)
 
     @pytest.mark.asyncio
     async def test_no_credential_raises_401(self):
@@ -369,9 +325,7 @@ class TestValidateAccessTokenOrApiKey:
         """IdentityService JWT failure propagates 401."""
         request = _fresh_request()
         mock_svc = MagicMock(spec=IdentityService)
-        mock_svc.resolve_from_access_token.side_effect = HTTPException(
-            status_code=401, detail="Token expired"
-        )
+        mock_svc.resolve_from_access_token.side_effect = HTTPException(status_code=401, detail="Token expired")
 
         with pytest.raises(HTTPException) as exc:
             await auth_security.validate_access_token_or_api_key(
@@ -418,9 +372,7 @@ class TestValidateAccessTokenOrApiKey:
         request = _fresh_request()
         principal = _make_principal(
             user_id=30,
-            credential=ApiKeyCred(
-                api_key_id=1, key_prefix="hdr_"
-            ),
+            credential=ApiKeyCred(api_key_id=1, key_prefix="hdr_"),
         )
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_api_key.return_value = principal
@@ -435,18 +387,14 @@ class TestValidateAccessTokenOrApiKey:
 
         assert ctx.auth_type == "api_key"
         assert ctx.user_id == 30
-        mock_svc.resolve_from_api_key.assert_called_once_with(
-            "header-key", request
-        )
+        mock_svc.resolve_from_api_key.assert_called_once_with("header-key", request)
 
     @pytest.mark.asyncio
     async def test_api_key_failure_raises_401(self):
         """IdentityService API key failure propagates 401."""
         request = _fresh_request()
         mock_svc = MagicMock(spec=IdentityService)
-        mock_svc.resolve_from_api_key.side_effect = HTTPException(
-            status_code=401, detail="Invalid API key"
-        )
+        mock_svc.resolve_from_api_key.side_effect = HTTPException(status_code=401, detail="Invalid API key")
 
         with pytest.raises(HTTPException) as exc:
             await auth_security.validate_access_token_or_api_key(
@@ -483,9 +431,7 @@ class TestCheckAuthScopes:
         Returns:
             AuthContext: Populated context for tests.
         """
-        return auth_security.AuthContext(
-            user_id=user_id, scopes=scopes, auth_type=auth_type
-        )
+        return auth_security.AuthContext(user_id=user_id, scopes=scopes, auth_type=auth_type)
 
     def test_all_required_scopes_present(self):
         """No exception when all required scopes are present."""
@@ -514,9 +460,7 @@ class TestCheckAuthScopes:
 
     def test_api_key_auth_type_scope_check(self):
         """Scope check also works for API key auth."""
-        ctx = self._make_auth_ctx(
-            ["activities"], auth_type="api_key"
-        )
+        ctx = self._make_auth_ctx(["activities"], auth_type="api_key")
         security_scopes = SecurityScopes(scopes=["profile"])
 
         with pytest.raises(HTTPException) as exc:

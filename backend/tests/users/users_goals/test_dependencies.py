@@ -1,10 +1,10 @@
 """Tests for user goals dependencies."""
 
-import pytest
 from unittest.mock import patch
-from fastapi import HTTPException, status
 
+import pytest
 import users.users_goals.dependencies as user_goals_dependencies
+from fastapi import HTTPException, status
 
 
 class TestValidateGoalId:
@@ -24,9 +24,7 @@ class TestValidateGoalId:
 
         # Assert
         assert result is None
-        mock_validate_id.assert_called_once_with(
-            id=goal_id, min=1, message="Invalid goal ID"
-        )
+        mock_validate_id.assert_called_once_with(identifier=goal_id, min_value=1, message="Invalid goal ID")
 
     @patch("users.users_goals.dependencies.core_dependencies.validate_id")
     def test_validate_goal_id_zero(self, mock_validate_id):

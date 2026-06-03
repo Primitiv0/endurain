@@ -55,36 +55,36 @@ from .utils import (
 )
 
 __all__ = [
-    # CRUD operations
-    "get_identity_provider",
-    "get_identity_provider_by_slug",
-    "get_all_identity_providers",
-    "get_identity_providers_by_ids",
-    "get_enabled_providers",
-    "create_identity_provider",
-    "update_identity_provider",
-    "delete_identity_provider",
-    # Database model
-    "IdentityProviderModel",
     # Pydantic schemas
     "IdentityProvider",
     "IdentityProviderBase",
     "IdentityProviderCreate",
-    "IdentityProviderUpdate",
+    # Database model
+    "IdentityProviderModel",
     "IdentityProviderPublic",
-    "IdentityProviderTemplate",
-    "TokenExchangeRequest",
-    "TokenExchangeResponse",
     # Service layer
     "IdentityProviderService",
+    "IdentityProviderTemplate",
+    "IdentityProviderUpdate",
     "TokenAction",
+    "TokenExchangeRequest",
+    "TokenExchangeResponse",
+    "clear_all_idp_tokens",
+    "create_identity_provider",
+    "delete_identity_provider",
+    "get_all_identity_providers",
+    "get_enabled_providers",
+    # CRUD operations
+    "get_identity_provider",
+    "get_identity_provider_by_slug",
+    "get_identity_providers_by_ids",
+    "get_idp_template",
+    "get_idp_templates",
     "idp_service",
-    # Utilities
-    "validate_redirect_url",
+    "refresh_idp_tokens_if_needed",
+    "update_identity_provider",
     "validate_pkce_challenge",
     "validate_pkce_verifier",
-    "get_idp_templates",
-    "get_idp_template",
-    "refresh_idp_tokens_if_needed",
-    "clear_all_idp_tokens",
+    # Utilities
+    "validate_redirect_url",
 ]

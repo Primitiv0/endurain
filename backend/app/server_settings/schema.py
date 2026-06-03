@@ -1,16 +1,16 @@
-from enum import Enum
 import re
-from pydantic import (
-    BaseModel,
-    StrictInt,
-    StrictBool,
-    StrictStr,
-    ConfigDict,
-    Field,
-    field_validator,
-)
+from enum import Enum
 
 import core.sanitization as core_sanitization
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+    field_validator,
+)
 
 # Default allowed tile domains for map tiles
 DEFAULT_ALLOWED_TILE_DOMAINS: list[str] = [
@@ -97,16 +97,12 @@ class ServerSettingsBase(BaseModel):
     """
 
     units: Units = Field(Units.METRIC, description="Units (metric, imperial)")
-    public_shareable_links: StrictBool = Field(
-        ..., description="Allow public shareable links (true - yes, false - no)"
-    )
+    public_shareable_links: StrictBool = Field(..., description="Allow public shareable links (true - yes, false - no)")
     public_shareable_links_user_info: StrictBool = Field(
         ...,
         description="Allow show user info on public shareable links (true - yes, false - no)",
     )
-    login_photo_set: StrictBool = Field(
-        ..., description="Is login photo set (true - yes, false - no)"
-    )
+    login_photo_set: StrictBool = Field(..., description="Is login photo set (true - yes, false - no)")
     currency: Currency = Field(..., description="Currency (euro, dollar, pound)")
     num_records_per_page: StrictInt = Field(
         25,
@@ -114,9 +110,7 @@ class ServerSettingsBase(BaseModel):
         le=100,
         description="Number of records per page in lists",
     )
-    signup_enabled: StrictBool = Field(
-        ..., description="Allow user sign-up registration (true - yes, false - no)"
-    )
+    signup_enabled: StrictBool = Field(..., description="Allow user sign-up registration (true - yes, false - no)")
     sso_enabled: StrictBool = Field(
         ...,
         description="Enable SSO/IdP login (true - yes, false - no)",
@@ -144,14 +138,9 @@ class ServerSettingsBase(BaseModel):
     )
     tileserver_regenerate_thumbnails_on_change: StrictBool = Field(
         False,
-        description=(
-            "Delete and regenerate all activity thumbnails when "
-            "tile server settings change"
-        ),
+        description=("Delete and regenerate all activity thumbnails when tile server settings change"),
     )
-    password_type: PasswordType = Field(
-        PasswordType.STRICT, description="Password type policy (strict, length_only)"
-    )
+    password_type: PasswordType = Field(PasswordType.STRICT, description="Password type policy (strict, length_only)")
     password_length_regular_users: StrictInt = Field(
         8, ge=8, le=128, description="Minimum password length for regular users"
     )
@@ -189,25 +178,19 @@ class ServerSettingsBase(BaseModel):
             raise ValueError("Tile server URL must use http:// or https://")
 
         # Enforce HTTPS except for localhost
-        if value.lower().startswith("http://"):
-            if not re.match(
-                r"^http://(localhost|127\.0\.0\.1)(:|/)",
-                value,
-                re.IGNORECASE,
-            ):
-                raise ValueError(
-                    "Tile server URL must use https:// "
-                    "(http:// only allowed for localhost)"
-                )
+        if value.lower().startswith("http://") and not re.match(
+            r"^http://(localhost|127\.0\.0\.1)(:|/)",
+            value,
+            re.IGNORECASE,
+        ):
+            raise ValueError("Tile server URL must use https:// (http:// only allowed for localhost)")
 
         # Must contain required tile coordinate placeholders
         required = ["{z}", "{x}", "{y}"]
         missing = [p for p in required if p not in value.lower()]
         if missing:
             missing_str = ", ".join(missing)
-            raise ValueError(
-                f"Tile server URL must contain placeholders: {missing_str}"
-            )
+            raise ValueError(f"Tile server URL must contain placeholders: {missing_str}")
 
         # Block dangerous patterns
         dangerous = [
@@ -254,9 +237,7 @@ class ServerSettings(ServerSettingsBase):
         tileserver_api_key: API key encrypted for the tile server.
     """
 
-    id: StrictInt = Field(
-        ..., description="Unique identifier for server settings (always 1)"
-    )
+    id: StrictInt = Field(..., description="Unique identifier for server settings (always 1)")
     tileserver_api_key: StrictStr | None = Field(
         default=None,
         max_length=512,
@@ -329,15 +310,9 @@ class TileMapsTemplate(BaseModel):
         min_length=1,
         description=("Template identifier (e.g., 'openstreetmap', 'stadia_outdoors')"),
     )
-    name: StrictStr = Field(
-        ..., min_length=1, description="Human-readable name of the tile map template"
-    )
-    url_template: StrictStr = Field(
-        ..., min_length=1, description="URL template for fetching map tiles"
-    )
-    attribution: StrictStr = Field(
-        ..., min_length=1, description="HTML string for map attribution"
-    )
+    name: StrictStr = Field(..., min_length=1, description="Human-readable name of the tile map template")
+    url_template: StrictStr = Field(..., min_length=1, description="URL template for fetching map tiles")
+    attribution: StrictStr = Field(..., min_length=1, description="HTML string for map attribution")
     map_background_color: StrictStr = Field(
         max_length=7,
         min_length=7,
@@ -346,15 +321,11 @@ class TileMapsTemplate(BaseModel):
     )
     requires_api_key_frontend: StrictBool = Field(
         ...,
-        description=(
-            "Indicates if an API key is required on the frontend " "to use the tile map"
-        ),
+        description=("Indicates if an API key is required on the frontend to use the tile map"),
     )
     requires_api_key_backend: StrictBool = Field(
         ...,
-        description=(
-            "Indicates if an API key is required on the backend " "to use the tile map"
-        ),
+        description=("Indicates if an API key is required on the backend to use the tile map"),
     )
 
     model_config = ConfigDict(

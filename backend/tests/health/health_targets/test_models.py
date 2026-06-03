@@ -1,5 +1,3 @@
-import pytest
-
 import health.health_targets.models as health_targets_models
 
 
@@ -70,10 +68,10 @@ class TestHealthTargetsModel:
         Test HealthTargets model column types.
         """
         # Assert
-        assert health_targets_models.HealthTargets.id.type.python_type == int
-        assert health_targets_models.HealthTargets.user_id.type.python_type == int
-        assert health_targets_models.HealthTargets.steps.type.python_type == int
-        assert health_targets_models.HealthTargets.sleep.type.python_type == int
+        assert health_targets_models.HealthTargets.id.type.python_type is int
+        assert health_targets_models.HealthTargets.user_id.type.python_type is int
+        assert health_targets_models.HealthTargets.steps.type.python_type is int
+        assert health_targets_models.HealthTargets.sleep.type.python_type is int
 
     def test_health_targets_model_relationship(self):
         """

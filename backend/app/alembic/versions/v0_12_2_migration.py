@@ -6,16 +6,16 @@ Create Date: 2025-06-08 21:49:56.254908
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "bd59252fe91f"
-down_revision: Union[str, None] = "f2395550aab9"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "f2395550aab9"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -105,15 +105,9 @@ def downgrade() -> None:
     op.drop_constraint("fk_users_default_gear_snowboard_gear_id", "users_default_gear", type_="foreignkey")
     op.drop_constraint("fk_users_default_gear_nordic_ski_gear_id", "users_default_gear", type_="foreignkey")
     op.drop_constraint("fk_users_default_gear_alpine_ski_gear_id", "users_default_gear", type_="foreignkey")
-    op.drop_index(
-        op.f("ix_users_default_gear_snowboard_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_nordic_ski_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_alpine_ski_gear_id"), table_name="users_default_gear"
-    )
+    op.drop_index(op.f("ix_users_default_gear_snowboard_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_nordic_ski_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_alpine_ski_gear_id"), table_name="users_default_gear")
     op.drop_column("users_default_gear", "snowboard_gear_id")
     op.drop_column("users_default_gear", "nordic_ski_gear_id")
     op.drop_column("users_default_gear", "alpine_ski_gear_id")

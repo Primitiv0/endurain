@@ -1,36 +1,36 @@
 """FastAPI routes for the activities module (authenticated)."""
 
+import asyncio
 import calendar
 import glob
 import os
-import asyncio
-from datetime import date, datetime, timedelta, timezone
-from typing import Annotated, Callable
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
+from typing import Annotated
 
 import activities.activity.crud as activities_crud
 import activities.activity.dependencies as activities_dependencies
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
+import auth.dependencies as auth_dependencies
+import core.config as core_config
 import core.database as core_database
 import core.dependencies as core_dependencies
-import core.logger as core_logger
-import core.config as core_config
 import core.file_uploads as core_file_uploads
-import gears.gear.crud as gears_crud
-import gears.gear.dependencies as gears_dependencies
-import auth.dependencies as auth_dependencies
-import users.users.dependencies as users_dependencies
+import core.logger as core_logger
 import garmin.activity_utils as garmin_activity_utils
+import gears.gear.dependencies as gears_dependencies
 import strava.activity_utils as strava_activity_utils
+import users.users.dependencies as users_dependencies
 import websocket.manager as websocket_manager
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    Security,
     Query,
+    Security,
     UploadFile,
     status,
 )
@@ -54,16 +54,10 @@ executor = ThreadPoolExecutor(max_workers=2)
 )
 async def read_activities_user_activities_week(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     week_number: int,
-    _validate_week_number: Annotated[
-        Callable, Depends(activities_dependencies.validate_week_number)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_week_number: Annotated[Callable, Depends(activities_dependencies.validate_week_number)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -74,15 +68,13 @@ async def read_activities_user_activities_week(
     ],
 ):
     # Calculate the start of the requested week
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     start_of_week = today - timedelta(days=(today.weekday() + 7 * week_number))
     end_of_week = start_of_week + timedelta(days=6)
 
     if user_id == token_user_id:
         # Get all user activities for the requested week if the user is the owner of the token
-        activities = activities_crud.get_user_activities_per_timeframe(
-            user_id, start_of_week, end_of_week, db, True
-        )
+        activities = activities_crud.get_user_activities_per_timeframe(user_id, start_of_week, end_of_week, db, True)
     else:
         activities = activities_crud.get_user_activities_per_timeframe(
             user_id,
@@ -108,12 +100,8 @@ async def read_activities_user_activities_week(
 )
 async def read_activities_user_activities_this_week_stats(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -124,16 +112,14 @@ async def read_activities_user_activities_this_week_stats(
     ],
 ) -> activities_schema.ActivityStats:
     # Calculate the start of the current week
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
     activities = []
 
     if user_id == token_user_id:
         # Get all user activities for the requested week if the user is the owner of the token
-        activities = activities_crud.get_user_activities_per_timeframe(
-            user_id, start_of_week, end_of_week, db, True
-        )
+        activities = activities_crud.get_user_activities_per_timeframe(user_id, start_of_week, end_of_week, db, True)
     else:
         activities = activities_crud.get_user_activities_per_timeframe(
             user_id,
@@ -156,12 +142,8 @@ async def read_activities_user_activities_this_week_stats(
 )
 async def read_activities_user_activities_this_month_stats(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -172,18 +154,14 @@ async def read_activities_user_activities_this_month_stats(
     ],
 ) -> activities_schema.ActivityStats:
     # Calculate the start of the current month
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     start_of_month = today.replace(day=1)
-    end_of_month = start_of_month.replace(
-        day=calendar.monthrange(today.year, today.month)[1]
-    )
+    end_of_month = start_of_month.replace(day=calendar.monthrange(today.year, today.month)[1])
     activities = []
 
     if user_id == token_user_id:
         # Get all user activities for the requested month if the user is the owner of the token
-        activities = activities_crud.get_user_activities_per_timeframe(
-            user_id, start_of_month, end_of_month, db, True
-        )
+        activities = activities_crud.get_user_activities_per_timeframe(user_id, start_of_month, end_of_month, db, True)
     else:
         activities = activities_crud.get_user_activities_per_timeframe(
             user_id,
@@ -206,12 +184,8 @@ async def read_activities_user_activities_this_month_stats(
 )
 async def read_activities_user_activities_this_month_number(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -222,17 +196,13 @@ async def read_activities_user_activities_this_month_number(
     ],
 ):
     # Calculate the start of the current month
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     start_of_month = today.replace(day=1)
-    end_of_month = start_of_month.replace(
-        day=calendar.monthrange(today.year, today.month)[1]
-    )
+    end_of_month = start_of_month.replace(day=calendar.monthrange(today.year, today.month)[1])
 
     if user_id == token_user_id:
         # Get all user activities for the requested month if the user is the owner of the token
-        activities = activities_crud.get_user_activities_per_timeframe(
-            user_id, start_of_month, end_of_month, db, True
-        )
+        activities = activities_crud.get_user_activities_per_timeframe(user_id, start_of_month, end_of_month, db, True)
     else:
         activities = activities_crud.get_user_activities_per_timeframe(
             user_id,
@@ -253,9 +223,7 @@ async def read_activities_user_activities_this_month_number(
 
 @router.get(
     "/gear/{gear_id}/list",
-    response_model=(
-        activities_schema.GearActivitiesListResponse
-    ),
+    response_model=(activities_schema.GearActivitiesListResponse),
     status_code=status.HTTP_200_OK,
 )
 async def read_gear_activities_list(
@@ -276,8 +244,7 @@ async def read_gear_activities_list(
     token_user_id: Annotated[
         int,
         Depends(
-            auth_dependencies
-            .get_sub_from_access_token,
+            auth_dependencies.get_sub_from_access_token,
         ),
     ],
     db: Annotated[
@@ -296,9 +263,7 @@ async def read_gear_activities_list(
             description="Records per page",
         ),
     ] = None,
-) -> (
-    activities_schema.GearActivitiesListResponse
-):
+) -> activities_schema.GearActivitiesListResponse:
     """
     Retrieve paginated gear activities with total
     count.
@@ -316,31 +281,24 @@ async def read_gear_activities_list(
         GearActivitiesListResponse with total count
         and paginated records.
     """
-    total = (
-        activities_crud
-        .get_gear_activities_count_by_user_id(
-            token_user_id, gear_id, db,
-        )
+    total = activities_crud.get_gear_activities_count_by_user_id(
+        token_user_id,
+        gear_id,
+        db,
     )
-    records = (
-        activities_crud
-        .get_user_activities_by_gear_id_and_user_id_with_pagination(
-            token_user_id,
-            gear_id,
-            page_number or 1,
-            num_records or 10,
-            db,
-        )
+    records = activities_crud.get_user_activities_by_gear_id_and_user_id_with_pagination(
+        token_user_id,
+        gear_id,
+        page_number or 1,
+        num_records or 10,
+        db,
     )
 
-    return (
-        activities_schema
-        .GearActivitiesListResponse(
-            total=total,
-            num_records=num_records,
-            page_number=page_number,
-            records=records or [],
-        )
+    return activities_schema.GearActivitiesListResponse(
+        total=total,
+        num_records=num_records,
+        page_number=page_number,
+        records=records or [],
     )
 
 
@@ -350,12 +308,8 @@ async def read_gear_activities_list(
 )
 async def read_activities_gear_activities(
     gear_id: int,
-    _validate_gear_id: Annotated[
-        Callable, Depends(gears_dependencies.validate_gear_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_gear_id: Annotated[Callable, Depends(gears_dependencies.validate_gear_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -366,9 +320,7 @@ async def read_activities_gear_activities(
     ],
 ):
     # Get the activities for the gear
-    return activities_crud.get_user_activities_by_gear_id_and_user_id(
-        token_user_id, gear_id, db
-    )
+    return activities_crud.get_user_activities_by_gear_id_and_user_id(token_user_id, gear_id, db)
 
 
 @router.get(
@@ -377,12 +329,8 @@ async def read_activities_gear_activities(
 )
 async def read_activities_gear_activities_number(
     gear_id: int,
-    _validate_gear_id: Annotated[
-        Callable, Depends(gears_dependencies.validate_gear_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_gear_id: Annotated[Callable, Depends(gears_dependencies.validate_gear_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -393,9 +341,7 @@ async def read_activities_gear_activities_number(
     ],
 ):
     # Get the number of activities for the gear
-    activities = activities_crud.get_user_activities_by_gear_id_and_user_id(
-        token_user_id, gear_id, db
-    )
+    activities = activities_crud.get_user_activities_by_gear_id_and_user_id(token_user_id, gear_id, db)
     if activities is None:
         return 0
     return len(activities)
@@ -407,17 +353,11 @@ async def read_activities_gear_activities_number(
 )
 async def read_activities_gear_activities_with_pagination(
     gear_id: int,
-    _validate_gear_id: Annotated[
-        Callable, Depends(gears_dependencies.validate_gear_id)
-    ],
+    _validate_gear_id: Annotated[Callable, Depends(gears_dependencies.validate_gear_id)],
     page_number: int,
     num_records: int,
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_pagination_values: Annotated[Callable, Depends(core_dependencies.validate_pagination_values)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -438,9 +378,7 @@ async def read_activities_gear_activities_with_pagination(
     response_model=int,
 )
 async def read_activities_user_activities_number(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -450,9 +388,7 @@ async def read_activities_user_activities_number(
         Depends(core_database.get_db),
     ],
     # Added dependencies for optional query parameters
-    _validate_activity_type: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_type)
-    ],
+    _validate_activity_type: Annotated[Callable, Depends(activities_dependencies.validate_activity_type)],
     # Added optional filter query parameters
     activity_type: int | None = Query(None, alias="type"),
     start_date: date | None = Query(None),
@@ -482,9 +418,7 @@ async def read_activities_user_activities_number(
     response_model=dict | None,
 )
 async def read_activities_types(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -503,17 +437,11 @@ async def read_activities_types(
 )
 async def read_activities_user_activities_pagination(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     page_number: int,
     num_records: int,
-    validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    validate_pagination_values: Annotated[Callable, Depends(core_dependencies.validate_pagination_values)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -523,15 +451,9 @@ async def read_activities_user_activities_pagination(
         Depends(core_database.get_db),
     ],
     # Added dependencies for optional query parameters
-    _validate_activity_type: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_type)
-    ],
-    _validate_sort_by: Annotated[
-        Callable, Depends(activities_dependencies.validate_sort_by)
-    ],
-    _validate_sort_order: Annotated[
-        Callable, Depends(activities_dependencies.validate_sort_order)
-    ],
+    _validate_activity_type: Annotated[Callable, Depends(activities_dependencies.validate_activity_type)],
+    _validate_sort_by: Annotated[Callable, Depends(activities_dependencies.validate_sort_by)],
+    _validate_sort_order: Annotated[Callable, Depends(activities_dependencies.validate_sort_order)],
     # Added optional filter query parameters
     activity_type: int | None = Query(None, alias="type"),
     start_date: date | None = Query(None),
@@ -562,22 +484,15 @@ async def read_activities_user_activities_pagination(
 
 @router.get(
     "/user/{user_id}/followed/page_number/{page_number}/num_records/{num_records}",
-    response_model=list[activities_schema.Activity]
-    | None,  # Keep old response model for now
+    response_model=list[activities_schema.Activity] | None,  # Keep old response model for now
 )
 async def read_activities_followed_user_activities_pagination(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     page_number: int,
     num_records: int,
-    _validate_pagination_values: Annotated[
-        Callable, Depends(core_dependencies.validate_pagination_values)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_pagination_values: Annotated[Callable, Depends(core_dependencies.validate_pagination_values)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -595,9 +510,7 @@ async def read_activities_followed_user_activities_pagination(
             detail="Forbidden",
         )
     # Get the activities for the following users with pagination
-    return activities_crud.get_user_following_activities_with_pagination(
-        token_user_id, page_number, num_records, db
-    )
+    return activities_crud.get_user_following_activities_with_pagination(token_user_id, page_number, num_records, db)
 
 
 @router.get(
@@ -606,12 +519,8 @@ async def read_activities_followed_user_activities_pagination(
 )
 async def read_activities_followed_user_activities_number(
     user_id: int,
-    _validate_user_id: Annotated[
-        Callable, Depends(users_dependencies.validate_user_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_user_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -644,9 +553,7 @@ async def read_activities_followed_user_activities_number(
     response_model=list[activities_schema.Activity] | None,
 )
 async def read_activities_user_activities_refresh(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -665,22 +572,20 @@ async def read_activities_user_activities_refresh(
 
     # Get the strava activities for the user for the last 24h
     strava_activities = await strava_activity_utils.get_user_strava_activities_by_dates(
-        start_date=datetime.now(timezone.utc) - timedelta(days=1),
-        end_date=datetime.now(timezone.utc),
+        start_date=datetime.now(UTC) - timedelta(days=1),
+        end_date=datetime.now(UTC),
         user_id=token_user_id,
         ws_manager=ws_manager,
         db=db,
     )
 
     # Get the garmin activities for the user for the last 24h
-    garmin_activities = (
-        await garmin_activity_utils.get_user_garminconnect_activities_by_dates(
-            start_date=datetime.now(timezone.utc) - timedelta(days=1),
-            end_date=datetime.now(timezone.utc),
-            user_id=token_user_id,
-            ws_manager=ws_manager,
-            db=db,
-        )
+    garmin_activities = await garmin_activity_utils.get_user_garminconnect_activities_by_dates(
+        start_date=datetime.now(UTC) - timedelta(days=1),
+        end_date=datetime.now(UTC),
+        user_id=token_user_id,
+        ws_manager=ws_manager,
+        db=db,
     )
 
     # Extend the activities to the list
@@ -703,12 +608,8 @@ async def read_activities_user_activities_refresh(
 )
 async def read_activities_activity_from_id(
     activity_id: int,
-    _validate_activity_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_activity_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -719,9 +620,7 @@ async def read_activities_activity_from_id(
     ],
 ):
     # Get the activity from the database and return it
-    return activities_crud.get_activity_by_id_from_user_id_or_has_visibility(
-        activity_id, token_user_id, db
-    )
+    return activities_crud.get_activity_by_id_from_user_id_or_has_visibility(activity_id, token_user_id, db)
 
 
 @router.get(
@@ -730,9 +629,7 @@ async def read_activities_activity_from_id(
 )
 async def read_activities_contain_name(
     name: str,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -792,9 +689,7 @@ async def create_activity_with_uploaded_file(
     Returns:
         List of created activity objects.
     """
-    return await activities_utils.parse_and_store_activity_from_uploaded_file(
-        token_user_id, file, ws_manager, db
-    )
+    return await activities_utils.parse_and_store_activity_from_uploaded_file(token_user_id, file, ws_manager, db)
 
 
 @router.post(
@@ -807,9 +702,7 @@ async def create_activity_with_bulk_import(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])],
     ws_manager: Annotated[
         websocket_manager.WebSocketManager,
         Depends(websocket_manager.get_websocket_manager),
@@ -817,7 +710,7 @@ async def create_activity_with_bulk_import(
 ):
     try:
         # Get time of import initiation to pass to function for recording in import_data
-        import_time = datetime.now(timezone.utc).isoformat()
+        import_time = datetime.now(UTC).isoformat()
 
         core_logger.print_to_log_and_console(f"Bulk import initiated at {import_time}.", "info")
 
@@ -866,9 +759,7 @@ async def create_activity_with_bulk_import(
 
                 files_to_process.append(file_path)
                 # Log the file being processed
-                core_logger.print_to_log_and_console(
-                    f"Queuing file for processing: {file_path}", "info"
-                )
+                core_logger.print_to_log_and_console(f"Queuing file for processing: {file_path}", "info")
 
         # Submit ONE task that processes all files. Use the running
         # loop (get_event_loop is deprecated in 3.12+ when no loop
@@ -934,18 +825,14 @@ async def edit_activity(
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
     activity_attributes: activities_schema.ActivityEdit,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
 ):
     # Update the activity in the database and return updated entity
-    return activities_crud.edit_activity(
-        token_user_id, activity_attributes, db
-    )
+    return activities_crud.edit_activity(token_user_id, activity_attributes, db)
 
 
 @router.put(
@@ -954,32 +841,23 @@ async def edit_activity(
 )
 async def edit_activity_visibility(
     visibility: int,
-    _validate_visibility: Annotated[
-        Callable, Depends(activities_dependencies.validate_visibility)
-    ],
+    _validate_visibility: Annotated[Callable, Depends(activities_dependencies.validate_visibility)],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
 ):
     # Update the activities in the database
-    updated = activities_crud.edit_user_activities_visibility(
-        token_user_id, visibility, db
-    )
+    updated = activities_crud.edit_user_activities_visibility(token_user_id, visibility, db)
 
     # Return success message with rowcount
     return {
-        "detail": (
-            f"Visibility changed to {visibility} for all user "
-            f"activities"
-        ),
+        "detail": (f"Visibility changed to {visibility} for all user activities"),
         "updated": updated or 0,
     }
 
@@ -990,12 +868,8 @@ async def edit_activity_visibility(
 )
 async def delete_activity(
     activity_id: int,
-    _validate_activity_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
-    ],
+    _validate_activity_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -1006,9 +880,7 @@ async def delete_activity(
     ],
 ):
     # Get the activity by id from user id
-    activity = activities_crud.get_activity_by_id_from_user_id(
-        activity_id, token_user_id, db
-    )
+    activity = activities_crud.get_activity_by_id_from_user_id(activity_id, token_user_id, db)
 
     # Check if activity is None and raise an HTTPException with a 404 Not Found status code if it is
     if activity is None:
@@ -1030,8 +902,7 @@ async def delete_activity(
                 pass
             except OSError as fs_err:
                 core_logger.print_to_log(
-                    f"Error deleting thumbnail "
-                    f"{activity.map_thumbnail_path}: {fs_err}",
+                    f"Error deleting thumbnail {activity.map_thumbnail_path}: {fs_err}",
                     "error",
                     exc=fs_err,
                 )
@@ -1043,13 +914,10 @@ async def delete_activity(
             # resolves outside FILES_PROCESSED_DIR (defense in depth
             # against crafted activity IDs or symlinks).
             try:
-                core_file_uploads.safe_remove_within(
-                    file, base_dir=core_config.FILES_PROCESSED_DIR
-                )
+                core_file_uploads.safe_remove_within(file, base_dir=core_config.FILES_PROCESSED_DIR)
             except HTTPException as fs_err:
                 core_logger.print_to_log(
-                    f"Refused to delete file outside processed dir "
-                    f"{file}: {fs_err.detail}",
+                    f"Refused to delete file outside processed dir {file}: {fs_err.detail}",
                     "warning",
                 )
 

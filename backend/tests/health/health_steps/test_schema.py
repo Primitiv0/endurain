@@ -1,8 +1,8 @@
-import pytest
 from datetime import date as datetime_date
-from pydantic import ValidationError
 
 import health.health_steps.schema as health_steps_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestHealthStepsSchema:
@@ -97,9 +97,7 @@ class TestHealthStepsSchema:
             source = "garmin"
 
         # Act
-        health_steps = health_steps_schema.HealthStepsRead.model_validate(
-            MockORMModel()
-        )
+        health_steps = health_steps_schema.HealthStepsRead.model_validate(MockORMModel())
 
         # Assert
         assert health_steps.id == 1
@@ -126,9 +124,7 @@ class TestHealthStepsSchema:
         Test date field validation.
         """
         # Arrange & Act
-        health_steps = health_steps_schema.HealthStepsBase(
-            date=datetime_date(2024, 12, 31)
-        )
+        health_steps = health_steps_schema.HealthStepsBase(date=datetime_date(2024, 12, 31))
 
         # Assert
         assert health_steps.date == datetime_date(2024, 12, 31)
@@ -174,9 +170,7 @@ class TestSourceEnum:
         Test Source enum can be used in HealthStepsBase schema.
         """
         # Arrange & Act
-        health_steps = health_steps_schema.HealthStepsBase(
-            source=health_steps_schema.Source.GARMIN
-        )
+        health_steps = health_steps_schema.HealthStepsBase(source=health_steps_schema.Source.GARMIN)
 
         # Assert
         assert health_steps.source == "garmin"
@@ -225,9 +219,7 @@ class TestHealthStepsListResponse:
             steps=12000,
         )
 
-        response = health_steps_schema.HealthStepsListResponse(
-            total=2, records=[health_steps1, health_steps2]
-        )
+        response = health_steps_schema.HealthStepsListResponse(total=2, records=[health_steps1, health_steps2])
 
         # Assert
         assert response.total == 2
@@ -252,8 +244,6 @@ class TestHealthStepsListResponse:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            health_steps_schema.HealthStepsListResponse(
-                total=1, records=[], extra="not allowed"
-            )
+            health_steps_schema.HealthStepsListResponse(total=1, records=[], extra="not allowed")
 
         assert "extra" in str(exc_info.value)

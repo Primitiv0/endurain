@@ -1,15 +1,14 @@
 """User goals utility functions for progress calculation."""
 
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
-
-import users.users_goals.schema as user_goals_schema
-import users.users_goals.models as user_goals_models
-import users.users_goals.crud as user_goals_crud
+from datetime import UTC, datetime, timedelta
 
 import activities.activity.crud as activity_crud
 import core.logger as core_logger
+import users.users_goals.crud as user_goals_crud
+import users.users_goals.models as user_goals_models
+import users.users_goals.schema as user_goals_schema
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 _ACTIVITY_TYPE_MAP: dict[str, list[int]] = {
     user_goals_schema.ActivityType.RUN.value: [1, 2, 3, 34, 40],
@@ -42,16 +41,14 @@ def calculate_user_goals(
         HTTPException: If database error occurs.
     """
     if not date:
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date = datetime.now(UTC).strftime("%Y-%m-%d")
     try:
         goals = user_goals_crud.get_user_goals_by_user_id(user_id, db)
 
         if not goals:
             return None
 
-        return [
-            calculate_goal_progress_by_activity_type(goal, date, db) for goal in goals
-        ]
+        return [calculate_goal_progress_by_activity_type(goal, date, db) for goal in goals]
     except HTTPException as http_err:
         raise http_err
     except (ValueError, TypeError) as err:
@@ -103,9 +100,7 @@ def calculate_goal_progress_by_activity_type(
         start_date, end_date = get_start_end_date_by_interval(goal.interval, date)
 
         # Get activity types based on goal.activity_type
-        activity_types = _ACTIVITY_TYPE_MAP.get(
-            goal.activity_type, _DEFAULT_ACTIVITY_TYPES
-        )
+        activity_types = _ACTIVITY_TYPE_MAP.get(goal.activity_type, _DEFAULT_ACTIVITY_TYPES)
 
         # Fetch all activities in a single query (exclude hidden to avoid
         # counting duplicate imports from multiple sources)
@@ -137,23 +132,17 @@ def calculate_goal_progress_by_activity_type(
                 if goal.goal_distance and goal.goal_distance > 0:
                     percentage_completed = (total_distance / goal.goal_distance) * 100
             elif goal.goal_type == user_goals_schema.GoalType.ELEVATION:
-                total_elevation = sum(
-                    activity.elevation_gain or 0 for activity in activities
-                )
+                total_elevation = sum(activity.elevation_gain or 0 for activity in activities)
                 if goal.goal_elevation and goal.goal_elevation > 0:
                     percentage_completed = (total_elevation / goal.goal_elevation) * 100
             elif goal.goal_type == user_goals_schema.GoalType.DURATION:
-                total_duration = sum(
-                    activity.total_elapsed_time or 0 for activity in activities
-                )
+                total_duration = sum(activity.total_elapsed_time or 0 for activity in activities)
                 if goal.goal_duration and goal.goal_duration > 0:
                     percentage_completed = (total_duration / goal.goal_duration) * 100
             elif goal.goal_type == user_goals_schema.GoalType.ACTIVITIES:
                 total_activities_number = len(activities)
                 if goal.goal_activities_number and goal.goal_activities_number > 0:
-                    percentage_completed = (
-                        total_activities_number / goal.goal_activities_number
-                    ) * 100
+                    percentage_completed = (total_activities_number / goal.goal_activities_number) * 100
 
         if percentage_completed > 100:
             percentage_completed = 100
@@ -206,9 +195,7 @@ def calculate_goal_progress_by_activity_type(
         ) from err
 
 
-def get_start_end_date_by_interval(
-    interval: str, date: str
-) -> tuple[datetime, datetime]:
+def get_start_end_date_by_interval(interval: str, date: str) -> tuple[datetime, datetime]:
     """
     Get start and end datetimes for interval containing date.
 
@@ -224,17 +211,13 @@ def get_start_end_date_by_interval(
     """
     date_obj = datetime.strptime(date, "%Y-%m-%d")
     if interval == "yearly":
-        start_date = date_obj.replace(
-            month=1, day=1, hour=0, minute=0, second=0, microsecond=0
-        )
+        start_date = date_obj.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         # Calculate the last second of December 31st of the same year
         end_date = datetime(date_obj.year, 12, 31, 23, 59, 59)
     elif interval == "weekly":
         start_date = date_obj - timedelta(days=date_obj.weekday())  # Monday
         start_date = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_date = start_date + timedelta(
-            days=6, hours=23, minutes=59, seconds=59
-        )  # Sunday
+        end_date = start_date + timedelta(days=6, hours=23, minutes=59, seconds=59)  # Sunday
     elif interval == "monthly":
         start_date = date_obj.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         # Get the first day of next month

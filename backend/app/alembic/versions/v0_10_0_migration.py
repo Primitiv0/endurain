@@ -6,16 +6,16 @@ Create Date: 2025-02-27 15:43:18.729569
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "4ac2cc4f4e41"
-down_revision: Union[str, None] = "7217cc0eee8c"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "7217cc0eee8c"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -121,12 +121,8 @@ def upgrade() -> None:
             nullable=True,
             comment="Lap total distance (m)",
         ),
-        sa.Column(
-            "total_cycles", sa.Integer(), nullable=True, comment="Lap total cycles"
-        ),
-        sa.Column(
-            "total_calories", sa.Integer(), nullable=True, comment="Lap total calories"
-        ),
+        sa.Column("total_cycles", sa.Integer(), nullable=True, comment="Lap total cycles"),
+        sa.Column("total_calories", sa.Integer(), nullable=True, comment="Lap total calories"),
         sa.Column(
             "avg_heart_rate",
             sa.Integer(),
@@ -139,37 +135,21 @@ def upgrade() -> None:
             nullable=True,
             comment="Lap maximum heart rate",
         ),
-        sa.Column(
-            "avg_cadence", sa.Integer(), nullable=True, comment="Lap average cadence"
-        ),
-        sa.Column(
-            "max_cadence", sa.Integer(), nullable=True, comment="Lap maximum cadence"
-        ),
-        sa.Column(
-            "avg_power", sa.Integer(), nullable=True, comment="Lap average power"
-        ),
-        sa.Column(
-            "max_power", sa.Integer(), nullable=True, comment="Lap maximum power"
-        ),
-        sa.Column(
-            "total_ascent", sa.Integer(), nullable=True, comment="Lap total ascent (m)"
-        ),
+        sa.Column("avg_cadence", sa.Integer(), nullable=True, comment="Lap average cadence"),
+        sa.Column("max_cadence", sa.Integer(), nullable=True, comment="Lap maximum cadence"),
+        sa.Column("avg_power", sa.Integer(), nullable=True, comment="Lap average power"),
+        sa.Column("max_power", sa.Integer(), nullable=True, comment="Lap maximum power"),
+        sa.Column("total_ascent", sa.Integer(), nullable=True, comment="Lap total ascent (m)"),
         sa.Column(
             "total_descent",
             sa.Integer(),
             nullable=True,
             comment="Lap total descent (m)",
         ),
-        sa.Column(
-            "intensity", sa.String(length=250), nullable=True, comment="Lap intensity"
-        ),
-        sa.Column(
-            "lap_trigger", sa.String(length=250), nullable=True, comment="Lap trigger"
-        ),
+        sa.Column("intensity", sa.String(length=250), nullable=True, comment="Lap intensity"),
+        sa.Column("lap_trigger", sa.String(length=250), nullable=True, comment="Lap trigger"),
         sa.Column("sport", sa.String(length=250), nullable=True, comment="Lap sport"),
-        sa.Column(
-            "sub_sport", sa.String(length=250), nullable=True, comment="Lap sub sport"
-        ),
+        sa.Column("sub_sport", sa.String(length=250), nullable=True, comment="Lap sub sport"),
         sa.Column(
             "normalized_power",
             sa.Integer(),
@@ -268,9 +248,7 @@ def upgrade() -> None:
             nullable=False,
             comment="Exercise category",
         ),
-        sa.Column(
-            "exercise_name", sa.Integer(), nullable=False, comment="Exercise name ID"
-        ),
+        sa.Column("exercise_name", sa.Integer(), nullable=False, comment="Exercise name ID"),
         sa.Column(
             "wkt_step_name",
             sa.String(length=250),
@@ -325,18 +303,14 @@ def upgrade() -> None:
             nullable=True,
             comment="Workout step intensity type",
         ),
-        sa.Column(
-            "notes", sa.String(length=250), nullable=True, comment="Workout step notes"
-        ),
+        sa.Column("notes", sa.String(length=250), nullable=True, comment="Workout step notes"),
         sa.Column(
             "exercise_category",
             sa.Integer(),
             nullable=True,
             comment="Workout step exercise category",
         ),
-        sa.Column(
-            "exercise_name", sa.Integer(), nullable=True, comment="Exercise name ID"
-        ),
+        sa.Column("exercise_name", sa.Integer(), nullable=True, comment="Exercise name ID"),
         sa.Column(
             "exercise_weight",
             sa.DECIMAL(precision=20, scale=10),
@@ -380,9 +354,7 @@ def upgrade() -> None:
             nullable=False,
             comment="Workout set duration",
         ),
-        sa.Column(
-            "repetitions", sa.Integer(), nullable=True, comment="Repetitions number"
-        ),
+        sa.Column("repetitions", sa.Integer(), nullable=True, comment="Repetitions number"),
         sa.Column(
             "weight",
             sa.DECIMAL(precision=20, scale=10),
@@ -465,15 +437,13 @@ def downgrade() -> None:
     # Drop migration record
     op.execute(
         """
-    DELETE FROM migrations 
+    DELETE FROM migrations
     WHERE id = 3;
     """
     )
     # Drop foreign key constraint from users_default_gear table
     op.drop_constraint(None, "users_default_gear", type_="foreignkey")
-    op.drop_index(
-        op.f("ix_users_default_gear_tennis_gear_id"), table_name="users_default_gear"
-    )
+    op.drop_index(op.f("ix_users_default_gear_tennis_gear_id"), table_name="users_default_gear")
     op.drop_column("users_default_gear", "tennis_gear_id")
     # Alter gear column gear_type to remove racquet from comment
     op.alter_column(

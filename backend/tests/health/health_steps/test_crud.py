@@ -1,12 +1,12 @@
-import pytest
 from datetime import date as datetime_date
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 import health.health_steps.crud as health_steps_crud
-import health.health_steps.schema as health_steps_schema
 import health.health_steps.models as health_steps_models
+import health.health_steps.schema as health_steps_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 
 class TestGetHealthStepsNumber:
@@ -83,9 +83,7 @@ class TestGetHealthStepsWithPagination:
         mock_db.execute.return_value = mock_execute
 
         # Act
-        result = health_steps_crud.get_health_steps_by_user_id(
-            user_id, mock_db, page_number, num_records
-        )
+        result = health_steps_crud.get_health_steps_by_user_id(user_id, mock_db, page_number, num_records)
 
         # Assert
         assert result == [mock_steps1, mock_steps2]
@@ -142,9 +140,7 @@ class TestGetHealthStepsByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_steps
 
         # Act
-        result = health_steps_crud.get_health_steps_by_date_and_user_id(
-            user_id, test_date, mock_db
-        )
+        result = health_steps_crud.get_health_steps_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
         assert result == mock_steps
@@ -160,9 +156,7 @@ class TestGetHealthStepsByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
-        result = health_steps_crud.get_health_steps_by_date_and_user_id(
-            user_id, test_date, mock_db
-        )
+        result = health_steps_crud.get_health_steps_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
         assert result is None
@@ -178,9 +172,7 @@ class TestGetHealthStepsByDate:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_steps_crud.get_health_steps_by_date_and_user_id(
-                user_id, test_date, mock_db
-            )
+            health_steps_crud.get_health_steps_by_date_and_user_id(user_id, test_date, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert exc_info.value.detail == "Database error occurred"
@@ -216,9 +208,7 @@ class TestCreateHealthSteps:
             return_value=mock_db_steps,
         ):
             # Act
-            result = health_steps_crud.create_health_steps(
-                user_id, health_steps, mock_db
-            )
+            result = health_steps_crud.create_health_steps(user_id, health_steps, mock_db)
 
             # Assert
             assert result.id == 1
@@ -234,9 +224,7 @@ class TestCreateHealthSteps:
         # Arrange
         user_id = 1
         # Note: HealthStepsCreate automatically sets date to today if None
-        health_steps = health_steps_schema.HealthStepsCreate(
-            steps=10000, source="garmin"
-        )
+        health_steps = health_steps_schema.HealthStepsCreate(steps=10000, source="garmin")
 
         mock_db_steps = MagicMock()
         mock_db_steps.id = 1
@@ -250,9 +238,7 @@ class TestCreateHealthSteps:
             return_value=mock_db_steps,
         ):
             # Act
-            result = health_steps_crud.create_health_steps(
-                user_id, health_steps, mock_db
-            )
+            result = health_steps_crud.create_health_steps(user_id, health_steps, mock_db)
 
             # Assert
             # The schema should have set date to today
@@ -292,9 +278,7 @@ class TestCreateHealthSteps:
         """
         # Arrange
         user_id = 1
-        health_steps = health_steps_schema.HealthStepsCreate(
-            date=datetime_date(2024, 1, 15), steps=10000
-        )
+        health_steps = health_steps_schema.HealthStepsCreate(date=datetime_date(2024, 1, 15), steps=10000)
 
         mock_db.add.side_effect = SQLAlchemyError("Database error")
 
@@ -380,7 +364,7 @@ class TestEditHealthSteps:
             return_value=mock_db_steps,
         ):
             # Act
-            result = health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+            health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
 
             # Assert
             mock_db.commit.assert_called_once()

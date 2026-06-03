@@ -1,17 +1,16 @@
 """Integration tests for users_sessions router endpoints."""
 
+from datetime import UTC
 from unittest.mock import MagicMock, patch
 
+import auth.security as auth_security
+import auth.sessions.router as users_sessions_router
+import auth.sessions.schema as users_session_schema
+import core.database as core_database
 import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
-
-import auth.security as auth_security
-import core.database as core_database
-import auth.sessions.router as users_sessions_router
-import auth.sessions.schema as users_session_schema
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -77,9 +76,7 @@ def sessions_client(sessions_app: FastAPI) -> TestClient:
 class TestReadSessionsUser:
     """Tests for GET /sessions/user/{user_id}."""
 
-    @patch(
-        "auth.sessions.router.users_session_crud.get_user_sessions"
-    )
+    @patch("auth.sessions.router.users_session_crud.get_user_sessions")
     @patch("auth.sessions.router.core_config.settings")
     def test_returns_sessions_list_for_user(
         self,
@@ -91,9 +88,9 @@ class TestReadSessionsUser:
         Returns 200 with list of sessions for the specified user.
         """
         mock_settings.ENVIRONMENT = "production"
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_session = MagicMock(spec=users_session_schema.UsersSessionsRead)
         mock_session.id = "sess-1"
         mock_session.user_id = 5
@@ -114,9 +111,7 @@ class TestReadSessionsUser:
         assert isinstance(response.json(), list)
         mock_get_sessions.assert_called_once()
 
-    @patch(
-        "auth.sessions.router.users_session_crud.get_user_sessions"
-    )
+    @patch("auth.sessions.router.users_session_crud.get_user_sessions")
     @patch("auth.sessions.router.core_config.settings")
     def test_returns_empty_list_when_user_has_no_sessions(
         self,
@@ -152,9 +147,7 @@ class TestReadSessionsUser:
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
-    @patch(
-        "auth.sessions.router.users_session_crud.get_user_sessions"
-    )
+    @patch("auth.sessions.router.users_session_crud.get_user_sessions")
     @patch("auth.sessions.router.core_config.settings")
     def test_propagates_database_error_as_500(
         self,
@@ -173,10 +166,7 @@ class TestReadSessionsUser:
 
         response = sessions_client.get("/sessions/user/1")
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 # ---------------------------------------------------------------------------
@@ -187,9 +177,7 @@ class TestReadSessionsUser:
 class TestDeleteSessionUser:
     """Tests for DELETE /sessions/{session_id}/user/{user_id}."""
 
-    @patch(
-        "auth.sessions.router.users_session_crud.delete_session"
-    )
+    @patch("auth.sessions.router.users_session_crud.delete_session")
     def test_delete_session_success_returns_204(
         self,
         mock_delete,
@@ -200,16 +188,12 @@ class TestDeleteSessionUser:
         """
         mock_delete.return_value = None
 
-        response = sessions_client.delete(
-            "/sessions/session-abc/user/1"
-        )
+        response = sessions_client.delete("/sessions/session-abc/user/1")
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
         mock_delete.assert_called_once()
 
-    @patch(
-        "auth.sessions.router.users_session_crud.delete_session"
-    )
+    @patch("auth.sessions.router.users_session_crud.delete_session")
     def test_delete_nonexistent_session_returns_404(
         self,
         mock_delete,
@@ -223,15 +207,11 @@ class TestDeleteSessionUser:
             detail="Session not found",
         )
 
-        response = sessions_client.delete(
-            "/sessions/no-such-session/user/1"
-        )
+        response = sessions_client.delete("/sessions/no-such-session/user/1")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch(
-        "auth.sessions.router.users_session_crud.delete_session"
-    )
+    @patch("auth.sessions.router.users_session_crud.delete_session")
     def test_delete_session_for_different_user_propagates_error(
         self,
         mock_delete,
@@ -246,15 +226,11 @@ class TestDeleteSessionUser:
             detail="Session not found",
         )
 
-        response = sessions_client.delete(
-            "/sessions/session-abc/user/99"
-        )
+        response = sessions_client.delete("/sessions/session-abc/user/99")
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch(
-        "auth.sessions.router.users_session_crud.delete_session"
-    )
+    @patch("auth.sessions.router.users_session_crud.delete_session")
     def test_delete_session_calls_crud_with_correct_args(
         self,
         mock_delete,
@@ -271,9 +247,7 @@ class TestDeleteSessionUser:
 
         mock_delete.assert_called_once_with("my-session-id", 7, mock_db)
 
-    @patch(
-        "auth.sessions.router.users_session_crud.delete_session"
-    )
+    @patch("auth.sessions.router.users_session_crud.delete_session")
     def test_delete_session_database_error_returns_500(
         self,
         mock_delete,
@@ -287,11 +261,6 @@ class TestDeleteSessionUser:
             detail="Database error occurred",
         )
 
-        response = sessions_client.delete(
-            "/sessions/session-abc/user/1"
-        )
+        response = sessions_client.delete("/sessions/session-abc/user/1")
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

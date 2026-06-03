@@ -2,15 +2,12 @@
 
 from typing import Annotated
 
+import auth.dependencies as auth_dependencies
+import core.database as core_database
+import users.users_default_gear.crud as user_default_gear_crud
+import users.users_default_gear.schema as user_default_gear_schema
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
-
-import users.users_default_gear.schema as user_default_gear_schema
-import users.users_default_gear.crud as user_default_gear_crud
-
-import auth.dependencies as auth_dependencies
-
-import core.database as core_database
 
 # Define the API router
 router = APIRouter()
@@ -71,6 +68,4 @@ async def edit_user_default_gear(
     Returns:
         Updated user default gear settings.
     """
-    return user_default_gear_crud.edit_user_default_gear(
-        user_default_gear, token_user_id, db
-    )
+    return user_default_gear_crud.edit_user_default_gear(user_default_gear, token_user_id, db)

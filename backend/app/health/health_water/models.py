@@ -8,9 +8,10 @@ water intake data, including consumption amount and data source.
 from datetime import date as date_type
 from decimal import Decimal
 from typing import TYPE_CHECKING
+
+from core.database import Base
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from core.database import Base
 
 if TYPE_CHECKING:
     from users.users.models import Users

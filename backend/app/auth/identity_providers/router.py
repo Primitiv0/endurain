@@ -1,9 +1,7 @@
 """HTTP routes for managing identity providers (admin only)."""
 
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
+from collections.abc import Callable
+from typing import Annotated
 
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.dependencies as idp_dependencies
@@ -12,6 +10,8 @@ import auth.identity_providers.utils as idp_utils
 import auth.security as auth_security
 import core.database as core_database
 import users.users.schema as users_schema
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

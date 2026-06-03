@@ -4,6 +4,7 @@ import os
 from collections.abc import Generator
 from datetime import datetime
 
+import core.config as core_config
 from sqlalchemy import DateTime, create_engine, func
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm import (
@@ -14,18 +15,13 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
-import core.config as core_config
-
 # Resolve and validate the database password before
 # building the connection URL so the failure mode is a
 # clear startup error instead of a confusing connection
 # refusal later.
 _db_password = core_config.read_secret("DB_PASSWORD")
 if not _db_password:
-    raise RuntimeError(
-        "DB_PASSWORD is not configured. Set DB_PASSWORD "
-        "or DB_PASSWORD_FILE environment variable."
-    )
+    raise RuntimeError("DB_PASSWORD is not configured. Set DB_PASSWORD or DB_PASSWORD_FILE environment variable.")
 
 # Define the database connection URL using environment variables
 db_url = URL.create(

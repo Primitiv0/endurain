@@ -1,24 +1,21 @@
 """Authenticated API router for activity exercise titles."""
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
+import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
+import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
+import auth.dependencies as auth_dependencies
+import core.database as core_database
 from fastapi import APIRouter, Depends, Security
 from sqlalchemy.orm import Session
-
-import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
-import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
-
-import auth.dependencies as auth_dependencies
-
-import core.database as core_database
 
 router = APIRouter()
 
 
 @router.get(
     "/all",
-    response_model=list[activity_exercise_titles_schema.ActivityExerciseTitles]
-    | None,
+    response_model=list[activity_exercise_titles_schema.ActivityExerciseTitles] | None,
 )
 async def read_activities_exercise_titles_all(
     _check_scopes: Annotated[
@@ -41,4 +38,3 @@ async def read_activities_exercise_titles_all(
         HTTPException: If a database error occurs.
     """
     return activity_exercise_titles_crud.get_activity_exercise_titles(db)
-

@@ -1,22 +1,19 @@
 """CRUD operations for user integrations."""
 
-from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import users.users_integrations.schema as user_integrations_schema
-import users.users_integrations.models as user_integrations_models
+from datetime import UTC, datetime
 
 import core.cryptography as core_cryptography
 import core.decorators as core_decorators
+import users.users_integrations.models as user_integrations_models
+import users.users_integrations.schema as user_integrations_schema
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_user_integrations_by_user_id(
-    user_id: int, db: Session
-) -> user_integrations_models.UsersIntegrations | None:
+def get_user_integrations_by_user_id(user_id: int, db: Session) -> user_integrations_models.UsersIntegrations | None:
     """
     Retrieve integrations for a specific user.
 
@@ -63,9 +60,7 @@ def get_user_integrations_by_strava_state(
 
 
 @core_decorators.handle_db_errors
-def create_user_integrations(
-    user_id: int, db: Session
-) -> user_integrations_models.UsersIntegrations:
+def create_user_integrations(user_id: int, db: Session) -> user_integrations_models.UsersIntegrations:
     """
     Create integration settings for a user.
 
@@ -127,15 +122,9 @@ def link_strava_account(
         HTTPException: 500 error if database operation fails.
     """
     # Update the user integrations with the tokens
-    user_integrations.strava_token = core_cryptography.encrypt_token_fernet(
-        tokens["access_token"]
-    )
-    user_integrations.strava_refresh_token = core_cryptography.encrypt_token_fernet(
-        tokens["refresh_token"]
-    )
-    user_integrations.strava_token_expires_at = datetime.fromtimestamp(
-        tokens["expires_at"], tz=timezone.utc
-    )
+    user_integrations.strava_token = core_cryptography.encrypt_token_fernet(tokens["access_token"])
+    user_integrations.strava_refresh_token = core_cryptography.encrypt_token_fernet(tokens["refresh_token"])
+    user_integrations.strava_token_expires_at = datetime.fromtimestamp(tokens["expires_at"], tz=UTC)
 
     # Set the strava state to None
     user_integrations.strava_state = None
@@ -185,9 +174,7 @@ def unlink_strava_account(user_id: int, db: Session) -> None:
 
 
 @core_decorators.handle_db_errors
-def set_user_strava_client(
-    user_id: int, client_id: str, client_secret: str, db: Session
-) -> None:
+def set_user_strava_client(user_id: int, client_id: str, client_secret: str, db: Session) -> None:
     """
     Set Strava client credentials for a user.
 
@@ -214,12 +201,8 @@ def set_user_strava_client(
         )
 
     # Encrypt and store Strava client credentials
-    user_integrations.strava_client_id = core_cryptography.encrypt_token_fernet(
-        client_id
-    )
-    user_integrations.strava_client_secret = core_cryptography.encrypt_token_fernet(
-        client_secret
-    )
+    user_integrations.strava_client_id = core_cryptography.encrypt_token_fernet(client_id)
+    user_integrations.strava_client_secret = core_cryptography.encrypt_token_fernet(client_secret)
 
     # Commit the changes to the database
     db.commit()
@@ -261,9 +244,7 @@ def set_user_strava_state(user_id: int, state: str | None, db: Session) -> None:
 
 
 @core_decorators.handle_db_errors
-def set_user_strava_sync_gear(
-    user_id: int, strava_sync_gear: bool, db: Session
-) -> None:
+def set_user_strava_sync_gear(user_id: int, strava_sync_gear: bool, db: Session) -> None:
     """
     Set Strava gear synchronization preference for a user.
 
@@ -335,9 +316,7 @@ def link_garminconnect_account(
 
 
 @core_decorators.handle_db_errors
-def set_user_garminconnect_sync_gear(
-    user_id: int, garminconnect_sync_gear: bool, db: Session
-) -> None:
+def set_user_garminconnect_sync_gear(user_id: int, garminconnect_sync_gear: bool, db: Session) -> None:
     """
     Set Garmin Connect gear synchronization preference.
 
@@ -436,9 +415,7 @@ def edit_user_integrations(
         )
 
     # Get fields to update
-    user_integrations_data = user_integrations.model_dump(
-        exclude_unset=True, exclude={"user_id", "id"}
-    )
+    user_integrations_data = user_integrations.model_dump(exclude_unset=True, exclude={"user_id", "id"})
     # Update fields dynamically
     for key, value in user_integrations_data.items():
         setattr(db_user_integrations, key, value)

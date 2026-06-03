@@ -1,12 +1,10 @@
 """Tests for user goals API endpoints."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
 
-import users.users_goals.schema as user_goals_schema
 import users.users_goals.models as user_goals_models
-import users.users_goals.dependencies as user_goals_dependencies
+import users.users_goals.schema as user_goals_schema
+from fastapi import HTTPException, status
 
 
 class TestGetUserGoals:
@@ -15,9 +13,7 @@ class TestGetUserGoals:
     """
 
     @patch("users.users_goals.router.user_goals_crud.get_user_goals_by_user_id")
-    def test_get_user_goals_success(
-        self, mock_get_goals, fast_api_client, fast_api_app
-    ):
+    def test_get_user_goals_success(self, mock_get_goals, fast_api_client, fast_api_app):
         """Test successful retrieval of all user goals."""
         # Arrange
         mock_goal1 = MagicMock(spec=user_goals_models.UsersGoal)
@@ -69,9 +65,7 @@ class TestGetUserGoalsResults:
     """
 
     @patch("users.users_goals.router.user_goals_utils.calculate_user_goals")
-    def test_get_user_goals_results_success(
-        self, mock_calculate, fast_api_client, fast_api_app
-    ):
+    def test_get_user_goals_results_success(self, mock_calculate, fast_api_client, fast_api_app):
         """Test successful calculation of goal progress."""
         # Arrange
         mock_progress = MagicMock(spec=user_goals_schema.UsersGoalProgress)
@@ -108,9 +102,7 @@ class TestGetUserGoalsResults:
         assert len(data) == 1
 
     @patch("users.users_goals.router.user_goals_utils.calculate_user_goals")
-    def test_get_user_goals_results_none(
-        self, mock_calculate, fast_api_client, fast_api_app
-    ):
+    def test_get_user_goals_results_none(self, mock_calculate, fast_api_client, fast_api_app):
         """Test calculation returns null when no goals."""
         # Arrange
         mock_calculate.return_value = None

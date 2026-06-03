@@ -1,15 +1,12 @@
-from fastapi import HTTPException, status
-from sqlalchemy import func, desc, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import health.constants as health_constants
-import health.utils as health_utils
-
-import health.health_sleep.schema as health_sleep_schema
-import health.health_sleep.models as health_sleep_models
-
 import core.decorators as core_decorators
+import health.constants as health_constants
+import health.health_sleep.models as health_sleep_models
+import health.health_sleep.schema as health_sleep_schema
+import health.utils as health_utils
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -40,8 +37,7 @@ def get_health_sleep_number_by_user_id(
 
     if interval is not None:
         stmt = stmt.where(
-            health_sleep_models.HealthSleep.date
-            >= health_utils.get_start_date_for_interval(interval.value)
+            health_sleep_models.HealthSleep.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     return db.execute(stmt).scalar_one()
@@ -104,14 +100,11 @@ def get_health_sleep_by_user_id(
             records sorted by date in descending order, optionally paginated.
     """
     # Get the health_sleep from the database
-    stmt = select(health_sleep_models.HealthSleep).where(
-        health_sleep_models.HealthSleep.user_id == user_id
-    )
+    stmt = select(health_sleep_models.HealthSleep).where(health_sleep_models.HealthSleep.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(
-            health_sleep_models.HealthSleep.date
-            >= health_utils.get_start_date_for_interval(interval.value)
+            health_sleep_models.HealthSleep.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     stmt = stmt.order_by(desc(health_sleep_models.HealthSleep.date))
@@ -193,10 +186,7 @@ def create_health_sleep(
         # Raise an HTTPException with a 409 Conflict status code
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Duplicate entry error. Check if there is "
-                f"already an entry created for {health_sleep.date}"
-            ),
+            detail=(f"Duplicate entry error. Check if there is already an entry created for {health_sleep.date}"),
         ) from integrity_error
 
 
@@ -273,10 +263,7 @@ def delete_health_sleep(user_id: int, health_sleep_id: int, db: Session) -> None
     if db_health_sleep is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"Health sleep with id {health_sleep_id} "
-                f"for user {user_id} not found"
-            ),
+            detail=(f"Health sleep with id {health_sleep_id} for user {user_id} not found"),
         )
 
     # Delete the record

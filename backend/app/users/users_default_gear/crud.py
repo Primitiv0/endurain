@@ -1,14 +1,12 @@
 """CRUD operations for user default gear."""
 
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
+import core.decorators as core_decorators
 import users.users_default_gear.models as user_default_gear_models
 import users.users_default_gear.schema as user_default_gear_schema
-
-import core.decorators as core_decorators
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -110,9 +108,7 @@ def edit_user_default_gear(
             detail="User default gear not found",
         )
 
-    user_default_gear_data = user_default_gear.model_dump(
-        exclude_unset=True, exclude={"user_id", "id"}
-    )
+    user_default_gear_data = user_default_gear.model_dump(exclude_unset=True, exclude={"user_id", "id"})
     for key, value in user_default_gear_data.items():
         setattr(db_user_default_gear, key, value)
 

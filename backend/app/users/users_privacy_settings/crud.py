@@ -1,14 +1,12 @@
 """CRUD operations for user privacy settings."""
 
+import core.decorators as core_decorators
+import users.users_privacy_settings.models as users_privacy_settings_models
+import users.users_privacy_settings.schema as users_privacy_settings_schema
 from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-
-import users.users_privacy_settings.schema as users_privacy_settings_schema
-import users.users_privacy_settings.models as users_privacy_settings_models
-
-import core.decorators as core_decorators
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -36,9 +34,7 @@ def get_user_privacy_settings_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def create_user_privacy_settings(
-    user_id: int, db: Session
-) -> users_privacy_settings_models.UsersPrivacySettings:
+def create_user_privacy_settings(user_id: int, db: Session) -> users_privacy_settings_models.UsersPrivacySettings:
     """
     Create privacy settings for a user.
 
@@ -108,9 +104,7 @@ def edit_user_privacy_settings(
         )
 
     # Dictionary of the fields to update if they are not None
-    privacy_settings_dict = user_privacy_settings_data.model_dump(
-        exclude_unset=True, exclude={"user_id", "id"}
-    )
+    privacy_settings_dict = user_privacy_settings_data.model_dump(exclude_unset=True, exclude={"user_id", "id"})
     # Iterate over the fields and update dynamically
     for key, value in privacy_settings_dict.items():
         setattr(db_user_privacy_settings, key, value)

@@ -2,17 +2,16 @@
 
 from typing import Any
 
-import tcxreader
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
+import tcxreader
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 
 def _parse_lap_power(
@@ -30,11 +29,7 @@ def _parse_lap_power(
     """
     power_waypoints: list[dict] = []
     for trackpoint in lap.trackpoints:
-        if (
-            hasattr(trackpoint, "tpx_ext")
-            and "Watts" in trackpoint.tpx_ext
-            and trackpoint.time is not None
-        ):
+        if hasattr(trackpoint, "tpx_ext") and "Watts" in trackpoint.tpx_ext and trackpoint.time is not None:
             power_waypoints.append(
                 {
                     "time": trackpoint.time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -78,14 +73,10 @@ def _parse_laps(
                 "end_position_lat": (lap.trackpoints[-1].latitude),
                 "end_position_long": (lap.trackpoints[-1].longitude),
                 "total_elapsed_time": (
-                    (lap.end_time - lap.start_time).total_seconds()
-                    if lap.start_time and lap.end_time
-                    else None
+                    (lap.end_time - lap.start_time).total_seconds() if lap.start_time and lap.end_time else None
                 ),
                 "total_timer_time": (
-                    (lap.end_time - lap.start_time).total_seconds()
-                    if lap.start_time and lap.end_time
-                    else None
+                    (lap.end_time - lap.start_time).total_seconds() if lap.start_time and lap.end_time else None
                 ),
                 "total_distance": (round(lap.distance) if lap.distance else None),
                 "total_calories": (round(lap.calories) if lap.calories else None),
@@ -98,13 +89,9 @@ def _parse_laps(
                 "total_ascent": (round(lap.ascent) if lap.ascent else None),
                 "total_descent": (round(lap.descent) if lap.descent else None),
                 "normalized_power": (round(lap_np) if lap_np else None),
-                "enhanced_avg_pace": (
-                    1 / lap.avg_speed if lap.avg_speed and lap.avg_speed != 0 else None
-                ),
+                "enhanced_avg_pace": (1 / lap.avg_speed if lap.avg_speed and lap.avg_speed != 0 else None),
                 "enhanced_avg_speed": (lap.avg_speed if lap.avg_speed else None),
-                "enhanced_max_pace": (
-                    1 / max_spd_val if max_spd_val and max_spd_val != 0 else None
-                ),
+                "enhanced_max_pace": (1 / max_spd_val if max_spd_val and max_spd_val != 0 else None),
                 "enhanced_max_speed": (max_spd_val if max_spd_val else None),
             }
         )
@@ -164,11 +151,7 @@ def _extract_waypoints(
                 "cad": tp.tpx_ext["RunCadence"],
             }
             for tp in tcx_file.trackpoints
-            if (
-                hasattr(tp, "tpx_ext")
-                and "RunCadence" in tp.tpx_ext
-                and tp.time is not None
-            )
+            if (hasattr(tp, "tpx_ext") and "RunCadence" in tp.tpx_ext and tp.time is not None)
         ]
 
     ele_waypoints = [
@@ -186,11 +169,7 @@ def _extract_waypoints(
             "power": tp.tpx_ext["Watts"],
         }
         for tp in tcx_file.trackpoints
-        if (
-            hasattr(tp, "tpx_ext")
-            and "Watts" in tp.tpx_ext
-            and tp.time is not None
-        )
+        if (hasattr(tp, "tpx_ext") and "Watts" in tp.tpx_ext and tp.time is not None)
     ]
 
     vel_waypoints: list[dict] = []
@@ -293,14 +272,10 @@ def _build_activity(
     """
     fmt = "%Y-%m-%dT%H:%M:%S"
     elapsed = (
-        (tcx_file.end_time - tcx_file.start_time).total_seconds()
-        if tcx_file.start_time and tcx_file.end_time
-        else None
+        (tcx_file.end_time - tcx_file.start_time).total_seconds() if tcx_file.start_time and tcx_file.end_time else None
     )
 
-    privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(
-        user_privacy_settings
-    )
+    privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(user_privacy_settings)
 
     return activities_schema.Activity(
         user_id=user_id,
@@ -308,11 +283,7 @@ def _build_activity(
         distance=distance,
         activity_type=activity_type,
         timezone=timezone,
-        start_time=(
-            tcx_file.start_time.strftime(fmt)
-            if tcx_file.start_time
-            else None
-        ),
+        start_time=(tcx_file.start_time.strftime(fmt) if tcx_file.start_time else None),
         end_time=(tcx_file.end_time.strftime(fmt) if tcx_file.end_time else None),
         total_elapsed_time=elapsed,
         total_timer_time=elapsed,
@@ -378,9 +349,7 @@ def parse_tcx_file(
 
         activity_type = activities_utils.define_activity_type(tcx_file.activity_type)
 
-        gear_id = user_default_gear_utils.get_user_default_gear_by_activity_type(
-            user_id, activity_type, db
-        )
+        gear_id = user_default_gear_utils.get_user_default_gear_by_activity_type(user_id, activity_type, db)
 
         laps = _parse_laps(tcx_file)
         waypoints = _extract_waypoints(trackpoints, tcx_file)
@@ -414,9 +383,7 @@ def parse_tcx_file(
             )
 
         if power_wp:
-            avg_power, max_power, norm_power = (
-                activity_file_import_utils.calculate_power_metrics(power_wp)
-            )
+            avg_power, max_power, norm_power = activity_file_import_utils.calculate_power_metrics(power_wp)
 
         activity = _build_activity(
             tcx_file=tcx_file,
@@ -441,9 +408,7 @@ def parse_tcx_file(
             "power_waypoints": power_wp,
             "lat_lon_waypoints": lat_lon_wp,
         }
-        return activity_file_import_utils.build_activity_file_payload(
-            activity, waypoints_combined, laps
-        )
+        return activity_file_import_utils.build_activity_file_payload(activity, waypoints_combined, laps)
 
     except HTTPException as http_err:
         raise http_err

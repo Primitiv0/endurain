@@ -2,16 +2,17 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING
+
+from core.database import Base
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from core.database import Base
 
 if TYPE_CHECKING:
     from auth.oauth_state.models import OAuthState
-    from users.users.models import Users
     from auth.sessions.rotated_refresh_tokens.models import (
         RotatedRefreshToken,
     )
+    from users.users.models import Users
 
 
 class UsersSessions(Base):
@@ -150,9 +151,7 @@ class UsersSessions(Base):
     users: Mapped["Users"] = relationship(back_populates="users_sessions")
 
     # Relationship to OAuthState model
-    oauth_state: Mapped["OAuthState | None"] = relationship(
-        back_populates="users_sessions"
-    )
+    oauth_state: Mapped["OAuthState | None"] = relationship(back_populates="users_sessions")
 
     # Relationship to RotatedRefreshToken model
     rotated_refresh_tokens: Mapped[list["RotatedRefreshToken"]] = relationship(

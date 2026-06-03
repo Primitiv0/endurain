@@ -2,17 +2,15 @@
 
 import hashlib
 import hmac
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 import auth.constants as auth_constants
-import core.logger as core_logger
 import auth.sessions.crud as users_session_crud
 import auth.sessions.rotated_refresh_tokens.crud as rotated_token_crud
 import auth.sessions.rotated_refresh_tokens.schema as rotated_token_schema
+import core.logger as core_logger
 from core.database import SessionLocal
-
+from sqlalchemy.orm import Session
 
 # Grace period for token reuse (60 seconds)
 # Allows for network retries/delays without false positives
@@ -68,7 +66,7 @@ def store_rotated_token(
     Raises:
         HTTPException: If storage fails.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires_at = now + timedelta(seconds=TOKEN_REUSE_GRACE_PERIOD_SECONDS)
 
     # Use HMAC-SHA256 for deterministic, secure hashing
@@ -113,13 +111,12 @@ def check_token_reuse(raw_token: str, db: Session) -> tuple[bool, bool]:
         return (False, False)
 
     # Token was already rotated - check grace period
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if now <= rotated_token.expires_at:
         # Within grace period - might be legitimate retry
         core_logger.print_to_log(
-            f"Token reuse within grace period for family "
-            f"{rotated_token.token_family_id}",
+            f"Token reuse within grace period for family {rotated_token.token_family_id}",
             "warning",
             context={
                 "token_family_id": rotated_token.token_family_id,
@@ -130,8 +127,7 @@ def check_token_reuse(raw_token: str, db: Session) -> tuple[bool, bool]:
 
     # Past grace period - likely theft!
     core_logger.print_to_log(
-        f"Token reuse detected after grace period for family "
-        f"{rotated_token.token_family_id}",
+        f"Token reuse detected after grace period for family {rotated_token.token_family_id}",
         "error",
         context={
             "token_family_id": rotated_token.token_family_id,
@@ -157,9 +153,7 @@ def invalidate_token_family(token_family_id: str, db: Session) -> int:
         HTTPException: If invalidation fails.
     """
     # Delete all sessions in the family
-    num_sessions_deleted = users_session_crud.delete_sessions_by_family(
-        token_family_id, db
-    )
+    num_sessions_deleted = users_session_crud.delete_sessions_by_family(token_family_id, db)
 
     # Delete all rotated tokens for this family
     num_tokens_deleted = rotated_token_crud.delete_by_family(token_family_id, db)
@@ -192,7 +186,7 @@ def cleanup_expired_rotated_tokens() -> None:
     """
     with SessionLocal() as db:
         try:
-            cutoff_time = datetime.now(timezone.utc)
+            cutoff_time = datetime.now(UTC)
             deleted_count = rotated_token_crud.delete_expired_tokens(cutoff_time, db)
 
             if deleted_count > 0:

@@ -23,14 +23,8 @@ class TestSettingsStorageWarnings:
             )
 
         messages = [call.args[0] for call in mock_log.call_args_list]
-        assert any(
-            "RATE_LIMIT_STORAGE_URI uses process-local memory" in message
-            for message in messages
-        )
-        assert any(
-            "AUTH_SECURITY_STORAGE_URI resolves to process-local" in message
-            for message in messages
-        )
+        assert any("RATE_LIMIT_STORAGE_URI uses process-local memory" in message for message in messages)
+        assert any("AUTH_SECURITY_STORAGE_URI resolves to process-local" in message for message in messages)
 
     def test_development_memory_storage_does_not_warn(self):
         """Test memory storage is allowed silently in development."""
@@ -47,9 +41,7 @@ class TestSettingsStorageWarnings:
             )
 
         messages = [call.args[0] for call in mock_log.call_args_list]
-        assert not any(
-            "process-local memory" in message for message in messages
-        )
+        assert not any("process-local memory" in message for message in messages)
 
     def test_production_redis_storage_does_not_warn(self):
         """Test Redis-backed storage does not emit memory warnings."""
@@ -66,6 +58,4 @@ class TestSettingsStorageWarnings:
             )
 
         messages = [call.args[0] for call in mock_log.call_args_list]
-        assert not any(
-            "process-local memory" in message for message in messages
-        )
+        assert not any("process-local memory" in message for message in messages)

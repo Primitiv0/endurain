@@ -1,7 +1,9 @@
 """Tests for TCX activity file import utilities."""
 
+# ruff: noqa: E402  # TODO: https://codeberg.org/endurain-project/endurain/issues/641
+
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import ModuleType, SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -50,7 +52,7 @@ class TestUtilsTcx:
 
     def test_extract_waypoints_skips_entries_without_time(self):
         """Test waypoints ignore trackpoints that have no timestamp."""
-        dt = datetime(2026, 4, 1, 10, 0, 0, tzinfo=timezone.utc)
+        dt = datetime(2026, 4, 1, 10, 0, 0, tzinfo=UTC)
 
         trackpoints = [
             {

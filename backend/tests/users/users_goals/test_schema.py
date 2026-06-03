@@ -1,10 +1,8 @@
 """Tests for user goals Pydantic schemas."""
 
 import pytest
-from pydantic import ValidationError
-from pydantic_core import PydanticCustomError
-
 import users.users_goals.schema as user_goals_schema
+from pydantic import ValidationError
 
 
 class TestIntervalEnum:
@@ -348,6 +346,4 @@ class TestUserGoalProgressSchema:
         """Test UsersGoalProgress has model_config."""
         # Assert
         assert hasattr(user_goals_schema.UsersGoalProgress, "model_config")
-        assert (
-            user_goals_schema.UsersGoalProgress.model_config["from_attributes"] is True
-        )
+        assert user_goals_schema.UsersGoalProgress.model_config["from_attributes"] is True

@@ -4,10 +4,9 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity.models import Activity
@@ -42,10 +41,7 @@ class ActivitySets(Base):
             ondelete="CASCADE",
         ),
         index=True,
-        comment=(
-            "Activity ID that the activity"
-            " lap belongs"
-        ),
+        comment=("Activity ID that the activity lap belongs"),
     )
     duration: Mapped[Decimal] = mapped_column(
         Numeric(precision=20, scale=10),

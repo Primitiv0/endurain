@@ -6,7 +6,7 @@ Create Date: 2025-12-18 12:02:47.808747
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
@@ -14,9 +14,9 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "ed5f1c867943"
-down_revision: Union[str, None] = "2af2c0629b37"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "2af2c0629b37"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -30,12 +30,8 @@ def upgrade() -> None:
             nullable=False,
             comment="State parameter itself (secrets.token_urlsafe(32))",
         ),
-        sa.Column(
-            "idp_id", sa.Integer(), nullable=False, comment="Identity provider ID"
-        ),
-        sa.Column(
-            "user_id", sa.Integer(), nullable=True, comment="User ID (for link mode)"
-        ),
+        sa.Column("idp_id", sa.Integer(), nullable=False, comment="Identity provider ID"),
+        sa.Column("user_id", sa.Integer(), nullable=True, comment="User ID (for link mode)"),
         sa.Column(
             "code_challenge",
             sa.String(length=128),
@@ -103,19 +99,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_oauth_states_expires_at"), "oauth_states", ["expires_at"], unique=False
-    )
+    op.create_index(op.f("ix_oauth_states_expires_at"), "oauth_states", ["expires_at"], unique=False)
     op.create_index(op.f("ix_oauth_states_id"), "oauth_states", ["id"], unique=False)
-    op.create_index(
-        op.f("ix_oauth_states_idp_id"), "oauth_states", ["idp_id"], unique=False
-    )
-    op.create_index(
-        op.f("ix_oauth_states_used"), "oauth_states", ["used"], unique=False
-    )
-    op.create_index(
-        op.f("ix_oauth_states_user_id"), "oauth_states", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_oauth_states_idp_id"), "oauth_states", ["idp_id"], unique=False)
+    op.create_index(op.f("ix_oauth_states_used"), "oauth_states", ["used"], unique=False)
+    op.create_index(op.f("ix_oauth_states_user_id"), "oauth_states", ["user_id"], unique=False)
 
     # Delete all existing sessions before altering user_sessions table
     op.execute("DELETE FROM users_sessions")
@@ -276,9 +264,7 @@ def upgrade() -> None:
             nullable=False,
             comment="Whether this code has been consumed",
         ),
-        sa.Column(
-            "used_at", sa.DateTime(), nullable=True, comment="When this code was used"
-        ),
+        sa.Column("used_at", sa.DateTime(), nullable=True, comment="When this code was used"),
         sa.Column(
             "created_at",
             sa.DateTime(),
@@ -295,12 +281,8 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("code_hash"),
     )
-    op.create_index(
-        "idx_user_unused_codes", "mfa_backup_codes", ["user_id", "used"], unique=False
-    )
-    op.create_index(
-        op.f("ix_mfa_backup_codes_used"), "mfa_backup_codes", ["used"], unique=False
-    )
+    op.create_index("idx_user_unused_codes", "mfa_backup_codes", ["user_id", "used"], unique=False)
+    op.create_index(op.f("ix_mfa_backup_codes_used"), "mfa_backup_codes", ["used"], unique=False)
     op.create_index(
         op.f("ix_mfa_backup_codes_user_id"),
         "mfa_backup_codes",
@@ -316,12 +298,8 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_mfa_backup_codes_used"), table_name="mfa_backup_codes")
     op.drop_index("idx_user_unused_codes", table_name="mfa_backup_codes")
     op.drop_table("mfa_backup_codes")
-    op.drop_constraint(
-        "users_sessions_oauth_state_id_fkey", "users_sessions", type_="foreignkey"
-    )
-    op.drop_index(
-        op.f("ix_users_sessions_token_family_id"), table_name="users_sessions"
-    )
+    op.drop_constraint("users_sessions_oauth_state_id_fkey", "users_sessions", type_="foreignkey")
+    op.drop_index(op.f("ix_users_sessions_token_family_id"), table_name="users_sessions")
     op.drop_index(op.f("ix_users_sessions_oauth_state_id"), table_name="users_sessions")
     op.drop_column("users_sessions", "csrf_token_hash")
     op.drop_column("users_sessions", "last_rotation_at")

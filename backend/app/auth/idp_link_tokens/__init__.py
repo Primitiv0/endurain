@@ -32,19 +32,19 @@ from .utils import (
 )
 
 __all__ = [
+    # Utilities
+    "TOKEN_EXPIRY_SECONDS",
+    # Pydantic schemas
+    "IdpLinkTokenCreate",
+    # Database model
+    "IdpLinkTokenModel",
+    "IdpLinkTokenResponse",
     # CRUD operations
     "create_idp_link_token",
     "delete_expired_tokens",
-    "get_idp_link_token_by_hash",
-    "mark_token_as_used",
-    # Database model
-    "IdpLinkTokenModel",
-    # Pydantic schemas
-    "IdpLinkTokenCreate",
-    "IdpLinkTokenResponse",
-    # Utilities
-    "TOKEN_EXPIRY_SECONDS",
     "delete_idp_link_expired_tokens_from_db",
     "generate_idp_link_token",
+    "get_idp_link_token_by_hash",
     "hash_idp_link_token",
+    "mark_token_as_used",
 ]

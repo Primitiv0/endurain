@@ -1,13 +1,12 @@
 """CRUD operations for user identity provider links."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import auth.identity_links.models as user_idp_models
+import core.decorators as core_decorators
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
-
-import core.decorators as core_decorators
-import auth.identity_links.models as user_idp_models
 
 
 @core_decorators.handle_db_errors
@@ -28,11 +27,7 @@ def check_user_identity_providers_by_idp_id(
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(
-        exists().where(
-            user_idp_models.UsersIdentityProvider.idp_id == idp_id
-        )
-    )
+    stmt = select(exists().where(user_idp_models.UsersIdentityProvider.idp_id == idp_id))
     return db.execute(stmt).scalar() or False
 
 
@@ -54,9 +49,7 @@ def get_user_identity_providers_by_user_id(
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(user_idp_models.UsersIdentityProvider).where(
-        user_idp_models.UsersIdentityProvider.user_id == user_id
-    )
+    stmt = select(user_idp_models.UsersIdentityProvider).where(user_idp_models.UsersIdentityProvider.user_id == user_id)
     return list(db.execute(stmt).scalars().all())
 
 
@@ -111,8 +104,7 @@ def get_user_identity_provider_by_subject_and_idp_id(
     """
     stmt = select(user_idp_models.UsersIdentityProvider).where(
         user_idp_models.UsersIdentityProvider.idp_id == idp_id,
-        user_idp_models.UsersIdentityProvider.idp_subject
-        == idp_subject,
+        user_idp_models.UsersIdentityProvider.idp_subject == idp_subject,
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -179,7 +171,7 @@ def update_user_identity_provider_last_login(
         db,
     )
     if db_link:
-        db_link.last_login = datetime.now(timezone.utc)
+        db_link.last_login = datetime.now(UTC)
         db.commit()
         db.refresh(db_link)
     return db_link
@@ -220,9 +212,7 @@ def store_user_identity_provider_tokens(
     if db_link:
         db_link.idp_refresh_token = encrypted_refresh_token
         db_link.idp_access_token_expires_at = access_token_expires_at
-        db_link.idp_refresh_token_updated_at = datetime.now(
-            timezone.utc
-        )
+        db_link.idp_refresh_token_updated_at = datetime.now(UTC)
         db.commit()
         db.refresh(db_link)
     return db_link

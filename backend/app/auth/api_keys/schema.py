@@ -1,14 +1,15 @@
 """User API key schemas."""
 
+from datetime import datetime
+
 from pydantic import (
     BaseModel,
-    Field,
     ConfigDict,
-    StrictStr,
+    Field,
     StrictBool,
+    StrictStr,
     field_validator,
 )
-from datetime import datetime
 
 
 class UsersApiKeyCreate(BaseModel):
@@ -51,18 +52,13 @@ class UsersApiKeyCreate(BaseModel):
     )
     expires_at: datetime | None = Field(
         None,
-        description=(
-            "Optional expiration datetime. " "None means the key never expires."
-        ),
+        description=("Optional expiration datetime. None means the key never expires."),
     )
     current_password: StrictStr | None = Field(
         default=None,
         min_length=1,
         max_length=250,
-        description=(
-            "Current password (step-up verification). Required"
-            " when the account has a local password."
-        ),
+        description=("Current password (step-up verification). Required when the account has a local password."),
     )
     mfa_code: StrictStr | None = Field(
         default=None,
@@ -88,10 +84,7 @@ class UsersApiKeyCreate(BaseModel):
         allowed = {"activities:upload"}
         unsupported = set(v) - allowed
         if unsupported:
-            raise ValueError(
-                "Unsupported API key scopes: "
-                f"{unsupported}. Valid scopes: {allowed}"
-            )
+            raise ValueError(f"Unsupported API key scopes: {unsupported}. Valid scopes: {allowed}")
         return v
 
     model_config = ConfigDict(from_attributes=True)
@@ -121,16 +114,10 @@ class UsersApiKeyRead(BaseModel):
     name: StrictStr = Field(..., description="User-friendly label")
     key_prefix: StrictStr = Field(..., description="First 8 chars of the random part")
     scopes: StrictStr = Field(..., description="JSON-encoded list of granted scopes")
-    expires_at: datetime | None = Field(
-        None, description="Optional expiration timestamp"
-    )
-    last_used_at: datetime | None = Field(
-        None, description="Last successful use timestamp"
-    )
+    expires_at: datetime | None = Field(None, description="Optional expiration timestamp")
+    last_used_at: datetime | None = Field(None, description="Last successful use timestamp")
     created_at: datetime = Field(..., description="Key creation timestamp")
-    is_active: StrictBool = Field(
-        ..., description="Whether the key is currently active"
-    )
+    is_active: StrictBool = Field(..., description="Whether the key is currently active")
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -150,9 +137,7 @@ class UsersApiKeyCreated(UsersApiKeyRead):
 
     key: StrictStr = Field(
         ...,
-        description=(
-            "Full raw API key. Shown once at creation " "only — store it securely."
-        ),
+        description=("Full raw API key. Shown once at creation only — store it securely."),
     )
 
     model_config = ConfigDict(

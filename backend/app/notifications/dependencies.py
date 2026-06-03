@@ -16,7 +16,7 @@ def validate_notification_id(
         ValueError: If the ID is less than 0.
     """
     core_dependencies.validate_id(
-        id=notification_id,
-        min=0,
+        identifier=notification_id,
+        min_value=0,
         message="Invalid notification ID",
     )

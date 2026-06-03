@@ -14,8 +14,8 @@ def validate_gear_id(gear_id: int) -> None:
         HTTPException: If gear_id is invalid.
     """
     core_dependencies.validate_id(
-        id=gear_id,
-        min=0,
+        identifier=gear_id,
+        min_value=0,
         message="Invalid gear ID",
     )
 
@@ -31,8 +31,8 @@ def validate_gear_type(gear_type: int) -> None:
         HTTPException: If gear_type is invalid.
     """
     core_dependencies.validate_type(
-        type=gear_type,
-        min=1,
-        max=8,
+        type_value=gear_type,
+        min_value=1,
+        max_value=8,
         message="Invalid gear type",
     )

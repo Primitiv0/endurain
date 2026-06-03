@@ -1,15 +1,13 @@
 """Tests for MFA backup codes CRUD operations."""
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
+import auth.mfa_backup_codes.crud as backup_crud
+import auth.mfa_backup_codes.models as backup_models
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import operators
-
-import auth.mfa_backup_codes.crud as backup_crud
-import auth.mfa_backup_codes.models as backup_models
 
 
 class TestGetUserBackupCodes:
@@ -93,16 +91,8 @@ class TestGetUserUnusedBackupCodes:
         stmt = mock_db.execute.call_args.args[0]
         expiry_clause = stmt._where_criteria[2]
         expiry_checks = list(expiry_clause.clauses)
-        assert any(
-            check.left.name == "expires_at"
-            and check.operator is operators.is_
-            for check in expiry_checks
-        )
-        assert any(
-            check.left.name == "expires_at"
-            and check.operator is operators.gt
-            for check in expiry_checks
-        )
+        assert any(check.left.name == "expires_at" and check.operator is operators.is_ for check in expiry_checks)
+        assert any(check.left.name == "expires_at" and check.operator is operators.gt for check in expiry_checks)
 
 
 class TestCreateBackupCodes:
@@ -115,14 +105,13 @@ class TestCreateBackupCodes:
         count = 10
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
-            "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
+        with (
+            patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete,
+            patch("auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"),
         ):
             mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act
-            codes = backup_crud.create_backup_codes(
-                user_id, password_hasher, mock_db, count
-            )
+            codes = backup_crud.create_backup_codes(user_id, password_hasher, mock_db, count)
 
             # Assert
             assert len(codes) == count
@@ -136,8 +125,9 @@ class TestCreateBackupCodes:
         user_id = 1
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
-            "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
+        with (
+            patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete,
+            patch("auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"),
         ):
             mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act
@@ -154,14 +144,13 @@ class TestCreateBackupCodes:
         custom_count = 5
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
-            "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
+        with (
+            patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete,
+            patch("auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"),
         ):
             mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act
-            codes = backup_crud.create_backup_codes(
-                user_id, password_hasher, mock_db, custom_count
-            )
+            codes = backup_crud.create_backup_codes(user_id, password_hasher, mock_db, custom_count)
 
             # Assert
             assert len(codes) == custom_count
@@ -173,8 +162,9 @@ class TestCreateBackupCodes:
         mock_db.commit.side_effect = SQLAlchemyError("Database error")
 
         # Mock the model instantiation to avoid SQLAlchemy mapper issues
-        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
-            "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
+        with (
+            patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete,
+            patch("auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"),
         ):
             mock_sa_delete.return_value.where.return_value = MagicMock()
             # Act & Assert
@@ -191,8 +181,9 @@ class TestCreateBackupCodes:
         http_exc = HTTPException(status_code=404, detail="User not found")
 
         # Use db.execute to trigger HTTPException re-raise path
-        with patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete, patch(
-            "auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"
+        with (
+            patch("auth.mfa_backup_codes.crud.delete") as mock_sa_delete,
+            patch("auth.mfa_backup_codes.crud.mfa_backup_codes_models.MFABackupCode"),
         ):
             mock_sa_delete.return_value.where.return_value = MagicMock()
             mock_db.execute.side_effect = http_exc

@@ -1,5 +1,7 @@
 """Tests for GPX activity file import utilities."""
 
+# ruff: noqa: E402  # TODO: https://codeberg.org/endurain-project/endurain/issues/641
+
 import sys
 from datetime import datetime, timedelta
 from types import ModuleType, SimpleNamespace
@@ -140,13 +142,16 @@ class TestParseGpxFile:
             db=MagicMock(),
         )
 
-        expected_distance = geodesic(
-            (0.0, 0.0),
-            (0.0, 0.001),
-        ).meters + geodesic(
-            (10.0, 10.0),
-            (10.0, 10.001),
-        ).meters
+        expected_distance = (
+            geodesic(
+                (0.0, 0.0),
+                (0.0, 0.001),
+            ).meters
+            + geodesic(
+                (10.0, 10.0),
+                (10.0, 10.001),
+            ).meters
+        )
 
         assert result["activity"].distance == round(expected_distance)
         assert result["vel_waypoints"][0]["vel"] == 0

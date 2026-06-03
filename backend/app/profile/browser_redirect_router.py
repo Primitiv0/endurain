@@ -13,21 +13,18 @@ Key Features:
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
-
 import auth.identity_links.crud as user_idp_crud
-
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.service as idp_service
 import auth.idp_link_tokens.crud as idp_link_token_crud
 import auth.idp_link_tokens.utils as idp_link_token_utils
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.utils as oauth_state_utils
-
 import core.database as core_database
 import core.logger as core_logger
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -78,9 +75,7 @@ async def link_identity_provider(
     """
     # Validate and retrieve link token by hash; plaintext is never stored.
     link_token_hash = idp_link_token_utils.hash_idp_link_token(link_token)
-    db_token = idp_link_token_crud.get_idp_link_token_by_hash(
-        link_token_hash, db
-    )
+    db_token = idp_link_token_crud.get_idp_link_token_by_hash(link_token_hash, db)
     if not db_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -117,9 +112,7 @@ async def link_identity_provider(
         )
 
     # Check if already linked
-    existing_link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(
-        token_user_id, idp_id, db
-    )
+    existing_link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(token_user_id, idp_id, db)
     if existing_link:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -131,8 +124,7 @@ async def link_identity_provider(
     # token (race) or if the row vanished/expired between fetch and claim.
     if not idp_link_token_crud.mark_token_as_used(link_token_hash, db):
         core_logger.print_to_log(
-            f"IdP link token replay/race rejected for user {token_user_id}: "
-            f"token row {db_token.id}",
+            f"IdP link token replay/race rejected for user {token_user_id}: token row {db_token.id}",
             "warning",
         )
         raise HTTPException(
@@ -161,9 +153,7 @@ async def link_identity_provider(
         )
 
         # Audit logging
-        core_logger.print_to_log(
-            f"User {token_user_id} initiated IdP link: idp_id={idp_id} ({idp.name})"
-        )
+        core_logger.print_to_log(f"User {token_user_id} initiated IdP link: idp_id={idp_id} ({idp.name})")
 
         return RedirectResponse(
             url=authorization_url,

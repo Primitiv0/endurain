@@ -7,7 +7,6 @@ to prevent XSS attacks while preserving safe formatting.
 
 import bleach
 
-
 # Allowed HTML tags for markdown content
 ALLOWED_TAGS = [
     "h1",

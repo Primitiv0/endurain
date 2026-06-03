@@ -6,7 +6,7 @@ Create Date: 2026-01-22 09:13:56.378498
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
@@ -14,9 +14,9 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "895a29b12c8c"
-down_revision: Union[str, None] = "262ec21a6c15"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "262ec21a6c15"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -82,9 +82,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_health_fasting_user_id"), "health_fasting", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_fasting_user_id"), "health_fasting", ["user_id"], unique=False)
     # Add fasting target column to health_targets table
     op.add_column(
         "health_targets",
@@ -161,12 +159,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_users_api_keys_key_hash"), "users_api_keys", ["key_hash"], unique=True
-    )
-    op.create_index(
-        op.f("ix_users_api_keys_user_id"), "users_api_keys", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_users_api_keys_key_hash"), "users_api_keys", ["key_hash"], unique=True)
+    op.create_index(op.f("ix_users_api_keys_user_id"), "users_api_keys", ["user_id"], unique=False)
     # Add map_thumbnail_path column to activities table
     op.add_column(
         "activities",
@@ -184,10 +178,7 @@ def upgrade() -> None:
             "tileserver_regenerate_thumbnails_on_change",
             sa.Boolean(),
             nullable=True,
-            comment=(
-                "Delete and regenerate all activity thumbnails when "
-                "tile server settings change"
-            ),
+            comment=("Delete and regenerate all activity thumbnails when tile server settings change"),
         ),
     )
     op.execute(
@@ -201,10 +192,7 @@ def upgrade() -> None:
         "server_settings",
         "tileserver_regenerate_thumbnails_on_change",
         nullable=False,
-        comment=(
-            "Delete and regenerate all activity thumbnails when "
-            "tile server settings change"
-        ),
+        comment=("Delete and regenerate all activity thumbnails when tile server settings change"),
         existing_type=sa.Boolean(),
     )
     # Update comments for notifications table columns
@@ -224,9 +212,7 @@ def upgrade() -> None:
         existing_comment="User ID that the gear belongs to",
         existing_nullable=False,
     )
-    op.create_index(
-        op.f("ix_notifications_user_id"), "notifications", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_notifications_user_id"), "notifications", ["user_id"], unique=False)
     op.alter_column(
         "password_reset_tokens",
         "used",
@@ -286,12 +272,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_health_poop_date_time"), "health_poop", ["date_time"], unique=False
-    )
-    op.create_index(
-        op.f("ix_health_poop_user_id"), "health_poop", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_poop_date_time"), "health_poop", ["date_time"], unique=False)
+    op.create_index(op.f("ix_health_poop_user_id"), "health_poop", ["user_id"], unique=False)
     # Create health_water table
     op.create_table(
         "health_water",
@@ -302,9 +284,7 @@ def upgrade() -> None:
             nullable=False,
             comment="User ID that the health_water belongs",
         ),
-        sa.Column(
-            "date", sa.Date(), nullable=False, comment="Health water intake date (date)"
-        ),
+        sa.Column("date", sa.Date(), nullable=False, comment="Health water intake date (date)"),
         sa.Column(
             "amount_ml",
             sa.Numeric(precision=10, scale=2),
@@ -320,12 +300,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_health_water_date"), "health_water", ["date"], unique=False
-    )
-    op.create_index(
-        op.f("ix_health_water_user_id"), "health_water", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_water_date"), "health_water", ["date"], unique=False)
+    op.create_index(op.f("ix_health_water_user_id"), "health_water", ["user_id"], unique=False)
     # Add water_ml and poop_count columns to health_targets table
     op.add_column(
         "health_targets",
@@ -654,33 +630,47 @@ def upgrade() -> None:
     )
 
     # Update comments for users_integrations table columns
-    op.alter_column('activities_streams', 'stream_type',
-               existing_type=sa.Integer(),
-               comment='Stream type (1-HR, 2-Power, 3-Cadence, 4-Elevation, 5-Velocity, 6-Pace, 7-lat/lon)',
-               existing_comment='Stream type (1 - HR, 2 - Power, 3 - Cadence, 4 - Elevation, 5 - Velocity, 6 - Pace, 7 - lat/lon)',
-               existing_nullable=False)
-    op.alter_column('activities_streams', 'strava_activity_stream_id',
-               existing_type=sa.BigInteger(),
-               type_=sa.Integer(),
-               existing_comment='Strava activity stream ID',
-               existing_nullable=True)
-    op.alter_column('activity_exercise_titles', 'wkt_step_name',
-               existing_type=sa.String(length=250),
-               comment='WKT step name (may include spaces)',
-               existing_comment='WKT step name (May include spaces)',
-               existing_nullable=False)
-    op.alter_column('activity_sets', 'start_time',
-               existing_type=sa.DateTime(timezone=True),
-               type_=sa.DateTime(),
-               comment='Workout set start date',
-               existing_comment='Workout set start date (DATETIME)',
-               existing_nullable=False)
-    
+    op.alter_column(
+        "activities_streams",
+        "stream_type",
+        existing_type=sa.Integer(),
+        comment="Stream type (1-HR, 2-Power, 3-Cadence, 4-Elevation, 5-Velocity, 6-Pace, 7-lat/lon)",
+        existing_comment="Stream type (1 - HR, 2 - Power, 3 - Cadence, 4 - Elevation, 5 - Velocity, 6 - Pace, 7 - lat/lon)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities_streams",
+        "strava_activity_stream_id",
+        existing_type=sa.BigInteger(),
+        type_=sa.Integer(),
+        existing_comment="Strava activity stream ID",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "activity_exercise_titles",
+        "wkt_step_name",
+        existing_type=sa.String(length=250),
+        comment="WKT step name (may include spaces)",
+        existing_comment="WKT step name (May include spaces)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activity_sets",
+        "start_time",
+        existing_type=sa.DateTime(timezone=True),
+        type_=sa.DateTime(),
+        comment="Workout set start date",
+        existing_comment="Workout set start date (DATETIME)",
+        existing_nullable=False,
+    )
+
     # Migrate Garmin Connect tokens to new JSON column
-    op.add_column('users_integrations', sa.Column('garminconnect_token', sa.JSON(), nullable=True, comment='Garmin Connect token'))
+    op.add_column(
+        "users_integrations", sa.Column("garminconnect_token", sa.JSON(), nullable=True, comment="Garmin Connect token")
+    )
     op.execute("UPDATE users_integrations SET garminconnect_token = garminconnect_oauth1")
-    op.drop_column('users_integrations', 'garminconnect_oauth2')
-    op.drop_column('users_integrations', 'garminconnect_oauth1')
+    op.drop_column("users_integrations", "garminconnect_oauth2")
+    op.drop_column("users_integrations", "garminconnect_oauth1")
 
     # Update idp_link_tokens schema and model to separate token hash from row ID
     op.execute("DELETE FROM idp_link_tokens")
@@ -727,32 +717,50 @@ def downgrade() -> None:
     )
     op.drop_column("idp_link_tokens", "token_hash")
     # Revert Garmin Connect token migration
-    op.add_column('users_integrations', sa.Column('garminconnect_oauth1', sa.JSON(), autoincrement=False, nullable=True, comment='Garmin OAuth1 token'))
-    op.add_column('users_integrations', sa.Column('garminconnect_oauth2', sa.JSON(), autoincrement=False, nullable=True, comment='Garmin OAuth2 token'))
+    op.add_column(
+        "users_integrations",
+        sa.Column("garminconnect_oauth1", sa.JSON(), autoincrement=False, nullable=True, comment="Garmin OAuth1 token"),
+    )
+    op.add_column(
+        "users_integrations",
+        sa.Column("garminconnect_oauth2", sa.JSON(), autoincrement=False, nullable=True, comment="Garmin OAuth2 token"),
+    )
     op.execute("UPDATE users_integrations SET garminconnect_oauth1 = garminconnect_token")
-    op.drop_column('users_integrations', 'garminconnect_token')
+    op.drop_column("users_integrations", "garminconnect_token")
     # Revert datetime with timezone to datetime without timezone
-    op.alter_column('activity_sets', 'start_time',
-               existing_type=sa.DateTime(),
-               type_=sa.DateTime(timezone=True),
-               comment='Workout set start date (DATETIME)',
-               existing_comment='Workout set start date',
-               existing_nullable=False)
-    op.alter_column('activity_exercise_titles', 'wkt_step_name',
-               existing_type=sa.String(length=250),
-               comment='WKT step name (May include spaces)',
-               existing_comment='WKT step name (may include spaces)',
-               existing_nullable=False)
-    op.alter_column('activities_streams', 'strava_activity_stream_id',
-               existing_type=sa.Integer(),
-               type_=sa.BigInteger(),
-               existing_comment='Strava activity stream ID',
-               existing_nullable=True)
-    op.alter_column('activities_streams', 'stream_type',
-               existing_type=sa.Integer(),
-               comment='Stream type (1 - HR, 2 - Power, 3 - Cadence, 4 - Elevation, 5 - Velocity, 6 - Pace, 7 - lat/lon)',
-               existing_comment='Stream type (1-HR, 2-Power, 3-Cadence, 4-Elevation, 5-Velocity, 6-Pace, 7-lat/lon)',
-               existing_nullable=False)
+    op.alter_column(
+        "activity_sets",
+        "start_time",
+        existing_type=sa.DateTime(),
+        type_=sa.DateTime(timezone=True),
+        comment="Workout set start date (DATETIME)",
+        existing_comment="Workout set start date",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activity_exercise_titles",
+        "wkt_step_name",
+        existing_type=sa.String(length=250),
+        comment="WKT step name (May include spaces)",
+        existing_comment="WKT step name (may include spaces)",
+        existing_nullable=False,
+    )
+    op.alter_column(
+        "activities_streams",
+        "strava_activity_stream_id",
+        existing_type=sa.Integer(),
+        type_=sa.BigInteger(),
+        existing_comment="Strava activity stream ID",
+        existing_nullable=True,
+    )
+    op.alter_column(
+        "activities_streams",
+        "stream_type",
+        existing_type=sa.Integer(),
+        comment="Stream type (1 - HR, 2 - Power, 3 - Cadence, 4 - Elevation, 5 - Velocity, 6 - Pace, 7 - lat/lon)",
+        existing_comment="Stream type (1-HR, 2-Power, 3-Cadence, 4-Elevation, 5-Velocity, 6-Pace, 7-lat/lon)",
+        existing_nullable=False,
+    )
     # Revert datetime with timezone to datetime without timezone
     op.alter_column(
         "users_sessions",

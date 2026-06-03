@@ -2,13 +2,14 @@
 
 from datetime import datetime
 from typing import Any
+
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     StrictBool,
-    StrictStr,
     StrictInt,
+    StrictStr,
 )
 
 
@@ -47,27 +48,16 @@ class UsersIntegrationsBase(BaseModel):
     strava_token: StrictStr | None = Field(
         default=None,
         max_length=512,
-        description=(
-            "Strava token after link process encrypted at rest with Fernet key"
-        ),
+        description=("Strava token after link process encrypted at rest with Fernet key"),
     )
     strava_refresh_token: StrictStr | None = Field(
         default=None,
         max_length=512,
-        description=(
-            "Strava refresh token after link process "
-            "encrypted at rest with Fernet key"
-        ),
+        description=("Strava refresh token after link process encrypted at rest with Fernet key"),
     )
-    strava_token_expires_at: datetime | None = Field(
-        default=None, description="Strava token expiration date"
-    )
-    strava_sync_gear: StrictBool = Field(
-        default=False, description="Whether Strava gear is to be synced"
-    )
-    garminconnect_token: dict[str, Any] | None = Field(
-        default=None, description="Garmin Connect token"
-    )
+    strava_token_expires_at: datetime | None = Field(default=None, description="Strava token expiration date")
+    strava_sync_gear: StrictBool = Field(default=False, description="Whether Strava gear is to be synced")
+    garminconnect_token: dict[str, Any] | None = Field(default=None, description="Garmin Connect token")
     garminconnect_sync_gear: StrictBool = Field(
         default=False,
         description="Whether Garmin Connect gear is to be synced",
@@ -107,6 +97,4 @@ class UsersIntegrationsRead(UsersIntegrationsBase):
     """
 
     id: StrictInt = Field(..., ge=1, description="Unique identifier for integrations")
-    user_id: StrictInt = Field(
-        ..., ge=1, description="Foreign key reference to the user"
-    )
+    user_id: StrictInt = Field(..., ge=1, description="Foreign key reference to the user")

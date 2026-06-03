@@ -1,8 +1,7 @@
 """Tests for users_api_keys utility functions."""
 
-import pytest
-
 import auth.api_keys.utils as users_api_keys_utils
+import pytest
 
 
 class TestGenerateApiKey:
@@ -74,9 +73,7 @@ class TestValidateApiKeyScopes:
 
     def test_validate_regular_user_with_valid_regular_scope(self):
         """Test that a regular user can request activities:upload."""
-        users_api_keys_utils.validate_api_key_scopes(
-            ["activities:upload"], "regular"
-        )
+        users_api_keys_utils.validate_api_key_scopes(["activities:upload"], "regular")
 
     def test_validate_admin_user_with_upload_scope(self):
         """Test that admin users can request activities:upload."""
@@ -90,22 +87,16 @@ class TestValidateApiKeyScopes:
     def test_validate_unknown_scope_raises_for_regular_user(self):
         """Test that unrecognised scopes raise ValueError for a regular user."""
         with pytest.raises(ValueError, match="Unsupported API key scopes"):
-            users_api_keys_utils.validate_api_key_scopes(
-                ["totally:unknown_scope"], "regular"
-            )
+            users_api_keys_utils.validate_api_key_scopes(["totally:unknown_scope"], "regular")
 
     def test_validate_unknown_scope_raises_for_admin_user(self):
         """Test that unrecognised scopes raise ValueError for an admin user."""
         with pytest.raises(ValueError, match="Unsupported API key scopes"):
-            users_api_keys_utils.validate_api_key_scopes(
-                ["totally:unknown_scope"], "admin"
-            )
+            users_api_keys_utils.validate_api_key_scopes(["totally:unknown_scope"], "admin")
 
     def test_validate_activities_upload_allowed_for_regular(self):
         """Test that activities:upload is allowed for regular users."""
-        users_api_keys_utils.validate_api_key_scopes(
-            ["activities:upload"], "regular"
-        )
+        users_api_keys_utils.validate_api_key_scopes(["activities:upload"], "regular")
 
     def test_validate_multiple_valid_regular_scopes(self):
         """Test that extra JWT scopes are rejected."""

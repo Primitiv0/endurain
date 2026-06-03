@@ -1,18 +1,17 @@
 """FastAPI routes for the activities module (public, unauthenticated)."""
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
+import activities.activity.crud as activities_crud
+import activities.activity.dependencies as activities_dependencies
+import activities.activity.schema as activities_schema
+import core.database as core_database
 from fastapi import (
     APIRouter,
     Depends,
 )
 from sqlalchemy.orm import Session
-
-import activities.activity.schema as activities_schema
-import activities.activity.crud as activities_crud
-import activities.activity.dependencies as activities_dependencies
-
-import core.database as core_database
 
 # Define the API router
 router = APIRouter()
@@ -24,15 +23,11 @@ router = APIRouter()
 )
 async def read_public_activities_activity_from_id(
     activity_id: int,
-    _validate_activity_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
+    _validate_activity_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
     ],
 ):
     """Return a public activity by ID, or None if not found/not public."""
-    return activities_crud.get_activity_by_id_if_is_public(
-        activity_id, db
-    )
+    return activities_crud.get_activity_by_id_if_is_public(activity_id, db)

@@ -5,13 +5,13 @@ This module tests utility functions for server settings,
 including settings retrieval and tile map templates.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
 
-import server_settings.utils as server_settings_utils
-import server_settings.schema as server_settings_schema
+import pytest
 import server_settings.models as server_settings_models
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
+from fastapi import HTTPException, status
 
 
 class TestGetServerSettings:
@@ -65,15 +65,10 @@ class TestGetTileMapsTemplates:
         result = server_settings_utils.get_tile_maps_templates()
 
         # Assert
-        openstreetmap = next(
-            (t for t in result if t.template_id == "openstreetmap"), None
-        )
+        openstreetmap = next((t for t in result if t.template_id == "openstreetmap"), None)
         assert openstreetmap is not None
         assert openstreetmap.name == "OpenStreetMap"
-        assert (
-            openstreetmap.url_template
-            == "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        )
+        assert openstreetmap.url_template == "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         assert openstreetmap.requires_api_key_frontend is False
         assert openstreetmap.requires_api_key_backend is False
 
@@ -83,9 +78,7 @@ class TestGetTileMapsTemplates:
         result = server_settings_utils.get_tile_maps_templates()
 
         # Assert
-        alidade_smooth = next(
-            (t for t in result if t.template_id == "alidade_smooth"), None
-        )
+        alidade_smooth = next((t for t in result if t.template_id == "alidade_smooth"), None)
         assert alidade_smooth is not None
         assert alidade_smooth.name == "Stadia Maps Alidade Smooth"
         assert alidade_smooth.requires_api_key_frontend is False
@@ -97,9 +90,7 @@ class TestGetTileMapsTemplates:
         result = server_settings_utils.get_tile_maps_templates()
 
         # Assert
-        alidade_dark = next(
-            (t for t in result if t.template_id == "alidade_smooth_dark"), None
-        )
+        alidade_dark = next((t for t in result if t.template_id == "alidade_smooth_dark"), None)
         assert alidade_dark is not None
         assert alidade_dark.name == "Stadia Maps Alidade Smooth Dark"
         assert alidade_dark.map_background_color == "#2a2a2a"
@@ -110,9 +101,7 @@ class TestGetTileMapsTemplates:
         result = server_settings_utils.get_tile_maps_templates()
 
         # Assert
-        alidade_satellite = next(
-            (t for t in result if t.template_id == "alidade_satellite"), None
-        )
+        alidade_satellite = next((t for t in result if t.template_id == "alidade_satellite"), None)
         assert alidade_satellite is not None
         assert alidade_satellite.name == "Stadia Maps Alidade Satellite"
         assert alidade_satellite.requires_api_key_frontend is True
@@ -124,9 +113,7 @@ class TestGetTileMapsTemplates:
         result = server_settings_utils.get_tile_maps_templates()
 
         # Assert
-        stadia_outdoors = next(
-            (t for t in result if t.template_id == "stadia_outdoors"), None
-        )
+        stadia_outdoors = next((t for t in result if t.template_id == "stadia_outdoors"), None)
         assert stadia_outdoors is not None
         assert stadia_outdoors.name == "Stadia Maps Outdoors"
 
@@ -288,9 +275,7 @@ class TestGetAllowedTileDomains:
     """Test suite for get_allowed_tile_domains function."""
 
     @patch("server_settings.utils.get_server_settings_or_404")
-    def test_get_allowed_tile_domains_with_custom_domain(
-        self, mock_get_settings, mock_db
-    ):
+    def test_get_allowed_tile_domains_with_custom_domain(self, mock_get_settings, mock_db):
         """Test that custom tile domain is added to allowed list."""
         # Arrange
         mock_settings = MagicMock(spec=server_settings_models.ServerSettings)
@@ -307,15 +292,11 @@ class TestGetAllowedTileDomains:
         assert len(result) == 3
 
     @patch("server_settings.utils.get_server_settings_or_404")
-    def test_get_allowed_tile_domains_with_builtin_domain(
-        self, mock_get_settings, mock_db
-    ):
+    def test_get_allowed_tile_domains_with_builtin_domain(self, mock_get_settings, mock_db):
         """Test that builtin domains are not duplicated."""
         # Arrange
         mock_settings = MagicMock(spec=server_settings_models.ServerSettings)
-        mock_settings.tileserver_url = (
-            "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}.png"
-        )
+        mock_settings.tileserver_url = "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}.png"
         mock_get_settings.return_value = mock_settings
 
         # Act
@@ -346,9 +327,7 @@ class TestGetAllowedTileDomains:
         assert len(result) == 3
 
     @patch("server_settings.utils.get_server_settings_or_404")
-    def test_get_allowed_tile_domains_no_custom_domain(
-        self, mock_get_settings, mock_db
-    ):
+    def test_get_allowed_tile_domains_no_custom_domain(self, mock_get_settings, mock_db):
         """Test that only builtins are returned when no custom domain."""
         # Arrange
         mock_settings = MagicMock(spec=server_settings_models.ServerSettings)

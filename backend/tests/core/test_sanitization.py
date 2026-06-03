@@ -53,7 +53,7 @@ class TestSanitizeMarkdown:
 
     def test_sanitize_markdown_removes_onclick(self):
         """Test that onclick attributes are removed."""
-        content = '<p onclick="alert(\'XSS\')">Click me</p>'
+        content = "<p onclick=\"alert('XSS')\">Click me</p>"
         result = sanitization.sanitize_markdown(content)
         assert "onclick" not in result
         assert "Click me" in result
@@ -234,7 +234,7 @@ class TestSanitizeAttribution:
 
     def test_sanitize_attribution_removes_other_tags(self):
         """Test that non-link tags are removed."""
-        content = '<p>Photo by <strong>John Doe</strong></p>'
+        content = "<p>Photo by <strong>John Doe</strong></p>"
         result = sanitization.sanitize_attribution(content)
         assert "<p>" not in result
         assert "<strong>" not in result
@@ -276,17 +276,17 @@ class TestXSSPrevention:
     @pytest.mark.parametrize(
         "malicious_content",
         [
-            '<img src=x onerror="alert(\'XSS\')">',
-            '<svg onload="alert(\'XSS\')">',
-            '<body onload="alert(\'XSS\')">',
-            '<input onfocus="alert(\'XSS\')" autofocus>',
-            '<select onfocus="alert(\'XSS\')" autofocus>',
-            '<textarea onfocus="alert(\'XSS\')" autofocus>',
-            '<iframe src="javascript:alert(\'XSS\')">',
-            '<object data="javascript:alert(\'XSS\')">',
+            "<img src=x onerror=\"alert('XSS')\">",
+            "<svg onload=\"alert('XSS')\">",
+            "<body onload=\"alert('XSS')\">",
+            "<input onfocus=\"alert('XSS')\" autofocus>",
+            "<select onfocus=\"alert('XSS')\" autofocus>",
+            "<textarea onfocus=\"alert('XSS')\" autofocus>",
+            "<iframe src=\"javascript:alert('XSS')\">",
+            "<object data=\"javascript:alert('XSS')\">",
             '<embed src="data:text/html;base64,PHNjcmlwdD5hbGVydCgnWFNTJyk8L3NjcmlwdD4=">',
             '<link rel="stylesheet" href="javascript:alert(\'XSS\')">',
-            '<style>body{background:url("javascript:alert(\'XSS\')")}</style>',
+            "<style>body{background:url(\"javascript:alert('XSS')\")}</style>",
         ],
     )
     def test_markdown_prevents_xss(self, malicious_content):
@@ -302,8 +302,8 @@ class TestXSSPrevention:
         "malicious_content",
         [
             '<script>alert("XSS")</script>',
-            '<img src=x onerror="alert(\'XSS\')">',
-            '<a href="javascript:alert(\'XSS\')">Click</a>',
+            "<img src=x onerror=\"alert('XSS')\">",
+            "<a href=\"javascript:alert('XSS')\">Click</a>",
         ],
     )
     def test_plain_text_prevents_xss(self, malicious_content):
@@ -318,7 +318,7 @@ class TestXSSPrevention:
     @pytest.mark.parametrize(
         "malicious_content",
         [
-            '<a href="javascript:alert(\'XSS\')">Click</a>',
+            "<a href=\"javascript:alert('XSS')\">Click</a>",
             '<a onclick="alert(\'XSS\')" href="#">Click</a>',
             '<script>alert("XSS")</script><a href="#">Link</a>',
         ],

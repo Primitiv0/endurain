@@ -1,11 +1,9 @@
 """Tests for user_identity_providers.utils module."""
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from auth.identity_links import utils as user_idp_utils
-from auth.identity_links.schema import UsersIdentityProviderResponse
 
 
 class TestEnrichUserIdentityProviders:
@@ -43,7 +41,7 @@ class TestEnrichUserIdentityProviders:
             - Batch fetching is used
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Mock IdP links
         mock_link1 = MagicMock()
@@ -77,16 +75,11 @@ class TestEnrichUserIdentityProviders:
         mock_idp2.icon = "https://example.com/garmin.svg"
         mock_idp2.provider_type = "oauth2"
 
-        with patch(
-            "auth.identity_links.utils.idp_crud"
-            ".get_identity_providers_by_ids"
-        ) as mock_get_idps:
+        with patch("auth.identity_links.utils.idp_crud.get_identity_providers_by_ids") as mock_get_idps:
             mock_get_idps.return_value = [mock_idp1, mock_idp2]
 
             # Act
-            result = user_idp_utils.enrich_user_identity_providers(
-                [mock_link1, mock_link2], 1, mock_db
-            )
+            result = user_idp_utils.enrich_user_identity_providers([mock_link1, mock_link2], 1, mock_db)
 
         # Assert
         assert len(result) == 2
@@ -108,7 +101,7 @@ class TestEnrichUserIdentityProviders:
             - Warning is logged
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Mock IdP links - 2 links
         mock_link1 = MagicMock()
@@ -133,19 +126,14 @@ class TestEnrichUserIdentityProviders:
         mock_idp1.icon = "icon"
         mock_idp1.provider_type = "oauth2"
 
-        with patch(
-            "auth.identity_links.utils.idp_crud"
-            ".get_identity_providers_by_ids"
-        ) as mock_get_idps:
-            with patch(
-                "auth.identity_links.utils.core_logger.print_to_log"
-            ) as mock_logger:
-                mock_get_idps.return_value = [mock_idp1]
+        with (
+            patch("auth.identity_links.utils.idp_crud.get_identity_providers_by_ids") as mock_get_idps,
+            patch("auth.identity_links.utils.core_logger.print_to_log") as mock_logger,
+        ):
+            mock_get_idps.return_value = [mock_idp1]
 
-                # Act
-                result = user_idp_utils.enrich_user_identity_providers(
-                    [mock_link1, mock_link2], 1, mock_db
-                )
+            # Act
+            result = user_idp_utils.enrich_user_identity_providers([mock_link1, mock_link2], 1, mock_db)
 
         # Assert
         assert len(result) == 1
@@ -163,26 +151,21 @@ class TestEnrichUserIdentityProviders:
             - Warnings logged for all missing IdPs
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         mock_link = MagicMock()
         mock_link.id = 1
         mock_link.idp_id = 1
         mock_link.linked_at = now
 
-        with patch(
-            "auth.identity_links.utils.idp_crud"
-            ".get_identity_providers_by_ids"
-        ) as mock_get_idps:
-            with patch(
-                "auth.identity_links.utils.core_logger.print_to_log"
-            ) as mock_logger:
-                mock_get_idps.return_value = []
+        with (
+            patch("auth.identity_links.utils.idp_crud.get_identity_providers_by_ids") as mock_get_idps,
+            patch("auth.identity_links.utils.core_logger.print_to_log") as mock_logger,
+        ):
+            mock_get_idps.return_value = []
 
-                # Act
-                result = user_idp_utils.enrich_user_identity_providers(
-                    [mock_link], 1, mock_db
-                )
+            # Act
+            result = user_idp_utils.enrich_user_identity_providers([mock_link], 1, mock_db)
 
         # Assert
         assert result == []
@@ -204,17 +187,14 @@ class TestGetUserIdentityProviderRefreshTokenByUserIdAndIdpId:
         """
         # Arrange
         with patch(
-            "auth.identity_links.utils.user_idp_crud"
-            ".get_user_identity_provider_by_user_id_and_idp_id"
+            "auth.identity_links.utils.user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_link = MagicMock()
             mock_link.idp_refresh_token = "encrypted_token_xyz"
             mock_get.return_value = mock_link
 
             # Act
-            result = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-                1, 1, mock_db
-            )
+            result = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(1, 1, mock_db)
 
         # Assert
         assert result == "encrypted_token_xyz"
@@ -230,15 +210,12 @@ class TestGetUserIdentityProviderRefreshTokenByUserIdAndIdpId:
         """
         # Arrange
         with patch(
-            "auth.identity_links.utils.user_idp_crud"
-            ".get_user_identity_provider_by_user_id_and_idp_id"
+            "auth.identity_links.utils.user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_get.return_value = None
 
             # Act
-            result = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-                1, 1, mock_db
-            )
+            result = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(1, 1, mock_db)
 
         # Assert
         assert result is None
@@ -254,17 +231,14 @@ class TestGetUserIdentityProviderRefreshTokenByUserIdAndIdpId:
         """
         # Arrange
         with patch(
-            "auth.identity_links.utils.user_idp_crud"
-            ".get_user_identity_provider_by_user_id_and_idp_id"
+            "auth.identity_links.utils.user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id"
         ) as mock_get:
             mock_link = MagicMock()
             mock_link.idp_refresh_token = None
             mock_get.return_value = mock_link
 
             # Act
-            result = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-                1, 1, mock_db
-            )
+            result = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(1, 1, mock_db)
 
         # Assert
         assert result is None

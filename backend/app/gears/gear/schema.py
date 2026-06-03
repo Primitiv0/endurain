@@ -133,26 +133,17 @@ class GearDetailRead(GearRead):
     total_distance: StrictFloat = Field(
         default=0,
         ge=0,
-        description=(
-            "Total activity distance"
-            " in meters"
-        ),
+        description=("Total activity distance in meters"),
     )
     total_time: StrictFloat = Field(
         default=0,
         ge=0,
-        description=(
-            "Total activity time"
-            " in seconds"
-        ),
+        description=("Total activity time in seconds"),
     )
     total_components_cost: StrictFloat = Field(
         default=0,
         ge=0,
-        description=(
-            "Sum of component"
-            " purchase values"
-        ),
+        description=("Sum of component purchase values"),
     )
 
 

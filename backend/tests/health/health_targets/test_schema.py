@@ -1,7 +1,6 @@
+import health.health_targets.schema as health_targets_schema
 import pytest
 from pydantic import ValidationError
-
-import health.health_targets.schema as health_targets_schema
 
 
 class TestHealthTargetsSchema:
@@ -109,9 +108,7 @@ class TestHealthTargetsSchema:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            health_targets_schema.HealthTargetsBase(
-                weight=75.5, extra_field="not allowed"
-            )
+            health_targets_schema.HealthTargetsBase(weight=75.5, extra_field="not allowed")
 
         assert "extra_field" in str(exc_info.value)
 
@@ -131,9 +128,7 @@ class TestHealthTargetsSchema:
             sleep = 28800
 
         # Act
-        health_targets = health_targets_schema.HealthTargetsRead.model_validate(
-            MockORMModel()
-        )
+        health_targets = health_targets_schema.HealthTargetsRead.model_validate(MockORMModel())
 
         # Assert
         assert health_targets.id == 1
@@ -180,9 +175,7 @@ class TestHealthTargetsSchema:
         Test HealthTargetsBase schema with large values.
         """
         # Arrange & Act
-        health_targets = health_targets_schema.HealthTargetsBase(
-            weight=200.5, steps=50000, sleep=86400
-        )
+        health_targets = health_targets_schema.HealthTargetsBase(weight=200.5, steps=50000, sleep=86400)
 
         # Assert
         assert health_targets.weight == 200.5

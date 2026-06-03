@@ -1,17 +1,16 @@
 """CRUD operations for user API keys."""
 
 import uuid
-from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
 import auth.api_keys.models as api_keys_models
 import auth.api_keys.schema as api_keys_schema
 import auth.api_keys.utils as api_keys_utils
-
 import core.decorators as core_decorators
 import core.logger as core_logger
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -89,9 +88,7 @@ def get_api_key_by_hash(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(api_keys_models.UsersApiKeys).where(
-        api_keys_models.UsersApiKeys.key_hash == key_hash
-    )
+    stmt = select(api_keys_models.UsersApiKeys).where(api_keys_models.UsersApiKeys.key_hash == key_hash)
     return db.execute(stmt).scalar_one_or_none()
 
 
@@ -139,7 +136,7 @@ def create_api_key(
         scopes=scopes_json,
         expires_at=data.expires_at,
         last_used_at=None,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         is_active=True,
     )
     db.add(db_api_key)
@@ -175,9 +172,7 @@ def update_last_used(
         HTTPException: If the key is not found (404) or
             a database error occurs.
     """
-    stmt = select(api_keys_models.UsersApiKeys).where(
-        api_keys_models.UsersApiKeys.id == api_key_id
-    )
+    stmt = select(api_keys_models.UsersApiKeys).where(api_keys_models.UsersApiKeys.id == api_key_id)
     db_api_key = db.execute(stmt).scalar_one_or_none()
 
     if db_api_key is None:
@@ -186,7 +181,7 @@ def update_last_used(
             detail=f"API key {api_key_id} not found",
         )
 
-    db_api_key.last_used_at = datetime.now(timezone.utc)
+    db_api_key.last_used_at = datetime.now(UTC)
     db.commit()
 
 
@@ -217,7 +212,7 @@ def revoke_api_key(
     if db_api_key is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"API key {api_key_id} not found " f"for user {user_id}"),
+            detail=(f"API key {api_key_id} not found for user {user_id}"),
         )
 
     db_api_key.is_active = False
@@ -260,7 +255,7 @@ def delete_api_key(
     if db_api_key is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"API key {api_key_id} not found " f"for user {user_id}"),
+            detail=(f"API key {api_key_id} not found for user {user_id}"),
         )
 
     db.delete(db_api_key)

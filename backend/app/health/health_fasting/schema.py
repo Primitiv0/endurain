@@ -5,18 +5,18 @@ This module defines the request/response schemas for fasting tracking,
 including validation rules and enumerations for fasting types and statuses.
 """
 
+from datetime import datetime
 from enum import Enum
+
+import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
-    model_validator,
+    Field,
     StrictInt,
     StrictStr,
-    Field,
+    model_validator,
 )
-from datetime import datetime
-
-import health.schema as health_schema
 
 
 class Source(Enum):

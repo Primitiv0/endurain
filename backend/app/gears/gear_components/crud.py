@@ -1,14 +1,12 @@
 """CRUD operations for gear components."""
 
+import activities.activity.models as activity_models
+import core.decorators as core_decorators
+import gears.gear_components.models as gear_components_models
+import gears.gear_components.schema as gear_components_schema
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
-
-import gears.gear_components.schema as gear_components_schema
-import gears.gear_components.models as gear_components_models
-import activities.activity.models as activity_models
-
-import core.decorators as core_decorators
 
 # Fields that must never be overwritten via
 # user-supplied data during updates.
@@ -40,12 +38,9 @@ def get_gear_component_by_id(
     stmt = select(
         gear_components_models.GearComponents,
     ).where(
-        gear_components_models.GearComponents.id
-        == gear_component_id,
+        gear_components_models.GearComponents.id == gear_component_id,
     )
-    return (
-        db.execute(stmt).scalar_one_or_none()
-    )
+    return db.execute(stmt).scalar_one_or_none()
 
 
 @core_decorators.handle_db_errors
@@ -69,9 +64,7 @@ def get_gear_components_user(
     stmt = select(
         gear_components_models.GearComponents,
     ).where(
-        gear_components_models.GearComponents
-        .user_id
-        == user_id,
+        gear_components_models.GearComponents.user_id == user_id,
     )
     return db.execute(stmt).scalars().all()
 
@@ -101,27 +94,19 @@ def get_gear_components_user_by_gear_id(
     stmt = select(
         gear_components_models.GearComponents,
     ).where(
-        gear_components_models.GearComponents
-        .user_id
-        == user_id,
-        gear_components_models.GearComponents
-        .gear_id
-        == gear_id,
+        gear_components_models.GearComponents.user_id == user_id,
+        gear_components_models.GearComponents.gear_id == gear_id,
     )
     if active is not None:
         stmt = stmt.where(
-            gear_components_models
-            .GearComponents.active
-            == active,
+            gear_components_models.GearComponents.active == active,
         )
     return db.execute(stmt).scalars().all()
 
 
 @core_decorators.handle_db_errors
 def create_gear_component(
-    gear_component: (
-        gear_components_schema.GearComponentCreate
-    ),
+    gear_component: (gear_components_schema.GearComponentCreate),
     user_id: int,
     db: Session,
 ) -> gear_components_models.GearComponents:
@@ -139,24 +124,16 @@ def create_gear_component(
     Raises:
         HTTPException: On database error (500).
     """
-    new_gear_component = (
-        gear_components_models.GearComponents(
-            user_id=user_id,
-            gear_id=gear_component.gear_id,
-            type=gear_component.type,
-            brand=gear_component.brand,
-            model=gear_component.model,
-            purchase_date=(
-                gear_component.purchase_date
-            ),
-            active=True,
-            expected_kms=(
-                gear_component.expected_kms
-            ),
-            purchase_value=(
-                gear_component.purchase_value
-            ),
-        )
+    new_gear_component = gear_components_models.GearComponents(
+        user_id=user_id,
+        gear_id=gear_component.gear_id,
+        type=gear_component.type,
+        brand=gear_component.brand,
+        model=gear_component.model,
+        purchase_date=(gear_component.purchase_date),
+        active=True,
+        expected_kms=(gear_component.expected_kms),
+        purchase_value=(gear_component.purchase_value),
     )
 
     db.add(new_gear_component)
@@ -168,9 +145,7 @@ def create_gear_component(
 
 @core_decorators.handle_db_errors
 def edit_gear_component(
-    gear_component: (
-        gear_components_schema.GearComponentUpdate
-    ),
+    gear_component: (gear_components_schema.GearComponentUpdate),
     db: Session,
 ) -> gear_components_models.GearComponents:
     """
@@ -190,25 +165,18 @@ def edit_gear_component(
     stmt = select(
         gear_components_models.GearComponents,
     ).where(
-        gear_components_models.GearComponents.id
-        == gear_component.id,
+        gear_components_models.GearComponents.id == gear_component.id,
     )
-    db_gear_component = (
-        db.execute(stmt).scalar_one_or_none()
-    )
+    db_gear_component = db.execute(stmt).scalar_one_or_none()
 
     if db_gear_component is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
             detail="Gear component not found",
         )
 
-    gear_component_data = (
-        gear_component.model_dump(
-            exclude_unset=True,
-        )
+    gear_component_data = gear_component.model_dump(
+        exclude_unset=True,
     )
     for key, value in gear_component_data.items():
         if key not in _IMMUTABLE_FIELDS:
@@ -251,23 +219,15 @@ def delete_gear_component(
     stmt = delete(
         gear_components_models.GearComponents,
     ).where(
-        gear_components_models.GearComponents
-        .user_id
-        == user_id,
-        gear_components_models.GearComponents.id
-        == gear_component_id,
+        gear_components_models.GearComponents.user_id == user_id,
+        gear_components_models.GearComponents.id == gear_component_id,
     )
     result = db.execute(stmt)
 
     if result.rowcount == 0:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
-            detail=(
-                f"Gear component with ID "
-                f"{gear_component_id} not found"
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
+            detail=(f"Gear component with ID {gear_component_id} not found"),
         )
 
     db.commit()
@@ -298,16 +258,12 @@ def get_components_activity_stats(
     """
     comp = (
         select(
-            gear_components_models.GearComponents.id
-            .label("comp_id"),
-            gear_components_models
-            .GearComponents.purchase_date,
-            gear_components_models
-            .GearComponents.retired_date,
+            gear_components_models.GearComponents.id.label("comp_id"),
+            gear_components_models.GearComponents.purchase_date,
+            gear_components_models.GearComponents.retired_date,
         )
         .where(
-            gear_components_models.GearComponents.gear_id
-            == gear_id,
+            gear_components_models.GearComponents.gear_id == gear_id,
         )
         .subquery()
     )
@@ -316,40 +272,20 @@ def get_components_activity_stats(
         select(
             comp.c.comp_id,
             func.coalesce(
-                func.sum(
-                    activity_models
-                    .Activity.distance
-                ),
+                func.sum(activity_models.Activity.distance),
                 0,
             ).label("distance"),
             func.coalesce(
-                func.sum(
-                    activity_models
-                    .Activity.total_timer_time
-                ),
+                func.sum(activity_models.Activity.total_timer_time),
                 0,
             ).label("time"),
         )
         .select_from(comp)
         .outerjoin(
             activity_models.Activity,
-            (
-                activity_models.Activity.gear_id
-                == gear_id
-            )
-            & (
-                activity_models
-                .Activity.start_time
-                >= comp.c.purchase_date
-            )
-            & (
-                (comp.c.retired_date.is_(None))
-                | (
-                    activity_models
-                    .Activity.start_time
-                    <= comp.c.retired_date
-                )
-            ),
+            (activity_models.Activity.gear_id == gear_id)
+            & (activity_models.Activity.start_time >= comp.c.purchase_date)
+            & ((comp.c.retired_date.is_(None)) | (activity_models.Activity.start_time <= comp.c.retired_date)),
         )
         .group_by(comp.c.comp_id)
     )

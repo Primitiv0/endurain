@@ -1,9 +1,8 @@
 """Tests for user_identity_providers.schema module."""
 
-import pytest
-from datetime import datetime, timezone
-from pydantic import ValidationError
+from datetime import UTC, datetime
 
+import pytest
 from auth.identity_links.schema import (
     UsersIdentityProviderBase,
     UsersIdentityProviderCreate,
@@ -11,6 +10,7 @@ from auth.identity_links.schema import (
     UsersIdentityProviderResponse,
     UsersIdentityProviderTokenUpdate,
 )
+from pydantic import ValidationError
 
 
 class TestUserIdentityProviderBase:
@@ -195,7 +195,7 @@ class TestUserIdentityProviderRead:
             "user_id": 1,
             "idp_id": 1,
             "idp_subject": "user123@example.com",
-            "linked_at": datetime.now(timezone.utc),
+            "linked_at": datetime.now(UTC),
         }
 
         # Act
@@ -214,7 +214,7 @@ class TestUserIdentityProviderRead:
             - Timestamps are preserved
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = {
             "id": 1,
             "user_id": 1,
@@ -267,7 +267,7 @@ class TestUserIdentityProviderResponse:
             - Optional enriched fields default to None
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = {
             "id": 1,
             "user_id": 1,
@@ -292,7 +292,7 @@ class TestUserIdentityProviderResponse:
             - All fields are accessible
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = {
             "id": 1,
             "user_id": 1,
@@ -327,7 +327,7 @@ class TestUserIdentityProviderResponse:
             user_id = 1
             idp_id = 1
             idp_subject = "user123@example.com"
-            linked_at = datetime.now(timezone.utc)
+            linked_at = datetime.now(UTC)
             last_login = None
             idp_access_token_expires_at = None
             idp_refresh_token_updated_at = None
@@ -368,7 +368,7 @@ class TestUserIdentityProviderTokenUpdate:
             - All fields are properly stored
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = {
             "idp_refresh_token": "encrypted_token_xyz",
             "idp_access_token_expires_at": now,

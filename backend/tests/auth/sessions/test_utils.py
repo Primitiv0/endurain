@@ -1,16 +1,16 @@
 import hashlib
 import hmac
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException
 
-import core.network as core_network
-import auth.sessions.utils as users_session_utils
-import auth.sessions.schema as users_session_schema
 import auth.sessions.models as users_session_models
-import users.users.schema as users_schema
+import auth.sessions.schema as users_session_schema
 import auth.sessions.utils as _auth_sessions_utils
+import auth.sessions.utils as users_session_utils
+import core.network as core_network
+import pytest
+import users.users.schema as users_schema
+from fastapi import HTTPException
 
 
 class TestDeviceTypeEnum:
@@ -71,19 +71,15 @@ class TestValidateSessionTimeout:
     Test suite for validate_session_timeout function.
     """
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 1)
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS", 24
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS", 24)
     def test_validate_session_timeout_valid(self):
         """
         Test valid session passes timeout validation.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.last_activity_at = now - timedelta(minutes=30)
         mock_session.created_at = now - timedelta(hours=12)
@@ -91,19 +87,15 @@ class TestValidateSessionTimeout:
         # Act & Assert (should not raise)
         users_session_utils.validate_session_timeout(mock_session)
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 1)
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS", 24
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS", 24)
     def test_validate_session_timeout_idle_expired(self):
         """
         Test session with idle timeout raises exception.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.last_activity_at = now - timedelta(hours=2)
         mock_session.created_at = now - timedelta(hours=12)
@@ -115,19 +107,15 @@ class TestValidateSessionTimeout:
         assert exc_info.value.status_code == 401
         assert "inactivity" in exc_info.value.detail
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 1)
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS", 24
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS", 24)
     def test_validate_session_timeout_absolute_expired(self):
         """
         Test session with absolute timeout raises exception.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.last_activity_at = now - timedelta(minutes=30)
         mock_session.created_at = now - timedelta(hours=30)
@@ -139,15 +127,13 @@ class TestValidateSessionTimeout:
         assert exc_info.value.status_code == 401
         assert "security" in exc_info.value.detail.lower()
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", False
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", False)
     def test_validate_session_timeout_disabled(self):
         """
         Test timeout validation is skipped when disabled.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.last_activity_at = now - timedelta(hours=100)
         mock_session.created_at = now - timedelta(hours=200)
@@ -209,11 +195,7 @@ class TestGetIpAddress:
         # Arrange
         mock_request = MagicMock()
         mock_request.client.host = "10.0.0.1"
-        mock_request.headers.get.side_effect = lambda h: (
-            "192.168.1.1, 10.0.0.1"
-            if h == "X-Forwarded-For"
-            else None
-        )
+        mock_request.headers.get.side_effect = lambda h: "192.168.1.1, 10.0.0.1" if h == "X-Forwarded-For" else None
 
         with patch.object(
             core_network.core_config.settings,
@@ -234,9 +216,7 @@ class TestGetIpAddress:
         # Arrange
         mock_request = MagicMock()
         mock_request.client.host = "10.0.0.1"
-        mock_request.headers.get.side_effect = lambda h: (
-            "172.16.0.5" if h == "X-Real-IP" else None
-        )
+        mock_request.headers.get.side_effect = lambda h: "172.16.0.5" if h == "X-Real-IP" else None
 
         with patch.object(
             core_network.core_config.settings,
@@ -299,13 +279,9 @@ class TestGetIpAddress:
         mock_user.id = 1
         mock_request = MagicMock()
         mock_request.client.host = "203.0.113.5"
-        mock_request.headers.get.side_effect = (
-            lambda h, d=None: "Mozilla/5.0"
-            if h == "user-agent"
-            else None
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else None
 
-        exp = datetime.now(timezone.utc) + timedelta(days=7)
+        exp = datetime.now(UTC) + timedelta(days=7)
 
         with patch.object(
             core_network.core_config.settings,
@@ -348,9 +324,7 @@ class TestVerifyCsrfToken:
         ).hexdigest()
 
         # Act
-        result = users_session_utils.verify_csrf_token(
-            token, stored_hmac
-        )
+        result = users_session_utils.verify_csrf_token(token, stored_hmac)
 
         # Assert
         assert result is True
@@ -374,9 +348,7 @@ class TestVerifyCsrfToken:
         wrong_candidate = "tampered-csrf-token"
 
         # Act
-        result = users_session_utils.verify_csrf_token(
-            wrong_candidate, stored_hmac
-        )
+        result = users_session_utils.verify_csrf_token(wrong_candidate, stored_hmac)
 
         # Assert
         assert result is False
@@ -420,9 +392,7 @@ class TestVerifyCsrfToken:
             "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
             "key-b",
         ):
-            digest_key_b = _auth_sessions_utils._hash_csrf_token(
-                token
-            )
+            digest_key_b = _auth_sessions_utils._hash_csrf_token(token)
 
         # Assert
         assert digest_key_a != digest_key_b
@@ -523,12 +493,10 @@ class TestCreateSessionObject:
         mock_request.client.host = "192.168.1.1"
 
         hashed_token = "hashed-refresh-token"
-        exp = datetime.now(timezone.utc) + timedelta(days=7)
+        exp = datetime.now(UTC) + timedelta(days=7)
 
         # Act
-        result = users_session_utils.create_session_object(
-            session_id, mock_user, mock_request, hashed_token, exp
-        )
+        result = users_session_utils.create_session_object(session_id, mock_user, mock_request, hashed_token, exp)
 
         # Assert
         assert result.id == session_id
@@ -549,13 +517,11 @@ class TestCreateSessionObject:
         mock_user.id = 1
 
         mock_request = MagicMock()
-        mock_request.headers.get.side_effect = lambda h, d=None: (
-            "Mozilla/5.0" if h == "user-agent" else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_request.client.host = "192.168.1.1"
 
         hashed_token = "hashed-refresh-token"
-        exp = datetime.now(timezone.utc) + timedelta(days=7)
+        exp = datetime.now(UTC) + timedelta(days=7)
         oauth_state_id = "oauth-state-123"
 
         # Act
@@ -581,13 +547,11 @@ class TestCreateSessionObject:
         mock_user.id = 1
 
         mock_request = MagicMock()
-        mock_request.headers.get.side_effect = lambda h, d=None: (
-            "Mozilla/5.0" if h == "user-agent" else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_request.client.host = "192.168.1.1"
 
         hashed_token = "hashed-refresh-token"
-        exp = datetime.now(timezone.utc) + timedelta(days=7)
+        exp = datetime.now(UTC) + timedelta(days=7)
         csrf_hash = "csrf-token-hash"
 
         # Act
@@ -614,7 +578,7 @@ class TestEditSessionObject:
         Test successful session object edit.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_request = MagicMock()
         mock_request.headers.get.side_effect = lambda h, d=None: (
             "Mozilla/5.0 (Windows NT 10.0)" if h == "user-agent" else d
@@ -642,9 +606,7 @@ class TestEditSessionObject:
         new_exp = now + timedelta(days=7)
 
         # Act
-        result = users_session_utils.edit_session_object(
-            mock_request, new_hashed_token, new_exp, existing_session
-        )
+        result = users_session_utils.edit_session_object(mock_request, new_hashed_token, new_exp, existing_session)
 
         # Assert
         assert result.id == existing_session.id
@@ -660,11 +622,9 @@ class TestEditSessionObject:
         Test that edit increments rotation count.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_request = MagicMock()
-        mock_request.headers.get.side_effect = lambda h, d=None: (
-            "Mozilla/5.0" if h == "user-agent" else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_request.client.host = "192.168.1.1"
 
         existing_session = users_session_schema.UsersSessionsInternal(
@@ -688,9 +648,7 @@ class TestEditSessionObject:
         new_exp = now + timedelta(days=7)
 
         # Act
-        result = users_session_utils.edit_session_object(
-            mock_request, new_hashed_token, new_exp, existing_session
-        )
+        result = users_session_utils.edit_session_object(mock_request, new_hashed_token, new_exp, existing_session)
 
         # Assert
         assert result.rotation_count == 6
@@ -701,9 +659,7 @@ class TestCleanupIdleSessions:
     Test suite for cleanup_idle_sessions function.
     """
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", False
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", False)
     def test_cleanup_idle_sessions_disabled(self):
         """
         Test cleanup is skipped when disabled.
@@ -711,9 +667,7 @@ class TestCleanupIdleSessions:
         # Act & Assert (should not raise and should return early)
         users_session_utils.cleanup_idle_sessions()
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 24)
     @patch("auth.sessions.utils.SessionLocal")
     @patch("auth.sessions.utils.users_session_crud.delete_idle_sessions")
@@ -732,16 +686,12 @@ class TestCleanupIdleSessions:
         # Assert
         mock_delete_idle.assert_called_once()
 
-    @patch(
-        "auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True
-    )
+    @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 24)
     @patch("auth.sessions.utils.SessionLocal")
     @patch("auth.sessions.utils.users_session_crud.delete_idle_sessions")
     @patch("auth.sessions.utils.core_logger.print_to_log")
-    def test_cleanup_idle_sessions_error_handling(
-        self, mock_logger, mock_delete_idle, mock_session_local
-    ):
+    def test_cleanup_idle_sessions_error_handling(self, mock_logger, mock_delete_idle, mock_session_local):
         """
         Test error handling in cleanup.
         """
@@ -757,9 +707,7 @@ class TestCleanupIdleSessions:
         mock_logger.assert_called()
 
 
-_TEST_SECRET = (
-    "test-secret-key-for-testing-purposes-minimum-32-characters-long"
-)
+_TEST_SECRET = "test-secret-key-for-testing-purposes-minimum-32-characters-long"
 
 
 class TestCreateSessionUtilsCsrf:
@@ -772,13 +720,8 @@ class TestCreateSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch(
-        "auth.sessions.utils.users_session_crud"
-        ".create_session"
-    )
-    def test_create_session_hashes_csrf_token_before_persistence(
-        self, mock_crud_create, mock_db
-    ):
+    @patch("auth.sessions.utils.users_session_crud.create_session")
+    def test_create_session_hashes_csrf_token_before_persistence(self, mock_crud_create, mock_db):
         """
         Test that create_session computes an HMAC-SHA256 of the
         plain csrf_token and passes the digest (not the plain
@@ -790,11 +733,7 @@ class TestCreateSessionUtilsCsrf:
         mock_user.id = 42
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
-        mock_request.headers.get.side_effect = (
-            lambda h, d=None: "Mozilla/5.0"
-            if h == "user-agent"
-            else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_hasher = MagicMock()
         mock_hasher.hash_password.return_value = "hashed-rt"
         csrf_token = "plain-csrf-token-value"
@@ -824,13 +763,8 @@ class TestCreateSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch(
-        "auth.sessions.utils.users_session_crud"
-        ".create_session"
-    )
-    def test_create_session_none_csrf_token_stores_none(
-        self, mock_crud_create, mock_db
-    ):
+    @patch("auth.sessions.utils.users_session_crud.create_session")
+    def test_create_session_none_csrf_token_stores_none(self, mock_crud_create, mock_db):
         """
         Test that create_session stores None for csrf_token_hash
         when no csrf_token is provided.
@@ -840,11 +774,7 @@ class TestCreateSessionUtilsCsrf:
         mock_user.id = 1
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
-        mock_request.headers.get.side_effect = (
-            lambda h, d=None: "Mozilla/5.0"
-            if h == "user-agent"
-            else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_hasher = MagicMock()
         mock_hasher.hash_password.return_value = "hashed-rt"
 
@@ -873,19 +803,15 @@ class TestEditSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch(
-        "auth.sessions.utils.users_session_crud.edit_session"
-    )
-    def test_edit_session_hashes_new_csrf_token_before_persistence(
-        self, mock_crud_edit, mock_db
-    ):
+    @patch("auth.sessions.utils.users_session_crud.edit_session")
+    def test_edit_session_hashes_new_csrf_token_before_persistence(self, mock_crud_edit, mock_db):
         """
         Test that edit_session computes an HMAC-SHA256 of the
         plain new_csrf_token and passes the digest to the CRUD
         layer rather than the plain value.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing_session = users_session_schema.UsersSessionsInternal(
             id="sess-edit-csrf",
             user_id=1,
@@ -904,11 +830,7 @@ class TestEditSessionUtilsCsrf:
         )
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
-        mock_request.headers.get.side_effect = (
-            lambda h, d=None: "Mozilla/5.0"
-            if h == "user-agent"
-            else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_hasher = MagicMock()
         mock_hasher.hash_password.return_value = "new-hashed-rt"
         new_csrf_token = "new-plain-csrf-token"
@@ -937,18 +859,14 @@ class TestEditSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch(
-        "auth.sessions.utils.users_session_crud.edit_session"
-    )
-    def test_edit_session_none_csrf_token_stores_none(
-        self, mock_crud_edit, mock_db
-    ):
+    @patch("auth.sessions.utils.users_session_crud.edit_session")
+    def test_edit_session_none_csrf_token_stores_none(self, mock_crud_edit, mock_db):
         """
         Test that edit_session stores None for csrf_token_hash
         when no new_csrf_token is supplied.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing_session = users_session_schema.UsersSessionsInternal(
             id="sess-edit-no-csrf",
             user_id=1,
@@ -967,11 +885,7 @@ class TestEditSessionUtilsCsrf:
         )
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
-        mock_request.headers.get.side_effect = (
-            lambda h, d=None: "Mozilla/5.0"
-            if h == "user-agent"
-            else d
-        )
+        mock_request.headers.get.side_effect = lambda h, d=None: "Mozilla/5.0" if h == "user-agent" else d
         mock_hasher = MagicMock()
         mock_hasher.hash_password.return_value = "new-hashed-rt"
 

@@ -1,6 +1,7 @@
 """Rotated refresh token Pydantic schemas."""
 
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 
 

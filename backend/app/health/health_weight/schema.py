@@ -1,15 +1,15 @@
+from datetime import date as datetime_date
 from enum import Enum
+
+import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
-    model_validator,
-    StrictInt,
-    StrictFloat,
     Field,
+    StrictFloat,
+    StrictInt,
+    model_validator,
 )
-from datetime import date as datetime_date
-
-import health.schema as health_schema
 
 
 class Source(Enum):
@@ -50,36 +50,16 @@ class HealthWeightBase(BaseModel):
         - Uses enum values for serialization
     """
 
-    date: datetime_date | None = Field(
-        default=None, description="Health weight date (date)"
-    )
-    weight: StrictFloat | None = Field(
-        default=None, ge=0, le=500, description="Weight in kilograms"
-    )
-    bmi: StrictFloat | None = Field(
-        default=None, ge=0, le=100, description="Body Mass Index"
-    )
-    body_fat: StrictFloat | None = Field(
-        default=None, ge=0, le=100, description="Body fat percentage"
-    )
-    body_water: StrictFloat | None = Field(
-        default=None, ge=0, le=100, description="Body water percentage"
-    )
-    bone_mass: StrictFloat | None = Field(
-        default=None, ge=0, le=500, description="Bone mass in kilograms"
-    )
-    muscle_mass: StrictFloat | None = Field(
-        default=None, ge=0, le=500, description="Muscle mass in kilograms"
-    )
-    physique_rating: StrictInt | None = Field(
-        default=None, ge=0, description="Physique rating"
-    )
-    visceral_fat: StrictFloat | None = Field(
-        default=None, ge=0, le=100, description="Visceral fat"
-    )
-    metabolic_age: StrictInt | None = Field(
-        default=None, ge=0, le=120, description="Metabolic age"
-    )
+    date: datetime_date | None = Field(default=None, description="Health weight date (date)")
+    weight: StrictFloat | None = Field(default=None, ge=0, le=500, description="Weight in kilograms")
+    bmi: StrictFloat | None = Field(default=None, ge=0, le=100, description="Body Mass Index")
+    body_fat: StrictFloat | None = Field(default=None, ge=0, le=100, description="Body fat percentage")
+    body_water: StrictFloat | None = Field(default=None, ge=0, le=100, description="Body water percentage")
+    bone_mass: StrictFloat | None = Field(default=None, ge=0, le=500, description="Bone mass in kilograms")
+    muscle_mass: StrictFloat | None = Field(default=None, ge=0, le=500, description="Muscle mass in kilograms")
+    physique_rating: StrictInt | None = Field(default=None, ge=0, description="Physique rating")
+    visceral_fat: StrictFloat | None = Field(default=None, ge=0, le=100, description="Visceral fat")
+    metabolic_age: StrictInt | None = Field(default=None, ge=0, le=120, description="Metabolic age")
     source: Source | None = Field(default=None, description="Source of the weight data")
 
     model_config = ConfigDict(
@@ -123,9 +103,7 @@ class HealthWeightRead(HealthWeightBase):
         user_id (StrictInt): Foreign key reference to the user.
     """
 
-    id: StrictInt = Field(
-        ..., description="Unique identifier for the weight record to update"
-    )
+    id: StrictInt = Field(..., description="Unique identifier for the weight record to update")
     user_id: StrictInt = Field(..., description="Foreign key reference to the user")
 
 
@@ -152,9 +130,7 @@ class HealthWeightListResponse(health_schema.HealthListResponse):
             weight records.
     """
 
-    records: list[HealthWeightRead] = Field(
-        ..., description="List of health weight records"
-    )
+    records: list[HealthWeightRead] = Field(..., description="List of health weight records")
 
     model_config = ConfigDict(
         from_attributes=True,

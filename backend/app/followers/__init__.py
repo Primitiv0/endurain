@@ -30,20 +30,20 @@ from .models import Follower as FollowerModel
 from .schema import Follower, MessageResponse
 
 __all__ = [
-    # CRUD operations
-    "get_all_followers_by_user_id",
-    "get_accepted_followers_by_user_id",
-    "get_all_following_by_user_id",
-    "get_accepted_following_by_user_id",
-    "count_followers_by_user_id",
-    "count_following_by_user_id",
-    "get_follower_for_user_id_and_target_user_id",
-    "create_follower",
-    "accept_follower",
-    "delete_follower",
-    # Database model
-    "FollowerModel",
     # Pydantic schemas
     "Follower",
+    # Database model
+    "FollowerModel",
     "MessageResponse",
+    "accept_follower",
+    "count_followers_by_user_id",
+    "count_following_by_user_id",
+    "create_follower",
+    "delete_follower",
+    "get_accepted_followers_by_user_id",
+    "get_accepted_following_by_user_id",
+    # CRUD operations
+    "get_all_followers_by_user_id",
+    "get_all_following_by_user_id",
+    "get_follower_for_user_id_and_target_user_id",
 ]

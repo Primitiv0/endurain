@@ -1,10 +1,10 @@
 """Tests for OAuth state utility functions."""
 
-import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
-import auth.oauth_state.utils as oauth_state_utils
 import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.utils as oauth_state_utils
+import pytest
 
 
 class TestCreateStateIdAndNonce:
@@ -74,12 +74,10 @@ class TestDeleteExpiredOAuthStatesFromDb:
         num_deleted = 5
         mock_db = MagicMock()
 
-        with patch(
-            "auth.oauth_state.utils.SessionLocal"
-        ) as mock_session_local, patch.object(
-            oauth_state_crud, "delete_expired_oauth_states", return_value=num_deleted
-        ) as mock_delete:
-
+        with (
+            patch("auth.oauth_state.utils.SessionLocal") as mock_session_local,
+            patch.object(oauth_state_crud, "delete_expired_oauth_states", return_value=num_deleted) as mock_delete,
+        ):
             mock_session_local.return_value.__enter__.return_value = mock_db
 
             # Act
@@ -95,12 +93,10 @@ class TestDeleteExpiredOAuthStatesFromDb:
         num_deleted = 0
         mock_db = MagicMock()
 
-        with patch(
-            "auth.oauth_state.utils.SessionLocal"
-        ) as mock_session_local, patch.object(
-            oauth_state_crud, "delete_expired_oauth_states", return_value=num_deleted
-        ) as mock_delete:
-
+        with (
+            patch("auth.oauth_state.utils.SessionLocal") as mock_session_local,
+            patch.object(oauth_state_crud, "delete_expired_oauth_states", return_value=num_deleted) as mock_delete,
+        ):
             mock_session_local.return_value.__enter__.return_value = mock_db
 
             # Act
@@ -114,14 +110,14 @@ class TestDeleteExpiredOAuthStatesFromDb:
         # Arrange
         mock_db = MagicMock()
 
-        with patch(
-            "auth.oauth_state.utils.SessionLocal"
-        ) as mock_session_local, patch.object(
-            oauth_state_crud,
-            "delete_expired_oauth_states",
-            side_effect=Exception("Database error"),
+        with (
+            patch("auth.oauth_state.utils.SessionLocal") as mock_session_local,
+            patch.object(
+                oauth_state_crud,
+                "delete_expired_oauth_states",
+                side_effect=Exception("Database error"),
+            ),
         ):
-
             mock_session_local.return_value.__enter__.return_value = mock_db
 
             # Act & Assert
@@ -137,12 +133,10 @@ class TestDeleteExpiredOAuthStatesFromDb:
         mock_context.__enter__.return_value = mock_db
         mock_context.__exit__.return_value = None
 
-        with patch(
-            "auth.oauth_state.utils.SessionLocal", return_value=mock_context
-        ) as mock_session_local, patch.object(
-            oauth_state_crud, "delete_expired_oauth_states", return_value=num_deleted
+        with (
+            patch("auth.oauth_state.utils.SessionLocal", return_value=mock_context) as mock_session_local,
+            patch.object(oauth_state_crud, "delete_expired_oauth_states", return_value=num_deleted),
         ):
-
             # Act
             oauth_state_utils.delete_expired_oauth_states_from_db()
 

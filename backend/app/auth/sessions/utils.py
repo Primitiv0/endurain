@@ -2,30 +2,26 @@
 
 import hashlib
 import hmac
-from enum import Enum
-from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
-from fastapi import (
-    Request,
-    HTTPException,
-    status,
-)
-from user_agents import parse
-
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
+from enum import Enum
 
 import auth.constants as auth_constants
 import auth.password_hasher as auth_password_hasher
-
+import auth.sessions.crud as users_session_crud
 import auth.sessions.models as users_session_models
 import auth.sessions.schema as users_session_schema
-import auth.sessions.crud as users_session_crud
-
-import users.users.schema as users_schema
-
 import core.logger as core_logger
 import core.network as core_network
+import users.users.schema as users_schema
 from core.database import SessionLocal
+from fastapi import (
+    HTTPException,
+    Request,
+    status,
+)
+from sqlalchemy.orm import Session
+from user_agents import parse
 
 
 class DeviceType(Enum):
@@ -77,7 +73,8 @@ def _hash_csrf_token(token: str) -> str:
         Hex-encoded HMAC-SHA256 digest.
     """
     # JWT_SECRET_KEY is validated non-None at application startup
-    assert auth_constants.JWT_SECRET_KEY, "SECRET_KEY must be configured"
+    if not auth_constants.JWT_SECRET_KEY:
+        raise RuntimeError("SECRET_KEY must be configured")
     return hmac.new(
         auth_constants.JWT_SECRET_KEY.encode(),
         token.encode(),
@@ -122,12 +119,10 @@ def validate_session_timeout(
     if not auth_constants.SESSION_IDLE_TIMEOUT_ENABLED:
         return
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Check idle timeout
-    idle_limit = session.last_activity_at + timedelta(
-        hours=auth_constants.SESSION_IDLE_TIMEOUT_HOURS
-    )
+    idle_limit = session.last_activity_at + timedelta(hours=auth_constants.SESSION_IDLE_TIMEOUT_HOURS)
     if now > idle_limit:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -136,9 +131,7 @@ def validate_session_timeout(
         )
 
     # Check absolute timeout
-    absolute_limit = session.created_at + timedelta(
-        hours=auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS
-    )
+    absolute_limit = session.created_at + timedelta(hours=auth_constants.SESSION_ABSOLUTE_TIMEOUT_HOURS)
     if now > absolute_limit:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -174,7 +167,7 @@ def create_session_object(
     user_agent = get_user_agent(request)
     device_info = parse_user_agent(user_agent)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     return users_session_schema.UsersSessionsInternal(
         id=session_id,
@@ -221,7 +214,7 @@ def edit_session_object(
     user_agent = get_user_agent(request)
     device_info = parse_user_agent(user_agent)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     new_rotation_count = session.rotation_count + 1
 
     return users_session_schema.UsersSessionsInternal(
@@ -273,9 +266,7 @@ def create_session(
         HTTPException: If database error occurs.
     """
     # Calculate the refresh token expiration date
-    exp = datetime.now(timezone.utc) + timedelta(
-        days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS
-    )
+    exp = datetime.now(UTC) + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
 
     # Compute HMAC-SHA256 of the CSRF token if provided
     csrf_hash = _hash_csrf_token(csrf_token) if csrf_token else None
@@ -318,9 +309,7 @@ def edit_session(
         HTTPException: If database error occurs.
     """
     # Calculate the refresh token expiration date
-    exp = datetime.now(timezone.utc) + timedelta(
-        days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS
-    )
+    exp = datetime.now(UTC) + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
 
     # Compute HMAC-SHA256 of the new CSRF token if provided
     csrf_hash = _hash_csrf_token(new_csrf_token) if new_csrf_token else None
@@ -363,11 +352,7 @@ def parse_user_agent(user_agent: str) -> DeviceInfo:
         details. Unknown fields default to "Unknown".
     """
     ua = parse(user_agent)
-    device_type = (
-        DeviceType.MOBILE
-        if ua.is_mobile
-        else DeviceType.TABLET if ua.is_tablet else DeviceType.PC
-    )
+    device_type = DeviceType.MOBILE if ua.is_mobile else DeviceType.TABLET if ua.is_tablet else DeviceType.PC
 
     return DeviceInfo(
         device_type=device_type,
@@ -394,17 +379,13 @@ def cleanup_idle_sessions() -> None:
 
     with SessionLocal() as db:
         try:
-            cutoff_time = datetime.now(timezone.utc) - timedelta(
-                hours=auth_constants.SESSION_IDLE_TIMEOUT_HOURS
-            )
+            cutoff_time = datetime.now(UTC) - timedelta(hours=auth_constants.SESSION_IDLE_TIMEOUT_HOURS)
 
             # Delete sessions with last_activity_at older than cutoff
             deleted_count = users_session_crud.delete_idle_sessions(cutoff_time, db)
 
             if deleted_count > 0:
-                core_logger.print_to_log(
-                    f"Cleaned up {deleted_count} idle sessions", "info"
-                )
+                core_logger.print_to_log(f"Cleaned up {deleted_count} idle sessions", "info")
         except Exception as err:
             core_logger.print_to_log(
                 f"Error in cleanup_idle_sessions: {err}",

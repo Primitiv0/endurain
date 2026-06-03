@@ -2,6 +2,12 @@
 
 from typing import Annotated
 
+import auth.security as auth_security
+import auth.sessions.crud as users_session_crud
+import auth.sessions.schema as users_session_schema
+import core.config as core_config
+import core.database as core_database
+import core.logger as core_logger
 from fastapi import (
     APIRouter,
     Depends,
@@ -9,15 +15,6 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
-
-import auth.security as auth_security
-
-import auth.sessions.crud as users_session_crud
-import auth.sessions.schema as users_session_schema
-
-import core.database as core_database
-import core.logger as core_logger
-import core.config as core_config
 
 # Define the API router
 router = APIRouter()

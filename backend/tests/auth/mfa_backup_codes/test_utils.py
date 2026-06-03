@@ -1,11 +1,10 @@
 """Tests for MFA backup codes utilities."""
 
-import pytest
 import string
 from unittest.mock import MagicMock, patch
 
-import auth.mfa_backup_codes.utils as backup_utils
 import auth.mfa_backup_codes.crud as backup_crud
+import auth.mfa_backup_codes.utils as backup_utils
 
 
 class TestGenerateBackupCode:
@@ -29,9 +28,7 @@ class TestGenerateBackupCode:
         for _ in range(100):
             code = backup_utils.generate_backup_code().replace("-", "")
             for char in code:
-                assert (
-                    char not in ambiguous_chars
-                ), f"Code contains ambiguous character: {char}"
+                assert char not in ambiguous_chars, f"Code contains ambiguous character: {char}"
 
     def test_generate_backup_code_uniqueness(self):
         """Test that generated codes are unique."""
@@ -68,20 +65,16 @@ class TestVerifyAndConsumeBackupCode:
         mock_code_obj.code_hash = password_hasher.hash_password(code)
         mock_code_obj.used = False
 
-        with patch.object(
-            backup_crud, "get_user_unused_backup_codes", return_value=[mock_code_obj]
-        ), patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used:
-
+        with (
+            patch.object(backup_crud, "get_user_unused_backup_codes", return_value=[mock_code_obj]),
+            patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used,
+        ):
             # Act
-            result = backup_utils.verify_and_consume_backup_code(
-                user_id, code, password_hasher, mock_db
-            )
+            result = backup_utils.verify_and_consume_backup_code(user_id, code, password_hasher, mock_db)
 
             # Assert
             assert result is True
-            mock_mark_used.assert_called_once_with(
-                mock_code_obj.id, user_id, mock_db
-            )
+            mock_mark_used.assert_called_once_with(mock_code_obj.id, user_id, mock_db)
 
     def test_verify_invalid_code_failure(self, mock_db, password_hasher):
         """Test verification fails with invalid code."""
@@ -94,14 +87,12 @@ class TestVerifyAndConsumeBackupCode:
         mock_code_obj.code_hash = password_hasher.hash_password(correct_code)
         mock_code_obj.used = False
 
-        with patch.object(
-            backup_crud, "get_user_unused_backup_codes", return_value=[mock_code_obj]
-        ), patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used:
-
+        with (
+            patch.object(backup_crud, "get_user_unused_backup_codes", return_value=[mock_code_obj]),
+            patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used,
+        ):
             # Act
-            result = backup_utils.verify_and_consume_backup_code(
-                user_id, wrong_code, password_hasher, mock_db
-            )
+            result = backup_utils.verify_and_consume_backup_code(user_id, wrong_code, password_hasher, mock_db)
 
             # Assert
             assert result is False
@@ -113,14 +104,12 @@ class TestVerifyAndConsumeBackupCode:
         user_id = 1
         code = "A3K97BDF"
 
-        with patch.object(
-            backup_crud, "get_user_unused_backup_codes", return_value=[]
-        ), patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used:
-
+        with (
+            patch.object(backup_crud, "get_user_unused_backup_codes", return_value=[]),
+            patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used,
+        ):
             # Act
-            result = backup_utils.verify_and_consume_backup_code(
-                user_id, code, password_hasher, mock_db
-            )
+            result = backup_utils.verify_and_consume_backup_code(user_id, code, password_hasher, mock_db)
 
             # Assert
             assert result is False
@@ -139,14 +128,12 @@ class TestVerifyAndConsumeBackupCode:
             mock_code.used = False
             mock_codes.append(mock_code)
 
-        with patch.object(
-            backup_crud, "get_user_unused_backup_codes", return_value=mock_codes
-        ), patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used:
-
+        with (
+            patch.object(backup_crud, "get_user_unused_backup_codes", return_value=mock_codes),
+            patch.object(backup_crud, "mark_backup_code_as_used") as mock_mark_used,
+        ):
             # Act
-            result = backup_utils.verify_and_consume_backup_code(
-                user_id, correct_code, password_hasher, mock_db
-            )
+            result = backup_utils.verify_and_consume_backup_code(user_id, correct_code, password_hasher, mock_db)
 
             # Assert
             assert result is True

@@ -1,11 +1,10 @@
-import pytest
-from datetime import datetime, date as datetime_date
-from decimal import Decimal
-from unittest.mock import MagicMock, patch, ANY
-from fastapi import HTTPException, status
+from datetime import date as datetime_date
+from datetime import datetime
+from unittest.mock import ANY, MagicMock, patch
 
-import health.health_sleep.schema as health_sleep_schema
 import health.health_sleep.models as health_sleep_models
+import health.health_sleep.schema as health_sleep_schema
+from fastapi import HTTPException, status
 
 
 class TestReadHealthSleepAll:
@@ -13,13 +12,9 @@ class TestReadHealthSleepAll:
     Test suite for read_health_sleep_all endpoint.
     """
 
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id")
     @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_user_id")
-    def test_read_health_sleep_all_success(
-        self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
-    ):
+    def test_read_health_sleep_all_success(self, mock_get_all, mock_get_number, fast_api_client, fast_api_app):
         """
         Test successful retrieval of all health sleep records with total count.
         """
@@ -82,13 +77,9 @@ class TestReadHealthSleepAll:
         assert data["total"] == 1
         assert len(data["records"]) == 1
 
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id")
     @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_user_id")
-    def test_read_health_sleep_all_empty(
-        self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
-    ):
+    def test_read_health_sleep_all_empty(self, mock_get_all, mock_get_number, fast_api_client, fast_api_app):
         """
         Test retrieval when user has no health sleep records.
         """
@@ -114,9 +105,7 @@ class TestReadHealthSleepAllPagination:
     Test suite for read_health_sleep_all_pagination endpoint.
     """
 
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id")
     @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_user_id")
     def test_read_health_sleep_all_pagination_success(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
@@ -185,9 +174,7 @@ class TestReadHealthSleepAllPagination:
         assert data["page_number"] == 1
         assert len(data["records"]) == 1
 
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_number_by_user_id")
     @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_user_id")
     def test_read_health_sleep_all_pagination_different_page(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
@@ -221,9 +208,7 @@ class TestCreateHealthSleep:
     """
 
     @patch("health.health_sleep.router.health_sleep_crud.create_health_sleep")
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id")
     def test_create_health_sleep_success(
         self,
         mock_get_by_date,
@@ -260,12 +245,8 @@ class TestCreateHealthSleep:
         assert data["total_sleep_seconds"] == 28800
 
     @patch("health.health_sleep.router.health_sleep_crud.edit_health_sleep")
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id"
-    )
-    def test_create_health_sleep_updates_existing(
-        self, mock_get_by_date, mock_edit, fast_api_client, fast_api_app
-    ):
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id")
+    def test_create_health_sleep_updates_existing(self, mock_get_by_date, mock_edit, fast_api_client, fast_api_app):
         """
         Test creating health sleep when entry exists updates it.
         """
@@ -297,9 +278,7 @@ class TestCreateHealthSleep:
         mock_edit.assert_called_once()
 
     @patch("health.health_sleep.router.health_sleep_crud.create_health_sleep")
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id")
     def test_create_health_sleep_missing_date_uses_today(
         self, mock_get_by_date, mock_create, fast_api_client, fast_api_app
     ):
@@ -331,9 +310,7 @@ class TestCreateHealthSleep:
 
     @patch("health.health_sleep.sleep_scoring._calculate_and_set_sleep_scores")
     @patch("health.health_sleep.router.health_sleep_crud.create_health_sleep")
-    @patch(
-        "health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id"
-    )
+    @patch("health.health_sleep.router.health_sleep_crud.get_health_sleep_by_date_and_user_id")
     def test_create_health_sleep_calls_scoring(
         self, mock_get_by_date, mock_create, mock_scoring, fast_api_client, fast_api_app
     ):
@@ -402,9 +379,7 @@ class TestEditHealthSleep:
         assert data["total_sleep_seconds"] == 32400
 
     @patch("health.health_sleep.router.health_sleep_crud.edit_health_sleep")
-    def test_edit_health_sleep_not_found(
-        self, mock_edit, fast_api_client, fast_api_app
-    ):
+    def test_edit_health_sleep_not_found(self, mock_edit, fast_api_client, fast_api_app):
         """
         Test edit when health sleep not found.
         """
@@ -437,9 +412,7 @@ class TestEditHealthSleepScoringIntegration:
 
     @patch("health.health_sleep.sleep_scoring._calculate_and_set_sleep_scores")
     @patch("health.health_sleep.router.health_sleep_crud.edit_health_sleep")
-    def test_edit_health_sleep_calls_scoring(
-        self, mock_edit, mock_scoring, fast_api_client, fast_api_app
-    ):
+    def test_edit_health_sleep_calls_scoring(self, mock_edit, mock_scoring, fast_api_client, fast_api_app):
         """
         Test editing health sleep calls sleep scoring function.
         """
@@ -475,9 +448,7 @@ class TestDeleteHealthSleep:
     """
 
     @patch("health.health_sleep.router.health_sleep_crud.delete_health_sleep")
-    def test_delete_health_sleep_success(
-        self, mock_delete, fast_api_client, fast_api_app
-    ):
+    def test_delete_health_sleep_success(self, mock_delete, fast_api_client, fast_api_app):
         """
         Test successful deletion of health sleep entry.
         """
@@ -495,9 +466,7 @@ class TestDeleteHealthSleep:
         mock_delete.assert_called_once_with(1, 1, ANY)
 
     @patch("health.health_sleep.router.health_sleep_crud.delete_health_sleep")
-    def test_delete_health_sleep_not_found(
-        self, mock_delete, fast_api_client, fast_api_app
-    ):
+    def test_delete_health_sleep_not_found(self, mock_delete, fast_api_client, fast_api_app):
         """
         Test deletion when health sleep not found.
         """

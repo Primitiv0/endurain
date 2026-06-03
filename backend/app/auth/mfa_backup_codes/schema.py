@@ -15,9 +15,7 @@ class MFABackupCodesResponse(BaseModel):
 
     model_config = ConfigDict(strict=True)
 
-    codes: list[StrictStr] = Field(
-        ..., min_length=1, description="One-time backup codes"
-    )
+    codes: list[StrictStr] = Field(..., min_length=1, description="One-time backup codes")
     created_at: datetime
 
 

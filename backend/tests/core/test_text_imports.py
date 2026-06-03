@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import core.text_imports as core_text_imports
 import pytest
 from fastapi import HTTPException
-
-import core.text_imports as core_text_imports
 
 
 def _write_csv(path: Path, rows: int, header: str = "name,value") -> None:
@@ -45,9 +44,7 @@ def test_read_bounded_csv_rejects_oversized_file(tmp_path: Path):
     _write_csv(csv_path, rows=10)
 
     with pytest.raises(HTTPException) as exc:
-        list(
-            core_text_imports.read_bounded_csv(csv_path, max_bytes=10)
-        )
+        list(core_text_imports.read_bounded_csv(csv_path, max_bytes=10))
     assert exc.value.status_code == 413
 
 
@@ -57,9 +54,7 @@ def test_read_bounded_csv_enforces_row_cap(tmp_path: Path):
     _write_csv(csv_path, rows=20)
 
     with pytest.raises(HTTPException) as exc:
-        list(
-            core_text_imports.read_bounded_csv(csv_path, max_rows=5)
-        )
+        list(core_text_imports.read_bounded_csv(csv_path, max_rows=5))
     assert exc.value.status_code == 413
 
 

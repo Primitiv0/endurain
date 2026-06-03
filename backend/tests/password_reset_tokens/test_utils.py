@@ -3,11 +3,10 @@
 import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import password_reset_tokens.utils as password_reset_tokens_utils
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
-
-import password_reset_tokens.utils as password_reset_tokens_utils
 
 
 class TestUsePasswordResetToken:
@@ -15,23 +14,11 @@ class TestUsePasswordResetToken:
     Test suite for use_password_reset_token function.
     """
 
-    @patch(
-        "password_reset_tokens.utils.users_sessions_crud."
-        "delete_sessions_by_user"
-    )
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.mark_user_password_reset_tokens_used"
-    )
+    @patch("password_reset_tokens.utils.users_sessions_crud.delete_sessions_by_user")
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.mark_user_password_reset_tokens_used")
     @patch("password_reset_tokens.utils.users_crud.edit_user_password")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.claim_password_reset_token"
-    )
-    @patch(
-        "password_reset_tokens.utils.auth_security_stores."
-        "clear_pending_mfa_for_user"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.claim_password_reset_token")
+    @patch("password_reset_tokens.utils.auth_security_stores.clear_pending_mfa_for_user")
     def test_revokes_sessions_after_successful_reset(
         self,
         mock_clear_pending_mfa,
@@ -69,17 +56,12 @@ class TestUsePasswordResetToken:
             commit=False,
         )
         mock_mark_user_tokens_used.assert_called_once_with(user_id, mock_db)
-        mock_delete_sessions.assert_called_once_with(
-            user_id, mock_db, commit=False
-        )
+        mock_delete_sessions.assert_called_once_with(user_id, mock_db, commit=False)
         mock_db.commit.assert_called_once_with()
         mock_clear_pending_mfa.assert_called_once_with(user_id)
 
     @patch("password_reset_tokens.utils.users_crud.edit_user_password")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.claim_password_reset_token"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.claim_password_reset_token")
     def test_invalid_token_raises_bad_request(
         self,
         mock_claim_token,
@@ -106,23 +88,11 @@ class TestUsePasswordResetToken:
         mock_edit_password.assert_not_called()
         mock_db.commit.assert_not_called()
 
-    @patch(
-        "password_reset_tokens.utils.auth_security_stores."
-        "clear_pending_mfa_for_user"
-    )
-    @patch(
-        "password_reset_tokens.utils.users_sessions_crud."
-        "delete_sessions_by_user"
-    )
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.mark_user_password_reset_tokens_used"
-    )
+    @patch("password_reset_tokens.utils.auth_security_stores.clear_pending_mfa_for_user")
+    @patch("password_reset_tokens.utils.users_sessions_crud.delete_sessions_by_user")
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.mark_user_password_reset_tokens_used")
     @patch("password_reset_tokens.utils.users_crud.edit_user_password")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.claim_password_reset_token"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.claim_password_reset_token")
     def test_rolls_back_when_commit_fails(
         self,
         mock_claim_token,
@@ -149,10 +119,7 @@ class TestUsePasswordResetToken:
                 mock_db,
             )
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         mock_edit_password.assert_called_once()
         mock_mark_user_tokens_used.assert_called_once()
         mock_delete_sessions.assert_called_once()
@@ -163,14 +130,9 @@ class TestUsePasswordResetToken:
 class TestCreatePasswordResetTokenUtils:
     """Test suite for the create_password_reset_token utility function."""
 
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.create_password_reset_token"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.create_password_reset_token")
     @patch("password_reset_tokens.utils.core_apprise.generate_token_and_hash")
-    def test_returns_plaintext_token_not_hash(
-        self, mock_gen, mock_create, mock_db
-    ):
+    def test_returns_plaintext_token_not_hash(self, mock_gen, mock_create, mock_db):
         """
         Returns the plaintext token; only the hash is persisted.
         """
@@ -178,9 +140,7 @@ class TestCreatePasswordResetTokenUtils:
         mock_gen.return_value = ("plain-token-123", "sha256-hash-xyz")
 
         # Act
-        result = password_reset_tokens_utils.create_password_reset_token(
-            user_id=1, db=mock_db
-        )
+        result = password_reset_tokens_utils.create_password_reset_token(user_id=1, db=mock_db)
 
         # Assert
         assert result == "plain-token-123"
@@ -191,14 +151,9 @@ class TestCreatePasswordResetTokenUtils:
         assert schema_obj.user_id == 1
         assert schema_obj.used is False
 
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.create_password_reset_token"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.create_password_reset_token")
     @patch("password_reset_tokens.utils.core_apprise.generate_token_and_hash")
-    def test_crud_error_propagates(
-        self, mock_gen, mock_create, mock_db
-    ):
+    def test_crud_error_propagates(self, mock_gen, mock_create, mock_db):
         """
         HTTPException from the CRUD layer propagates to the caller.
         """
@@ -211,23 +166,16 @@ class TestCreatePasswordResetTokenUtils:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            password_reset_tokens_utils.create_password_reset_token(
-                user_id=1, db=mock_db
-            )
+            password_reset_tokens_utils.create_password_reset_token(user_id=1, db=mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestSendPasswordResetEmail:
     """Test suite for the send_password_reset_email utility function."""
 
     @pytest.mark.asyncio
-    async def test_raises_503_when_email_service_not_configured(
-        self, mock_db
-    ):
+    async def test_raises_503_when_email_service_not_configured(self, mock_db):
         """
         Raises HTTP 503 immediately when the email service is not
         configured, without touching the database.
@@ -238,20 +186,13 @@ class TestSendPasswordResetEmail:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await password_reset_tokens_utils.send_password_reset_email(
-                "user@example.com", mock_email_service, mock_db
-            )
+            await password_reset_tokens_utils.send_password_reset_email("user@example.com", mock_email_service, mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
     @pytest.mark.asyncio
     @patch("password_reset_tokens.utils.users_crud.get_user_by_email")
-    async def test_returns_true_for_unknown_email(
-        self, mock_get_user, mock_db
-    ):
+    async def test_returns_true_for_unknown_email(self, mock_get_user, mock_db):
         """
         Returns True without error when the email is not registered,
         preventing user enumeration.
@@ -272,9 +213,7 @@ class TestSendPasswordResetEmail:
 
     @pytest.mark.asyncio
     @patch("password_reset_tokens.utils.users_crud.get_user_by_email")
-    async def test_returns_true_for_inactive_user(
-        self, mock_get_user, mock_db
-    ):
+    async def test_returns_true_for_inactive_user(self, mock_get_user, mock_db):
         """
         Returns True without sending an email when the user is inactive,
         preventing user enumeration.
@@ -296,15 +235,9 @@ class TestSendPasswordResetEmail:
         mock_email_service.send_email.assert_not_called()
 
     @pytest.mark.asyncio
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.create_password_reset_token"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.create_password_reset_token")
     @patch("password_reset_tokens.utils.core_apprise.generate_token_and_hash")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_email_messages.get_password_reset_email"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_email_messages.get_password_reset_email")
     @patch("password_reset_tokens.utils.core_i18n.normalize_locale")
     @patch("password_reset_tokens.utils.users_crud.get_user_by_email")
     async def test_sends_email_and_returns_true_for_active_user(
@@ -350,15 +283,9 @@ class TestSendPasswordResetEmail:
         mock_email_service.send_email.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.create_password_reset_token"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.create_password_reset_token")
     @patch("password_reset_tokens.utils.core_apprise.generate_token_and_hash")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_email_messages.get_password_reset_email"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_email_messages.get_password_reset_email")
     @patch("password_reset_tokens.utils.core_i18n.normalize_locale")
     @patch("password_reset_tokens.utils.users_crud.get_user_by_email")
     async def test_returns_false_when_email_send_fails(
@@ -403,14 +330,9 @@ class TestSendPasswordResetEmail:
 class TestDeleteInvalidTokensFromDb:
     """Test suite for delete_invalid_tokens_from_db function."""
 
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.delete_expired_password_reset_tokens"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.delete_expired_password_reset_tokens")
     @patch("password_reset_tokens.utils.SessionLocal")
-    def test_calls_delete_expired_tokens_with_db_session(
-        self, mock_session_local, mock_delete
-    ):
+    def test_calls_delete_expired_tokens_with_db_session(self, mock_session_local, mock_delete):
         """
         Opens a SessionLocal context manager and delegates to the
         CRUD delete function.
@@ -428,14 +350,9 @@ class TestDeleteInvalidTokensFromDb:
         mock_delete.assert_called_once_with(mock_db)
 
     @patch("password_reset_tokens.utils.core_logger.print_to_log_and_console")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.delete_expired_password_reset_tokens"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.delete_expired_password_reset_tokens")
     @patch("password_reset_tokens.utils.SessionLocal")
-    def test_logs_when_expired_tokens_deleted(
-        self, mock_session_local, mock_delete, mock_log
-    ):
+    def test_logs_when_expired_tokens_deleted(self, mock_session_local, mock_delete, mock_log):
         """
         Logs a message when at least one expired token is deleted.
         """
@@ -454,14 +371,9 @@ class TestDeleteInvalidTokensFromDb:
         assert "3" in log_msg
 
     @patch("password_reset_tokens.utils.core_logger.print_to_log_and_console")
-    @patch(
-        "password_reset_tokens.utils."
-        "password_reset_tokens_crud.delete_expired_password_reset_tokens"
-    )
+    @patch("password_reset_tokens.utils.password_reset_tokens_crud.delete_expired_password_reset_tokens")
     @patch("password_reset_tokens.utils.SessionLocal")
-    def test_does_not_log_when_nothing_deleted(
-        self, mock_session_local, mock_delete, mock_log
-    ):
+    def test_does_not_log_when_nothing_deleted(self, mock_session_local, mock_delete, mock_log):
         """
         Does not log when no expired tokens are found.
         """

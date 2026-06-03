@@ -1,30 +1,22 @@
 """Tests for auth.utils module."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
-import pytest
-from fastapi import HTTPException, Response
 
 import auth.utils as auth_utils
-import auth.token_manager as auth_token_manager
-import users.users.schema as user_schema
+import pytest
+from fastapi import HTTPException, Response
 
 
 def _set_cookie_headers(response: Response) -> list[str]:
     """Return all Set-Cookie headers from a response."""
-    return [
-        value.decode()
-        for key, value in response.raw_headers
-        if key == b"set-cookie"
-    ]
+    return [value.decode() for key, value in response.raw_headers if key == b"set-cookie"]
 
 
 class TestAuthenticateUser:
     """Test user authentication function."""
 
-    def test_authenticate_user_success(
-        self, password_hasher, mock_db, sample_user_read
-    ):
+    def test_authenticate_user_success(self, password_hasher, mock_db, sample_user_read):
         """Test successful user authentication."""
         # Arrange
         username = "testuser"
@@ -38,13 +30,9 @@ class TestAuthenticateUser:
         mock_user.username = username
 
         # Mock the CRUD function to return our user
-        with patch(
-            "auth.utils.users_crud.get_user_by_username", return_value=mock_user
-        ):
+        with patch("auth.utils.users_crud.get_user_by_username", return_value=mock_user):
             # Act
-            result = auth_utils.authenticate_user(
-                username, password, password_hasher, mock_db
-            )
+            result = auth_utils.authenticate_user(username, password, password_hasher, mock_db)
 
             # Assert
             assert result == mock_user
@@ -53,9 +41,7 @@ class TestAuthenticateUser:
         """Test authentication with invalid username raises 401."""
         with patch("auth.utils.users_crud.get_user_by_username", return_value=None):
             with pytest.raises(HTTPException) as exc_info:
-                auth_utils.authenticate_user(
-                    "nonexistent", "password", password_hasher, mock_db
-                )
+                auth_utils.authenticate_user("nonexistent", "password", password_hasher, mock_db)
             assert exc_info.value.status_code == 401
             assert "Unable to authenticate" in exc_info.value.detail
 
@@ -70,19 +56,13 @@ class TestAuthenticateUser:
         mock_user = MagicMock()
         mock_user.password = hashed_password
 
-        with patch(
-            "auth.utils.users_crud.get_user_by_username", return_value=mock_user
-        ):
+        with patch("auth.utils.users_crud.get_user_by_username", return_value=mock_user):
             with pytest.raises(HTTPException) as exc_info:
-                auth_utils.authenticate_user(
-                    username, wrong_password, password_hasher, mock_db
-                )
+                auth_utils.authenticate_user(username, wrong_password, password_hasher, mock_db)
             assert exc_info.value.status_code == 401
             assert "Unable to authenticate" in exc_info.value.detail
 
-    def test_authenticate_user_updates_password_hash_if_needed(
-        self, password_hasher, mock_db, sample_user_read
-    ):
+    def test_authenticate_user_updates_password_hash_if_needed(self, password_hasher, mock_db, sample_user_read):
         """Test that password hash is updated if algorithm changed."""
         # Arrange
         username = "testuser"
@@ -99,19 +79,17 @@ class TestAuthenticateUser:
         mock_user.password = old_hash
         mock_user.username = username
 
-        with patch(
-            "auth.utils.users_crud.get_user_by_username", return_value=mock_user
+        with (
+            patch("auth.utils.users_crud.get_user_by_username", return_value=mock_user),
+            patch("auth.utils.users_crud.edit_user_password") as mock_edit,
         ):
-            with patch("auth.utils.users_crud.edit_user_password") as mock_edit:
-                # Act
-                result = auth_utils.authenticate_user(
-                    username, password, password_hasher, mock_db
-                )
+            # Act
+            result = auth_utils.authenticate_user(username, password, password_hasher, mock_db)
 
-                # Assert
-                assert result == mock_user
-                # Password should be updated since we're using different hasher
-                mock_edit.assert_called_once()
+            # Assert
+            assert result == mock_user
+            # Password should be updated since we're using different hasher
+            mock_edit.assert_called_once()
 
 
 class TestCreateTokens:
@@ -136,7 +114,7 @@ class TestCreateTokens:
 
         assert access_token_exp is not None
         assert isinstance(access_token_exp, datetime)
-        assert access_token_exp > datetime.now(timezone.utc)
+        assert access_token_exp > datetime.now(UTC)
 
         assert access_token is not None
         assert isinstance(access_token, str)
@@ -144,7 +122,7 @@ class TestCreateTokens:
 
         assert refresh_token_exp is not None
         assert isinstance(refresh_token_exp, datetime)
-        assert refresh_token_exp > datetime.now(timezone.utc)
+        assert refresh_token_exp > datetime.now(UTC)
 
         assert refresh_token is not None
         assert isinstance(refresh_token, str)
@@ -154,9 +132,7 @@ class TestCreateTokens:
         assert isinstance(csrf_token, str)
         assert len(csrf_token) >= 32
 
-    def test_create_tokens_with_custom_session_id(
-        self, token_manager, sample_user_read
-    ):
+    def test_create_tokens_with_custom_session_id(self, token_manager, sample_user_read):
         """Test that create_tokens uses provided session ID."""
         # Arrange
         custom_session_id = "custom-session-123"
@@ -174,9 +150,7 @@ class TestCreateTokens:
         # Assert
         assert session_id == custom_session_id
 
-    def test_create_tokens_refresh_expires_after_access(
-        self, token_manager, sample_user_read
-    ):
+    def test_create_tokens_refresh_expires_after_access(self, token_manager, sample_user_read):
         """Test that refresh token expires after access token."""
         # Act
         (
@@ -191,16 +165,14 @@ class TestCreateTokens:
         # Assert
         assert refresh_token_exp > access_token_exp
 
-    def test_create_tokens_generates_unique_tokens(
-        self, token_manager, sample_user_read
-    ):
+    def test_create_tokens_generates_unique_tokens(self, token_manager, sample_user_read):
         """Test that multiple calls generate unique tokens."""
         # Act
-        (_, _, access_token1, _, refresh_token1, csrf_token1) = (
-            auth_utils.create_tokens(sample_user_read, token_manager)
+        (_, _, access_token1, _, refresh_token1, csrf_token1) = auth_utils.create_tokens(
+            sample_user_read, token_manager
         )
-        (_, _, access_token2, _, refresh_token2, csrf_token2) = (
-            auth_utils.create_tokens(sample_user_read, token_manager)
+        (_, _, access_token2, _, refresh_token2, csrf_token2) = auth_utils.create_tokens(
+            sample_user_read, token_manager
         )
 
         # Assert
@@ -281,9 +253,7 @@ class TestCompleteLogin:
         response = Response()
         client_type = "web"
 
-        with patch(
-            "auth.utils.users_session_utils.create_session"
-        ) as mock_create_session:
+        with patch("auth.utils.users_session_utils.create_session") as mock_create_session:
             # Act
             result = auth_utils.complete_login(
                 response,
@@ -336,18 +306,20 @@ class TestCompleteLogin:
         response = Response()
         client_type = "web"
 
-        with patch("auth.utils.users_session_utils.create_session"):
-            with patch.dict("os.environ", {"FRONTEND_PROTOCOL": "https"}):
-                # Act
-                auth_utils.complete_login(
-                    response,
-                    mock_request,
-                    sample_user_read,
-                    client_type,
-                    password_hasher,
-                    token_manager,
-                    mock_db,
-                )
+        with (
+            patch("auth.utils.users_session_utils.create_session"),
+            patch.dict("os.environ", {"FRONTEND_PROTOCOL": "https"}),
+        ):
+            # Act
+            auth_utils.complete_login(
+                response,
+                mock_request,
+                sample_user_read,
+                client_type,
+                password_hasher,
+                token_manager,
+                mock_db,
+            )
 
         # Assert
         set_cookie_header = response.headers.get("set-cookie", "")
@@ -386,24 +358,16 @@ class TestCompleteLogin:
 
         auth_utils.set_refresh_token_cookie(response, "new-refresh-token")
 
-        set_cookie_headers = [
-            header.lower() for header in _set_cookie_headers(response)
-        ]
+        set_cookie_headers = [header.lower() for header in _set_cookie_headers(response)]
         assert any(
-            "endurain_refresh_token" in header
-            and "max-age=0" in header
-            and "path=/;" in header
+            "endurain_refresh_token" in header and "max-age=0" in header and "path=/;" in header
             for header in set_cookie_headers
         )
         assert any(
-            "endurain_refresh_token" in header
-            and "max-age=0" in header
-            and "path=/api/v1/auth" in header
+            "endurain_refresh_token" in header and "max-age=0" in header and "path=/api/v1/auth" in header
             for header in set_cookie_headers
         )
-        assert set_cookie_headers[-1].startswith(
-            "endurain_refresh_token=new-refresh-token"
-        )
+        assert set_cookie_headers[-1].startswith("endurain_refresh_token=new-refresh-token")
         assert "path=/api/v1/auth" in set_cookie_headers[-1]
 
     @pytest.mark.asyncio
@@ -420,16 +384,11 @@ class TestCompleteLogin:
             exc,
         )
 
-        set_cookie_headers = [
-            header.lower() for header in _set_cookie_headers(response)
-        ]
+        set_cookie_headers = [header.lower() for header in _set_cookie_headers(response)]
         assert response.status_code == 401
         assert response.headers["www-authenticate"] == "Bearer"
         assert any("max-age=0" in h and "path=/;" in h for h in set_cookie_headers)
-        assert any(
-            "max-age=0" in h and "path=/api/v1/auth" in h
-            for h in set_cookie_headers
-        )
+        assert any("max-age=0" in h and "path=/api/v1/auth" in h for h in set_cookie_headers)
 
     def test_complete_login_returns_different_tokens_on_each_call(
         self, password_hasher, token_manager, mock_db, sample_user_read, mock_request

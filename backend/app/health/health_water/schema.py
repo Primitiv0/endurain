@@ -5,18 +5,18 @@ This module defines the request/response schemas for water intake
 tracking, including validation rules and source enumeration.
 """
 
+from datetime import date as datetime_date
 from enum import Enum
+
+import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
-    model_validator,
-    StrictInt,
-    StrictFloat,
     Field,
+    StrictFloat,
+    StrictInt,
+    model_validator,
 )
-from datetime import date as datetime_date
-
-import health.schema as health_schema
 
 
 class Source(Enum):
@@ -96,10 +96,7 @@ class HealthWaterRead(HealthWaterBase):
 
     id: StrictInt = Field(
         ...,
-        description=(
-            "Unique identifier for the water"
-            " intake record"
-        ),
+        description=("Unique identifier for the water intake record"),
     )
     user_id: StrictInt = Field(
         ...,

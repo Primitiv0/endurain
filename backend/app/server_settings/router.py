@@ -1,34 +1,25 @@
-import os
-import aiofiles.os
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
-import aiofiles
+import activities.activity.utils as activities_utils
+import auth.dependencies as auth_dependencies
+import core.config as core_config
+import core.database as core_database
+import core.file_uploads as core_file_uploads
+import core.logger as core_logger
+import server_settings.crud as server_settings_crud
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
 from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
+    Request,
     Security,
     UploadFile,
-    Request,
     status,
 )
 from sqlalchemy.orm import Session
-
-from safeuploads import FileValidator
-from safeuploads.exceptions import FileValidationError
-
-import server_settings.schema as server_settings_schema
-import server_settings.crud as server_settings_crud
-import server_settings.utils as server_settings_utils
-
-import auth.dependencies as auth_dependencies
-
-import core.database as core_database
-import core.logger as core_logger
-import core.config as core_config
-import core.file_uploads as core_file_uploads
-
-import activities.activity.utils as activities_utils
 
 # Define the API router
 router = APIRouter()
@@ -122,34 +113,21 @@ async def edit_server_settings(
     # Update allowed tile domains in app.state if tileserver_url changed
     if server_settings_attributes.tileserver_url is not None:
         try:
-            request.app.state.allowed_tile_domains = (
-                server_settings_utils.get_allowed_tile_domains(db)
-            )
-            core_logger.print_to_log(
-                f"Updated allowed tile domains: {request.app.state.allowed_tile_domains}"
-            )
+            request.app.state.allowed_tile_domains = server_settings_utils.get_allowed_tile_domains(db)
+            core_logger.print_to_log(f"Updated allowed tile domains: {request.app.state.allowed_tile_domains}")
         except Exception as e:
-            core_logger.print_to_log(
-                f"Error updating tile domains in app.state: {e}", "error", exc=e
-            )
+            core_logger.print_to_log(f"Error updating tile domains in app.state: {e}", "error", exc=e)
 
     # Trigger full thumbnail regeneration if the setting is enabled
     # and any map-related field was part of this update
-    _MAP_FIELDS = {"tileserver_url", "tileserver_api_key", "map_background_color"}
-    changed_fields = set(
-        server_settings_attributes.model_dump(exclude_unset=True).keys()
-    )
-    if result.tileserver_regenerate_thumbnails_on_change and (
-        changed_fields & _MAP_FIELDS
-    ):
+    _map_fields = {"tileserver_url", "tileserver_api_key", "map_background_color"}
+    changed_fields = set(server_settings_attributes.model_dump(exclude_unset=True).keys())
+    if result.tileserver_regenerate_thumbnails_on_change and (changed_fields & _map_fields):
         core_logger.print_to_log(
-            "Tile server settings changed with regeneration enabled — "
-            "scheduling thumbnail regeneration",
+            "Tile server settings changed with regeneration enabled — scheduling thumbnail regeneration",
             "info",
         )
-        background_tasks.add_task(
-            activities_utils.delete_and_regenerate_all_activity_thumbnails
-        )
+        background_tasks.add_task(activities_utils.delete_and_regenerate_all_activity_thumbnails)
 
     return result
 
@@ -220,8 +198,6 @@ async def delete_login_photo(
     Raises:
         HTTPException: If deletion fails.
     """
-    await core_file_uploads.delete_files_by_pattern(
-        core_config.SERVER_IMAGES_DIR, "login.png"
-    )
+    await core_file_uploads.delete_files_by_pattern(core_config.SERVER_IMAGES_DIR, "login.png")
 
     server_settings_crud.update_server_settings_login_photo_set(False, db)

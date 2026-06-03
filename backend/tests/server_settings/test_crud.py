@@ -5,14 +5,14 @@ This module tests CRUD operations for server settings,
 including retrieval and update operations.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+import server_settings.crud as server_settings_crud
+import server_settings.models as server_settings_models
+import server_settings.schema as server_settings_schema
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
-
-import server_settings.crud as server_settings_crud
-import server_settings.schema as server_settings_schema
-import server_settings.models as server_settings_models
 
 
 class TestGetServerSettings:

@@ -1,21 +1,19 @@
 """CRUD operations for OAuth state (PKCE, nonce, replay prevention)."""
 
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import delete as sa_delete, select, update as sa_update
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 import auth.oauth_state.models as oauth_state_models
 import auth.sessions.models as users_session_models
-
 import core.decorators as core_decorators
 import core.logger as core_logger
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_oauth_state_by_id_and_not_used(
-    state_id: str, db: Session
-) -> oauth_state_models.OAuthState | None:
+def get_oauth_state_by_id_and_not_used(state_id: str, db: Session) -> oauth_state_models.OAuthState | None:
     """Retrieve an OAuth state by ID, validating it is not expired or used.
 
     Args:
@@ -32,23 +30,18 @@ def get_oauth_state_by_id_and_not_used(
     stmt = select(oauth_state_models.OAuthState).where(
         oauth_state_models.OAuthState.id == state_id,
         oauth_state_models.OAuthState.used.is_(False),
-        oauth_state_models.OAuthState.expires_at
-        > datetime.now(timezone.utc),
+        oauth_state_models.OAuthState.expires_at > datetime.now(UTC),
     )
     oauth_state = db.execute(stmt).scalar_one_or_none()
 
     if not oauth_state:
-        core_logger.print_to_log(
-            f"OAuth state invalid or expired: {state_id[:8]}...", "warning"
-        )
+        core_logger.print_to_log(f"OAuth state invalid or expired: {state_id[:8]}...", "warning")
 
     return oauth_state
 
 
 @core_decorators.handle_db_errors
-def get_oauth_state_by_id(
-    state_id: str, db: Session
-) -> oauth_state_models.OAuthState | None:
+def get_oauth_state_by_id(state_id: str, db: Session) -> oauth_state_models.OAuthState | None:
     """Retrieve an OAuth state by ID without validity checks.
 
     Args:
@@ -61,16 +54,12 @@ def get_oauth_state_by_id(
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(oauth_state_models.OAuthState).where(
-        oauth_state_models.OAuthState.id == state_id
-    )
+    stmt = select(oauth_state_models.OAuthState).where(oauth_state_models.OAuthState.id == state_id)
     return db.execute(stmt).scalar_one_or_none()
 
 
 @core_decorators.handle_db_errors
-def get_oauth_state_by_id_not_expired(
-    state_id: str, db: Session
-) -> oauth_state_models.OAuthState | None:
+def get_oauth_state_by_id_not_expired(state_id: str, db: Session) -> oauth_state_models.OAuthState | None:
     """Retrieve an OAuth state by ID if it is still unexpired.
 
     Args:
@@ -86,8 +75,7 @@ def get_oauth_state_by_id_not_expired(
     """
     stmt = select(oauth_state_models.OAuthState).where(
         oauth_state_models.OAuthState.id == state_id,
-        oauth_state_models.OAuthState.expires_at
-        > datetime.now(timezone.utc),
+        oauth_state_models.OAuthState.expires_at > datetime.now(UTC),
     )
     oauth_state = db.execute(stmt).scalar_one_or_none()
 
@@ -101,9 +89,7 @@ def get_oauth_state_by_id_not_expired(
 
 
 @core_decorators.handle_db_errors
-def get_oauth_state_by_session_id(
-    session_id: str, db: Session
-) -> oauth_state_models.OAuthState | None:
+def get_oauth_state_by_session_id(session_id: str, db: Session) -> oauth_state_models.OAuthState | None:
     """Retrieve an OAuth state via the session relationship.
 
     Used during token exchange to retrieve stored PKCE challenge
@@ -119,9 +105,7 @@ def get_oauth_state_by_session_id(
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(users_session_models.UsersSessions).where(
-        users_session_models.UsersSessions.id == session_id
-    )
+    stmt = select(users_session_models.UsersSessions).where(users_session_models.UsersSessions.id == session_id)
     session = db.execute(stmt).scalar_one_or_none()
 
     if not session or not session.oauth_state_id:
@@ -163,7 +147,7 @@ def create_oauth_state(
     Raises:
         HTTPException: 500 error if database operation fails.
     """
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    expires_at = datetime.now(UTC) + timedelta(minutes=10)
 
     oauth_state = oauth_state_models.OAuthState(
         id=state_id,
@@ -184,8 +168,7 @@ def create_oauth_state(
     db.refresh(oauth_state)
 
     core_logger.print_to_log(
-        f"OAuth state created: {state_id[:8]}... "
-        f"for IdP {idp_id}, client_type={client_type}",
+        f"OAuth state created: {state_id[:8]}... for IdP {idp_id}, client_type={client_type}",
         "debug",
     )
 
@@ -215,8 +198,7 @@ def mark_oauth_state_used(state_id: str, db: Session) -> bool:
         .where(
             oauth_state_models.OAuthState.id == state_id,
             oauth_state_models.OAuthState.used.is_(False),
-            oauth_state_models.OAuthState.expires_at
-            > datetime.now(timezone.utc),
+            oauth_state_models.OAuthState.expires_at > datetime.now(UTC),
         )
         .values(used=True)
     )
@@ -225,13 +207,10 @@ def mark_oauth_state_used(state_id: str, db: Session) -> bool:
 
     claimed = result.rowcount == 1
     if claimed:
-        core_logger.print_to_log(
-            f"OAuth state marked as used: {state_id[:8]}...", "debug"
-        )
+        core_logger.print_to_log(f"OAuth state marked as used: {state_id[:8]}...", "debug")
     else:
         core_logger.print_to_log(
-            f"Cannot mark OAuth state used (missing/expired/replay): "
-            f"{state_id[:8]}...",
+            f"Cannot mark OAuth state used (missing/expired/replay): {state_id[:8]}...",
             "warning",
         )
     return claimed
@@ -251,9 +230,7 @@ def delete_oauth_state(oauth_state_id: str, db: Session) -> int:
     Raises:
         HTTPException: 500 error if database operation fails.
     """
-    stmt = sa_delete(oauth_state_models.OAuthState).where(
-        oauth_state_models.OAuthState.id == oauth_state_id
-    )
+    stmt = sa_delete(oauth_state_models.OAuthState).where(oauth_state_models.OAuthState.id == oauth_state_id)
     result = db.execute(stmt)
     db.commit()
     return result.rowcount
@@ -274,15 +251,11 @@ def delete_expired_oauth_states(db: Session) -> int:
     Raises:
         HTTPException: 500 error if database operation fails.
     """
-    stmt = sa_delete(oauth_state_models.OAuthState).where(
-        oauth_state_models.OAuthState.expires_at < datetime.now(timezone.utc)
-    )
+    stmt = sa_delete(oauth_state_models.OAuthState).where(oauth_state_models.OAuthState.expires_at < datetime.now(UTC))
     result = db.execute(stmt)
     db.commit()
 
     deleted_count = result.rowcount
     if deleted_count > 0:
-        core_logger.print_to_log(
-            f"Deleted {deleted_count} expired OAuth state(s)", "debug"
-        )
+        core_logger.print_to_log(f"Deleted {deleted_count} expired OAuth state(s)", "debug")
     return deleted_count

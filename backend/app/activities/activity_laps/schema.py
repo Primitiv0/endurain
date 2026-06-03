@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+import core.timezone as core_timezone
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -14,9 +15,6 @@ from pydantic import (
     field_serializer,
     field_validator,
 )
-
-import core.timezone as core_timezone
-
 
 _FLOAT_FIELDS: tuple[str, ...] = (
     "start_position_lat",

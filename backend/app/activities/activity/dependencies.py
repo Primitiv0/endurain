@@ -1,7 +1,6 @@
-from fastapi import HTTPException, status, Query
-
 import core.dependencies as core_dependencies
 from activities.activity.utils import ACTIVITY_ID_TO_NAME
+from fastapi import HTTPException, Query, status
 
 
 def validate_activity_id(activity_id: int):
@@ -18,7 +17,7 @@ def validate_activity_id(activity_id: int):
         ValueError: If the activity ID is less than 0.
     """
     # Activity primary keys are >= 0; align with schema field constraint.
-    core_dependencies.validate_id(id=activity_id, min=0, message="Invalid activity ID")
+    core_dependencies.validate_id(identifier=activity_id, min_value=0, message="Invalid activity ID")
 
 
 def validate_week_number(week_number: int):
@@ -32,9 +31,7 @@ def validate_week_number(week_number: int):
         ValueError: If the week number is not within the valid range or is of an incorrect type.
     """
     # check if week_number is between 0 and 52
-    core_dependencies.validate_type(
-        type=week_number, min=0, max=52, message="Invalid week number"
-    )
+    core_dependencies.validate_type(type_value=week_number, min_value=0, max_value=52, message="Invalid week number")
 
 
 def validate_visibility(visibility: int):
@@ -42,16 +39,14 @@ def validate_visibility(visibility: int):
     Validates the visibility value to ensure it is within the allowed range.
 
     Args:
-        visibility (int): The visibility value to validate. Must be an integer 
+        visibility (int): The visibility value to validate. Must be an integer
                           between 0 and 2 (inclusive).
 
     Raises:
         ValueError: If the visibility value is not within the range [0, 2].
     """
     # check if visibility is between 0 and 2
-    core_dependencies.validate_type(
-        type=visibility, min=0, max=2, message="Invalid visibility"
-    )
+    core_dependencies.validate_type(type_value=visibility, min_value=0, max_value=2, message="Invalid visibility")
 
 
 def validate_activity_type(activity_type: int | None = Query(None)):
@@ -62,7 +57,7 @@ def validate_activity_type(activity_type: int | None = Query(None)):
         activity_type (int | None): The activity type to validate. Defaults to None.
 
     Raises:
-        HTTPException: If the provided activity type is not in the predefined mapping 
+        HTTPException: If the provided activity type is not in the predefined mapping
                        and is not None, an HTTP 422 Unprocessable Entity exception is raised.
 
     """

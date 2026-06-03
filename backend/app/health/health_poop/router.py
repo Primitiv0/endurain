@@ -5,27 +5,24 @@ This module defines the API endpoints for managing bowel movement
 records, including CRUD operations with pagination and filtering.
 """
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
+import auth.dependencies as auth_dependencies
+import core.database as core_database
+import core.dependencies as core_dependencies
+import health.constants as health_constants
+import health.health_poop.crud as health_poop_crud
+import health.health_poop.schema as health_poop_schema
 from fastapi import (
     APIRouter,
     Depends,
-    Security,
     HTTPException,
-    status,
     Query,
+    Security,
+    status,
 )
 from sqlalchemy.orm import Session
-
-import health.constants as health_constants
-
-import health.health_poop.schema as health_poop_schema
-import health.health_poop.crud as health_poop_crud
-
-import auth.dependencies as auth_dependencies
-
-import core.database as core_database
-import core.dependencies as core_dependencies
 
 # Define the API router
 router = APIRouter()
@@ -33,9 +30,7 @@ router = APIRouter()
 
 @router.get(
     "",
-    response_model=(
-        health_poop_schema.HealthPoopListResponse
-    ),
+    response_model=(health_poop_schema.HealthPoopListResponse),
     status_code=status.HTTP_200_OK,
 )
 async def read_health_poop_all_pagination(
@@ -48,10 +43,7 @@ async def read_health_poop_all_pagination(
     ],
     _validate_pagination_values_on_query: Annotated[
         Callable,
-        Depends(
-            core_dependencies
-            .validate_pagination_values_on_query
-        ),
+        Depends(core_dependencies.validate_pagination_values_on_query),
     ],
     token_user_id: Annotated[
         int,
@@ -97,11 +89,7 @@ async def read_health_poop_all_pagination(
         HTTPException: If the user lacks required scope or
             pagination values are invalid.
     """
-    total = (
-        health_poop_crud.get_health_poop_number_by_user_id(
-            token_user_id, db, interval
-        )
-    )
+    total = health_poop_crud.get_health_poop_number_by_user_id(token_user_id, db, interval)
     records = health_poop_crud.get_health_poop_by_user_id(
         token_user_id,
         db,
@@ -156,9 +144,7 @@ async def read_health_poop_by_id(
     Raises:
         HTTPException: If record not found.
     """
-    record = health_poop_crud.get_health_poop_by_id_and_user_id(
-        health_poop_id, token_user_id, db
-    )
+    record = health_poop_crud.get_health_poop_by_id_and_user_id(health_poop_id, token_user_id, db)
 
     if record is None:
         raise HTTPException(
@@ -207,9 +193,7 @@ async def create_health_poop(
     Returns:
         Created HealthPoopRead record.
     """
-    return health_poop_crud.create_health_poop(
-        token_user_id, health_poop, db
-    )
+    return health_poop_crud.create_health_poop(token_user_id, health_poop, db)
 
 
 @router.put(
@@ -250,9 +234,7 @@ async def edit_health_poop(
     Raises:
         HTTPException: If record not found or unauthorized.
     """
-    return health_poop_crud.edit_health_poop(
-        token_user_id, health_poop, db
-    )
+    return health_poop_crud.edit_health_poop(token_user_id, health_poop, db)
 
 
 @router.delete(
@@ -290,6 +272,4 @@ async def delete_health_poop(
     Raises:
         HTTPException: If record not found or unauthorized.
     """
-    health_poop_crud.delete_health_poop(
-        token_user_id, health_poop_id, db
-    )
+    health_poop_crud.delete_health_poop(token_user_id, health_poop_id, db)

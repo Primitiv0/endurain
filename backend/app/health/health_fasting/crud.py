@@ -5,18 +5,15 @@ This module provides database operations for creating, reading, updating,
 and deleting fasting session records.
 """
 
-from fastapi import HTTPException, status
-from sqlalchemy import func, desc, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import health.constants as health_constants
-import health.utils as health_utils
-
-import health.health_fasting.schema as health_fasting_schema
-import health.health_fasting.models as health_fasting_models
-
 import core.decorators as core_decorators
+import health.constants as health_constants
+import health.health_fasting.models as health_fasting_models
+import health.health_fasting.schema as health_fasting_schema
+import health.utils as health_utils
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -110,9 +107,7 @@ def get_health_fasting_by_user_id(
             paginated.
     """
     # Get the health_fasting from the database
-    stmt = select(health_fasting_models.HealthFasting).where(
-        health_fasting_models.HealthFasting.user_id == user_id
-    )
+    stmt = select(health_fasting_models.HealthFasting).where(health_fasting_models.HealthFasting.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(
@@ -128,9 +123,7 @@ def get_health_fasting_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_active_fasting_by_user_id(
-    user_id: int, db: Session
-) -> health_fasting_models.HealthFasting | None:
+def get_active_fasting_by_user_id(user_id: int, db: Session) -> health_fasting_models.HealthFasting | None:
     """
     Retrieve the active (in_progress) fasting session for a user.
 
@@ -197,11 +190,7 @@ def get_total_fasting_seconds(user_id: int, db: Session) -> int:
         HTTPException: If database error occurs.
     """
     stmt = (
-        select(
-            func.coalesce(
-                func.sum(health_fasting_models.HealthFasting.actual_duration_seconds), 0
-            )
-        )
+        select(func.coalesce(func.sum(health_fasting_models.HealthFasting.actual_duration_seconds), 0))
         .select_from(health_fasting_models.HealthFasting)
         .where(
             health_fasting_models.HealthFasting.user_id == user_id,
@@ -331,9 +320,7 @@ def edit_health_fasting(
             detail="Cannot edit fasting record for another user.",
         )
 
-    db_health_fasting = get_health_fasting_by_id_and_user_id(
-        health_fasting.id, user_id, db
-    )
+    db_health_fasting = get_health_fasting_by_id_and_user_id(health_fasting.id, user_id, db)
 
     if db_health_fasting is None:
         raise HTTPException(
@@ -374,9 +361,7 @@ def complete_health_fasting(
     Raises:
         HTTPException: If record not found or not in progress.
     """
-    db_health_fasting = get_health_fasting_by_id_and_user_id(
-        health_fasting_id, user_id, db
-    )
+    db_health_fasting = get_health_fasting_by_id_and_user_id(health_fasting_id, user_id, db)
 
     if db_health_fasting is None:
         raise HTTPException(
@@ -426,17 +411,12 @@ def delete_health_fasting(user_id: int, health_fasting_id: int, db: Session) -> 
     Raises:
         HTTPException: If record not found.
     """
-    db_health_fasting = get_health_fasting_by_id_and_user_id(
-        health_fasting_id, user_id, db
-    )
+    db_health_fasting = get_health_fasting_by_id_and_user_id(health_fasting_id, user_id, db)
 
     if db_health_fasting is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"Fasting record with id {health_fasting_id} "
-                f"for user {user_id} not found"
-            ),
+            detail=(f"Fasting record with id {health_fasting_id} for user {user_id} not found"),
         )
 
     db.delete(db_health_fasting)

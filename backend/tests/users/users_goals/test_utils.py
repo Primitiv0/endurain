@@ -1,14 +1,14 @@
 """Tests for user goals utility functions."""
 
-import pytest
 from datetime import datetime
 from unittest.mock import MagicMock, patch
+
+import pytest
+import users.users_goals.models as user_goals_models
+import users.users_goals.schema as user_goals_schema
+import users.users_goals.utils as user_goals_utils
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-
-import users.users_goals.utils as user_goals_utils
-import users.users_goals.schema as user_goals_schema
-import users.users_goals.models as user_goals_models
 
 
 class TestCalculateUserGoals:
@@ -93,13 +93,9 @@ class TestCalculateGoalProgressByActivityType:
     Test suite for calculate_goal_progress_by_activity_type.
     """
 
-    @patch(
-        "users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types"
-    )
+    @patch("users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types")
     @patch("users.users_goals.utils.get_start_end_date_by_interval")
-    def test_calculate_progress_calories_goal(
-        self, mock_get_dates, mock_get_activities
-    ):
+    def test_calculate_progress_calories_goal(self, mock_get_dates, mock_get_activities):
         """Test calculation for calories goal."""
         # Arrange
         mock_db = MagicMock(spec=Session)
@@ -124,22 +120,16 @@ class TestCalculateGoalProgressByActivityType:
         mock_get_activities.return_value = [mock_activity]
 
         # Act
-        result = user_goals_utils.calculate_goal_progress_by_activity_type(
-            mock_goal, "2024-01-15", mock_db
-        )
+        result = user_goals_utils.calculate_goal_progress_by_activity_type(mock_goal, "2024-01-15", mock_db)
 
         # Assert
         assert result.goal_id == 1
         assert result.total_calories == 1500
         assert result.percentage_completed == 30
 
-    @patch(
-        "users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types"
-    )
+    @patch("users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types")
     @patch("users.users_goals.utils.get_start_end_date_by_interval")
-    def test_calculate_progress_distance_goal(
-        self, mock_get_dates, mock_get_activities
-    ):
+    def test_calculate_progress_distance_goal(self, mock_get_dates, mock_get_activities):
         """Test calculation for distance goal."""
         # Arrange
         mock_db = MagicMock(spec=Session)
@@ -165,21 +155,15 @@ class TestCalculateGoalProgressByActivityType:
         mock_get_activities.return_value = [mock_activity]
 
         # Act
-        result = user_goals_utils.calculate_goal_progress_by_activity_type(
-            mock_goal, "2024-01-15", mock_db
-        )
+        result = user_goals_utils.calculate_goal_progress_by_activity_type(mock_goal, "2024-01-15", mock_db)
 
         # Assert
         assert result.total_distance == 10000
         assert result.percentage_completed == 20
 
-    @patch(
-        "users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types"
-    )
+    @patch("users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types")
     @patch("users.users_goals.utils.get_start_end_date_by_interval")
-    def test_calculate_progress_activities_goal(
-        self, mock_get_dates, mock_get_activities
-    ):
+    def test_calculate_progress_activities_goal(self, mock_get_dates, mock_get_activities):
         """Test calculation for activities count goal."""
         # Arrange
         mock_db = MagicMock(spec=Session)
@@ -202,21 +186,15 @@ class TestCalculateGoalProgressByActivityType:
         mock_get_activities.return_value = [MagicMock(), MagicMock()]
 
         # Act
-        result = user_goals_utils.calculate_goal_progress_by_activity_type(
-            mock_goal, "2024-01-15", mock_db
-        )
+        result = user_goals_utils.calculate_goal_progress_by_activity_type(mock_goal, "2024-01-15", mock_db)
 
         # Assert
         assert result.total_activities_number == 2
         assert result.percentage_completed == 40
 
-    @patch(
-        "users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types"
-    )
+    @patch("users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types")
     @patch("users.users_goals.utils.get_start_end_date_by_interval")
-    def test_calculate_progress_caps_at_100_percent(
-        self, mock_get_dates, mock_get_activities
-    ):
+    def test_calculate_progress_caps_at_100_percent(self, mock_get_dates, mock_get_activities):
         """Test percentage is capped at 100."""
         # Arrange
         mock_db = MagicMock(spec=Session)
@@ -241,20 +219,14 @@ class TestCalculateGoalProgressByActivityType:
         mock_get_activities.return_value = [mock_activity]
 
         # Act
-        result = user_goals_utils.calculate_goal_progress_by_activity_type(
-            mock_goal, "2024-01-15", mock_db
-        )
+        result = user_goals_utils.calculate_goal_progress_by_activity_type(mock_goal, "2024-01-15", mock_db)
 
         # Assert
         assert result.percentage_completed == 100
 
-    @patch(
-        "users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types"
-    )
+    @patch("users.users_goals.utils.activity_crud.get_user_activities_per_timeframe_and_activity_types")
     @patch("users.users_goals.utils.get_start_end_date_by_interval")
-    def test_calculate_progress_excludes_hidden_activities(
-        self, mock_get_dates, mock_get_activities
-    ):
+    def test_calculate_progress_excludes_hidden_activities(self, mock_get_dates, mock_get_activities):
         """Test that hidden activities are excluded from goal progress."""
         # Arrange
         mock_db = MagicMock(spec=Session)
@@ -277,9 +249,7 @@ class TestCalculateGoalProgressByActivityType:
         mock_get_activities.return_value = [MagicMock()]
 
         # Act
-        user_goals_utils.calculate_goal_progress_by_activity_type(
-            mock_goal, "2024-01-15", mock_db
-        )
+        user_goals_utils.calculate_goal_progress_by_activity_type(mock_goal, "2024-01-15", mock_db)
 
         # Assert - verify exclude_hidden=True is passed
         mock_get_activities.assert_called_once()
@@ -295,9 +265,7 @@ class TestGetStartEndDateByInterval:
     def test_get_dates_daily_interval(self):
         """Test date calculation for daily interval."""
         # Act
-        start, end = user_goals_utils.get_start_end_date_by_interval(
-            "daily", "2024-01-15"
-        )
+        start, end = user_goals_utils.get_start_end_date_by_interval("daily", "2024-01-15")
 
         # Assert
         assert start == datetime(2024, 1, 15, 0, 0, 0)
@@ -307,7 +275,8 @@ class TestGetStartEndDateByInterval:
         """Test date calculation for weekly interval."""
         # Act
         start, end = user_goals_utils.get_start_end_date_by_interval(
-            "weekly", "2024-01-15"  # Monday
+            "weekly",
+            "2024-01-15",  # Monday
         )
 
         # Assert
@@ -317,9 +286,7 @@ class TestGetStartEndDateByInterval:
     def test_get_dates_monthly_interval(self):
         """Test date calculation for monthly interval."""
         # Act
-        start, end = user_goals_utils.get_start_end_date_by_interval(
-            "monthly", "2024-01-15"
-        )
+        start, end = user_goals_utils.get_start_end_date_by_interval("monthly", "2024-01-15")
 
         # Assert
         assert start.day == 1
@@ -329,9 +296,7 @@ class TestGetStartEndDateByInterval:
     def test_get_dates_yearly_interval(self):
         """Test date calculation for yearly interval."""
         # Act
-        start, end = user_goals_utils.get_start_end_date_by_interval(
-            "yearly", "2024-06-15"
-        )
+        start, end = user_goals_utils.get_start_end_date_by_interval("yearly", "2024-06-15")
 
         # Assert
         assert start == datetime(2024, 1, 1, 0, 0, 0)
@@ -364,17 +329,17 @@ class TestActivityTypeMap:
 
     def test_activity_type_map_has_expected_types(self):
         """Test mapping contains expected activity types."""
-        map = user_goals_utils._ACTIVITY_TYPE_MAP
+        type_map = user_goals_utils._ACTIVITY_TYPE_MAP
 
-        assert user_goals_schema.ActivityType.RUN in map
-        assert user_goals_schema.ActivityType.BIKE in map
-        assert user_goals_schema.ActivityType.SWIM in map
-        assert user_goals_schema.ActivityType.WALK in map
-        assert user_goals_schema.ActivityType.CARDIO in map
+        assert user_goals_schema.ActivityType.RUN in type_map
+        assert user_goals_schema.ActivityType.BIKE in type_map
+        assert user_goals_schema.ActivityType.SWIM in type_map
+        assert user_goals_schema.ActivityType.WALK in type_map
+        assert user_goals_schema.ActivityType.CARDIO in type_map
 
     def test_strength_uses_default_types(self):
         """Test STRENGTH not in map, uses default."""
-        map = user_goals_utils._ACTIVITY_TYPE_MAP
+        type_map = user_goals_utils._ACTIVITY_TYPE_MAP
 
         # STRENGTH should NOT be in map (uses defaults)
-        assert user_goals_schema.ActivityType.STRENGTH not in map
+        assert user_goals_schema.ActivityType.STRENGTH not in type_map

@@ -9,13 +9,12 @@ Verifies:
 5. Error handling for invalid keys and malformed data
 """
 
-import os
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+from core import cryptography
 from cryptography.fernet import Fernet
 from fastapi import HTTPException
-
-from core import cryptography
 
 
 class TestCreateFernetCipher:

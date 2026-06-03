@@ -15,10 +15,8 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 
-from fastapi import HTTPException, status
-
 import core.logger as core_logger
-
+from fastapi import HTTPException, status
 
 # Hard ceiling on a single CSV file size and row count. Strava
 # exports of bikes/shoes are tiny in practice (kilobytes / dozens of
@@ -53,10 +51,7 @@ def _enforce_size(path: Path, max_bytes: int) -> None:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail={
-                "message": (
-                    f"Import file {path.name} is "
-                    f"{size} bytes, exceeds {max_bytes} byte cap"
-                ),
+                "message": (f"Import file {path.name} is {size} bytes, exceeds {max_bytes} byte cap"),
                 "code": "TEXT_IMPORT_TOO_LARGE",
             },
         )
@@ -88,40 +83,28 @@ def read_bounded_csv(
     _enforce_size(file_path, max_bytes)
 
     try:
-        handle = open(file_path, "r", encoding=encoding, newline="")
+        with open(file_path, encoding=encoding, newline="") as fh:
+            reader = csv.DictReader(fh)
+            for rows_yielded, row in enumerate(reader, start=1):
+                if rows_yielded > max_rows:
+                    raise HTTPException(
+                        status_code=(status.HTTP_413_CONTENT_TOO_LARGE),
+                        detail={
+                            "message": (f"Import file {file_path.name} exceeds {max_rows} row cap"),
+                            "code": "TEXT_IMPORT_TOO_MANY_ROWS",
+                        },
+                    )
+                yield row
     except OSError as err:
         core_logger.print_to_log(
-            f"read_bounded_csv failed to open {file_path.name}: "
-            f"{type(err).__name__}",
+            f"read_bounded_csv failed to open {file_path.name}: {type(err).__name__}",
             "error",
             exc=err,
         )
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
             detail={
-                "message": (
-                    f"Failed to open import file {file_path.name}"
-                ),
+                "message": (f"Failed to open import file {file_path.name}"),
                 "code": "TEXT_IMPORT_OPEN_FAILED",
             },
         ) from err
-
-    with handle as fh:
-        reader = csv.DictReader(fh)
-        rows_yielded = 0
-        for row in reader:
-            rows_yielded += 1
-            if rows_yielded > max_rows:
-                raise HTTPException(
-                    status_code=(
-                        status.HTTP_413_CONTENT_TOO_LARGE
-                    ),
-                    detail={
-                        "message": (
-                            f"Import file {file_path.name} exceeds "
-                            f"{max_rows} row cap"
-                        ),
-                        "code": "TEXT_IMPORT_TOO_MANY_ROWS",
-                    },
-                )
-            yield row

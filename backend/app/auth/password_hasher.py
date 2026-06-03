@@ -5,9 +5,9 @@ hashes), :class:`PasswordPolicyError`, and the singleton accessor used as a
 FastAPI dependency.
 """
 
-from collections.abc import Iterable
-import string
 import secrets
+import string
+from collections.abc import Iterable
 
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
@@ -79,9 +79,7 @@ class PasswordHasher:
 
     def __init__(
         self,
-        hasher: (
-            Argon2Hasher | BcryptHasher | Iterable[object] | PasswordHash | None
-        ) = None,
+        hasher: (Argon2Hasher | BcryptHasher | Iterable[object] | PasswordHash | None) = None,
     ):
         """
         Initialize the password hasher configuration.
@@ -138,9 +136,7 @@ class PasswordHasher:
         """
         return self._password_hash.verify(plain_password, hashed_password)
 
-    def verify_and_update(
-        self, plain_password: str, hashed_password: str
-    ) -> tuple[bool, str | None]:
+    def verify_and_update(self, plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
         """
         Verifies a plain password against a hashed password and updates the hash if necessary.
 
@@ -203,9 +199,7 @@ class PasswordHasher:
             ValueError: If the requested length is less than 8.
         """
         if length < 8:
-            raise PasswordPolicyError(
-                f"Requested length {length!r} is too short; must be ≥ 8."
-            )
+            raise PasswordPolicyError(f"Requested length {length!r} is too short; must be ≥ 8.")
 
         # Guarantee at least one from each category
         chars = [
@@ -240,9 +234,7 @@ class PasswordHasher:
             PasswordPolicyError: If the password does not meet the policy requirements.
         """
         if len(password) < min_length:
-            raise PasswordPolicyError(
-                f"Password is too short (got {len(password)}, need ≥ {min_length})."
-            )
+            raise PasswordPolicyError(f"Password is too short (got {len(password)}, need ≥ {min_length}).")
 
         # For length_only policy, only min length is enforced
         if policy_type == "length_only":
@@ -251,19 +243,13 @@ class PasswordHasher:
         # For strict policy, enforce complexity requirements
         if policy_type == "strict":
             if not any(c.isupper() for c in password):
-                raise PasswordPolicyError(
-                    "Password must contain at least one uppercase letter (A–Z)."
-                )
+                raise PasswordPolicyError("Password must contain at least one uppercase letter (A-Z).")
 
             if not any(c.islower() for c in password):
-                raise PasswordPolicyError(
-                    "Password must contain at least one lowercase letter (a–z)."
-                )
+                raise PasswordPolicyError("Password must contain at least one lowercase letter (a-z).")
 
             if not any(c.isdigit() for c in password):
-                raise PasswordPolicyError(
-                    "Password must contain at least one digit (0–9)."
-                )
+                raise PasswordPolicyError("Password must contain at least one digit (0-9).")
 
             if not any(c in PasswordHasher.PUNCTUATION for c in password):
                 raise PasswordPolicyError(
@@ -271,8 +257,7 @@ class PasswordHasher:
                 )
         else:
             raise PasswordPolicyError(
-                f"Unknown password policy type: {policy_type!r}. "
-                "Supported types: 'strict', 'length_only'."
+                f"Unknown password policy type: {policy_type!r}. Supported types: 'strict', 'length_only'."
             )
 
     @staticmethod

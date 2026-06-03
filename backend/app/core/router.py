@@ -1,11 +1,10 @@
 """Core metadata and static fallback routes."""
 
+import core.config as core_config
+import core.utils as core_utils
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict
-
-import core.config as core_config
-import core.utils as core_utils
 
 # Define the API router
 router = APIRouter()

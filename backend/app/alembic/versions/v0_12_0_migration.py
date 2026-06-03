@@ -6,7 +6,7 @@ Create Date: 2025-06-03 11:24:27.603414
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
@@ -14,9 +14,9 @@ from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision: str = "f2395550aab9"
-down_revision: Union[str, None] = "093d3fd32846"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "093d3fd32846"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -123,31 +123,31 @@ def upgrade() -> None:
         text(
             """
         INSERT INTO users_privacy_settings (
-            user_id, 
-            default_activity_visibility, 
-            hide_activity_start_time, 
-            hide_activity_location, 
-            hide_activity_map, 
-            hide_activity_hr, 
-            hide_activity_power, 
-            hide_activity_cadence, 
-            hide_activity_elevation, 
+            user_id,
+            default_activity_visibility,
+            hide_activity_start_time,
+            hide_activity_location,
+            hide_activity_map,
+            hide_activity_hr,
+            hide_activity_power,
+            hide_activity_cadence,
+            hide_activity_elevation,
             hide_activity_speed,
             hide_activity_pace,
             hide_activity_laps,
             hide_activity_workout_sets_steps,
             hide_activity_gear
-        ) 
-        SELECT 
-            id, 
-            0, 
-            FALSE, 
-            FALSE, 
-            FALSE, 
-            FALSE, 
-            FALSE, 
-            FALSE, 
-            FALSE, 
+        )
+        SELECT
+            id,
+            0,
+            FALSE,
+            FALSE,
+            FALSE,
+            FALSE,
+            FALSE,
+            FALSE,
+            FALSE,
             FALSE,
             FALSE,
             FALSE,
@@ -196,21 +196,15 @@ def upgrade() -> None:
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_hr", sa.Boolean(), nullable=True, comment="Hide activity heart rate"
-        ),
+        sa.Column("hide_hr", sa.Boolean(), nullable=True, comment="Hide activity heart rate"),
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_power", sa.Boolean(), nullable=True, comment="Hide activity power"
-        ),
+        sa.Column("hide_power", sa.Boolean(), nullable=True, comment="Hide activity power"),
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_cadence", sa.Boolean(), nullable=True, comment="Hide activity cadence"
-        ),
+        sa.Column("hide_cadence", sa.Boolean(), nullable=True, comment="Hide activity cadence"),
     )
     op.add_column(
         "activities",
@@ -223,21 +217,15 @@ def upgrade() -> None:
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_speed", sa.Boolean(), nullable=True, comment="Hide activity speed"
-        ),
+        sa.Column("hide_speed", sa.Boolean(), nullable=True, comment="Hide activity speed"),
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_pace", sa.Boolean(), nullable=True, comment="Hide activity pace"
-        ),
+        sa.Column("hide_pace", sa.Boolean(), nullable=True, comment="Hide activity pace"),
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_laps", sa.Boolean(), nullable=True, comment="Hide activity laps"
-        ),
+        sa.Column("hide_laps", sa.Boolean(), nullable=True, comment="Hide activity laps"),
     )
     op.add_column(
         "activities",
@@ -250,16 +238,14 @@ def upgrade() -> None:
     )
     op.add_column(
         "activities",
-        sa.Column(
-            "hide_gear", sa.Boolean(), nullable=True, comment="Hide activity gear"
-        ),
+        sa.Column("hide_gear", sa.Boolean(), nullable=True, comment="Hide activity gear"),
     )
 
     # Update all existing activities to set these columns to FALSE
     connection.execute(
         text(
             """
-            UPDATE activities SET 
+            UPDATE activities SET
                 hide_start_time = FALSE,
                 hide_location = FALSE,
                 hide_map = FALSE,
@@ -278,53 +264,33 @@ def upgrade() -> None:
     )
 
     # Update the new columns to be NOT NULL
-    op.alter_column(
-        "activities", "hide_start_time", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_location", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_map", existing_type=sa.Boolean(), nullable=False
-    )
+    op.alter_column("activities", "hide_start_time", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_location", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_map", existing_type=sa.Boolean(), nullable=False)
     op.alter_column("activities", "hide_hr", existing_type=sa.Boolean(), nullable=False)
-    op.alter_column(
-        "activities", "hide_power", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_cadence", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_elevation", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_speed", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_pace", existing_type=sa.Boolean(), nullable=False
-    )
-    op.alter_column(
-        "activities", "hide_laps", existing_type=sa.Boolean(), nullable=False
-    )
+    op.alter_column("activities", "hide_power", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_cadence", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_elevation", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_speed", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_pace", existing_type=sa.Boolean(), nullable=False)
+    op.alter_column("activities", "hide_laps", existing_type=sa.Boolean(), nullable=False)
     op.alter_column(
         "activities",
         "hide_workout_sets_steps",
         existing_type=sa.Boolean(),
         nullable=False,
     )
-    op.alter_column(
-        "activities", "hide_gear", existing_type=sa.Boolean(), nullable=False
-    )
+    op.alter_column("activities", "hide_gear", existing_type=sa.Boolean(), nullable=False)
     # Fix unique index on gear nickname
-    op.drop_index(op.f('ix_gear_nickname'), table_name='gear')
-    op.create_index(op.f('ix_gear_nickname'), 'gear', ['nickname'], unique=False)
+    op.drop_index(op.f("ix_gear_nickname"), table_name="gear")
+    op.create_index(op.f("ix_gear_nickname"), "gear", ["nickname"], unique=False)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_gear_nickname'), table_name='gear')
-    op.create_index(op.f('ix_gear_nickname'), 'gear', ['nickname'], unique=True)
+    op.drop_index(op.f("ix_gear_nickname"), table_name="gear")
+    op.create_index(op.f("ix_gear_nickname"), "gear", ["nickname"], unique=True)
     op.drop_column("activities", "hide_gear")
     op.drop_column("activities", "hide_workout_sets_steps")
     op.drop_column("activities", "hide_laps")
@@ -363,8 +329,6 @@ def downgrade() -> None:
             "UPDATE users SET default_activity_visibility = (SELECT default_activity_visibility FROM users_privacy_settings WHERE users_privacy_settings.user_id = users.id);"
         )
     )
-    op.drop_index(
-        op.f("ix_users_privacy_settings_user_id"), table_name="users_privacy_settings"
-    )
+    op.drop_index(op.f("ix_users_privacy_settings_user_id"), table_name="users_privacy_settings")
     op.drop_table("users_privacy_settings")
     # ### end Alembic commands ###

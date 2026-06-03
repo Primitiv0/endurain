@@ -2,17 +2,15 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from fastapi import FastAPI, HTTPException, status
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 import auth.password_hasher as auth_password_hasher
 import core.apprise as core_apprise
 import core.database as core_database
+import pytest
 import sign_up_tokens.router as sign_up_tokens_router
 import websocket.manager as websocket_manager
-
+from fastapi import FastAPI, HTTPException, status
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -80,15 +78,9 @@ def signup_app(
     )
 
     app.dependency_overrides[core_database.get_db] = lambda: mock_db
-    app.dependency_overrides[
-        core_apprise.get_email_service
-    ] = lambda: mock_email_service
-    app.dependency_overrides[
-        websocket_manager.get_websocket_manager
-    ] = lambda: mock_ws_manager
-    app.dependency_overrides[
-        auth_password_hasher.get_password_hasher
-    ] = lambda: password_hasher
+    app.dependency_overrides[core_apprise.get_email_service] = lambda: mock_email_service
+    app.dependency_overrides[websocket_manager.get_websocket_manager] = lambda: mock_ws_manager
+    app.dependency_overrides[auth_password_hasher.get_password_hasher] = lambda: password_hasher
 
     return app
 
@@ -121,10 +113,7 @@ class TestSignupEndpoint:
     )
     @patch("sign_up_tokens.router.users_utils.create_user_default_data")
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_success_no_verification_no_approval(
         self,
         mock_settings,
@@ -169,10 +158,7 @@ class TestSignupEndpoint:
     )
     @patch("sign_up_tokens.router.users_utils.create_user_default_data")
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_success_email_verification_required(
         self,
         mock_settings,
@@ -215,10 +201,7 @@ class TestSignupEndpoint:
     )
     @patch("sign_up_tokens.router.users_utils.create_user_default_data")
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_email_send_fails_includes_warning_in_message(
         self,
         mock_settings,
@@ -255,10 +238,7 @@ class TestSignupEndpoint:
         data = response.json()
         assert "Failed" in data["message"]
 
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_disabled_returns_403(
         self,
         mock_settings,
@@ -285,10 +265,7 @@ class TestSignupEndpoint:
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert "not enabled" in response.json()["detail"].lower()
 
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_missing_required_fields_returns_422(
         self,
         mock_settings,
@@ -304,16 +281,10 @@ class TestSignupEndpoint:
             json={},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_422_UNPROCESSABLE_ENTITY
-        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_duplicate_user_propagates_conflict(
         self,
         mock_settings,
@@ -353,10 +324,7 @@ class TestSignupEndpoint:
     )
     @patch("sign_up_tokens.router.users_utils.create_user_default_data")
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_admin_approval_required_returns_flag(
         self,
         mock_settings,
@@ -398,10 +366,7 @@ class TestSignupEndpoint:
     )
     @patch("sign_up_tokens.router.users_utils.create_user_default_data")
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_signup_propagates_503_when_send_sign_up_email_raises(
         self,
         mock_settings,
@@ -438,10 +403,7 @@ class TestSignupEndpoint:
             },
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
 
 # ---------------------------------------------------------------------------
@@ -453,22 +415,17 @@ class TestVerifyEmailEndpoint:
     """Tests for POST /sign-up/sign-up/confirm."""
 
     @patch(
-        "sign_up_tokens.router.notifications_utils"
-        ".create_admin_new_sign_up_approval_request_notification",
+        "sign_up_tokens.router.notifications_utils.create_admin_new_sign_up_approval_request_notification",
         new_callable=AsyncMock,
     )
     @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils"
-        ".send_sign_up_admin_approval_email",
+        "sign_up_tokens.router.sign_up_tokens_utils.send_sign_up_admin_approval_email",
         new_callable=AsyncMock,
     )
     @patch("sign_up_tokens.router.users_crud.get_user_by_id")
     @patch("sign_up_tokens.router.users_crud.verify_user_email")
     @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_success_no_admin_approval(
         self,
         mock_settings,
@@ -505,13 +462,8 @@ class TestVerifyEmailEndpoint:
         assert "verified" in data["message"].lower()
         assert data["admin_approval_required"] is None
 
-    @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_invalid_token_returns_400(
         self,
         mock_settings,
@@ -537,10 +489,7 @@ class TestVerifyEmailEndpoint:
 
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_not_enabled_returns_412(
         self,
         mock_settings,
@@ -559,15 +508,9 @@ class TestVerifyEmailEndpoint:
             json={"token": "any-token"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_412_PRECONDITION_FAILED
-        )
+        assert response.status_code == status.HTTP_412_PRECONDITION_FAILED
 
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_missing_token_returns_422(
         self,
         mock_settings,
@@ -585,28 +528,20 @@ class TestVerifyEmailEndpoint:
             json={},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_422_UNPROCESSABLE_ENTITY
-        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @patch(
-        "sign_up_tokens.router.notifications_utils"
-        ".create_admin_new_sign_up_approval_request_notification",
+        "sign_up_tokens.router.notifications_utils.create_admin_new_sign_up_approval_request_notification",
         new_callable=AsyncMock,
     )
     @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils"
-        ".send_sign_up_admin_approval_email",
+        "sign_up_tokens.router.sign_up_tokens_utils.send_sign_up_admin_approval_email",
         new_callable=AsyncMock,
     )
     @patch("sign_up_tokens.router.users_crud.get_user_by_id")
     @patch("sign_up_tokens.router.users_crud.verify_user_email")
     @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_with_admin_approval_sets_flag(
         self,
         mock_settings,
@@ -643,13 +578,8 @@ class TestVerifyEmailEndpoint:
         assert data["admin_approval_required"] is True
 
     @patch("sign_up_tokens.router.users_crud.verify_user_email")
-    @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_skips_notifications_when_email_not_configured(
         self,
         mock_settings,
@@ -686,19 +616,13 @@ class TestVerifyEmailEndpoint:
         assert data["admin_approval_required"] is None
 
     @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils"
-        ".send_sign_up_admin_approval_email",
+        "sign_up_tokens.router.sign_up_tokens_utils.send_sign_up_admin_approval_email",
         new_callable=AsyncMock,
     )
     @patch("sign_up_tokens.router.users_crud.get_user_by_id")
     @patch("sign_up_tokens.router.users_crud.verify_user_email")
-    @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_returns_500_when_get_user_by_id_returns_none(
         self,
         mock_settings,
@@ -727,39 +651,27 @@ class TestVerifyEmailEndpoint:
         mock_get_user.return_value = None
         mock_email_service.is_configured.return_value = True
         # Simulate the AttributeError raised when None.name is accessed
-        mock_send_admin_email.side_effect = AttributeError(
-            "'NoneType' object has no attribute 'name'"
-        )
+        mock_send_admin_email.side_effect = AttributeError("'NoneType' object has no attribute 'name'")
 
         response = signup_client.post(
             "/sign-up/sign-up/confirm",
             json={"token": "valid-token"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     @patch(
-        "sign_up_tokens.router.notifications_utils"
-        ".create_admin_new_sign_up_approval_request_notification",
+        "sign_up_tokens.router.notifications_utils.create_admin_new_sign_up_approval_request_notification",
         new_callable=AsyncMock,
     )
     @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils"
-        ".send_sign_up_admin_approval_email",
+        "sign_up_tokens.router.sign_up_tokens_utils.send_sign_up_admin_approval_email",
         new_callable=AsyncMock,
     )
     @patch("sign_up_tokens.router.users_crud.get_user_by_id")
     @patch("sign_up_tokens.router.users_crud.verify_user_email")
-    @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_returns_500_when_notification_raises_http500(
         self,
         mock_settings,
@@ -794,30 +706,20 @@ class TestVerifyEmailEndpoint:
             json={"token": "valid-token"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     @patch(
-        "sign_up_tokens.router.notifications_utils"
-        ".create_admin_new_sign_up_approval_request_notification",
+        "sign_up_tokens.router.notifications_utils.create_admin_new_sign_up_approval_request_notification",
         new_callable=AsyncMock,
     )
     @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils"
-        ".send_sign_up_admin_approval_email",
+        "sign_up_tokens.router.sign_up_tokens_utils.send_sign_up_admin_approval_email",
         new_callable=AsyncMock,
     )
     @patch("sign_up_tokens.router.users_crud.get_user_by_id")
     @patch("sign_up_tokens.router.users_crud.verify_user_email")
-    @patch(
-        "sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.router.server_settings_utils"
-        ".get_server_settings_or_404"
-    )
+    @patch("sign_up_tokens.router.sign_up_tokens_utils.use_sign_up_token")
+    @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
     def test_verify_email_returns_500_when_notification_raises_runtime(
         self,
         mock_settings,
@@ -845,16 +747,11 @@ class TestVerifyEmailEndpoint:
         mock_get_user.return_value = MagicMock(id=31)
         mock_send_admin_email.return_value = None
         mock_email_service.is_configured.return_value = True
-        mock_notify.side_effect = RuntimeError(
-            "WebSocket broadcast failed"
-        )
+        mock_notify.side_effect = RuntimeError("WebSocket broadcast failed")
 
         response = signup_client.post(
             "/sign-up/sign-up/confirm",
             json={"token": "valid-token"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -1,12 +1,15 @@
+# ruff: noqa: E402  # TODO: https://codeberg.org/endurain-project/endurain/issues/641
+
+import contextlib
 import os
 import sys
 from importlib import import_module
 from pathlib import Path
 from unittest.mock import MagicMock
-from dotenv import load_dotenv
 
 import pytest
-from fastapi import Request, FastAPI
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -17,11 +20,11 @@ load_dotenv(dotenv_path=env_test_path)
 # Add the app directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
-import auth.sessions.router as users_session_router
-import auth.password_hasher as auth_password_hasher
 import auth.dependencies as auth_dependencies
-import auth.token_manager as auth_token_manager
+import auth.password_hasher as auth_password_hasher
 import auth.security as auth_security
+import auth.sessions.router as users_session_router
+import auth.token_manager as auth_token_manager
 import users.users.schema as user_schema
 
 # Variables and constants
@@ -59,9 +62,7 @@ def token_manager() -> auth_token_manager.TokenManager:
     Returns:
         auth_token_manager.TokenManager: An instance of auth_token_manager.TokenManager initialized with a test secret key for use in testing.
     """
-    return auth_token_manager.TokenManager(
-        secret_key="test-secret-key-for-testing-only-min-32-chars"
-    )
+    return auth_token_manager.TokenManager(secret_key="test-secret-key-for-testing-only-min-32-chars")
 
 
 @pytest.fixture
@@ -142,7 +143,7 @@ def _include_router_if_exists(app: FastAPI, dotted: str):
         - This is useful for conditionally including routers in a modular FastAPI project.
         - For health_weight router, adds /health_weight prefix to match expected test URLs
     """
-    try:
+    with contextlib.suppress(Exception):
         mod = import_module(dotted)
         router = getattr(mod, "router", None)
         if router is not None:
@@ -162,9 +163,6 @@ def _include_router_if_exists(app: FastAPI, dotted: str):
                 app.include_router(router, prefix="/server_settings/public")
             else:
                 app.include_router(router)
-    except Exception:
-        # Silently ignore if module isn't present in this project
-        pass
 
 
 def _override_if_exists(app: FastAPI, dotted: str, attr: str, override_callable):
@@ -183,14 +181,12 @@ def _override_if_exists(app: FastAPI, dotted: str, attr: str, override_callable)
     Notes:
         - If the module or attribute does not exist, or any exception occurs, the function silently fails and returns None.
     """
-    try:
+    with contextlib.suppress(Exception):
         mod = import_module(dotted)
         provider = getattr(mod, attr, None)
         if provider is not None:
             app.dependency_overrides[provider] = override_callable
             return provider
-    except Exception:
-        pass
     return None
 
 
@@ -216,13 +212,11 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
 
     # Include server_settings router with prefix
     _include_router_if_exists(app, "server_settings.router")
-    try:
+    with contextlib.suppress(Exception):
         mod = import_module("server_settings.router")
         router = getattr(mod, "router", None)
         if router is not None:
             app.include_router(router, prefix="/server_settings")
-    except Exception:
-        pass
 
     app.state._client_type = "web"
 
@@ -334,11 +328,7 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
             Returns:
                 int: Number of entries removed.
             """
-            matching = [
-                username
-                for username, entry_user_id in self._store.items()
-                if entry_user_id == user_id
-            ]
+            matching = [username for username, entry_user_id in self._store.items() if entry_user_id == user_id]
             for username in matching:
                 del self._store[username]
             return len(matching)
@@ -397,79 +387,53 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         """Mock scope check that always passes"""
         return None
 
-    try:
-        app.dependency_overrides[
-            users_session_router.auth_security.header_client_type_scheme
-        ] = _client_type_override
-        app.dependency_overrides[
-            users_session_router.users_session_schema.get_pending_mfa_store
-        ] = lambda: fake_store
+    with contextlib.suppress(Exception):
+        app.dependency_overrides[users_session_router.auth_security.header_client_type_scheme] = _client_type_override
+        app.dependency_overrides[users_session_router.users_session_schema.get_pending_mfa_store] = lambda: fake_store
 
         # Override security dependencies for authenticated endpoint testing
-        app.dependency_overrides[
-            users_session_router.auth_security.validate_access_token
-        ] = _mock_validate_access_token
-        app.dependency_overrides[
-            users_session_router.auth_security.validate_refresh_token
-        ] = _mock_validate_refresh_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_access_token
-        ] = _mock_get_access_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_refresh_token
-        ] = _mock_get_refresh_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_sub_from_access_token
-        ] = _mock_get_sub_from_access_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_sid_from_access_token
-        ] = _mock_get_sid_from_access_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_sub_from_refresh_token
-        ] = _mock_get_sub_from_refresh_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_sid_from_refresh_token
-        ] = _mock_get_sid_from_refresh_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_and_return_access_token
-        ] = _mock_get_and_return_access_token
-        app.dependency_overrides[
-            users_session_router.auth_security.get_and_return_refresh_token
-        ] = _mock_get_and_return_refresh_token
-        app.dependency_overrides[users_session_router.auth_security.check_scopes] = (
-            _mock_check_scopes
+        app.dependency_overrides[users_session_router.auth_security.validate_access_token] = _mock_validate_access_token
+        app.dependency_overrides[users_session_router.auth_security.validate_refresh_token] = (
+            _mock_validate_refresh_token
         )
-    except Exception:
-        pass
+        app.dependency_overrides[users_session_router.auth_security.get_access_token] = _mock_get_access_token
+        app.dependency_overrides[users_session_router.auth_security.get_refresh_token] = _mock_get_refresh_token
+        app.dependency_overrides[users_session_router.auth_security.get_sub_from_access_token] = (
+            _mock_get_sub_from_access_token
+        )
+        app.dependency_overrides[users_session_router.auth_security.get_sid_from_access_token] = (
+            _mock_get_sid_from_access_token
+        )
+        app.dependency_overrides[users_session_router.auth_security.get_sub_from_refresh_token] = (
+            _mock_get_sub_from_refresh_token
+        )
+        app.dependency_overrides[users_session_router.auth_security.get_sid_from_refresh_token] = (
+            _mock_get_sid_from_refresh_token
+        )
+        app.dependency_overrides[users_session_router.auth_security.get_and_return_access_token] = (
+            _mock_get_and_return_access_token
+        )
+        app.dependency_overrides[users_session_router.auth_security.get_and_return_refresh_token] = (
+            _mock_get_and_return_refresh_token
+        )
+        app.dependency_overrides[users_session_router.auth_security.check_scopes] = _mock_check_scopes
 
     # Override public auth dependencies used by non-auth routers
-    try:
+    with contextlib.suppress(Exception):
         app.dependency_overrides[auth_security.check_scopes] = _mock_check_scopes
-        app.dependency_overrides[auth_security.get_sub_from_access_token] = (
-            _mock_get_sub_from_access_token
-        )
+        app.dependency_overrides[auth_security.get_sub_from_access_token] = _mock_get_sub_from_access_token
         app.dependency_overrides[auth_dependencies.check_scopes] = _mock_check_scopes
-        app.dependency_overrides[auth_dependencies.get_sub_from_access_token] = (
-            _mock_get_sub_from_access_token
+        app.dependency_overrides[auth_dependencies.get_sub_from_access_token] = _mock_get_sub_from_access_token
+        app.dependency_overrides[auth_dependencies.validate_access_token] = _mock_validate_access_token
+        app.dependency_overrides[auth_dependencies.validate_access_token_or_api_key] = lambda: (
+            auth_dependencies.AuthContext(
+                user_id=app.state.mock_user_id,
+                scopes=["*"],
+                auth_type="jwt",
+            )
         )
-        app.dependency_overrides[
-            auth_dependencies.validate_access_token
-        ] = _mock_validate_access_token
-        app.dependency_overrides[
-            auth_dependencies.validate_access_token_or_api_key
-        ] = lambda: auth_dependencies.AuthContext(
-            user_id=app.state.mock_user_id,
-            scopes=["*"],
-            auth_type="jwt",
-        )
-        app.dependency_overrides[
-            auth_dependencies.get_user_id_from_auth
-        ] = _mock_get_sub_from_access_token
-        app.dependency_overrides[
-            auth_dependencies.check_auth_scopes
-        ] = _mock_check_scopes
-    except Exception:
-        pass
+        app.dependency_overrides[auth_dependencies.get_user_id_from_auth] = _mock_get_sub_from_access_token
+        app.dependency_overrides[auth_dependencies.check_auth_scopes] = _mock_check_scopes
 
     # Generic overrides
     _override_if_exists(
@@ -478,19 +442,11 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         "get_password_hasher",
         lambda: password_hasher,
     )
-    _override_if_exists(
-        app, "auth.token_manager", "get_token_manager", lambda: token_manager
-    )
-    _override_if_exists(
-        app, "session.auth_token_manager", "get_token_manager", lambda: token_manager
-    )
-    _override_if_exists(
-        app, "core.database", "get_db", lambda: mock_db
-    ) or _override_if_exists(
+    _override_if_exists(app, "auth.token_manager", "get_token_manager", lambda: token_manager)
+    _override_if_exists(app, "session.auth_token_manager", "get_token_manager", lambda: token_manager)
+    _override_if_exists(app, "core.database", "get_db", lambda: mock_db) or _override_if_exists(
         app, "core_database", "get_db", lambda: mock_db
-    ) or _override_if_exists(
-        app, "app.core.database", "get_db", lambda: mock_db
-    )
+    ) or _override_if_exists(app, "app.core.database", "get_db", lambda: mock_db)
 
     return app
 
@@ -568,16 +524,10 @@ def fast_api_app_public(password_hasher, token_manager, mock_db) -> FastAPI:
         "get_password_hasher",
         lambda: password_hasher,
     )
-    _override_if_exists(
-        app, "auth.token_manager", "get_token_manager", lambda: token_manager
-    )
-    _override_if_exists(
-        app, "core.database", "get_db", lambda: mock_db
-    ) or _override_if_exists(
+    _override_if_exists(app, "auth.token_manager", "get_token_manager", lambda: token_manager)
+    _override_if_exists(app, "core.database", "get_db", lambda: mock_db) or _override_if_exists(
         app, "core_database", "get_db", lambda: mock_db
-    ) or _override_if_exists(
-        app, "app.core.database", "get_db", lambda: mock_db
-    )
+    ) or _override_if_exists(app, "app.core.database", "get_db", lambda: mock_db)
 
     return app
 

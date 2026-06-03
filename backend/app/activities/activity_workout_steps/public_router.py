@@ -1,16 +1,14 @@
 """Activity workout steps public router."""
 
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
-import activities.activity_workout_steps.schema as activity_workout_steps_schema
-import activities.activity_workout_steps.crud as activity_workout_steps_crud
+from collections.abc import Callable
+from typing import Annotated
 
 import activities.activity.dependencies as activities_dependencies
-
+import activities.activity_workout_steps.crud as activity_workout_steps_crud
+import activities.activity_workout_steps.schema as activity_workout_steps_schema
 import core.database as core_database
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -18,22 +16,13 @@ router = APIRouter()
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=(
-        list[
-            activity_workout_steps_schema
-            .ActivityWorkoutSteps
-        ]
-        | None
-    ),
+    response_model=(list[activity_workout_steps_schema.ActivityWorkoutSteps] | None),
 )
 async def read_public_activity_workout_steps_all(
     activity_id: int,
     _validate_id: Annotated[
         Callable,
-        Depends(
-            activities_dependencies
-            .validate_activity_id
-        ),
+        Depends(activities_dependencies.validate_activity_id),
     ],
     db: Annotated[
         Session,
@@ -46,9 +35,4 @@ async def read_public_activity_workout_steps_all(
     Returns:
         List of workout steps or None.
     """
-    return (
-        activity_workout_steps_crud
-        .get_public_activity_workout_steps(
-            activity_id, db
-        )
-    )
+    return activity_workout_steps_crud.get_public_activity_workout_steps(activity_id, db)

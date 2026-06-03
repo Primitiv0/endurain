@@ -6,7 +6,7 @@ Create Date: 2026-01-13 11:36:50.047064
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
@@ -14,9 +14,9 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "262ec21a6c15"
-down_revision: Union[str, None] = "215d794b3041"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "215d794b3041"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 # Mapping from old integer values to new string values
 ACTIVITY_TYPE_MAP = {
@@ -148,20 +148,14 @@ def upgrade() -> None:
     # Update activity_type_new based on old activity_type values
     for old_val, new_val in ACTIVITY_TYPE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users_goals SET activity_type_new = :new_val "
-                "WHERE activity_type = :old_val"
-            ),
+            sa.text("UPDATE users_goals SET activity_type_new = :new_val WHERE activity_type = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
     # Update goal_type_new based on old goal_type values
     for old_val, new_val in GOAL_TYPE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users_goals SET goal_type_new = :new_val "
-                "WHERE goal_type = :old_val"
-            ),
+            sa.text("UPDATE users_goals SET goal_type_new = :new_val WHERE goal_type = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
@@ -218,29 +212,21 @@ def upgrade() -> None:
     # Update gender_new based on old gender values
     for old_val, new_val in GENDER_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET gender_new = :new_val " "WHERE gender = :old_val"
-            ),
+            sa.text("UPDATE users SET gender_new = :new_val WHERE gender = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
     # Update access_type_new based on old access_type values
     for old_val, new_val in ACCESS_TYPE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET access_type_new = :new_val "
-                "WHERE access_type = :old_val"
-            ),
+            sa.text("UPDATE users SET access_type_new = :new_val WHERE access_type = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
     # Update first_day_of_week_new based on old first_day_of_week values
     for old_val, new_val in WEEK_DAY_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET first_day_of_week_new = :new_val "
-                "WHERE first_day_of_week = :old_val"
-            ),
+            sa.text("UPDATE users SET first_day_of_week_new = :new_val WHERE first_day_of_week = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
@@ -294,20 +280,14 @@ def upgrade() -> None:
     # Update units_new based on old units values
     for old_val, new_val in UNITS_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE server_settings SET units_new = :new_val "
-                "WHERE units = :old_val"
-            ),
+            sa.text("UPDATE server_settings SET units_new = :new_val WHERE units = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
     # Update currency_new based on old currency values
     for old_val, new_val in CURRENCY_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE server_settings SET currency_new = :new_val "
-                "WHERE currency = :old_val"
-            ),
+            sa.text("UPDATE server_settings SET currency_new = :new_val WHERE currency = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
@@ -354,16 +334,14 @@ def upgrade() -> None:
     # Update units_new based on old units values
     for old_val, new_val in UNITS_MAP.items():
         connection.execute(
-            sa.text("UPDATE users SET units_new = :new_val " "WHERE units = :old_val"),
+            sa.text("UPDATE users SET units_new = :new_val WHERE units = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
     # Update currency_new based on old currency values
     for old_val, new_val in CURRENCY_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET currency_new = :new_val " "WHERE currency = :old_val"
-            ),
+            sa.text("UPDATE users SET currency_new = :new_val WHERE currency = :old_val"),
             {"new_val": new_val, "old_val": old_val},
         )
 
@@ -527,16 +505,14 @@ def downgrade() -> None:
     # Update units_old based on current units string values
     for str_val, int_val in UNITS_REVERSE_MAP.items():
         connection.execute(
-            sa.text("UPDATE users SET units_old = :int_val " "WHERE units = :str_val"),
+            sa.text("UPDATE users SET units_old = :int_val WHERE units = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
     # Update currency_old based on current currency string values
     for str_val, int_val in CURRENCY_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET currency_old = :int_val " "WHERE currency = :str_val"
-            ),
+            sa.text("UPDATE users SET currency_old = :int_val WHERE currency = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
@@ -583,20 +559,14 @@ def downgrade() -> None:
     # Update units_old based on current units string values
     for str_val, int_val in UNITS_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE server_settings SET units_old = :int_val "
-                "WHERE units = :str_val"
-            ),
+            sa.text("UPDATE server_settings SET units_old = :int_val WHERE units = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
     # Update currency_old based on current currency string values
     for str_val, int_val in CURRENCY_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE server_settings SET currency_old = :int_val "
-                "WHERE currency = :str_val"
-            ),
+            sa.text("UPDATE server_settings SET currency_old = :int_val WHERE currency = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
@@ -653,29 +623,21 @@ def downgrade() -> None:
     # Update gender_old based on current gender string values
     for str_val, int_val in GENDER_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET gender_old = :int_val " "WHERE gender = :str_val"
-            ),
+            sa.text("UPDATE users SET gender_old = :int_val WHERE gender = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
     # Update access_type_old based on current access_type string values
     for str_val, int_val in ACCESS_TYPE_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET access_type_old = :int_val "
-                "WHERE access_type = :str_val"
-            ),
+            sa.text("UPDATE users SET access_type_old = :int_val WHERE access_type = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
     # Update first_day_of_week_old based on current first_day_of_week string values
     for str_val, int_val in WEEK_DAY_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users SET first_day_of_week_old = :int_val "
-                "WHERE first_day_of_week = :str_val"
-            ),
+            sa.text("UPDATE users SET first_day_of_week_old = :int_val WHERE first_day_of_week = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
@@ -730,20 +692,14 @@ def downgrade() -> None:
     # Update activity_type_old based on current activity_type string values
     for str_val, int_val in ACTIVITY_TYPE_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users_goals SET activity_type_old = :int_val "
-                "WHERE activity_type = :str_val"
-            ),
+            sa.text("UPDATE users_goals SET activity_type_old = :int_val WHERE activity_type = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 
     # Update goal_type_old based on current goal_type string values
     for str_val, int_val in GOAL_TYPE_REVERSE_MAP.items():
         connection.execute(
-            sa.text(
-                "UPDATE users_goals SET goal_type_old = :int_val "
-                "WHERE goal_type = :str_val"
-            ),
+            sa.text("UPDATE users_goals SET goal_type_old = :int_val WHERE goal_type = :str_val"),
             {"int_val": int_val, "str_val": str_val},
         )
 

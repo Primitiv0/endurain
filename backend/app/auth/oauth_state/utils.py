@@ -2,11 +2,9 @@
 
 import secrets
 
-from core.database import SessionLocal
-
 import auth.oauth_state.crud as oauth_state_crud
-
 import core.logger as core_logger
+from core.database import SessionLocal
 
 
 def create_state_id_and_nonce() -> tuple[str, str]:

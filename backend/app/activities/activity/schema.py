@@ -12,7 +12,6 @@ from pydantic import (
     StrictStr,
 )
 
-
 PositiveInt = Annotated[StrictInt, Field(ge=1)]
 VisibilityValue = Annotated[StrictInt, Field(ge=0, le=2)]
 LongText = Annotated[StrictStr, Field(max_length=2500)]
@@ -132,9 +131,7 @@ class Activity(BaseModel):
     strava_gear_id: str | None = Field(default=None, max_length=45)
     strava_activity_id: int | None = None
     garminconnect_activity_id: int | None = None
-    garminconnect_gear_id: str | None = Field(
-        default=None, max_length=45
-    )
+    garminconnect_gear_id: str | None = Field(default=None, max_length=45)
     import_info: dict | None = None
     is_hidden: bool = False
     hide_start_time: bool | None = None
@@ -149,13 +146,9 @@ class Activity(BaseModel):
     hide_laps: bool | None = None
     hide_workout_sets_steps: bool | None = None
     hide_gear: bool | None = None
-    tracker_manufacturer: str | None = Field(
-        default=None, max_length=250
-    )
+    tracker_manufacturer: str | None = Field(default=None, max_length=250)
     tracker_model: str | None = Field(default=None, max_length=250)
-    map_thumbnail_path: str | None = Field(
-        default=None, max_length=500
-    )
+    map_thumbnail_path: str | None = Field(default=None, max_length=500)
 
 
 class ActivitySportStats(BaseModel):
@@ -204,36 +197,16 @@ class ActivityStats(BaseModel):
     swim: ActivitySportStats = Field(default_factory=ActivitySportStats)
     walk: ActivitySportStats = Field(default_factory=ActivitySportStats)
     hike: ActivitySportStats = Field(default_factory=ActivitySportStats)
-    rowing: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    snow_ski: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    snowboard: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    windsurf: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    stand_up_paddleboarding: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    surfing: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    kayaking: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    sailing: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    snowshoeing: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
-    inline_skating: ActivitySportStats = Field(
-        default_factory=ActivitySportStats
-    )
+    rowing: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    snow_ski: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    snowboard: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    windsurf: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    stand_up_paddleboarding: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    surfing: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    kayaking: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    sailing: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    snowshoeing: ActivitySportStats = Field(default_factory=ActivitySportStats)
+    inline_skating: ActivitySportStats = Field(default_factory=ActivitySportStats)
 
 
 class GearActivitiesListResponse(BaseModel):

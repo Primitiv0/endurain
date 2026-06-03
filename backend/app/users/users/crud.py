@@ -1,25 +1,20 @@
 """CRUD operations for user management."""
 
 import posixpath
-
-from fastapi import HTTPException, status
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from urllib.parse import unquote
 
 import auth.mfa.models as auth_mfa_models
-
+import core.decorators as core_decorators
+import health.health_weight.utils as health_weight_utils
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
+import users.users.models as users_models
 import users.users.schema as users_schema
 import users.users.utils as users_utils
-import users.users.models as users_models
-
-import health.health_weight.utils as health_weight_utils
-
-import server_settings.utils as server_settings_utils
-import server_settings.schema as server_settings_schema
-
-import core.decorators as core_decorators
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -132,24 +127,16 @@ def get_user_by_username(
 
     if contains:
         # Escape LIKE special characters to prevent SQL injection
-        escaped_username = (
-            normalized_username.replace("\\", "\\\\")
-            .replace("%", r"\%")
-            .replace("_", r"\_")
-        )
+        escaped_username = normalized_username.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
 
         # Query users with username containing the search term
         stmt = select(users_models.Users).where(
-            func.lower(users_models.Users.username).like(
-                f"%{escaped_username}%", escape="\\"
-            )
+            func.lower(users_models.Users.username).like(f"%{escaped_username}%", escape="\\")
         )
         return db.execute(stmt).scalars().all()
     else:
         # Exact match - no LIKE escaping needed
-        stmt = select(users_models.Users).where(
-            users_models.Users.username == normalized_username
-        )
+        stmt = select(users_models.Users).where(users_models.Users.username == normalized_username)
         return db.execute(stmt).scalar_one_or_none()
 
 
@@ -173,9 +160,7 @@ def get_user_by_email(email: str, db: Session) -> users_models.Users | None:
 
 
 @core_decorators.handle_db_errors
-def get_user_by_id(
-    user_id: int, db: Session, public_check: bool = False
-) -> users_models.Users | None:
+def get_user_by_id(user_id: int, db: Session, public_check: bool = False) -> users_models.Users | None:
     """
     Retrieve user by ID.
 
@@ -197,10 +182,7 @@ def get_user_by_id(
         server_settings = server_settings_utils.get_server_settings_or_404(db)
 
         # Return None if public sharable links are disabled
-        if (
-            not server_settings.public_shareable_links
-            or not server_settings.public_shareable_links_user_info
-        ):
+        if not server_settings.public_shareable_links or not server_settings.public_shareable_links_user_info:
             return None
 
     stmt = select(users_models.Users).where(users_models.Users.id == user_id)
@@ -221,9 +203,7 @@ def get_users_admin(db: Session) -> list[users_models.Users]:
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(users_models.Users).where(
-        users_models.Users.access_type == users_schema.UserAccessType.ADMIN.value
-    )
+    stmt = select(users_models.Users).where(users_models.Users.access_type == users_schema.UserAccessType.ADMIN.value)
     return db.execute(stmt).scalars().all()
 
 
@@ -257,9 +237,7 @@ def create_user(
 
         # Normalize access_type to string value
         access_type_value = (
-            user.access_type.value
-            if isinstance(user.access_type, users_schema.UserAccessType)
-            else user.access_type
+            user.access_type.value if isinstance(user.access_type, users_schema.UserAccessType) else user.access_type
         )
 
         # Hash the password with configurable policy and length
@@ -338,10 +316,7 @@ def create_signup_user(
             active = False  # Inactive until approved
 
         # If both email verification and admin approval are disabled, user is immediately active
-        if (
-            not server_settings.signup_require_email_verification
-            and not server_settings.signup_require_admin_approval
-        ):
+        if not server_settings.signup_require_email_verification and not server_settings.signup_require_admin_approval:
             active = True
             email_verified = True
 
@@ -391,9 +366,7 @@ def create_signup_user(
 
 
 @core_decorators.handle_db_errors
-async def edit_user(
-    user_id: int, user: users_schema.UsersRead, db: Session
-) -> users_models.Users:
+async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> users_models.Users:
     """
     Update an existing user's information.
 
@@ -555,10 +528,7 @@ async def edit_profile_user(
             new_path = updates["photo_path"]
             if new_path is not None:
                 expected_prefix = f"data/user_images/{user_id}."
-                has_traversal = (
-                    "\\" in new_path
-                    or any(part == ".." for part in new_path.split("/"))
-                )
+                has_traversal = "\\" in new_path or any(part == ".." for part in new_path.split("/"))
                 normalised = posixpath.normpath(new_path)
                 if has_traversal or not normalised.startswith(expected_prefix):
                     updates.pop("photo_path")
@@ -569,9 +539,7 @@ async def edit_profile_user(
 
         # If the photo_path is being cleared or replaced, delete
         # the on-disk file (matches legacy edit_user behaviour).
-        photo_changed = (
-            "photo_path" in updates and updates["photo_path"] != previous_photo_path
-        )
+        photo_changed = "photo_path" in updates and updates["photo_path"] != previous_photo_path
         if photo_changed and previous_photo_path:
             await users_utils.delete_user_photo_filesystem(db_user.id)
 
@@ -721,9 +689,7 @@ def edit_user_password(
 
 
 @core_decorators.handle_db_errors
-async def update_user_photo(
-    user_id: int, db: Session, photo_path: str | None = None
-) -> str | None:
+async def update_user_photo(user_id: int, db: Session, photo_path: str | None = None) -> str | None:
     """
     Update a user's photo path.
 
@@ -760,9 +726,7 @@ async def update_user_photo(
 
 
 @core_decorators.handle_db_errors
-def update_user_mfa(
-    user_id: int, db: Session, encrypted_secret: str | None = None
-) -> None:
+def update_user_mfa(user_id: int, db: Session, encrypted_secret: str | None = None) -> None:
     """
     Update a user's MFA settings.
 
@@ -785,9 +749,7 @@ def update_user_mfa(
     # Verify the user exists (raises 404 if not found).
     users_utils.get_user_by_id_or_404(user_id, db)
 
-    stmt = select(auth_mfa_models.AuthUserMFA).where(
-        auth_mfa_models.AuthUserMFA.user_id == user_id
-    )
+    stmt = select(auth_mfa_models.AuthUserMFA).where(auth_mfa_models.AuthUserMFA.user_id == user_id)
     mfa_row = db.execute(stmt).scalar_one_or_none()
     if mfa_row is None:
         # Row may be missing if the backfill migration has

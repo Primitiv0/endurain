@@ -24,15 +24,14 @@ Architecture
 
 import hashlib
 
-from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from starlette.responses import Response
-
 import core.config as core_config
 import core.logger as core_logger
 import core.network as core_network
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from starlette.responses import Response
 
 #: Baseline applied globally via ``SlowAPIMiddleware``.
 DEFAULT: str = "120/minute"
@@ -63,11 +62,10 @@ def _get_rate_limit_key(request: Request) -> str:
     """
     auth = request.headers.get("authorization", "")
     if auth.startswith("Bearer ") and len(auth) > 7:
-        token_hash = hashlib.sha256(
-            auth[7:].encode()
-        ).hexdigest()[:16]
+        token_hash = hashlib.sha256(auth[7:].encode()).hexdigest()[:16]
         return f"user:{token_hash}"
     return core_network.get_ip_address(request)
+
 
 limiter: Limiter = Limiter(
     key_func=_get_rate_limit_key,
@@ -98,36 +96,28 @@ def rate_limit_exceeded_handler(
         headers attached when available.
     """
     core_logger.print_to_log(
-        f"Rate limit exceeded: "
-        f"{_get_rate_limit_key(request)} "
-        f"on {request.method} {request.url.path}",
+        f"Rate limit exceeded: {_get_rate_limit_key(request)} on {request.method} {request.url.path}",
         "warning",
     )
     response = JSONResponse(
         status_code=429,
         content={
-            "detail": (
-                "Too many requests. "
-                "Please try again later."
-            ),
+            "detail": ("Too many requests. Please try again later."),
         },
     )
     # Inject X-RateLimit-* and Retry-After headers.
     # request.state.view_rate_limit is populated by
     # SlowAPIMiddleware before this handler is called.
     try:
-        response = (
-            request.app.state.limiter._inject_headers(
-                response,
-                request.state.view_rate_limit,
-            )
+        response = request.app.state.limiter._inject_headers(
+            response,
+            request.state.view_rate_limit,
         )
-    except Exception as header_err:  # noqa: BLE001
+    except Exception as header_err:
         # Headers are informational — never let injection
         # errors break the 429 response itself.
         core_logger.print_to_log(
-            "Failed to inject rate-limit headers:"
-            f" {header_err}",
+            f"Failed to inject rate-limit headers: {header_err}",
             "debug",
         )
     return response

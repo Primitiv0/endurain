@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictFloat
+from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt
 
 
 class HealthTargetsBase(BaseModel):
@@ -14,15 +14,9 @@ class HealthTargetsBase(BaseModel):
         poop_count: Target daily bowel movement count.
     """
 
-    weight: StrictFloat | None = Field(
-        default=None, gt=0, le=500, description="Target weight in kg"
-    )
-    steps: StrictInt | None = Field(
-        default=None, ge=0, description="Target daily steps count"
-    )
-    sleep: StrictInt | None = Field(
-        default=None, ge=0, le=86400, description="Target sleep duration in seconds"
-    )
+    weight: StrictFloat | None = Field(default=None, gt=0, le=500, description="Target weight in kg")
+    steps: StrictInt | None = Field(default=None, ge=0, description="Target daily steps count")
+    sleep: StrictInt | None = Field(default=None, ge=0, le=86400, description="Target sleep duration in seconds")
     fasting: StrictInt | None = Field(
         default=None,
         ge=0,
@@ -33,9 +27,7 @@ class HealthTargetsBase(BaseModel):
         default=None,
         ge=0,
         le=20000,
-        description=(
-            "Target daily water intake in milliliters"
-        ),
+        description=("Target daily water intake in milliliters"),
     )
     poop_count: StrictInt | None = Field(
         default=None,

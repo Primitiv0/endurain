@@ -24,14 +24,14 @@ from .models import ActivityLaps
 from .schema import ActivityLapsBase, ActivityLapsRead
 
 __all__ = [
+    # ORM models
+    "ActivityLaps",
+    # Pydantic schemas
+    "ActivityLapsBase",
+    "ActivityLapsRead",
     # CRUD operations
     "create_activity_laps",
     "get_activities_laps",
     "get_activity_laps",
     "get_public_activity_laps",
-    # Pydantic schemas
-    "ActivityLapsBase",
-    "ActivityLapsRead",
-    # ORM models
-    "ActivityLaps",
 ]

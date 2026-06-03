@@ -6,9 +6,8 @@ including validation rules and field constraints.
 """
 
 import pytest
-from pydantic import ValidationError
-
 import server_settings.schema as server_settings_schema
+from pydantic import ValidationError
 
 
 class TestUnitsEnum:
@@ -179,9 +178,7 @@ class TestServerSettingsBase:
                 password_length_admin_users=12,
             )
         # javascript: gets caught by http/https protocol check first
-        assert "must use http://" in str(
-            exc_info.value
-        ) or "contains disallowed" in str(exc_info.value)
+        assert "must use http://" in str(exc_info.value) or "contains disallowed" in str(exc_info.value)
 
     def test_tileserver_url_dangerous_pattern_data(self):
         """Test validation fails for dangerous data: pattern."""

@@ -3,14 +3,14 @@
 Canonical path tests — imports from auth.api_keys.* directly.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 import auth.api_keys.crud as api_keys_crud
 import auth.api_keys.models as api_keys_models
 import auth.api_keys.schema as api_keys_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetApiKeysByUserId:

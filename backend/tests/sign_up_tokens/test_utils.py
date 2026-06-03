@@ -4,9 +4,8 @@ import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException, status
-
 import sign_up_tokens.utils as sign_up_tokens_utils
+from fastapi import HTTPException, status
 
 
 def _make_email_service(configured: bool = True) -> MagicMock:
@@ -21,14 +20,8 @@ def _make_email_service(configured: bool = True) -> MagicMock:
 class TestCreateSignUpTokenUtils:
     """Test suite for create_sign_up_token utility function."""
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.create_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "core_apprise.generate_token_and_hash"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.create_sign_up_token")
+    @patch("sign_up_tokens.utils.core_apprise.generate_token_and_hash")
     def test_create_sign_up_token_returns_plain_token(
         self,
         mock_generate,
@@ -40,22 +33,14 @@ class TestCreateSignUpTokenUtils:
         mock_generate.return_value = ("plain-token", "hashed-token")
 
         # Act
-        result = sign_up_tokens_utils.create_sign_up_token(
-            42, mock_db
-        )
+        result = sign_up_tokens_utils.create_sign_up_token(42, mock_db)
 
         # Assert
         assert result == "plain-token"
         mock_generate.assert_called_once()
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.create_sign_up_token"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "core_apprise.generate_token_and_hash"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.create_sign_up_token")
+    @patch("sign_up_tokens.utils.core_apprise.generate_token_and_hash")
     def test_create_sign_up_token_persists_to_db(
         self,
         mock_generate,
@@ -78,9 +63,7 @@ class TestCreateSignUpTokenUtils:
 class TestSendSignUpEmail:
     """Test suite for send_sign_up_email function."""
 
-    async def test_send_sign_up_email_not_configured_raises_503(
-        self, mock_db
-    ):
+    async def test_send_sign_up_email_not_configured_raises_503(self, mock_db):
         """503 raised when email service is not configured."""
         # Arrange
         email_service = _make_email_service(configured=False)
@@ -88,20 +71,11 @@ class TestSendSignUpEmail:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await sign_up_tokens_utils.send_sign_up_email(
-                user, email_service, mock_db
-            )
+            await sign_up_tokens_utils.send_sign_up_email(user, email_service, mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_email_messages"
-        ".get_signup_confirmation_email"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_email_messages.get_signup_confirmation_email")
     @patch("sign_up_tokens.utils.core_i18n.normalize_locale")
     @patch("sign_up_tokens.utils.create_sign_up_token")
     async def test_send_sign_up_email_success_sends_email(
@@ -123,9 +97,7 @@ class TestSendSignUpEmail:
         mock_get_email.return_value = ("Subject", "<html>", "text")
 
         # Act
-        result = await sign_up_tokens_utils.send_sign_up_email(
-            user, email_service, mock_db
-        )
+        result = await sign_up_tokens_utils.send_sign_up_email(user, email_service, mock_db)
 
         # Assert
         assert result is True
@@ -136,9 +108,7 @@ class TestSendSignUpEmail:
 class TestSendSignUpAdminApprovalEmail:
     """Test suite for send_sign_up_admin_approval_email."""
 
-    async def test_send_sign_up_admin_approval_not_configured_503(
-        self, mock_db
-    ):
+    async def test_send_sign_up_admin_approval_not_configured_503(self, mock_db):
         """503 raised when email service is not configured."""
         # Arrange
         email_service = _make_email_service(configured=False)
@@ -146,27 +116,13 @@ class TestSendSignUpAdminApprovalEmail:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await (
-                sign_up_tokens_utils
-                .send_sign_up_admin_approval_email(
-                    user, email_service, mock_db
-                )
-            )
+            await sign_up_tokens_utils.send_sign_up_admin_approval_email(user, email_service, mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_email_messages"
-        ".get_admin_signup_notification_email"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_email_messages.get_admin_signup_notification_email")
     @patch("sign_up_tokens.utils.core_i18n.normalize_locale")
-    @patch(
-        "sign_up_tokens.utils.users_utils.get_admin_users_or_404"
-    )
+    @patch("sign_up_tokens.utils.users_utils.get_admin_users_or_404")
     async def test_send_sign_up_admin_approval_sends_to_all_admins(
         self,
         mock_get_admins,
@@ -191,16 +147,12 @@ class TestSendSignUpAdminApprovalEmail:
         mock_get_email.return_value = ("Subject", "<html>", "text")
 
         # Act
-        await sign_up_tokens_utils.send_sign_up_admin_approval_email(
-            user, email_service, mock_db
-        )
+        await sign_up_tokens_utils.send_sign_up_admin_approval_email(user, email_service, mock_db)
 
         # Assert
         assert email_service.send_email.await_count == 2
 
-    @patch(
-        "sign_up_tokens.utils.users_utils.get_admin_users_or_404"
-    )
+    @patch("sign_up_tokens.utils.users_utils.get_admin_users_or_404")
     async def test_send_sign_up_admin_approval_no_admins_raises_404(
         self,
         mock_get_admins,
@@ -217,38 +169,24 @@ class TestSendSignUpAdminApprovalEmail:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await (
-                sign_up_tokens_utils
-                .send_sign_up_admin_approval_email(
-                    user, email_service, mock_db
-                )
-            )
+            await sign_up_tokens_utils.send_sign_up_admin_approval_email(user, email_service, mock_db)
 
-        assert (
-            exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        )
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
 
 class TestSendSignUpApprovalEmail:
     """Test suite for send_sign_up_approval_email function."""
 
-    async def test_send_sign_up_approval_not_configured_raises_503(
-        self, mock_db
-    ):
+    async def test_send_sign_up_approval_not_configured_raises_503(self, mock_db):
         """503 raised when email service is not configured."""
         # Arrange
         email_service = _make_email_service(configured=False)
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await sign_up_tokens_utils.send_sign_up_approval_email(
-                1, email_service, mock_db
-            )
+            await sign_up_tokens_utils.send_sign_up_approval_email(1, email_service, mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        assert exc_info.value.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
     @patch("sign_up_tokens.utils.users_crud.get_user_by_id")
     async def test_send_sign_up_approval_user_not_found_raises_404(
@@ -263,19 +201,11 @@ class TestSendSignUpApprovalEmail:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            await sign_up_tokens_utils.send_sign_up_approval_email(
-                99, email_service, mock_db
-            )
+            await sign_up_tokens_utils.send_sign_up_approval_email(99, email_service, mock_db)
 
-        assert (
-            exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        )
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_email_messages"
-        ".get_user_signup_approved_email"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_email_messages.get_user_signup_approved_email")
     @patch("sign_up_tokens.utils.core_i18n.normalize_locale")
     @patch("sign_up_tokens.utils.users_crud.get_user_by_id")
     async def test_send_sign_up_approval_success_sends_email(
@@ -298,9 +228,7 @@ class TestSendSignUpApprovalEmail:
         mock_get_email.return_value = ("Subject", "<html>", "text")
 
         # Act
-        result = await sign_up_tokens_utils.send_sign_up_approval_email(
-            1, email_service, mock_db
-        )
+        result = await sign_up_tokens_utils.send_sign_up_approval_email(1, email_service, mock_db)
 
         # Assert
         assert result is True
@@ -310,14 +238,8 @@ class TestSendSignUpApprovalEmail:
 class TestUseSignUpToken:
     """Test suite for use_sign_up_token function."""
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.mark_sign_up_token_used"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.get_sign_up_token_by_hash"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.mark_sign_up_token_used")
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.get_sign_up_token_by_hash")
     def test_use_sign_up_token_success_returns_user_id(
         self,
         mock_get_by_hash,
@@ -327,33 +249,21 @@ class TestUseSignUpToken:
         """Valid token is consumed and user_id is returned."""
         # Arrange
         plain_token = "valid-plain-token"
-        token_hash = hashlib.sha256(
-            plain_token.encode()
-        ).hexdigest()
+        token_hash = hashlib.sha256(plain_token.encode()).hexdigest()
         mock_token = MagicMock()
         mock_token.user_id = 42
         mock_get_by_hash.return_value = mock_token
 
         # Act
-        result = sign_up_tokens_utils.use_sign_up_token(
-            plain_token, mock_db
-        )
+        result = sign_up_tokens_utils.use_sign_up_token(plain_token, mock_db)
 
         # Assert
         assert result == 42
         mock_get_by_hash.assert_called_once_with(token_hash, mock_db)
-        mock_mark_used.assert_called_once_with(
-            mock_token.id, mock_db
-        )
+        mock_mark_used.assert_called_once_with(mock_token.id, mock_db)
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.mark_sign_up_token_used"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.get_sign_up_token_by_hash"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.mark_sign_up_token_used")
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.get_sign_up_token_by_hash")
     def test_use_sign_up_token_invalid_token_raises_400(
         self,
         mock_get_by_hash,
@@ -366,23 +276,13 @@ class TestUseSignUpToken:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            sign_up_tokens_utils.use_sign_up_token(
-                "invalid-token", mock_db
-            )
+            sign_up_tokens_utils.use_sign_up_token("invalid-token", mock_db)
 
-        assert (
-            exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-        )
+        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         mock_mark_used.assert_not_called()
 
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.mark_sign_up_token_used"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.get_sign_up_token_by_hash"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.mark_sign_up_token_used")
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.get_sign_up_token_by_hash")
     def test_use_sign_up_token_mark_used_http_exception_propagates(
         self,
         mock_get_by_hash,
@@ -401,21 +301,13 @@ class TestUseSignUpToken:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            sign_up_tokens_utils.use_sign_up_token(
-                "valid-token", mock_db
-            )
+            sign_up_tokens_utils.use_sign_up_token("valid-token", mock_db)
 
         assert exc_info.value is http_err
 
     @patch("sign_up_tokens.utils.core_logger.print_to_log")
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.mark_sign_up_token_used"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.get_sign_up_token_by_hash"
-    )
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.mark_sign_up_token_used")
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.get_sign_up_token_by_hash")
     def test_use_sign_up_token_unexpected_error_raises_500(
         self,
         mock_get_by_hash,
@@ -431,28 +323,17 @@ class TestUseSignUpToken:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            sign_up_tokens_utils.use_sign_up_token(
-                "valid-token", mock_db
-            )
+            sign_up_tokens_utils.use_sign_up_token("valid-token", mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         mock_log.assert_called_once()
 
 
 class TestDeleteInvalidTokensFromDb:
     """Test suite for delete_invalid_tokens_from_db function."""
 
-    @patch(
-        "sign_up_tokens.utils."
-        "core_logger.print_to_log_and_console"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.delete_expired_sign_up_tokens"
-    )
+    @patch("sign_up_tokens.utils.core_logger.print_to_log_and_console")
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.delete_expired_sign_up_tokens")
     @patch("sign_up_tokens.utils.SessionLocal")
     def test_delete_invalid_tokens_from_db_logs_on_deletion(
         self,
@@ -463,9 +344,7 @@ class TestDeleteInvalidTokensFromDb:
         """Log is printed when expired tokens are deleted."""
         # Arrange
         mock_db_ctx = MagicMock()
-        mock_session_local.return_value.__enter__.return_value = (
-            mock_db_ctx
-        )
+        mock_session_local.return_value.__enter__.return_value = mock_db_ctx
         mock_delete_expired.return_value = 3
 
         # Act
@@ -475,14 +354,8 @@ class TestDeleteInvalidTokensFromDb:
         mock_delete_expired.assert_called_once_with(mock_db_ctx)
         mock_log.assert_called_once()
 
-    @patch(
-        "sign_up_tokens.utils."
-        "core_logger.print_to_log_and_console"
-    )
-    @patch(
-        "sign_up_tokens.utils."
-        "sign_up_tokens_crud.delete_expired_sign_up_tokens"
-    )
+    @patch("sign_up_tokens.utils.core_logger.print_to_log_and_console")
+    @patch("sign_up_tokens.utils.sign_up_tokens_crud.delete_expired_sign_up_tokens")
     @patch("sign_up_tokens.utils.SessionLocal")
     def test_delete_invalid_tokens_from_db_no_log_when_zero(
         self,
@@ -493,9 +366,7 @@ class TestDeleteInvalidTokensFromDb:
         """No log printed when zero expired tokens are found."""
         # Arrange
         mock_db_ctx = MagicMock()
-        mock_session_local.return_value.__enter__.return_value = (
-            mock_db_ctx
-        )
+        mock_session_local.return_value.__enter__.return_value = mock_db_ctx
         mock_delete_expired.return_value = 0
 
         # Act

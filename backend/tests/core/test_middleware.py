@@ -10,10 +10,9 @@ Verifies:
 """
 
 import pytest
+from core.middleware import CSRFMiddleware
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from core.middleware import CSRFMiddleware
 
 
 @pytest.fixture
@@ -90,10 +89,7 @@ class TestCSRFMiddlewareWebClients:
             - GET requests succeed without X-CSRF-Token header
             - Only state-changing methods require CSRF
         """
-        response = client.get(
-            "/api/v1/test/get",
-            headers={"X-Client-Type": "web"}
-        )
+        response = client.get("/api/v1/test/get", headers={"X-Client-Type": "web"})
         assert response.status_code == 200
         assert response.json() == {"message": "GET success"}
 
@@ -121,11 +117,7 @@ class TestCSRFMiddlewareWebClients:
             - In-memory token model works correctly
         """
         response = client.post(
-            "/api/v1/test/post",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "test-csrf-token-123"
-            }
+            "/api/v1/test/post", headers={"X-Client-Type": "web", "X-CSRF-Token": "test-csrf-token-123"}
         )
         assert response.status_code == 200
         assert response.json() == {"message": "POST success"}
@@ -139,11 +131,7 @@ class TestCSRFMiddlewareWebClients:
             - X-CSRF-Token header works
         """
         response = client.put(
-            "/api/v1/test/put",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "test-csrf-token-123"
-            }
+            "/api/v1/test/put", headers={"X-Client-Type": "web", "X-CSRF-Token": "test-csrf-token-123"}
         )
         assert response.status_code == 200
         assert response.json() == {"message": "PUT success"}
@@ -157,11 +145,7 @@ class TestCSRFMiddlewareWebClients:
             - X-CSRF-Token header works
         """
         response = client.delete(
-            "/api/v1/test/delete",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "test-csrf-token-123"
-            }
+            "/api/v1/test/delete", headers={"X-Client-Type": "web", "X-CSRF-Token": "test-csrf-token-123"}
         )
         assert response.status_code == 200
         assert response.json() == {"message": "DELETE success"}
@@ -175,11 +159,7 @@ class TestCSRFMiddlewareWebClients:
             - X-CSRF-Token header works
         """
         response = client.patch(
-            "/api/v1/test/patch",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "test-csrf-token-123"
-            }
+            "/api/v1/test/patch", headers={"X-Client-Type": "web", "X-CSRF-Token": "test-csrf-token-123"}
         )
         assert response.status_code == 200
         assert response.json() == {"message": "PATCH success"}
@@ -210,10 +190,7 @@ class TestCSRFMiddlewareMobileClients:
             - X-Client-Type: mobile is exempt from CSRF checks
             - No X-CSRF-Token required
         """
-        response = client.post(
-            "/api/v1/test/post",
-            headers={"X-Client-Type": "mobile"}
-        )
+        response = client.post("/api/v1/test/post", headers={"X-Client-Type": "mobile"})
         assert response.status_code == 200
         assert response.json() == {"message": "POST success"}
 
@@ -225,10 +202,7 @@ class TestCSRFMiddlewareMobileClients:
             - Any non-"web" X-Client-Type is exempt from CSRF
             - DELETE works without X-CSRF-Token for mobile/app clients
         """
-        response = client.delete(
-            "/api/v1/test/delete",
-            headers={"X-Client-Type": "app"}
-        )
+        response = client.delete("/api/v1/test/delete", headers={"X-Client-Type": "app"})
         assert response.status_code == 200
         assert response.json() == {"message": "DELETE success"}
 
@@ -246,10 +220,7 @@ class TestCSRFMiddlewareExemptPaths:
             - Login endpoint works without X-CSRF-Token
             - Even with X-Client-Type: web
         """
-        response = client.post(
-            "/api/v1/auth/login",
-            headers={"X-Client-Type": "web"}
-        )
+        response = client.post("/api/v1/auth/login", headers={"X-Client-Type": "web"})
         assert response.status_code == 200
         assert response.json() == {"message": "Login success"}
 
@@ -261,10 +232,7 @@ class TestCSRFMiddlewareExemptPaths:
             - Routes starting with /api/v1/public/idp/session/ are exempt
             - Dynamic route segments work correctly
         """
-        response = client.post(
-            "/api/v1/public/idp/session/test/callback",
-            headers={"X-Client-Type": "web"}
-        )
+        response = client.post("/api/v1/public/idp/session/test/callback", headers={"X-Client-Type": "web"})
         assert response.status_code == 200
         assert response.json() == {"message": "Public success"}
 
@@ -288,11 +256,7 @@ class TestCSRFMiddlewareInMemoryModel:
         """
         # Request with CSRF header but no CSRF cookie
         response = client.post(
-            "/api/v1/test/post",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "in-memory-csrf-token-abc123"
-            }
+            "/api/v1/test/post", headers={"X-Client-Type": "web", "X-CSRF-Token": "in-memory-csrf-token-abc123"}
         )
         assert response.status_code == 200
         assert response.json() == {"message": "POST success"}
@@ -311,20 +275,12 @@ class TestCSRFMiddlewareInMemoryModel:
             "simple-token",
             "base64url-encoded-token",
             "a" * 64,  # Long token
-            "123",     # Short token
+            "123",  # Short token
         ]
 
         for token in token_formats:
-            response = client.post(
-                "/api/v1/test/post",
-                headers={
-                    "X-Client-Type": "web",
-                    "X-CSRF-Token": token
-                }
-            )
-            assert response.status_code == 200, (
-                f"Failed for token format: {token}"
-            )
+            response = client.post("/api/v1/test/post", headers={"X-Client-Type": "web", "X-CSRF-Token": token})
+            assert response.status_code == 200, f"Failed for token format: {token}"
 
 
 class TestCSRFMiddlewareSameSiteCookie:
@@ -348,11 +304,8 @@ class TestCSRFMiddlewareSameSiteCookie:
         # Request without any cookies, only CSRF header
         response = client.post(
             "/api/v1/test/post",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "header-only-token"
-            },
-            cookies={}  # Explicitly no cookies
+            headers={"X-Client-Type": "web", "X-CSRF-Token": "header-only-token"},
+            cookies={},  # Explicitly no cookies
         )
         assert response.status_code == 200
         assert response.json() == {"message": "POST success"}
@@ -377,10 +330,7 @@ class TestCSRFMiddlewareSameSiteCookie:
         # Request with both cookie and header - header wins
         response = client.post(
             "/api/v1/test/post",
-            headers={
-                "X-Client-Type": "web",
-                "X-CSRF-Token": "header-csrf-token"
-            },
-            cookies={"csrf_token": "different-cookie-csrf-token"}
+            headers={"X-Client-Type": "web", "X-CSRF-Token": "header-csrf-token"},
+            cookies={"csrf_token": "different-cookie-csrf-token"},
         )
         assert response.status_code == 200

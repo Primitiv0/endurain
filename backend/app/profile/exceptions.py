@@ -205,19 +205,19 @@ def handle_import_export_exception(error: Exception, operation: str) -> HTTPExce
     elif isinstance(error, ImportValidationError):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Import validation failed during {operation}. {str(error)}",
+            detail=f"Import validation failed during {operation}. {error!s}",
         )
 
     elif isinstance(error, FileFormatError):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file format during {operation}. {str(error)}",
+            detail=f"Invalid file format during {operation}. {error!s}",
         )
 
     elif isinstance(error, DataIntegrityError):
         return HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Data integrity error during {operation}. {str(error)}",
+            detail=f"Data integrity error during {operation}. {error!s}",
         )
 
     elif isinstance(error, ImportTimeoutError):
@@ -235,31 +235,31 @@ def handle_import_export_exception(error: Exception, operation: str) -> HTTPExce
     elif isinstance(error, FileSizeError):
         return HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"File too large during {operation}. {str(error)}",
+            detail=f"File too large during {operation}. {error!s}",
         )
 
     elif isinstance(error, ActivityLimitError):
         return HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"Too many activities during {operation}. {str(error)}",
+            detail=f"Too many activities during {operation}. {error!s}",
         )
 
     elif isinstance(error, ZipStructureError):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid ZIP file structure during {operation}. {str(error)}",
+            detail=f"Invalid ZIP file structure during {operation}. {error!s}",
         )
 
     elif isinstance(error, JSONParseError):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"JSON parsing error during {operation}. {str(error)}",
+            detail=f"JSON parsing error during {operation}. {error!s}",
         )
 
     elif isinstance(error, SchemaValidationError):
         return HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Schema validation error during {operation}. {str(error)}",
+            detail=f"Schema validation error during {operation}. {error!s}",
         )
 
     # Shared exceptions

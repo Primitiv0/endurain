@@ -3,11 +3,29 @@
 import base64
 import json
 import secrets as secrets_module
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
+import auth.identity_links.crud as user_idp_crud
+import auth.identity_links.models as user_idp_models
+import auth.identity_links.utils as user_idp_utils
+import auth.identity_providers.crud as idp_crud
+import auth.identity_providers.models as idp_models
+import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.models as oauth_state_models
+import auth.password_hasher as auth_password_hasher
+import core.config as core_config
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import core.network as core_network
 import httpx
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
+import users.users.crud as users_crud
+import users.users.models as users_models
+import users.users.schema as users_schema
+import users.users.utils as users_utils
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import HTTPException, Request, status
 from joserfc import jwt
@@ -20,26 +38,6 @@ from joserfc.errors import (
 )
 from joserfc.jwk import ECKey, OctKey, RSAKey
 from sqlalchemy.orm import Session
-
-import auth.identity_providers.crud as idp_crud
-import auth.identity_providers.models as idp_models
-import auth.oauth_state.crud as oauth_state_crud
-import auth.oauth_state.models as oauth_state_models
-import auth.password_hasher as auth_password_hasher
-import core.config as core_config
-import core.cryptography as core_cryptography
-import core.logger as core_logger
-import core.network as core_network
-import server_settings.schema as server_settings_schema
-import server_settings.utils as server_settings_utils
-import users.users.crud as users_crud
-import users.users.models as users_models
-import users.users.schema as users_schema
-import users.users.utils as users_utils
-import auth.identity_links.crud as user_idp_crud
-import auth.identity_links.models as user_idp_models
-import auth.identity_links.utils as user_idp_utils
-
 
 # Constants for token rotation policy
 MAX_IDP_TOKEN_AGE_DAYS = 90
@@ -64,7 +62,6 @@ class TokenAction(Enum):
 
 
 class IdentityProviderService:
-
     def __init__(self):
         """
         Initializes the service with in-memory caches for discovery data and their expiry times,
@@ -85,14 +82,10 @@ class IdentityProviderService:
         write keeps memory usage proportional to the number of
         currently-active providers rather than to lifetime churn.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Discovery cache uses a parallel _cache_expiry map
-        expired_idp_ids = [
-            idp_id
-            for idp_id, expires_at in self._cache_expiry.items()
-            if expires_at <= now
-        ]
+        expired_idp_ids = [idp_id for idp_id, expires_at in self._cache_expiry.items() if expires_at <= now]
         for idp_id in expired_idp_ids:
             self._discovery_cache.pop(idp_id, None)
             self._cache_expiry.pop(idp_id, None)
@@ -101,8 +94,7 @@ class IdentityProviderService:
         expired_jwks_uris = [
             uri
             for uri, entry in self._jwks_cache.items()
-            if (entry.get("cached_at") is None)
-            or (now - entry["cached_at"]) >= self._cache_ttl
+            if (entry.get("cached_at") is None) or (now - entry["cached_at"]) >= self._cache_ttl
         ]
         for uri in expired_jwks_uris:
             self._jwks_cache.pop(uri, None)
@@ -164,7 +156,7 @@ class IdentityProviderService:
         }
         """
         # Check cache first
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if jwks_uri in self._jwks_cache:
             cached_data = self._jwks_cache[jwks_uri]
             cached_at = cached_data.get("cached_at")
@@ -182,9 +174,7 @@ class IdentityProviderService:
             # attacker pivot via signed token replay.
             # Self-hosted IdPs on private networks can
             # be opted in via SSRF_ALLOWED_HOSTS.
-            core_network.reject_private_url(
-                jwks_uri, purpose="oidc_jwks"
-            )
+            core_network.reject_private_url(jwks_uri, purpose="oidc_jwks")
             client = await self._get_http_client()
             core_logger.print_to_log(f"Fetching JWKS from {jwks_uri}", "debug")
 
@@ -209,21 +199,18 @@ class IdentityProviderService:
             self._prune_expired_caches()
 
             core_logger.print_to_log(
-                f"Successfully fetched and cached JWKS from {jwks_uri} "
-                f"({len(jwks.get('keys', []))} keys)",
+                f"Successfully fetched and cached JWKS from {jwks_uri} ({len(jwks.get('keys', []))} keys)",
                 "debug",
             )
 
             return jwks
 
         except httpx.TimeoutException as err:
-            core_logger.print_to_log(
-                f"Timeout fetching JWKS from {jwks_uri}: {err}", "error", exc=err
-            )
+            core_logger.print_to_log(f"Timeout fetching JWKS from {jwks_uri}: {err}", "error", exc=err)
             raise HTTPException(
                 status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 detail="Timeout retrieving signing keys from identity provider",
-            )
+            ) from err
         except httpx.HTTPStatusError as err:
             core_logger.print_to_log(
                 f"HTTP error fetching JWKS from {jwks_uri}: {err.response.status_code}",
@@ -233,7 +220,7 @@ class IdentityProviderService:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Identity provider JWKS endpoint returned error: {err.response.status_code}",
-            )
+            ) from err
         except json.JSONDecodeError as err:
             core_logger.print_to_log(
                 f"Invalid JSON in JWKS response from {jwks_uri}: {err}",
@@ -243,7 +230,7 @@ class IdentityProviderService:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Identity provider returned invalid JWKS JSON",
-            )
+            ) from err
         except Exception as err:
             core_logger.print_to_log(
                 f"Unexpected error fetching JWKS from {jwks_uri}: {err}",
@@ -253,7 +240,7 @@ class IdentityProviderService:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to retrieve signing keys from identity provider",
-            )
+            ) from err
 
     async def _verify_id_token(
         self,
@@ -301,9 +288,7 @@ class IdentityProviderService:
             # The ID token has format: header.payload.signature
             parts = id_token.split(".")
             if len(parts) != 3:
-                core_logger.print_to_log(
-                    f"Invalid JWT format: expected 3 parts, got {len(parts)}", "warning"
-                )
+                core_logger.print_to_log(f"Invalid JWT format: expected 3 parts, got {len(parts)}", "warning")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid ID token format",
@@ -323,18 +308,14 @@ class IdentityProviderService:
             alg = header.get("alg")
 
             if not kid:
-                core_logger.print_to_log(
-                    "ID token header missing 'kid' claim", "warning"
-                )
+                core_logger.print_to_log("ID token header missing 'kid' claim", "warning")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="ID token missing key identifier",
                 )
 
             if not alg:
-                core_logger.print_to_log(
-                    "ID token header missing 'alg' claim", "warning"
-                )
+                core_logger.print_to_log("ID token header missing 'alg' claim", "warning")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="ID token missing algorithm",
@@ -353,9 +334,7 @@ class IdentityProviderService:
                     break
 
             if not matching_key:
-                core_logger.print_to_log(
-                    f"No matching key found in JWKS for kid={kid}", "warning"
-                )
+                core_logger.print_to_log(f"No matching key found in JWKS for kid={kid}", "warning")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="ID token signed with unknown key",
@@ -376,9 +355,7 @@ class IdentityProviderService:
             elif key_type == "oct":
                 key = OctKey.import_key(matching_key)
             else:
-                core_logger.print_to_log(
-                    f"Unsupported key type in JWKS: {key_type}", "warning"
-                )
+                core_logger.print_to_log(f"Unsupported key type in JWKS: {key_type}", "warning")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail=f"Unsupported key type: {key_type}",
@@ -411,9 +388,7 @@ class IdentityProviderService:
             if expected_nonce:
                 token_nonce = claims.get("nonce")
                 if not token_nonce:
-                    core_logger.print_to_log(
-                        "ID token missing nonce claim but nonce was expected", "warning"
-                    )
+                    core_logger.print_to_log("ID token missing nonce claim but nonce was expected", "warning")
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="ID token missing nonce",
@@ -433,57 +408,43 @@ class IdentityProviderService:
             return claims
 
         except BadSignatureError as err:
-            core_logger.print_to_log(
-                f"ID token signature verification failed: {err}", "warning", exc=err
-            )
+            core_logger.print_to_log(f"ID token signature verification failed: {err}", "warning", exc=err)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="ID token signature is invalid",
-            )
+            ) from err
         except ExpiredTokenError as err:
             core_logger.print_to_log(f"ID token has expired: {err}", "warning", exc=err)
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED, detail="ID token has expired"
-            )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="ID token has expired") from err
         except InvalidClaimError as err:
-            core_logger.print_to_log(
-                f"ID token claim validation failed: {err}", "warning", exc=err
-            )
+            core_logger.print_to_log(f"ID token claim validation failed: {err}", "warning", exc=err)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"ID token claim validation failed: {err}",
-            )
+            ) from err
         except MissingClaimError as err:
-            core_logger.print_to_log(
-                f"ID token missing required claim: {err}", "warning", exc=err
-            )
+            core_logger.print_to_log(f"ID token missing required claim: {err}", "warning", exc=err)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"ID token missing required claim: {err}",
-            )
+            ) from err
         except InvalidPayloadError as err:
-            core_logger.print_to_log(
-                f"ID token payload is invalid: {err}", "warning", exc=err
-            )
+            core_logger.print_to_log(f"ID token payload is invalid: {err}", "warning", exc=err)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="ID token payload is invalid",
-            )
+            ) from err
         except HTTPException:
             # Re-raise HTTPExceptions from _fetch_jwks or our own validations
             raise
         except Exception as err:
-            core_logger.print_to_log(
-                f"Unexpected error verifying ID token: {err}", "error", exc=err
-            )
+            core_logger.print_to_log(f"Unexpected error verifying ID token: {err}", "error", exc=err)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to verify ID token",
-            )
+            ) from err
 
-    async def get_oidc_configuration(
-        self, idp: idp_models.IdentityProvider
-    ) -> dict[str, Any] | None:
+    async def get_oidc_configuration(self, idp: idp_models.IdentityProvider) -> dict[str, Any] | None:
         """
         Retrieves the OpenID Connect (OIDC) discovery configuration for a given identity provider.
         This method attempts to fetch the OIDC configuration from the provider's well-known discovery endpoint.
@@ -502,11 +463,10 @@ class IdentityProviderService:
             return None
 
         # Check cache
-        if idp.id in self._discovery_cache:
-            if datetime.now(timezone.utc) < self._cache_expiry.get(
-                idp.id, datetime.min.replace(tzinfo=timezone.utc)
-            ):
-                return self._discovery_cache[idp.id]
+        if idp.id in self._discovery_cache and datetime.now(UTC) < self._cache_expiry.get(
+            idp.id, datetime.min.replace(tzinfo=UTC)
+        ):
+            return self._discovery_cache[idp.id]
 
         # Construct the discovery URL
         discovery_url = f"{idp.issuer_url.rstrip('/')}/.well-known/openid-configuration"
@@ -514,9 +474,7 @@ class IdentityProviderService:
         try:
             # SSRF guard for the admin-supplied issuer
             # URL: see jwks_uri rationale above.
-            core_network.reject_private_url(
-                discovery_url, purpose="oidc_discovery"
-            )
+            core_network.reject_private_url(discovery_url, purpose="oidc_discovery")
             # Fetch the configuration
             client = await self._get_http_client()
             response = await client.get(discovery_url)
@@ -526,7 +484,7 @@ class IdentityProviderService:
 
             # Cache the configuration
             self._discovery_cache[idp.id] = config
-            self._cache_expiry[idp.id] = datetime.now(timezone.utc) + self._cache_ttl
+            self._cache_expiry[idp.id] = datetime.now(UTC) + self._cache_ttl
             self._prune_expired_caches()
 
             return config
@@ -546,8 +504,7 @@ class IdentityProviderService:
             return None
         except httpx.RequestError as err:
             core_logger.print_to_log(
-                f"Request error fetching OIDC discovery for {idp.name}. "
-                f"URL: {discovery_url}. Error: {err}",
+                f"Request error fetching OIDC discovery for {idp.name}. URL: {discovery_url}. Error: {err}",
                 "warning",
             )
             return None
@@ -565,9 +522,7 @@ class IdentityProviderService:
             )
             return None
         except Exception as err:
-            core_logger.print_to_log(
-                f"Failed to fetch OIDC discovery for {idp.name}: {err}", "warning"
-            )
+            core_logger.print_to_log(f"Failed to fetch OIDC discovery for {idp.name}: {err}", "warning")
             return None
 
     def _get_redirect_uri(self, idp_slug: str) -> str:
@@ -791,9 +746,7 @@ class IdentityProviderService:
                     detail="OAuth state ID is required (PKCE mandatory)",
                 )
 
-            oauth_state_obj = oauth_state_crud.get_oauth_state_by_id_and_not_used(
-                oauth_state_id, db
-            )
+            oauth_state_obj = oauth_state_crud.get_oauth_state_by_id_and_not_used(oauth_state_id, db)
             if not oauth_state_obj:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -807,13 +760,9 @@ class IdentityProviderService:
             redirect_uri = self._get_redirect_uri(idp.slug)
             scopes = idp.scopes or "openid profile email"
 
-            client = AsyncOAuth2Client(
-                client_id=client_id, redirect_uri=redirect_uri, scope=scopes
-            )
+            client = AsyncOAuth2Client(client_id=client_id, redirect_uri=redirect_uri, scope=scopes)
 
-            authorization_url, _ = client.create_authorization_url(
-                authorization_endpoint, state=state, nonce=nonce
-            )
+            authorization_url, _ = client.create_authorization_url(authorization_endpoint, state=state, nonce=nonce)
 
             return authorization_url
 
@@ -898,9 +847,7 @@ class IdentityProviderService:
                     detail="OAuth state ID is required for secure linking",
                 )
 
-            oauth_state_obj = oauth_state_crud.get_oauth_state_by_id_and_not_used(
-                oauth_state_id, db
-            )
+            oauth_state_obj = oauth_state_crud.get_oauth_state_by_id_and_not_used(oauth_state_id, db)
             if not oauth_state_obj:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -921,13 +868,9 @@ class IdentityProviderService:
             redirect_uri = self._get_redirect_uri(idp.slug)
             scopes = idp.scopes or "openid profile email"
 
-            client = AsyncOAuth2Client(
-                client_id=client_id, redirect_uri=redirect_uri, scope=scopes
-            )
+            client = AsyncOAuth2Client(client_id=client_id, redirect_uri=redirect_uri, scope=scopes)
 
-            authorization_url, _ = client.create_authorization_url(
-                authorization_endpoint, state=state, nonce=nonce
-            )
+            authorization_url, _ = client.create_authorization_url(authorization_endpoint, state=state, nonce=nonce)
 
             return authorization_url
 
@@ -1065,9 +1008,7 @@ class IdentityProviderService:
                     redirect_uri=redirect_uri,
                 )
 
-                token_response = await client.fetch_token(
-                    token_endpoint, grant_type="authorization_code", code=code
-                )
+                token_response = await client.fetch_token(token_endpoint, grant_type="authorization_code", code=code)
             except httpx.TimeoutException as err:
                 core_logger.print_to_log(
                     f"Timeout connecting to IdP {idp.name} token endpoint: {err}",
@@ -1153,11 +1094,7 @@ class IdentityProviderService:
                     )
 
                 # Check if this IdP subject is already linked to ANY user
-                existing_link = (
-                    user_idp_crud.get_user_identity_provider_by_subject_and_idp_id(
-                        idp.id, subject, db
-                    )
-                )
+                existing_link = user_idp_crud.get_user_identity_provider_by_subject_and_idp_id(idp.id, subject, db)
                 if existing_link:
                     # Check if it's already linked to THIS user
                     if existing_link.user_id == link_user_id:
@@ -1198,16 +1135,12 @@ class IdentityProviderService:
                 }
             else:
                 # LOGIN MODE: Find or create user and establish session
-                user = await self._find_or_create_user(
-                    idp, subject, userinfo, password_hasher, db
-                )
+                user = await self._find_or_create_user(idp, subject, userinfo, password_hasher, db)
 
                 # Store IdP tokens for future session renewal
                 await self._store_idp_tokens(user.id, idp.id, token_response, db)
 
-                core_logger.print_to_log(
-                    f"User {user.username} authenticated via IdP {idp.name}", "info"
-                )
+                core_logger.print_to_log(f"User {user.username} authenticated via IdP {idp.name}", "info")
 
                 return {
                     "user": user,
@@ -1284,13 +1217,9 @@ class IdentityProviderService:
                     )
                     response.raise_for_status()
                     userinfo_claims = response.json()
-                    core_logger.print_to_log(
-                        "Successfully retrieved userinfo from endpoint", "debug"
-                    )
+                    core_logger.print_to_log("Successfully retrieved userinfo from endpoint", "debug")
                 else:
-                    core_logger.print_to_log(
-                        "No access token available for userinfo request", "warning"
-                    )
+                    core_logger.print_to_log("No access token available for userinfo request", "warning")
             except httpx.TimeoutException as err:
                 core_logger.print_to_log(
                     f"Timeout fetching userinfo from endpoint: {err}",
@@ -1304,9 +1233,7 @@ class IdentityProviderService:
                     exc=err,
                 )
             except httpx.RequestError as err:
-                core_logger.print_to_log(
-                    f"Network error fetching userinfo: {err}", "warning", exc=err
-                )
+                core_logger.print_to_log(f"Network error fetching userinfo: {err}", "warning", exc=err)
             except Exception as err:
                 core_logger.print_to_log(
                     f"Unexpected error fetching userinfo from endpoint: {err}",
@@ -1353,13 +1280,11 @@ class IdentityProviderService:
                 # These are security-critical and should not be ignored
                 raise
             except Exception as err:
-                core_logger.print_to_log(
-                    f"Unexpected error verifying ID token: {err}", "error", exc=err
-                )
+                core_logger.print_to_log(f"Unexpected error verifying ID token: {err}", "error", exc=err)
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Failed to verify ID token",
-                )
+                ) from err
 
         # If we got userinfo from endpoint but no ID token, return userinfo
         if userinfo_claims:
@@ -1437,17 +1362,14 @@ class IdentityProviderService:
 
             if not encrypted_refresh:
                 core_logger.print_to_log(
-                    f"Failed to encrypt refresh token for user {user_id}, idp {idp_id}. "
-                    "Token will not be stored.",
+                    f"Failed to encrypt refresh token for user {user_id}, idp {idp_id}. Token will not be stored.",
                     "warning",
                 )
                 return
 
             # Calculate when the access token expires
             expires_in = token_response.get("expires_in", DEFAULT_TOKEN_EXPIRY_SECONDS)
-            access_token_expires_at = datetime.now(timezone.utc) + timedelta(
-                seconds=expires_in
-            )
+            access_token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
             # Store encrypted token and metadata in database
             user_idp_crud.store_user_identity_provider_tokens(
@@ -1474,9 +1396,7 @@ class IdentityProviderService:
             # Authentication succeeds even if token storage fails
             # User will need to re-auth when session expires, but that's acceptable
 
-    def _map_user_claims(
-        self, idp: idp_models.IdentityProvider, claims: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _map_user_claims(self, idp: idp_models.IdentityProvider, claims: dict[str, Any]) -> dict[str, Any]:
         """
         Maps user claims from an identity provider to a standardized user dictionary.
 
@@ -1506,7 +1426,7 @@ class IdentityProviderService:
             if isinstance(claim_names, str):
                 claim_names = [claim_names]
             for claim in claim_names:
-                if claim in claims and claims[claim]:
+                if claims.get(claim):
                     result[field] = claims[claim]
                     break
 
@@ -1542,16 +1462,12 @@ class IdentityProviderService:
             HTTPException: If user creation is disabled for the identity provider and no existing user is found.
         """
         # Try to find existing user by IdP link
-        link = user_idp_crud.get_user_identity_provider_by_subject_and_idp_id(
-            idp.id, subject, db
-        )
+        link = user_idp_crud.get_user_identity_provider_by_subject_and_idp_id(idp.id, subject, db)
 
         if link:
             user = link.users
             # Update last login timestamp
-            user_idp_crud.update_user_identity_provider_last_login(
-                link.user_id, idp.id, db
-            )
+            user_idp_crud.update_user_identity_provider_last_login(link.user_id, idp.id, db)
 
             # Update user info if sync is enabled
             if idp.sync_user_info:
@@ -1566,13 +1482,9 @@ class IdentityProviderService:
             user = users_crud.get_user_by_email(email, db)
             if user:
                 # Link existing account to IdP
-                user_idp_crud.create_user_identity_provider(
-                    user.id, idp.id, subject, db
-                )
+                user_idp_crud.create_user_identity_provider(user.id, idp.id, subject, db)
 
-                core_logger.print_to_log(
-                    f"Linked existing user {user.username} to IdP {idp.name}", "info"
-                )
+                core_logger.print_to_log(f"Linked existing user {user.username} to IdP {idp.name}", "info")
 
                 # Update user info if sync is enabled
                 if idp.sync_user_info:
@@ -1586,9 +1498,7 @@ class IdentityProviderService:
                 detail="User account creation is disabled for this identity provider",
             )
 
-        user = await self._create_user_from_idp(
-            idp, subject, mapped_data, password_hasher, db
-        )
+        user = await self._create_user_from_idp(idp, subject, mapped_data, password_hasher, db)
 
         return user
 
@@ -1635,36 +1545,30 @@ class IdentityProviderService:
         user_signup = users_schema.UsersSignup(
             username=username,
             email=mapped_data.get("email", f"{username}@sso.local"),
-            city=mapped_data.get("city", None),
-            birthdate=mapped_data.get("birthdate", None),
+            city=mapped_data.get("city"),
+            birthdate=mapped_data.get("birthdate"),
             name=mapped_data.get("name", username),
             password=random_password,
             preferred_language=users_schema.Language.ENGLISH_USA,
             gender=users_schema.Gender.UNSPECIFIED,
             units=server_settings_schema.Units.METRIC,
-            height=mapped_data.get("height", None),
-            max_heart_rate=mapped_data.get("max_heart_rate", None),
+            height=mapped_data.get("height"),
+            max_heart_rate=mapped_data.get("max_heart_rate"),
             first_day_of_week=users_schema.WeekDay.MONDAY,
             currency=server_settings_schema.Currency.EURO,
         )
 
         server_settings = server_settings_utils.get_server_settings_or_404(db)
 
-        created_user = users_crud.create_signup_user(
-            user_signup, server_settings, password_hasher, db
-        )
+        created_user = users_crud.create_signup_user(user_signup, server_settings, password_hasher, db)
 
         # Create default data for the user
         users_utils.create_user_default_data(created_user.id, db)
 
         # Create the IdP link
-        user_idp_crud.create_user_identity_provider(
-            created_user.id, idp.id, subject, db
-        )
+        user_idp_crud.create_user_identity_provider(created_user.id, idp.id, subject, db)
 
-        core_logger.print_to_log(
-            f"Created new user {created_user.username} from IdP {idp.name}", "info"
-        )
+        core_logger.print_to_log(f"Created new user {created_user.username} from IdP {idp.name}", "info")
 
         return created_user
 
@@ -1705,8 +1609,7 @@ class IdentityProviderService:
             existing_user = users_crud.get_user_by_email(mapped_data["email"], db)
             if existing_user and existing_user.id != user.id:
                 core_logger.print_to_log(
-                    f"Cannot sync email from IdP {idp.name}: "
-                    f"{mapped_data['email']} already in use by another user",
+                    f"Cannot sync email from IdP {idp.name}: {mapped_data['email']} already in use by another user",
                     "warning",
                 )
             else:
@@ -1720,8 +1623,7 @@ class IdentityProviderService:
         # Check name
         if "name" in mapped_data and mapped_data["name"] != user.name:
             core_logger.print_to_log(
-                f"Syncing name for user {user.username} from IdP {idp.name}: "
-                f"{user.name} -> {mapped_data['name']}",
+                f"Syncing name for user {user.username} from IdP {idp.name}: {user.name} -> {mapped_data['name']}",
                 "debug",
             )
             updates["name"] = mapped_data["name"].strip()
@@ -1791,17 +1693,14 @@ class IdentityProviderService:
 
         if not encrypted_refresh_token:
             core_logger.print_to_log(
-                f"No refresh token stored for user {user_id}, idp {idp_id}. "
-                "Cannot refresh session.",
+                f"No refresh token stored for user {user_id}, idp {idp_id}. Cannot refresh session.",
                 "debug",
             )
             return None
 
         # Decrypt the refresh token
         try:
-            refresh_token = core_cryptography.decrypt_token_fernet(
-                encrypted_refresh_token
-            )
+            refresh_token = core_cryptography.decrypt_token_fernet(encrypted_refresh_token)
             if not refresh_token:
                 raise ValueError("Decryption returned empty value")
         except Exception as err:
@@ -1811,9 +1710,7 @@ class IdentityProviderService:
                 exc=err,
             )
             # Clear corrupted token
-            user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-                user_id, idp_id, db
-            )
+            user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(user_id, idp_id, db)
             return None
 
         # Resolve endpoints and credentials using helper methods
@@ -1865,9 +1762,7 @@ class IdentityProviderService:
                     exc=err,
                 )
                 # Clear invalid token from database
-                user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-                    user_id, idp_id, db
-                )
+                user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(user_id, idp_id, db)
                 return None
             else:
                 # Other HTTP errors (5xx) - don't clear token
@@ -1966,9 +1861,7 @@ class IdentityProviderService:
 
             # Decrypt the refresh token
             try:
-                refresh_token = core_cryptography.decrypt_token_fernet(
-                    encrypted_refresh_token
-                )
+                refresh_token = core_cryptography.decrypt_token_fernet(encrypted_refresh_token)
                 if not refresh_token:
                     core_logger.print_to_log(
                         f"Failed to decrypt refresh token for revocation (user {user_id}, idp {idp_id})",
@@ -2080,9 +1973,7 @@ class IdentityProviderService:
             )
             return False
 
-    def _is_token_expired_by_age(
-        self, link: user_idp_models.UsersIdentityProvider
-    ) -> bool:
+    def _is_token_expired_by_age(self, link: user_idp_models.UsersIdentityProvider) -> bool:
         """
         Check if an IdP refresh token has exceeded the maximum age policy.
 
@@ -2112,7 +2003,7 @@ class IdentityProviderService:
             # No token stored - not expired
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Determine when the token was first issued or last refreshed
         token_timestamp = link.idp_refresh_token_updated_at or link.linked_at
@@ -2120,8 +2011,7 @@ class IdentityProviderService:
         if not token_timestamp:
             # No timestamp available - cannot determine age (should not happen)
             core_logger.print_to_log(
-                f"Warning: IdP link user_id={link.user_id}, idp_id={link.idp_id} "
-                "has no timestamp for age calculation",
+                f"Warning: IdP link user_id={link.user_id}, idp_id={link.idp_id} has no timestamp for age calculation",
                 "warning",
             )
             return False
@@ -2133,9 +2023,7 @@ class IdentityProviderService:
         max_age = timedelta(days=MAX_IDP_TOKEN_AGE_DAYS)
         return token_age > max_age
 
-    def _should_refresh_idp_token(
-        self, link: user_idp_models.UsersIdentityProvider
-    ) -> TokenAction:
+    def _should_refresh_idp_token(self, link: user_idp_models.UsersIdentityProvider) -> TokenAction:
         """
         Determine what action to take for an IdP token based on expiry and age policies.
 
@@ -2185,7 +2073,7 @@ class IdentityProviderService:
             # No expiry info - assume token is still valid
             return TokenAction.SKIP
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Check if token was refreshed very recently (rate limiting)
         if link.idp_refresh_token_updated_at:

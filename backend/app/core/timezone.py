@@ -31,12 +31,6 @@ def format_aware_datetime(
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("UTC"))
 
-    timezone = (
-        ZoneInfo(tz_name)
-        if tz_name
-        else ZoneInfo(core_config.settings.TZ)
-    )
+    timezone = ZoneInfo(tz_name) if tz_name else ZoneInfo(core_config.settings.TZ)
 
-    return dt.astimezone(timezone).strftime(
-        "%Y-%m-%dT%H:%M:%S"
-    )
+    return dt.astimezone(timezone).strftime("%Y-%m-%dT%H:%M:%S")

@@ -19,36 +19,36 @@ Exports:
 """
 
 from .crud import (
+    create_gear_component,
+    delete_gear_component,
+    edit_gear_component,
     get_gear_component_by_id,
     get_gear_components_user,
     get_gear_components_user_by_gear_id,
-    create_gear_component,
-    edit_gear_component,
-    delete_gear_component,
 )
 from .models import GearComponents
 from .schema import (
     GearComponentBase,
     GearComponentCreate,
     GearComponentRead,
-    GearComponentUpdate,
     GearComponentTypesRead,
+    GearComponentUpdate,
 )
 
 __all__ = [
-    # CRUD operations
-    "get_gear_component_by_id",
-    "get_gear_components_user",
-    "get_gear_components_user_by_gear_id",
-    "create_gear_component",
-    "edit_gear_component",
-    "delete_gear_component",
-    # Database model
-    "GearComponents",
     # Pydantic schemas
     "GearComponentBase",
     "GearComponentCreate",
     "GearComponentRead",
-    "GearComponentUpdate",
     "GearComponentTypesRead",
+    "GearComponentUpdate",
+    # Database model
+    "GearComponents",
+    "create_gear_component",
+    "delete_gear_component",
+    "edit_gear_component",
+    # CRUD operations
+    "get_gear_component_by_id",
+    "get_gear_components_user",
+    "get_gear_components_user_by_gear_id",
 ]

@@ -62,6 +62,7 @@ def __getattr__(name: str) -> frozenset[str]:
         return _supported()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
+
 # BCP 47 language tags for each supported locale. Region subtags are
 # included for every locale so the HTML ``lang`` attribute is consistent
 # across emails. Keep this table in sync when ``Language`` gains entries.
@@ -153,10 +154,7 @@ def _load_catalog(locale: str) -> dict[str, str]:
     if not catalog_path.exists():
         if locale != DEFAULT_LOCALE:
             core_logger.print_to_log(
-                (
-                    f"i18n: missing email catalog for locale "
-                    f"'{locale}', falling back to '{DEFAULT_LOCALE}'"
-                ),
+                (f"i18n: missing email catalog for locale '{locale}', falling back to '{DEFAULT_LOCALE}'"),
                 "warning",
             )
         catalog_path = _LOCALES_DIR / DEFAULT_LOCALE / "email.json"

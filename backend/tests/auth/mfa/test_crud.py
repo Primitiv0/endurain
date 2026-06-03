@@ -20,9 +20,7 @@ class TestCreateUsersMFARow:
         ) as ctor:
             row = auth_mfa_crud.create_users_mfa_row(42, db)
 
-        ctor.assert_called_once_with(
-            user_id=42, mfa_enabled=False, mfa_secret=None
-        )
+        ctor.assert_called_once_with(user_id=42, mfa_enabled=False, mfa_secret=None)
         assert row is fake_row
 
     def test_persists_via_db(self):

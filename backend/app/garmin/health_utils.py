@@ -1,31 +1,20 @@
-import os
-import zipfile
-
-from datetime import datetime, timedelta, date, timezone
-import garminconnect
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 import core.logger as core_logger
-
 import garmin.utils as garmin_utils
-
-import health.health_weight.crud as health_weight_crud
-import health.health_weight.schema as health_weight_schema
-
-import health.health_steps.crud as health_steps_crud
-import health.health_steps.schema as health_steps_schema
-
+import garminconnect
 import health.health_sleep.crud as health_sleep_crud
 import health.health_sleep.schema as health_sleep_schema
-
+import health.health_steps.crud as health_steps_crud
+import health.health_steps.schema as health_steps_schema
+import health.health_weight.crud as health_weight_crud
+import health.health_weight.schema as health_weight_schema
+import notifications.utils as notifications_utils
 import users.users.crud as users_crud
 import users.users_integrations.crud as user_integrations_crud
-
-import notifications.utils as notifications_utils
-
 import websocket.manager as websocket_manager_module
-
 from core.database import SessionLocal
+from sqlalchemy.orm import Session
 
 
 def fetch_and_process_bc_by_dates(
@@ -37,9 +26,7 @@ def fetch_and_process_bc_by_dates(
 ) -> int:
     try:
         # Fetch Garmin Connect body composition data for the specified date range
-        garmin_bc = garminconnect_client.get_body_composition(
-            str(start_date.date()), str(end_date.date())
-        )
+        garmin_bc = garminconnect_client.get_body_composition(str(start_date.date()), str(end_date.date()))
     except garminconnect.GarminConnectAuthenticationError:
         raise
     except Exception as err:
@@ -52,11 +39,7 @@ def fetch_and_process_bc_by_dates(
         # Return 0 to indicate no body composition were processed
         return 0
 
-    if (
-        garmin_bc is None
-        or "dateWeightList" not in garmin_bc
-        or not garmin_bc["dateWeightList"]
-    ):
+    if garmin_bc is None or "dateWeightList" not in garmin_bc or not garmin_bc["dateWeightList"]:
         # Log an informational event if no body composition were found
         core_logger.print_to_log_and_console(
             f"User {user_id}: No new Garmin Connect body composition found between {start_date.date()} and {end_date.date()}: garmin_bc is None or empty"
@@ -80,9 +63,7 @@ def fetch_and_process_bc_by_dates(
             body_fat=bc["bodyFat"],
             body_water=bc["bodyWater"],
             bone_mass=(bc["boneMass"] / 1000 if bc["boneMass"] is not None else None),
-            muscle_mass=(
-                bc["muscleMass"] / 1000 if bc["muscleMass"] is not None else None
-            ),
+            muscle_mass=(bc["muscleMass"] / 1000 if bc["muscleMass"] is not None else None),
             physique_rating=bc["physiqueRating"],
             visceral_fat=bc["visceralFat"],
             metabolic_age=metabolic_age,
@@ -100,19 +81,13 @@ def fetch_and_process_bc_by_dates(
             )
             # Updates the health_weight in the database
             health_weight_crud.edit_health_weight(user_id, health_weight_update, db)
-            core_logger.print_to_log(
-                f"User {user_id}: Body composition edited for date {health_weight.date}"
-            )
+            core_logger.print_to_log(f"User {user_id}: Body composition edited for date {health_weight.date}")
         else:
             # Convert to update schema with the existing ID
-            health_weight_create = health_weight_schema.HealthWeightCreate(
-                **health_weight.model_dump()
-            )
+            health_weight_create = health_weight_schema.HealthWeightCreate(**health_weight.model_dump())
             # Creates the health_weight in the database
             health_weight_crud.create_health_weight(user_id, health_weight_create, db)
-            core_logger.print_to_log(
-                f"User {user_id}: Body composition created for date {health_weight.date}"
-            )
+            core_logger.print_to_log(f"User {user_id}: Body composition created for date {health_weight.date}")
         # Increment the count of processed body composition
         count_processed += 1
     # Return the count of processed body composition
@@ -128,9 +103,7 @@ def fetch_and_process_ds_by_dates(
 ) -> int:
     try:
         # Fetch Garmin Connect daily steps data for the specified date range
-        garmin_ds = garminconnect_client.get_daily_steps(
-            str(start_date.date()), str(end_date.date())
-        )
+        garmin_ds = garminconnect_client.get_daily_steps(str(start_date.date()), str(end_date.date()))
     except garminconnect.GarminConnectAuthenticationError:
         raise
     except Exception as err:
@@ -143,12 +116,7 @@ def fetch_and_process_ds_by_dates(
         # Return 0 to indicate no daily steps were processed
         return 0
 
-    if (
-        garmin_ds is None
-        or len(garmin_ds) == 0
-        or "totalSteps" not in garmin_ds[0]
-        or not garmin_ds[0]["totalSteps"]
-    ):
+    if garmin_ds is None or len(garmin_ds) == 0 or "totalSteps" not in garmin_ds[0] or not garmin_ds[0]["totalSteps"]:
         # Log an informational event if no daily steps were found
         core_logger.print_to_log_and_console(
             f"User {user_id}: No new Garmin Connect daily steps found between {start_date.date()} and {end_date.date()}: garmin_ds is None or empty"
@@ -169,9 +137,7 @@ def fetch_and_process_ds_by_dates(
             source=health_steps_schema.Source.GARMIN,
         )
 
-        health_steps_db = health_steps_crud.get_health_steps_by_date_and_user_id(
-            user_id, str(health_steps.date), db
-        )
+        health_steps_db = health_steps_crud.get_health_steps_by_date_and_user_id(user_id, str(health_steps.date), db)
 
         if health_steps_db:
             # Convert to update schema with the existing ID
@@ -180,19 +146,13 @@ def fetch_and_process_ds_by_dates(
             )
             # Updates the health_steps in the database
             health_steps_crud.edit_health_steps(user_id, health_steps_update, db)
-            core_logger.print_to_log(
-                f"User {user_id}: Daily steps edited for date {health_steps.date}"
-            )
+            core_logger.print_to_log(f"User {user_id}: Daily steps edited for date {health_steps.date}")
         else:
             # Convert to update schema with the existing ID
-            health_steps_create = health_steps_schema.HealthStepsCreate(
-                **health_steps.model_dump()
-            )
+            health_steps_create = health_steps_schema.HealthStepsCreate(**health_steps.model_dump())
             # Creates the health_steps in the database
             health_steps_crud.create_health_steps(user_id, health_steps_create, db)
-            core_logger.print_to_log(
-                f"User {user_id}: Daily steps created for date {health_steps.date}"
-            )
+            core_logger.print_to_log(f"User {user_id}: Daily steps created for date {health_steps.date}")
         # Increment the count of processed steps
         count_processed += 1
     # Return the count of processed steps
@@ -233,23 +193,15 @@ def fetch_and_process_sleep_by_dates(
             raise
         except Exception as err:
             core_logger.print_to_log(
-                f"Error fetching sleep data for user "
-                f"{user_id} on {date_string}: {err}",
+                f"Error fetching sleep data for user {user_id} on {date_string}: {err}",
                 "error",
                 exc=err,
             )
             current_date += timedelta(days=1)
             continue
 
-        if (
-            garmin_sleep is None
-            or "dailySleepDTO" not in garmin_sleep
-            or not garmin_sleep["dailySleepDTO"]
-        ):
-            core_logger.print_to_log(
-                f"User {user_id}: No Garmin Connect sleep data "
-                f"found for {date_string}"
-            )
+        if garmin_sleep is None or "dailySleepDTO" not in garmin_sleep or not garmin_sleep["dailySleepDTO"]:
+            core_logger.print_to_log(f"User {user_id}: No Garmin Connect sleep data found for {date_string}")
             current_date += timedelta(days=1)
             continue
 
@@ -259,7 +211,7 @@ def fetch_and_process_sleep_by_dates(
         sleep_start_gmt = (
             datetime.fromtimestamp(
                 sleep_dto["sleepStartTimestampGMT"] / 1000,
-                tz=timezone.utc,
+                tz=UTC,
             )
             if sleep_dto.get("sleepStartTimestampGMT")
             else None
@@ -267,7 +219,7 @@ def fetch_and_process_sleep_by_dates(
         sleep_end_gmt = (
             datetime.fromtimestamp(
                 sleep_dto["sleepEndTimestampGMT"] / 1000,
-                tz=timezone.utc,
+                tz=UTC,
             )
             if sleep_dto.get("sleepEndTimestampGMT")
             else None
@@ -275,7 +227,7 @@ def fetch_and_process_sleep_by_dates(
         sleep_start_local = (
             datetime.fromtimestamp(
                 sleep_dto["sleepStartTimestampLocal"] / 1000,
-                tz=timezone.utc,
+                tz=UTC,
             )
             if sleep_dto.get("sleepStartTimestampLocal")
             else None
@@ -283,7 +235,7 @@ def fetch_and_process_sleep_by_dates(
         sleep_end_local = (
             datetime.fromtimestamp(
                 sleep_dto["sleepEndTimestampLocal"] / 1000,
-                tz=timezone.utc,
+                tz=UTC,
             )
             if sleep_dto.get("sleepEndTimestampLocal")
             else None
@@ -291,7 +243,7 @@ def fetch_and_process_sleep_by_dates(
 
         # Process sleep stages from sleepLevels array
         sleep_stages = []
-        if "sleepLevels" in garmin_sleep and garmin_sleep["sleepLevels"]:
+        if garmin_sleep.get("sleepLevels"):
             for level in garmin_sleep["sleepLevels"]:
                 activity_level = level.get("activityLevel")
 
@@ -311,7 +263,7 @@ def fetch_and_process_sleep_by_dates(
                     datetime.strptime(
                         start_gmt_str,
                         "%Y-%m-%dT%H:%M:%S.%f",
-                    ).replace(tzinfo=timezone.utc)
+                    ).replace(tzinfo=UTC)
                     if start_gmt_str
                     else None
                 )
@@ -319,7 +271,7 @@ def fetch_and_process_sleep_by_dates(
                     datetime.strptime(
                         end_gmt_str,
                         "%Y-%m-%dT%H:%M:%S.%f",
-                    ).replace(tzinfo=timezone.utc)
+                    ).replace(tzinfo=UTC)
                     if end_gmt_str
                     else None
                 )
@@ -371,17 +323,11 @@ def fetch_and_process_sleep_by_dates(
             light_sleep_seconds=sleep_dto.get("lightSleepSeconds"),
             rem_sleep_seconds=sleep_dto.get("remSleepSeconds"),
             awake_sleep_seconds=sleep_dto.get("awakeSleepSeconds"),
-            avg_heart_rate=(
-                int(sleep_dto.get("avgHeartRate"))
-                if sleep_dto.get("avgHeartRate") is not None
-                else None
-            ),
+            avg_heart_rate=(int(sleep_dto.get("avgHeartRate")) if sleep_dto.get("avgHeartRate") is not None else None),
             min_heart_rate=None,
             max_heart_rate=None,
             avg_spo2=(
-                int(sleep_dto.get("averageSpO2Value"))
-                if sleep_dto.get("averageSpO2Value") is not None
-                else None
+                int(sleep_dto.get("averageSpO2Value")) if sleep_dto.get("averageSpO2Value") is not None else None
             ),
             lowest_spo2=sleep_dto.get("lowestSpO2Value"),
             highest_spo2=sleep_dto.get("highestSpO2Value"),
@@ -401,9 +347,7 @@ def fetch_and_process_sleep_by_dates(
                 else None
             ),
             avg_stress_level=(
-                int(sleep_dto.get("avgSleepStress"))
-                if sleep_dto.get("avgSleepStress") is not None
-                else None
+                int(sleep_dto.get("avgSleepStress")) if sleep_dto.get("avgSleepStress") is not None else None
             ),
             awake_count=sleep_dto.get("awakeCount"),
             restless_moments_count=None,
@@ -416,8 +360,7 @@ def fetch_and_process_sleep_by_dates(
             hrv_status=(
                 health_sleep_schema.HRVStatus(garmin_sleep.get("hrvStatus"))
                 if garmin_sleep.get("hrvStatus")
-                and garmin_sleep.get("hrvStatus")
-                in health_sleep_schema.HRVStatus._value2member_map_
+                and garmin_sleep.get("hrvStatus") in health_sleep_schema.HRVStatus._value2member_map_
                 else None
             ),
             resting_heart_rate=garmin_sleep.get("restingHeartRate"),
@@ -425,52 +368,39 @@ def fetch_and_process_sleep_by_dates(
             awake_count_score=(
                 health_sleep_schema.SleepScore(awake_count_score.get("qualifierKey"))
                 if awake_count_score
-                and awake_count_score.get("qualifierKey")
-                in health_sleep_schema.SleepScore._value2member_map_
+                and awake_count_score.get("qualifierKey") in health_sleep_schema.SleepScore._value2member_map_
                 else None
             ),
             rem_percentage_score=(
                 health_sleep_schema.SleepScore(rem_percentage_score.get("qualifierKey"))
                 if rem_percentage_score
-                and rem_percentage_score.get("qualifierKey")
-                in health_sleep_schema.SleepScore._value2member_map_
+                and rem_percentage_score.get("qualifierKey") in health_sleep_schema.SleepScore._value2member_map_
                 else None
             ),
             deep_percentage_score=(
-                health_sleep_schema.SleepScore(
-                    deep_percentage_score.get("qualifierKey")
-                )
+                health_sleep_schema.SleepScore(deep_percentage_score.get("qualifierKey"))
                 if deep_percentage_score
-                and deep_percentage_score.get("qualifierKey")
-                in health_sleep_schema.SleepScore._value2member_map_
+                and deep_percentage_score.get("qualifierKey") in health_sleep_schema.SleepScore._value2member_map_
                 else None
             ),
             light_percentage_score=(
-                health_sleep_schema.SleepScore(
-                    light_percentage_score.get("qualifierKey")
-                )
+                health_sleep_schema.SleepScore(light_percentage_score.get("qualifierKey"))
                 if light_percentage_score
-                and light_percentage_score.get("qualifierKey")
-                in health_sleep_schema.SleepScore._value2member_map_
+                and light_percentage_score.get("qualifierKey") in health_sleep_schema.SleepScore._value2member_map_
                 else None
             ),
             avg_sleep_stress=(
-                int(sleep_dto.get("avgSleepStress"))
-                if sleep_dto.get("avgSleepStress") is not None
-                else None
+                int(sleep_dto.get("avgSleepStress")) if sleep_dto.get("avgSleepStress") is not None else None
             ),
             sleep_stress_score=(
                 health_sleep_schema.SleepScore(sleep_stress_score.get("qualifierKey"))
                 if sleep_stress_score
-                and sleep_stress_score.get("qualifierKey")
-                in health_sleep_schema.SleepScore._value2member_map_
+                and sleep_stress_score.get("qualifierKey") in health_sleep_schema.SleepScore._value2member_map_
                 else None
             ),
         )
 
-        health_sleep_db = health_sleep_crud.get_health_sleep_by_date_and_user_id(
-            user_id, str(health_sleep.date), db
-        )
+        health_sleep_db = health_sleep_crud.get_health_sleep_by_date_and_user_id(user_id, str(health_sleep.date), db)
 
         if health_sleep_db:
             # Convert to update schema with the existing ID
@@ -479,19 +409,13 @@ def fetch_and_process_sleep_by_dates(
             )
             # Updates the health_sleep in the database
             health_sleep_crud.edit_health_sleep(user_id, health_sleep_update, db)
-            core_logger.print_to_log(
-                f"User {user_id}: Sleep data edited for date " f"{health_sleep.date}"
-            )
+            core_logger.print_to_log(f"User {user_id}: Sleep data edited for date {health_sleep.date}")
         else:
             # Convert to update schema with the existing ID
-            health_sleep_create = health_sleep_schema.HealthSleepCreate(
-                **health_sleep.model_dump()
-            )
+            health_sleep_create = health_sleep_schema.HealthSleepCreate(**health_sleep.model_dump())
             # Creates the health_sleep in the database
             health_sleep_crud.create_health_sleep(user_id, health_sleep_create, db)
-            core_logger.print_to_log(
-                f"User {user_id}: Sleep data created for date " f"{health_sleep.date}"
-            )
+            core_logger.print_to_log(f"User {user_id}: Sleep data created for date {health_sleep.date}")
 
         count_processed += 1
         current_date += timedelta(days=1)
@@ -508,8 +432,8 @@ async def retrieve_garminconnect_users_health_for_days(days: int):
             # Get all users
             users = users_crud.get_all_users(db)
             # Calculate the start and end dates
-            calculated_start_date = datetime.now(timezone.utc) - timedelta(days=days)
-            calculated_end_date = datetime.now(timezone.utc)
+            calculated_start_date = datetime.now(UTC) - timedelta(days=days)
+            calculated_end_date = datetime.now(UTC)
 
             # Iterate through all users
             for user in users:
@@ -545,9 +469,7 @@ async def get_user_garminconnect_health_by_dates(
     with SessionLocal() as db:
         try:
             # Get the user integrations by user ID
-            user_integrations = garmin_utils.fetch_user_integrations_and_validate_token(
-                user_id, db
-            )
+            user_integrations = garmin_utils.fetch_user_integrations_and_validate_token(user_id, db)
 
             if user_integrations is None:
                 core_logger.print_to_log(f"User {user_id}: Garmin Connect not linked")
@@ -593,9 +515,7 @@ async def get_user_garminconnect_health_by_dates(
                 exc=err,
             )
             user_integrations_crud.unlink_garminconnect_account(user_id, db)
-            await notifications_utils.create_garmin_token_expired_notification(
-                user_id, ws_manager
-            )
+            await notifications_utils.create_garmin_token_expired_notification(user_id, ws_manager)
         except Exception as err:
             core_logger.print_to_log(
                 f"Error in get_user_garminconnect_health_by_dates: {err}",

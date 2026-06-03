@@ -1,41 +1,29 @@
 """Authenticated activity stream endpoints."""
 
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, Security
-from sqlalchemy.orm import Session
-
-import activities.activity_streams.schema as activity_streams_schema
-import activities.activity_streams.crud as activity_streams_crud
-import activities.activity_streams.dependencies as activity_streams_dependencies
+from collections.abc import Callable
+from typing import Annotated
 
 import activities.activity.dependencies as activities_dependencies
-
+import activities.activity_streams.crud as activity_streams_crud
+import activities.activity_streams.dependencies as activity_streams_dependencies
+import activities.activity_streams.schema as activity_streams_schema
 import auth.dependencies as auth_dependencies
-
 import core.database as core_database
+from fastapi import APIRouter, Depends, Security
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=(
-        list[
-            activity_streams_schema
-            .ActivityStreams
-        ]
-        | None
-    ),
+    response_model=(list[activity_streams_schema.ActivityStreams] | None),
 )
 async def read_activities_streams_for_activity_all(
     activity_id: int,
     _validate_id: Annotated[
         Callable,
-        Depends(
-            activities_dependencies
-            .validate_activity_id
-        ),
+        Depends(activities_dependencies.validate_activity_id),
     ],
     _check_scopes: Annotated[
         Callable,
@@ -46,10 +34,7 @@ async def read_activities_streams_for_activity_all(
     ],
     token_user_id: Annotated[
         int,
-        Depends(
-            auth_dependencies
-            .get_sub_from_access_token
-        ),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -69,38 +54,23 @@ async def read_activities_streams_for_activity_all(
     Returns:
         List of activity streams or None.
     """
-    return (
-        activity_streams_crud
-        .get_activity_streams(
-            activity_id, token_user_id, db
-        )
-    )
+    return activity_streams_crud.get_activity_streams(activity_id, token_user_id, db)
 
 
 @router.get(
-    "/activity_id/{activity_id}"
-    "/stream_type/{stream_type}",
-    response_model=(
-        activity_streams_schema.ActivityStreams
-        | None
-    ),
+    "/activity_id/{activity_id}/stream_type/{stream_type}",
+    response_model=(activity_streams_schema.ActivityStreams | None),
 )
 async def read_activities_streams_for_activity_stream_type(
     activity_id: int,
     _validate_activity_id: Annotated[
         Callable,
-        Depends(
-            activities_dependencies
-            .validate_activity_id
-        ),
+        Depends(activities_dependencies.validate_activity_id),
     ],
     stream_type: int,
     _validate_activity_stream_type: Annotated[
         Callable,
-        Depends(
-            activity_streams_dependencies
-            .validate_activity_stream_type
-        ),
+        Depends(activity_streams_dependencies.validate_activity_stream_type),
     ],
     _check_scopes: Annotated[
         Callable,
@@ -111,10 +81,7 @@ async def read_activities_streams_for_activity_stream_type(
     ],
     token_user_id: Annotated[
         int,
-        Depends(
-            auth_dependencies
-            .get_sub_from_access_token
-        ),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -136,12 +103,9 @@ async def read_activities_streams_for_activity_stream_type(
     Returns:
         The activity stream or None.
     """
-    return (
-        activity_streams_crud
-        .get_activity_stream_by_type(
-            activity_id,
-            stream_type,
-            token_user_id,
-            db,
-        )
+    return activity_streams_crud.get_activity_stream_by_type(
+        activity_id,
+        stream_type,
+        token_user_id,
+        db,
     )

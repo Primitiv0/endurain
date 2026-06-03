@@ -5,22 +5,19 @@ This module tests API endpoints for server settings management,
 including read, update, and file upload operations.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from fastapi import HTTPException, status, UploadFile
-from io import BytesIO
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import server_settings.schema as server_settings_schema
+import pytest
 import server_settings.models as server_settings_models
+import server_settings.schema as server_settings_schema
+from fastapi import HTTPException, status
 
 
 class TestReadServerSettings:
     """Test suite for read_server_settings endpoint."""
 
     @patch("server_settings.router.server_settings_utils.get_server_settings_or_404")
-    def test_read_server_settings_success(
-        self, mock_get_settings, fast_api_client, fast_api_app
-    ):
+    def test_read_server_settings_success(self, mock_get_settings, fast_api_client, fast_api_app):
         """Test successful retrieval of server settings."""
         # Arrange
         mock_settings = MagicMock(spec=server_settings_models.ServerSettings)
@@ -37,9 +34,7 @@ class TestReadServerSettings:
         mock_settings.sso_enabled = False
         mock_settings.local_login_enabled = True
         mock_settings.sso_auto_redirect = False
-        mock_settings.tileserver_url = (
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        )
+        mock_settings.tileserver_url = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         mock_settings.tileserver_attribution = "&copy; OpenStreetMap"
         mock_settings.map_background_color = "#dddddd"
         mock_settings.password_type = "strict"
@@ -63,9 +58,7 @@ class TestReadServerSettings:
         assert data["public_shareable_links"] is False
 
     @patch("server_settings.router.server_settings_utils.get_server_settings_or_404")
-    def test_read_server_settings_not_found(
-        self, mock_get_settings, fast_api_client, fast_api_app
-    ):
+    def test_read_server_settings_not_found(self, mock_get_settings, fast_api_client, fast_api_app):
         """Test retrieval when settings not found."""
         # Arrange
         mock_get_settings.side_effect = HTTPException(
@@ -87,9 +80,7 @@ class TestListTileMapsTemplates:
     """Test suite for list_tile_maps_templates endpoint."""
 
     @patch("server_settings.router.server_settings_utils.get_tile_maps_templates")
-    def test_list_tile_maps_templates_success(
-        self, mock_get_templates, fast_api_client, fast_api_app
-    ):
+    def test_list_tile_maps_templates_success(self, mock_get_templates, fast_api_client, fast_api_app):
         """Test successful retrieval of tile map templates."""
         # Arrange
         mock_templates = [
@@ -132,9 +123,7 @@ class TestEditServerSettings:
     """Test suite for edit_server_settings endpoint."""
 
     @patch("server_settings.router.server_settings_crud.edit_server_settings")
-    def test_edit_server_settings_success(
-        self, mock_edit_settings, fast_api_client, fast_api_app
-    ):
+    def test_edit_server_settings_success(self, mock_edit_settings, fast_api_client, fast_api_app):
         """Test successful update of server settings."""
         # Arrange
         mock_updated_settings = MagicMock(spec=server_settings_models.ServerSettings)
@@ -151,9 +140,7 @@ class TestEditServerSettings:
         mock_updated_settings.sso_enabled = False
         mock_updated_settings.local_login_enabled = True
         mock_updated_settings.sso_auto_redirect = False
-        mock_updated_settings.tileserver_url = (
-            "https://tiles.example.com/{z}/{x}/{y}.png"
-        )
+        mock_updated_settings.tileserver_url = "https://tiles.example.com/{z}/{x}/{y}.png"
         mock_updated_settings.tileserver_attribution = "&copy; Example"
         mock_updated_settings.map_background_color = "#000000"
         mock_updated_settings.password_type = "length_only"
@@ -197,9 +184,7 @@ class TestEditServerSettings:
         assert data["num_records_per_page"] == 50
 
     @patch("server_settings.router.server_settings_crud.edit_server_settings")
-    def test_edit_server_settings_not_found(
-        self, mock_edit_settings, fast_api_client, fast_api_app
-    ):
+    def test_edit_server_settings_not_found(self, mock_edit_settings, fast_api_client, fast_api_app):
         """Test update when settings not found."""
         # Arrange
         mock_edit_settings.side_effect = HTTPException(
@@ -241,9 +226,7 @@ class TestEditServerSettings:
 class TestUploadLoginPhoto:
     """Test suite for upload_login_photo endpoint."""
 
-    @pytest.mark.skip(
-        reason="Complex async file upload mocking - tested via integration tests"
-    )
+    @pytest.mark.skip(reason="Complex async file upload mocking - tested via integration tests")
     def test_upload_login_photo_success(
         self,
         fast_api_client,
@@ -258,15 +241,12 @@ class TestUploadLoginPhoto:
 class TestDeleteLoginPhoto:
     """Test suite for delete_login_photo endpoint."""
 
-    @patch("server_settings.router.aiofiles.os.remove", new_callable=AsyncMock)
-    @patch("server_settings.router.os.path.exists")
-    def test_delete_login_photo_success(
-        self, mock_exists, mock_remove, fast_api_client, fast_api_app
-    ):
+    @patch(
+        "server_settings.router.core_file_uploads.delete_files_by_pattern",
+        new_callable=AsyncMock,
+    )
+    def test_delete_login_photo_success(self, mock_delete, fast_api_client, fast_api_app):
         """Test successful deletion of login photo."""
-        # Arrange
-        mock_exists.return_value = True
-
         # Act
         response = fast_api_client.delete(
             "/server_settings/upload/login",
@@ -276,14 +256,12 @@ class TestDeleteLoginPhoto:
         # Assert
         assert response.status_code == 204
 
-    @patch("server_settings.router.os.path.exists")
-    def test_delete_login_photo_not_exists(
-        self, mock_exists, fast_api_client, fast_api_app
-    ):
+    @patch(
+        "server_settings.router.core_file_uploads.delete_files_by_pattern",
+        new_callable=AsyncMock,
+    )
+    def test_delete_login_photo_not_exists(self, mock_delete, fast_api_client, fast_api_app):
         """Test deletion when photo doesn't exist."""
-        # Arrange
-        mock_exists.return_value = False
-
         # Act
         response = fast_api_client.delete(
             "/server_settings/upload/login",

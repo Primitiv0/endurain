@@ -1,11 +1,10 @@
 """Tests for users_api_keys Pydantic schemas."""
 
-from datetime import datetime, timezone, timedelta
-
-import pytest
-from pydantic import ValidationError
+from datetime import UTC, datetime, timedelta
 
 import auth.api_keys.schema as users_api_keys_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestUsersApiKeyCreate:
@@ -25,7 +24,7 @@ class TestUsersApiKeyCreate:
 
     def test_create_with_expiry(self):
         """Test valid key creation with an expiration date."""
-        expires = datetime.now(timezone.utc) + timedelta(days=30)
+        expires = datetime.now(UTC) + timedelta(days=30)
         data = users_api_keys_schema.UsersApiKeyCreate(
             name="Expiring Key",
             scopes=["activities:upload"],
@@ -108,7 +107,7 @@ class TestUsersApiKeyRead:
 
     def test_read_schema_valid(self):
         """Test UsersApiKeyRead instantiation with all fields."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = users_api_keys_schema.UsersApiKeyRead(
             id="some-uuid",
             user_id=1,
@@ -130,7 +129,7 @@ class TestUsersApiKeyRead:
 
     def test_read_schema_user_id_ge_1_fails(self):
         """Test that user_id < 1 fails validation."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with pytest.raises(ValidationError):
             users_api_keys_schema.UsersApiKeyRead(
                 id="some-uuid",
@@ -146,10 +145,7 @@ class TestUsersApiKeyRead:
 
     def test_read_schema_from_attributes(self):
         """Test that UsersApiKeyRead has from_attributes=True (ORM mode)."""
-        assert (
-            users_api_keys_schema.UsersApiKeyRead.model_config.get("from_attributes")
-            is True
-        )
+        assert users_api_keys_schema.UsersApiKeyRead.model_config.get("from_attributes") is True
 
 
 class TestUsersApiKeyCreated:
@@ -159,7 +155,7 @@ class TestUsersApiKeyCreated:
 
     def test_created_schema_has_key_field(self):
         """Test that UsersApiKeyCreated includes the raw 'key' field."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = users_api_keys_schema.UsersApiKeyCreated(
             id="some-uuid",
             user_id=1,
@@ -176,7 +172,7 @@ class TestUsersApiKeyCreated:
 
     def test_created_schema_extra_forbid(self):
         """Test that extra fields are forbidden on UsersApiKeyCreated."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with pytest.raises(ValidationError):
             users_api_keys_schema.UsersApiKeyCreated(
                 id="some-uuid",
@@ -194,7 +190,4 @@ class TestUsersApiKeyCreated:
 
     def test_created_schema_from_attributes(self):
         """Test that UsersApiKeyCreated has from_attributes=True (ORM mode)."""
-        assert (
-            users_api_keys_schema.UsersApiKeyCreated.model_config.get("from_attributes")
-            is True
-        )
+        assert users_api_keys_schema.UsersApiKeyCreated.model_config.get("from_attributes") is True

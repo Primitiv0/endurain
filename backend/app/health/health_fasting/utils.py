@@ -1,8 +1,7 @@
 from datetime import date, timedelta
 
-from sqlalchemy.orm import Session
-
 import health.health_fasting.crud as health_fasting_crud
+from sqlalchemy.orm import Session
 
 
 def calculate_streaks(user_id: int, db: Session) -> tuple[int, int]:
@@ -16,11 +15,7 @@ def calculate_streaks(user_id: int, db: Session) -> tuple[int, int]:
     Returns:
         Tuple of (current_streak, longest_streak).
     """
-    completed_fasts = (
-        health_fasting_crud.get_completed_fasting_ordered_by_date_and_user_id(
-            user_id, db
-        )
-    )
+    completed_fasts = health_fasting_crud.get_completed_fasting_ordered_by_date_and_user_id(user_id, db)
 
     if not completed_fasts:
         return 0, 0

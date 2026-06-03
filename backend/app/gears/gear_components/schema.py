@@ -141,17 +141,12 @@ class GearComponentBase(BaseModel):
     )
     active: StrictBool | None = Field(
         default=None,
-        description=(
-            "Whether the component"
-            " is active"
-        ),
+        description=("Whether the component is active"),
     )
     expected_kms: StrictInt | None = Field(
         default=None,
         ge=0,
-        description=(
-            "Expected kilometers"
-        ),
+        description=("Expected kilometers"),
     )
     purchase_value: StrictFloat | None = Field(
         default=None,
@@ -192,18 +187,12 @@ class GearComponentRead(GearComponentBase):
     current_distance: StrictFloat = Field(
         default=0,
         ge=0,
-        description=(
-            "Accumulated activity distance"
-            " in meters"
-        ),
+        description=("Accumulated activity distance in meters"),
     )
     current_time: StrictFloat = Field(
         default=0,
         ge=0,
-        description=(
-            "Accumulated activity time"
-            " in seconds"
-        ),
+        description=("Accumulated activity time in seconds"),
     )
 
 
@@ -234,27 +223,19 @@ class GearComponentTypesRead(BaseModel):
 
     bike: list[str] = Field(
         ...,
-        description=(
-            "Valid bike component types"
-        ),
+        description=("Valid bike component types"),
     )
     shoes: list[str] = Field(
         ...,
-        description=(
-            "Valid shoes component types"
-        ),
+        description=("Valid shoes component types"),
     )
     racquet: list[str] = Field(
         ...,
-        description=(
-            "Valid racquet component types"
-        ),
+        description=("Valid racquet component types"),
     )
     windsurf: list[str] = Field(
         ...,
-        description=(
-            "Valid windsurf component types"
-        ),
+        description=("Valid windsurf component types"),
     )
 
     model_config = ConfigDict(

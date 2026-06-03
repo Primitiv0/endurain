@@ -3,16 +3,15 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
-from core.database import Base
-
 if TYPE_CHECKING:
     from auth.identity_providers.models import IdentityProvider
-    from users.users.models import Users
     from auth.sessions.models import UsersSessions
+    from users.users.models import Users
 
 
 class OAuthState(Base):
@@ -128,9 +127,5 @@ class OAuthState(Base):
     identity_provider: Mapped["IdentityProvider | None"] = relationship(
         "IdentityProvider", back_populates="oauth_states"
     )
-    users: Mapped["Users | None"] = relationship(
-        "Users", back_populates="oauth_states"
-    )
-    users_sessions: Mapped[list["UsersSessions"]] = relationship(
-        "UsersSessions", back_populates="oauth_state"
-    )
+    users: Mapped["Users | None"] = relationship("Users", back_populates="oauth_states")
+    users_sessions: Mapped[list["UsersSessions"]] = relationship("UsersSessions", back_populates="oauth_state")

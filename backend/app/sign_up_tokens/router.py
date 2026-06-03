@@ -2,33 +2,26 @@
 
 from typing import Annotated
 
+import auth.identity_service as auth_identity_service
+import core.apprise as core_apprise
+import core.database as core_database
+import core.rate_limit as core_rate_limit
+import notifications.utils as notifications_utils
+import server_settings.utils as server_settings_utils
+import sign_up_tokens.schema as sign_up_tokens_schema
+import sign_up_tokens.utils as sign_up_tokens_utils
+import users.users.crud as users_crud
+import users.users.schema as users_schema
+import users.users.utils as users_utils
+import websocket.manager as websocket_manager
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
     Request,
+    status,
 )
 from sqlalchemy.orm import Session
-
-import users.users.crud as users_crud
-import users.users.utils as users_utils
-import users.users.schema as users_schema
-
-import notifications.utils as notifications_utils
-
-import sign_up_tokens.utils as sign_up_tokens_utils
-import sign_up_tokens.schema as sign_up_tokens_schema
-
-import auth.identity_service as auth_identity_service
-
-import server_settings.utils as server_settings_utils
-
-import core.apprise as core_apprise
-import core.database as core_database
-import core.rate_limit as core_rate_limit
-
-import websocket.manager as websocket_manager
 
 # Define the API router
 router = APIRouter()
@@ -83,9 +76,7 @@ async def signup(
         )
 
     # Create the user in the database
-    created_user = users_crud.create_signup_user(
-        user, server_settings, identity_service, db
-    )
+    created_user = users_crud.create_signup_user(user, server_settings, identity_service, db)
 
     # Create default data for the user
     users_utils.create_user_default_data(created_user.id, db)
@@ -97,9 +88,7 @@ async def signup(
 
     if server_settings.signup_require_email_verification:
         # Send the sign-up email
-        success = await sign_up_tokens_utils.send_sign_up_email(
-            created_user, email_service, db
-        )
+        success = await sign_up_tokens_utils.send_sign_up_email(created_user, email_service, db)
         if success:
             message += " Email sent with verification instructions."
         else:
@@ -108,10 +97,7 @@ async def signup(
     if server_settings.signup_require_admin_approval:
         message += " Account is pending admin approval."
         admin_approval_required = True
-    if (
-        not server_settings.signup_require_email_verification
-        and not server_settings.signup_require_admin_approval
-    ):
+    if not server_settings.signup_require_email_verification and not server_settings.signup_require_admin_approval:
         message += " You can now log in."
     return sign_up_tokens_schema.SignUpResponse(
         message=message,
@@ -171,13 +157,9 @@ async def verify_email(
 
     if email_service.is_configured():
         user = users_crud.get_user_by_id(user_id, db)
-        await sign_up_tokens_utils.send_sign_up_admin_approval_email(
-            user, email_service, db
-        )
-        notif_coro = (
-            notifications_utils.create_admin_new_sign_up_approval_request_notification(
-                user, websocket_manager, db
-            )
+        await sign_up_tokens_utils.send_sign_up_admin_approval_email(user, email_service, db)
+        notif_coro = notifications_utils.create_admin_new_sign_up_approval_request_notification(
+            user, websocket_manager, db
         )
         await notif_coro
 

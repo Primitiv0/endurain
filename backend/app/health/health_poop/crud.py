@@ -5,18 +5,15 @@ This module provides database operations for creating, reading,
 updating, and deleting bowel movement records.
 """
 
-from fastapi import HTTPException, status
-from sqlalchemy import func, desc, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import health.constants as health_constants
-import health.utils as health_utils
-
-import health.health_poop.schema as health_poop_schema
-import health.health_poop.models as health_poop_models
-
 import core.decorators as core_decorators
+import health.constants as health_constants
+import health.health_poop.models as health_poop_models
+import health.health_poop.schema as health_poop_schema
+import health.utils as health_utils
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -45,17 +42,12 @@ def get_health_poop_number_by_user_id(
     stmt = (
         select(func.count())
         .select_from(health_poop_models.HealthPoop)
-        .where(
-            health_poop_models.HealthPoop.user_id == user_id
-        )
+        .where(health_poop_models.HealthPoop.user_id == user_id)
     )
 
     if interval is not None:
         stmt = stmt.where(
-            health_poop_models.HealthPoop.date_time
-            >= health_utils.get_start_date_for_interval(
-                interval.value
-            )
+            health_poop_models.HealthPoop.date_time >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     return db.execute(stmt).scalar_one()
@@ -109,34 +101,23 @@ def get_health_poop_by_user_id(
         List of HealthPoop records sorted by date_time
             descending.
     """
-    stmt = select(health_poop_models.HealthPoop).where(
-        health_poop_models.HealthPoop.user_id == user_id
-    )
+    stmt = select(health_poop_models.HealthPoop).where(health_poop_models.HealthPoop.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(
-            health_poop_models.HealthPoop.date_time
-            >= health_utils.get_start_date_for_interval(
-                interval.value
-            )
+            health_poop_models.HealthPoop.date_time >= health_utils.get_start_date_for_interval(interval.value)
         )
 
-    stmt = stmt.order_by(
-        desc(health_poop_models.HealthPoop.date_time)
-    )
+    stmt = stmt.order_by(desc(health_poop_models.HealthPoop.date_time))
 
     if page_number is not None and num_records is not None:
-        stmt = stmt.offset(
-            (page_number - 1) * num_records
-        ).limit(num_records)
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
     return db.execute(stmt).scalars().all()
 
 
 @core_decorators.handle_db_errors
-def get_health_poop_by_date_and_user_id(
-    user_id: int, date: str, db: Session
-) -> list[health_poop_models.HealthPoop]:
+def get_health_poop_by_date_and_user_id(user_id: int, date: str, db: Session) -> list[health_poop_models.HealthPoop]:
     """
     Retrieve poop records for a user on a specific date.
 
@@ -157,16 +138,10 @@ def get_health_poop_by_date_and_user_id(
     stmt = (
         select(health_poop_models.HealthPoop)
         .where(
-            func.date(
-                health_poop_models.HealthPoop.date_time
-            )
-            == func.date(date),
-            health_poop_models.HealthPoop.user_id
-            == user_id,
+            func.date(health_poop_models.HealthPoop.date_time) == func.date(date),
+            health_poop_models.HealthPoop.user_id == user_id,
         )
-        .order_by(
-            desc(health_poop_models.HealthPoop.date_time)
-        )
+        .order_by(desc(health_poop_models.HealthPoop.date_time))
     )
     return db.execute(stmt).scalars().all()
 
@@ -207,10 +182,7 @@ def create_health_poop(
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Failed to create poop record."
-                " Database integrity error."
-            ),
+            detail=("Failed to create poop record. Database integrity error."),
         ) from integrity_error
 
 
@@ -238,15 +210,10 @@ def edit_health_poop(
     if health_poop.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Cannot edit health poop record"
-                " for another user."
-            ),
+            detail=("Cannot edit health poop record for another user."),
         )
 
-    db_health_poop = get_health_poop_by_id_and_user_id(
-        health_poop.id, user_id, db
-    )
+    db_health_poop = get_health_poop_by_id_and_user_id(health_poop.id, user_id, db)
 
     if db_health_poop is None:
         raise HTTPException(
@@ -254,9 +221,7 @@ def edit_health_poop(
             detail="Health poop record not found",
         ) from None
 
-    health_poop_data = health_poop.model_dump(
-        exclude_unset=True
-    )
+    health_poop_data = health_poop.model_dump(exclude_unset=True)
     for key, value in health_poop_data.items():
         setattr(db_health_poop, key, value)
 
@@ -267,9 +232,7 @@ def edit_health_poop(
 
 
 @core_decorators.handle_db_errors
-def delete_health_poop(
-    user_id: int, health_poop_id: int, db: Session
-) -> None:
+def delete_health_poop(user_id: int, health_poop_id: int, db: Session) -> None:
     """
     Delete a poop record for a user.
 
@@ -284,9 +247,7 @@ def delete_health_poop(
     Raises:
         HTTPException: If record not found or database error.
     """
-    db_health_poop = get_health_poop_by_id_and_user_id(
-        health_poop_id, user_id, db
-    )
+    db_health_poop = get_health_poop_by_id_and_user_id(health_poop_id, user_id, db)
 
     if db_health_poop is None:
         raise HTTPException(

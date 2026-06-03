@@ -1,13 +1,13 @@
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 import auth.sessions.crud as users_session_crud
-import auth.sessions.schema as users_session_schema
-import auth.sessions.models as users_session_models
 import auth.sessions.models as _auth_sessions_models
+import auth.sessions.models as users_session_models
+import auth.sessions.schema as users_session_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetUserSessions:
@@ -216,16 +216,11 @@ class TestGetSessionWithOauthState:
         mock_db.execute.return_value = mock_result
 
         with patch(
-            (
-                "auth.sessions.crud."
-                "oauth_state_crud.get_oauth_state_by_id_not_expired"
-            ),
+            ("auth.sessions.crud.oauth_state_crud.get_oauth_state_by_id_not_expired"),
             return_value=mock_oauth_state,
         ):
             # Act
-            result = users_session_crud.get_session_with_oauth_state(
-                session_id, mock_db
-            )
+            result = users_session_crud.get_session_with_oauth_state(session_id, mock_db)
 
             # Assert
             assert result == (mock_session, mock_oauth_state)
@@ -242,15 +237,10 @@ class TestGetSessionWithOauthState:
         mock_db.execute.return_value = mock_result
 
         with patch(
-            (
-                "auth.sessions.crud."
-                "oauth_state_crud.get_oauth_state_by_id_not_expired"
-            ),
+            ("auth.sessions.crud.oauth_state_crud.get_oauth_state_by_id_not_expired"),
             return_value=None,
         ):
-            result = users_session_crud.get_session_with_oauth_state(
-                session_id, mock_db
-            )
+            result = users_session_crud.get_session_with_oauth_state(session_id, mock_db)
 
         assert result == (mock_session, None)
 
@@ -281,7 +271,7 @@ class TestCreateSession:
         Test successful session creation.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session_data = users_session_schema.UsersSessionsInternal(
             id="test-session-id",
             user_id=1,
@@ -320,7 +310,7 @@ class TestCreateSession:
         Test exception handling when database error occurs.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session_data = users_session_schema.UsersSessionsInternal(
             id="test-session-id",
             user_id=1,
@@ -399,7 +389,7 @@ class TestEditSession:
         Test successful session update.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session_data = users_session_schema.UsersSessionsInternal(
             id="test-session-id",
             user_id=1,
@@ -434,7 +424,7 @@ class TestEditSession:
         Test exception when session not found.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session_data = users_session_schema.UsersSessionsInternal(
             id="nonexistent-session",
             user_id=1,
@@ -511,9 +501,7 @@ class TestDeleteSession:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in exc_info.value.detail
 
-    def test_delete_session_calls_rotated_token_cleanup_before_delete(
-        self, mock_db
-    ):
+    def test_delete_session_calls_rotated_token_cleanup_before_delete(self, mock_db):
         """
         Test that delete_session calls rotated token cleanup
         before executing the session DELETE statement.
@@ -521,9 +509,7 @@ class TestDeleteSession:
         # Arrange
         session_id = "sess-cleanup-order"
         user_id = 7
-        mock_session = MagicMock(
-            spec=users_session_models.UsersSessions
-        )
+        mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.token_family_id = "family-cleanup"
         mock_session.oauth_state_id = None
         mock_result = MagicMock()
@@ -542,29 +528,18 @@ class TestDeleteSession:
         mock_db.execute.side_effect = record_execute
 
         with patch(
-            "auth.sessions.crud"
-            ".users_session_rotated_tokens_crud.delete_by_family",
+            "auth.sessions.crud.users_session_rotated_tokens_crud.delete_by_family",
             side_effect=record_cleanup,
         ):
             # Act
-            users_session_crud.delete_session(
-                session_id, user_id, mock_db
-            )
+            users_session_crud.delete_session(session_id, user_id, mock_db)
 
         # Assert — cleanup happens before the DELETE execute
-        cleanup_idx = next(
-            i for i, v in enumerate(call_order) if v == "cleanup"
-        )
-        delete_idx = next(
-            i
-            for i, v in reversed(list(enumerate(call_order)))
-            if v == "execute"
-        )
+        cleanup_idx = next(i for i, v in enumerate(call_order) if v == "cleanup")
+        delete_idx = next(i for i, v in reversed(list(enumerate(call_order))) if v == "execute")
         assert cleanup_idx < delete_idx
 
-    def test_delete_session_deletes_oauth_state_when_linked(
-        self, mock_db
-    ):
+    def test_delete_session_deletes_oauth_state_when_linked(self, mock_db):
         """
         Test that delete_session deletes the linked OAuth state
         record when oauth_state_id is present.
@@ -573,36 +548,27 @@ class TestDeleteSession:
         session_id = "sess-oauth-cleanup"
         user_id = 3
         oauth_state_id = "oauth-state-to-delete"
-        mock_session = MagicMock(
-            spec=users_session_models.UsersSessions
-        )
+        mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.token_family_id = "family-oauth"
         mock_session.oauth_state_id = oauth_state_id
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_session
         mock_db.execute.return_value = mock_result
 
-        with patch(
-            "auth.sessions.crud"
-            ".users_session_rotated_tokens_crud.delete_by_family",
-            return_value=0,
-        ), patch(
-            "auth.sessions.crud"
-            ".oauth_state_crud.delete_oauth_state"
-        ) as mock_delete_oauth:
+        with (
+            patch(
+                "auth.sessions.crud.users_session_rotated_tokens_crud.delete_by_family",
+                return_value=0,
+            ),
+            patch("auth.sessions.crud.oauth_state_crud.delete_oauth_state") as mock_delete_oauth,
+        ):
             # Act
-            users_session_crud.delete_session(
-                session_id, user_id, mock_db
-            )
+            users_session_crud.delete_session(session_id, user_id, mock_db)
 
         # Assert
-        mock_delete_oauth.assert_called_once_with(
-            oauth_state_id, mock_db
-        )
+        mock_delete_oauth.assert_called_once_with(oauth_state_id, mock_db)
 
-    def test_delete_session_commit_failure_raises_http_500(
-        self, mock_db
-    ):
+    def test_delete_session_commit_failure_raises_http_500(self, mock_db):
         """
         Test that delete_session propagates a SQLAlchemyError
         on commit as an HTTP 500 response.
@@ -610,9 +576,7 @@ class TestDeleteSession:
         # Arrange
         session_id = "sess-commit-fail"
         user_id = 5
-        mock_session = MagicMock(
-            spec=users_session_models.UsersSessions
-        )
+        mock_session = MagicMock(spec=users_session_models.UsersSessions)
         mock_session.token_family_id = "family-fail"
         mock_session.oauth_state_id = None
         mock_result = MagicMock()
@@ -622,21 +586,17 @@ class TestDeleteSession:
         mock_db.execute.return_value = mock_result
         mock_db.commit.side_effect = SQLAlchemyError("commit failed")
 
-        with patch(
-            "auth.sessions.crud"
-            ".users_session_rotated_tokens_crud.delete_by_family",
-            return_value=0,
+        with (
+            patch(
+                "auth.sessions.crud.users_session_rotated_tokens_crud.delete_by_family",
+                return_value=0,
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
             # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                users_session_crud.delete_session(
-                    session_id, user_id, mock_db
-                )
+            users_session_crud.delete_session(session_id, user_id, mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestDeleteIdleSessions:
@@ -649,7 +609,7 @@ class TestDeleteIdleSessions:
         Test successful deletion of idle sessions.
         """
         # Arrange
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
         mock_result = MagicMock()
         mock_result.rowcount = 5
         mock_db.execute.return_value = mock_result
@@ -666,7 +626,7 @@ class TestDeleteIdleSessions:
         Test when no idle sessions exist.
         """
         # Arrange
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
+        cutoff_time = datetime.now(UTC) - timedelta(hours=24)
         mock_result = MagicMock()
         mock_result.rowcount = 0
         mock_db.execute.return_value = mock_result
@@ -755,9 +715,7 @@ class TestDeleteSessionsByUser:
         # Assert
         assert result == 0
 
-    def test_delete_sessions_by_user_commit_false_does_not_commit(
-        self, mock_db
-    ):
+    def test_delete_sessions_by_user_commit_false_does_not_commit(self, mock_db):
         """
         Test that delete_sessions_by_user does not call
         db.commit() when commit=False is passed, allowing the
@@ -770,9 +728,7 @@ class TestDeleteSessionsByUser:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_session_crud.delete_sessions_by_user(
-            user_id, mock_db, commit=False
-        )
+        result = users_session_crud.delete_sessions_by_user(user_id, mock_db, commit=False)
 
         # Assert
         assert result == 3
@@ -800,9 +756,7 @@ class TestSetSessionRefreshTokenHash:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_session_crud.set_session_refresh_token_hash(
-            session_id, hashed_token, mock_db
-        )
+        result = users_session_crud.set_session_refresh_token_hash(session_id, hashed_token, mock_db)
 
         # Assert
         assert mock_session.refresh_token == hashed_token
@@ -810,9 +764,7 @@ class TestSetSessionRefreshTokenHash:
         mock_db.refresh.assert_called_once_with(mock_session)
         assert result == mock_session
 
-    def test_set_refresh_token_hash_session_not_found_raises_404(
-        self, mock_db
-    ):
+    def test_set_refresh_token_hash_session_not_found_raises_404(self, mock_db):
         """
         Raises HTTP 404 when the session does not exist.
         """
@@ -824,9 +776,7 @@ class TestSetSessionRefreshTokenHash:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_session_crud.set_session_refresh_token_hash(
-                session_id, "some-hash", mock_db
-            )
+            users_session_crud.set_session_refresh_token_hash(session_id, "some-hash", mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert session_id in exc_info.value.detail
@@ -846,9 +796,7 @@ class TestSetSessionRefreshTokenHash:
         mock_db.execute.return_value = mock_result
 
         # Act
-        users_session_crud.set_session_refresh_token_hash(
-            session_id, new_hash, mock_db
-        )
+        users_session_crud.set_session_refresh_token_hash(session_id, new_hash, mock_db)
 
         # Assert
         assert mock_session.refresh_token == new_hash
@@ -862,14 +810,9 @@ class TestSetSessionRefreshTokenHash:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_session_crud.set_session_refresh_token_hash(
-                "session-id", "hash", mock_db
-            )
+            users_session_crud.set_session_refresh_token_hash("session-id", "hash", mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class TestClaimSessionForTokenExchange:
@@ -881,9 +824,7 @@ class TestClaimSessionForTokenExchange:
     succeeds when tokens_exchanged is False.
     """
 
-    def test_claim_succeeds_returns_true_when_session_unclaimed(
-        self, mock_db
-    ):
+    def test_claim_succeeds_returns_true_when_session_unclaimed(self, mock_db):
         """
         Returns True when the conditional UPDATE claims the session
         (rowcount == 1).
@@ -907,18 +848,14 @@ class TestClaimSessionForTokenExchange:
         ]
 
         # Act
-        result = users_session_crud.claim_session_for_token_exchange(
-            session_id, hashed_token, mock_db
-        )
+        result = users_session_crud.claim_session_for_token_exchange(session_id, hashed_token, mock_db)
 
         # Assert
         assert result is True
         # First commit for the UPDATE
         assert mock_db.commit.call_count >= 1
 
-    def test_claim_fails_returns_false_when_already_exchanged(
-        self, mock_db
-    ):
+    def test_claim_fails_returns_false_when_already_exchanged(self, mock_db):
         """
         Returns False when the session was already claimed
         (rowcount == 0 — duplicate exchange attempt).
@@ -930,16 +867,12 @@ class TestClaimSessionForTokenExchange:
         mock_db.execute.return_value = mock_execute_result
 
         # Act
-        result = users_session_crud.claim_session_for_token_exchange(
-            session_id, "any-hash", mock_db
-        )
+        result = users_session_crud.claim_session_for_token_exchange(session_id, "any-hash", mock_db)
 
         # Assert
         assert result is False
 
-    def test_claim_fails_returns_false_for_nonexistent_session(
-        self, mock_db
-    ):
+    def test_claim_fails_returns_false_for_nonexistent_session(self, mock_db):
         """
         Returns False when no session matches (missing session).
         """
@@ -949,9 +882,7 @@ class TestClaimSessionForTokenExchange:
         mock_db.execute.return_value = mock_execute_result
 
         # Act
-        result = users_session_crud.claim_session_for_token_exchange(
-            "nonexistent-session-id", "hash", mock_db
-        )
+        result = users_session_crud.claim_session_for_token_exchange("nonexistent-session-id", "hash", mock_db)
 
         # Assert
         assert result is False
@@ -977,16 +908,11 @@ class TestClaimSessionForTokenExchange:
             mock_scalar_result,
         ]
 
-        with patch(
-            "auth.sessions.crud"
-            ".oauth_state_crud.delete_oauth_state"
-        ) as mock_delete_state:
+        with patch("auth.sessions.crud.oauth_state_crud.delete_oauth_state") as mock_delete_state:
             mock_delete_state.return_value = None
 
             # Act
-            result = users_session_crud.claim_session_for_token_exchange(
-                session_id, "hashed-token", mock_db
-            )
+            result = users_session_crud.claim_session_for_token_exchange(session_id, "hashed-token", mock_db)
 
         # Assert
         assert result is True
@@ -1014,14 +940,11 @@ class TestClaimSessionForTokenExchange:
         ]
 
         with patch(
-            "auth.sessions.crud"
-            ".oauth_state_crud.delete_oauth_state",
+            "auth.sessions.crud.oauth_state_crud.delete_oauth_state",
             side_effect=Exception("cleanup error"),
         ):
             # Act — must not raise
-            result = users_session_crud.claim_session_for_token_exchange(
-                session_id, "hashed-token", mock_db
-            )
+            result = users_session_crud.claim_session_for_token_exchange(session_id, "hashed-token", mock_db)
 
         # Assert
         assert result is True
@@ -1036,11 +959,6 @@ class TestClaimSessionForTokenExchange:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_session_crud.claim_session_for_token_exchange(
-                "session-id", "hash", mock_db
-            )
+            users_session_crud.claim_session_for_token_exchange("session-id", "hash", mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -1,16 +1,13 @@
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, Security
-from sqlalchemy.orm import Session
-
-import activities.activity_sets.schema as activity_sets_schema
-import activities.activity_sets.crud as activity_sets_crud
+from collections.abc import Callable
+from typing import Annotated
 
 import activities.activity.dependencies as activities_dependencies
-
+import activities.activity_sets.crud as activity_sets_crud
+import activities.activity_sets.schema as activity_sets_schema
 import auth.dependencies as auth_dependencies
-
 import core.database as core_database
+from fastapi import APIRouter, Depends, Security
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -18,18 +15,12 @@ router = APIRouter()
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=list[
-        activity_sets_schema.ActivitySetsRead
-    ] | None,
+    response_model=list[activity_sets_schema.ActivitySetsRead] | None,
 )
 async def read_activities_sets_for_activity_all(
     activity_id: int,
-    validate_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    validate_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),

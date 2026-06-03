@@ -1,15 +1,12 @@
-from fastapi import HTTPException, status
-from sqlalchemy import func, desc, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import health.constants as health_constants
-import health.utils as health_utils
-
-import health.health_steps.schema as health_steps_schema
-import health.health_steps.models as health_steps_models
-
 import core.decorators as core_decorators
+import health.constants as health_constants
+import health.health_steps.models as health_steps_models
+import health.health_steps.schema as health_steps_schema
+import health.utils as health_utils
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -40,8 +37,7 @@ def get_health_steps_number_by_user_id(
 
     if interval is not None:
         stmt = stmt.where(
-            health_steps_models.HealthSteps.date
-            >= health_utils.get_start_date_for_interval(interval.value)
+            health_steps_models.HealthSteps.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     return db.execute(stmt).scalar_one()
@@ -102,14 +98,11 @@ def get_health_steps_by_user_id(
             records sorted by date in descending order, optionally paginated.
     """
     # Get the health_steps from the database
-    stmt = select(health_steps_models.HealthSteps).where(
-        health_steps_models.HealthSteps.user_id == user_id
-    )
+    stmt = select(health_steps_models.HealthSteps).where(health_steps_models.HealthSteps.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(
-            health_steps_models.HealthSteps.date
-            >= health_utils.get_start_date_for_interval(interval.value)
+            health_steps_models.HealthSteps.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     stmt = stmt.order_by(desc(health_steps_models.HealthSteps.date))
@@ -187,10 +180,7 @@ def create_health_steps(
         # Raise an HTTPException with a 409 Conflict status code
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Duplicate entry error. Check if there is already "
-                f"a entry created for {health_steps.date}"
-            ),
+            detail=(f"Duplicate entry error. Check if there is already a entry created for {health_steps.date}"),
         ) from integrity_error
 
 

@@ -26,18 +26,18 @@ from .schema import MFABackupCodesResponse, MFABackupCodeStatus
 from .utils import generate_backup_code, verify_and_consume_backup_code
 
 __all__ = [
+    # Database model
+    "MFABackupCodeModel",
+    "MFABackupCodeStatus",
+    # Pydantic schemas
+    "MFABackupCodesResponse",
     # CRUD operations
     "create_backup_codes",
     "delete_user_backup_codes",
+    # Utilities
+    "generate_backup_code",
     "get_user_backup_codes",
     "get_user_unused_backup_codes",
     "mark_backup_code_as_used",
-    # Database model
-    "MFABackupCodeModel",
-    # Pydantic schemas
-    "MFABackupCodesResponse",
-    "MFABackupCodeStatus",
-    # Utilities
-    "generate_backup_code",
     "verify_and_consume_backup_code",
 ]

@@ -15,9 +15,9 @@ Exports:
 """
 
 from .crud import (
-    get_user_privacy_settings_by_user_id,
     create_user_privacy_settings,
     edit_user_privacy_settings,
+    get_user_privacy_settings_by_user_id,
 )
 from .models import UsersPrivacySettings as UsersPrivacySettingsModel
 from .schema import (
@@ -29,17 +29,17 @@ from .schema import (
 )
 
 __all__ = [
-    # CRUD operations
-    "get_user_privacy_settings_by_user_id",
-    "create_user_privacy_settings",
-    "edit_user_privacy_settings",
-    # Database model
-    "UsersPrivacySettingsModel",
+    # Enums
+    "ActivityVisibility",
     # Pydantic schemas
     "UsersPrivacySettingsBase",
     "UsersPrivacySettingsCreate",
+    # Database model
+    "UsersPrivacySettingsModel",
     "UsersPrivacySettingsRead",
     "UsersPrivacySettingsUpdate",
-    # Enums
-    "ActivityVisibility",
+    "create_user_privacy_settings",
+    "edit_user_privacy_settings",
+    # CRUD operations
+    "get_user_privacy_settings_by_user_id",
 ]

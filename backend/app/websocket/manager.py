@@ -1,8 +1,7 @@
 from functools import lru_cache
 
-from fastapi import WebSocket
-
 import core.logger as core_logger
+from fastapi import WebSocket
 
 
 class WebSocketManager:

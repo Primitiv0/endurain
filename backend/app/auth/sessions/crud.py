@@ -1,20 +1,18 @@
 """CRUD operations for user sessions."""
 
-from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from sqlalchemy import delete, select, update as sa_update
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
-import auth.oauth_state.models as oauth_state_models
 import auth.oauth_state.crud as oauth_state_crud
-
+import auth.oauth_state.models as oauth_state_models
 import auth.sessions.models as users_session_models
-import auth.sessions.schema as users_session_schema
-
 import auth.sessions.rotated_refresh_tokens.crud as users_session_rotated_tokens_crud
-
-import core.logger as core_logger
+import auth.sessions.schema as users_session_schema
 import core.decorators as core_decorators
+import core.logger as core_logger
+from fastapi import HTTPException, status
+from sqlalchemy import delete, select
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -61,9 +59,7 @@ def get_session_by_id(
     Raises:
         HTTPException: If database error occurs.
     """
-    stmt = select(users_session_models.UsersSessions).where(
-        users_session_models.UsersSessions.id == session_id
-    )
+    stmt = select(users_session_models.UsersSessions).where(users_session_models.UsersSessions.id == session_id)
     return db.execute(stmt).scalar_one_or_none()
 
 
@@ -88,9 +84,7 @@ def get_session_by_id_not_expired(
     stmt = (
         select(users_session_models.UsersSessions)
         .where(users_session_models.UsersSessions.id == session_id)
-        .where(
-            users_session_models.UsersSessions.expires_at > datetime.now(timezone.utc)
-        )
+        .where(users_session_models.UsersSessions.expires_at > datetime.now(UTC))
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -128,9 +122,7 @@ def get_session_with_oauth_state(
     stmt = (
         select(users_session_models.UsersSessions)
         .where(users_session_models.UsersSessions.id == session_id)
-        .where(
-            users_session_models.UsersSessions.expires_at > datetime.now(timezone.utc)
-        )
+        .where(users_session_models.UsersSessions.expires_at > datetime.now(UTC))
     )
     db_session = db.execute(stmt).scalar_one_or_none()
 
@@ -140,9 +132,7 @@ def get_session_with_oauth_state(
     # Get OAuth state if linked
     oauth_state = None
     if db_session.oauth_state_id:
-        oauth_state = oauth_state_crud.get_oauth_state_by_id_not_expired(
-            db_session.oauth_state_id, db
-        )
+        oauth_state = oauth_state_crud.get_oauth_state_by_id_not_expired(db_session.oauth_state_id, db)
 
     return (db_session, oauth_state)
 
@@ -249,18 +239,14 @@ def mark_tokens_exchanged(session_id: str, db: Session) -> None:
         try:
             oauth_state_crud.delete_oauth_state(oauth_state_id_to_delete, db)
             core_logger.print_to_log(
-                f"Deleted OAuth state "
-                f"{oauth_state_id_to_delete[:8]}... after token "
-                f"exchange",
+                f"Deleted OAuth state {oauth_state_id_to_delete[:8]}... after token exchange",
                 "debug",
             )
         except Exception as err:
             # Log but don't fail - cleanup job handles orphaned
             # states
             core_logger.print_to_log(
-                f"Failed to delete OAuth state "
-                f"{oauth_state_id_to_delete[:8]}... after token "
-                f"exchange: {err}",
+                f"Failed to delete OAuth state {oauth_state_id_to_delete[:8]}... after token exchange: {err}",
                 "warning",
                 exc=err,
             )
@@ -317,8 +303,7 @@ def claim_session_for_token_exchange(
     claimed = result.rowcount == 1
     if not claimed:
         core_logger.print_to_log(
-            f"Token exchange claim lost race for session "
-            f"{session_id[:8]}... (missing or already exchanged)",
+            f"Token exchange claim lost race for session {session_id[:8]}... (missing or already exchanged)",
             "warning",
         )
         return False
@@ -333,9 +318,7 @@ def claim_session_for_token_exchange(
             oauth_state_crud.delete_oauth_state(oauth_state_id_to_delete, db)
         except Exception as err:
             core_logger.print_to_log(
-                f"Failed to delete OAuth state "
-                f"{oauth_state_id_to_delete[:8]}... after token "
-                f"exchange: {err}",
+                f"Failed to delete OAuth state {oauth_state_id_to_delete[:8]}... after token exchange: {err}",
                 "warning",
                 exc=err,
             )
@@ -411,7 +394,7 @@ def delete_session(
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Session {session_id} not found for user " f"{user_id}"),
+            detail=(f"Session {session_id} not found for user {user_id}"),
         )
 
     # Store oauth_state_id before deleting session (if exists)
@@ -515,9 +498,7 @@ def delete_sessions_by_user(
     Raises:
         HTTPException: If database error occurs.
     """
-    stmt = delete(users_session_models.UsersSessions).where(
-        users_session_models.UsersSessions.user_id == user_id
-    )
+    stmt = delete(users_session_models.UsersSessions).where(users_session_models.UsersSessions.user_id == user_id)
     result = db.execute(stmt)
     if commit:
         db.commit()

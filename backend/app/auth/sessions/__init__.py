@@ -35,14 +35,18 @@ from .utils import (
 )
 
 __all__ = [
+    "DeviceInfo",
+    "DeviceType",
+    "UsersSessionsBase",
+    "UsersSessionsInternal",
+    "UsersSessionsModel",
+    "UsersSessionsRead",
     "cleanup_idle_sessions",
     "create_session",
     "create_session_object",
     "delete_idle_sessions",
     "delete_session",
     "delete_sessions_by_family",
-    "DeviceInfo",
-    "DeviceType",
     "edit_session",
     "edit_session_object",
     "get_session_by_id",
@@ -52,9 +56,5 @@ __all__ = [
     "get_user_sessions",
     "mark_tokens_exchanged",
     "parse_user_agent",
-    "UsersSessionsBase",
-    "UsersSessionsInternal",
-    "UsersSessionsModel",
-    "UsersSessionsRead",
     "validate_session_timeout",
 ]

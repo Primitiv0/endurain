@@ -9,31 +9,29 @@ to endpoints that accept either auth method.
 
 from dataclasses import dataclass
 from typing import Annotated
-from fastapi import (
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    status,
-    WebSocket,
-    WebSocketException,
-)
-from fastapi.security import (
-    OAuth2PasswordBearer,
-    SecurityScopes,
-    APIKeyHeader,
-    APIKeyCookie,
-)
 
 import auth.constants as auth_constants
 import auth.identity_service as auth_identity_service
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
-
-from auth.principal import AccessTokenCred, Principal
-from joserfc.errors import MissingClaimError
-
 import core.logger as core_logger
+from auth.principal import AccessTokenCred, Principal
+from fastapi import (
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketException,
+    status,
+)
+from fastapi.security import (
+    APIKeyCookie,
+    APIKeyHeader,
+    OAuth2PasswordBearer,
+    SecurityScopes,
+)
+from joserfc.errors import MissingClaimError
 
 # Define the OAuth2 scheme for handling bearer tokens
 oauth2_scheme = OAuth2PasswordBearer(
@@ -71,9 +69,7 @@ class AuthContext:
 
 
 # Define the API key header for the client type for OAuth redirects
-header_client_type_scheme_optional = APIKeyHeader(
-    name="X-Client-Type", auto_error=False
-)
+header_client_type_scheme_optional = APIKeyHeader(name="X-Client-Type", auto_error=False)
 
 # Define the API key header for CSRF token
 header_csrf_token_scheme = APIKeyHeader(name="X-CSRF-Token", auto_error=False)
@@ -110,14 +106,10 @@ def _resolve_and_cache_principal(
         HTTPException: 401 if the token is invalid or
             the user is not found.
     """
-    cached: Principal | None = getattr(
-        request.state, "principal", None
-    )
+    cached: Principal | None = getattr(request.state, "principal", None)
     if cached is not None:
         return cached
-    principal = identity_service.resolve_from_access_token(
-        access_token
-    )
+    principal = identity_service.resolve_from_access_token(access_token)
     request.state.principal = principal
     return principal
 
@@ -342,17 +334,13 @@ def get_sub_from_access_token(
         HTTPException: 401 if the token is invalid,
             expired, or the user is not found.
     """
-    principal = _resolve_and_cache_principal(
-        access_token, request, identity_service
-    )
+    principal = _resolve_and_cache_principal(access_token, request, identity_service)
     return principal.user_id
 
 
 def get_sub_from_access_token_for_browser_redirect(
     request: Request,
-    access_token: Annotated[
-        str, Depends(get_access_token_for_browser_redirect)
-    ],
+    access_token: Annotated[str, Depends(get_access_token_for_browser_redirect)],
     identity_service: Annotated[
         auth_identity_service.IdentityService,
         Depends(auth_identity_service.get_identity_service),
@@ -377,9 +365,7 @@ def get_sub_from_access_token_for_browser_redirect(
         HTTPException: 401 if the token is invalid,
             expired, or the user is not found.
     """
-    principal = _resolve_and_cache_principal(
-        access_token, request, identity_service
-    )
+    principal = _resolve_and_cache_principal(access_token, request, identity_service)
     return principal.user_id
 
 
@@ -409,9 +395,7 @@ def get_sid_from_access_token(
         HTTPException: 401 if the token is invalid,
             expired, or the credential type is unexpected.
     """
-    principal = _resolve_and_cache_principal(
-        access_token, request, identity_service
-    )
+    principal = _resolve_and_cache_principal(access_token, request, identity_service)
     cred = principal.credential
     if not isinstance(cred, AccessTokenCred):
         raise HTTPException(
@@ -457,9 +441,7 @@ def get_refresh_token(
     Raises:
         HTTPException: If no valid refresh token is found or the client type is invalid.
     """
-    return get_token(
-        non_cookie_refresh_token, cookie_refresh_token, client_type, "refresh"
-    )
+    return get_token(non_cookie_refresh_token, cookie_refresh_token, client_type, "refresh")
 
 
 def validate_refresh_token(
@@ -789,9 +771,7 @@ async def validate_access_token_or_api_key(
             provided.
     """
     # --- Cache check: return early if Principal already resolved ---
-    cached: Principal | None = getattr(
-        request.state, "principal", None
-    )
+    cached: Principal | None = getattr(request.state, "principal", None)
     if cached is not None:
         auth_type = "api_key" if cached.is_api_key() else "jwt"
         return AuthContext(
@@ -802,9 +782,7 @@ async def validate_access_token_or_api_key(
 
     # --- JWT path ---
     if access_token is not None:
-        principal = identity_service.resolve_from_access_token(
-            access_token
-        )
+        principal = identity_service.resolve_from_access_token(access_token)
         request.state.principal = principal
         return AuthContext(
             user_id=principal.user_id,
@@ -815,9 +793,7 @@ async def validate_access_token_or_api_key(
     # --- API key path ---
     raw_key = api_key_header or api_key_query
     if raw_key is not None:
-        principal = identity_service.resolve_from_api_key(
-            raw_key, request
-        )
+        principal = identity_service.resolve_from_api_key(raw_key, request)
         request.state.principal = principal
         return AuthContext(
             user_id=principal.user_id,
@@ -827,10 +803,7 @@ async def validate_access_token_or_api_key(
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=(
-            "Not authenticated. "
-            "Provide a Bearer token or an API key."
-        ),
+        detail=("Not authenticated. Provide a Bearer token or an API key."),
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -882,15 +855,8 @@ def check_auth_scopes(
     if missing:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                f"Unauthorized Access - "
-                f"Missing permissions: {missing}"
-            ),
-            headers={
-                "WWW-Authenticate": (
-                    f'Bearer scope="{security_scopes.scopes}"'
-                )
-            },
+            detail=(f"Unauthorized Access - Missing permissions: {missing}"),
+            headers={"WWW-Authenticate": (f'Bearer scope="{security_scopes.scopes}"')},
         )
 
 
@@ -898,9 +864,7 @@ def check_auth_scopes(
 async def validate_websocket_access_token(
     websocket: WebSocket,
     access_token: str = Query(..., alias="access_token"),
-    token_manager: auth_token_manager.TokenManager = Depends(
-        auth_token_manager.get_token_manager
-    ),
+    token_manager: auth_token_manager.TokenManager = Depends(auth_token_manager.get_token_manager),
 ) -> int:
     """
     Validate access token for WebSocket connections.

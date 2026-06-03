@@ -7,9 +7,8 @@ and JSON serialisation round-trips.
 import hashlib
 import json
 
-import pytest
-
 import auth.api_keys.utils as api_keys_utils
+import pytest
 
 
 class TestGenerateApiKey:
@@ -23,7 +22,7 @@ class TestGenerateApiKey:
     def test_sufficient_entropy(self):
         """Key random part is at least 32 characters long (≥ 256 bits)."""
         key = api_keys_utils.generate_api_key()
-        random_part = key[len("endurain_"):]
+        random_part = key[len("endurain_") :]
         # token_urlsafe(32) produces 43 base64url chars
         assert len(random_part) >= 32
 
@@ -80,9 +79,7 @@ class TestValidateApiKeyScopes:
     def test_mixed_valid_and_invalid_raises(self):
         """A mix of valid and invalid scopes raises ValueError."""
         with pytest.raises(ValueError, match="Unsupported API key scopes"):
-            api_keys_utils.validate_api_key_scopes(
-                ["activities:upload", "admin:all"], "standard"
-            )
+            api_keys_utils.validate_api_key_scopes(["activities:upload", "admin:all"], "standard")
 
     def test_user_access_type_ignored(self):
         """The _user_access_type argument does not affect scope validation."""

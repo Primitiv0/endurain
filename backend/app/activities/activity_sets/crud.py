@@ -1,18 +1,14 @@
 """Activity sets CRUD operations."""
 
+import activities.activity.crud as activity_crud
+import activities.activity.models as activity_models
+import activities.activity_sets.models as activity_sets_models
+import activities.activity_sets.schema as activity_sets_schema
+import core.decorators as core_decorators
+import server_settings.utils as server_settings_utils
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-import activities.activity.models as activity_models
-import activities.activity.crud as activity_crud
-
-import activities.activity_sets.models as activity_sets_models
-import activities.activity_sets.schema as activity_sets_schema
-
-import server_settings.utils as server_settings_utils
-
-import core.decorators as core_decorators
 
 
 def _to_read_schema(
@@ -30,10 +26,7 @@ def _to_read_schema(
     Returns:
         An ActivitySetsRead schema instance.
     """
-    schema = (
-        activity_sets_schema.ActivitySetsRead
-        .model_validate(orm_set)
-    )
+    schema = activity_sets_schema.ActivitySetsRead.model_validate(orm_set)
     schema.timezone = timezone
     return schema
 
@@ -59,35 +52,23 @@ def get_activity_sets(
     Raises:
         HTTPException: If database error occurs.
     """
-    activity = activity_crud.get_activity_by_id(
-        activity_id, db
-    )
+    activity = activity_crud.get_activity_by_id(activity_id, db)
 
     if not activity:
         return None
 
-    if (
-        token_user_id != activity.user_id
-        and activity.hide_workout_sets_steps
-    ):
+    if token_user_id != activity.user_id and activity.hide_workout_sets_steps:
         return None
 
-    stmt = (
-        select(activity_sets_models.ActivitySets)
-        .where(
-            activity_sets_models.ActivitySets
-            .activity_id == activity_id,
-        )
+    stmt = select(activity_sets_models.ActivitySets).where(
+        activity_sets_models.ActivitySets.activity_id == activity_id,
     )
     activity_sets = db.scalars(stmt).all()
 
     if not activity_sets:
         return None
 
-    return [
-        _to_read_schema(s, activity.timezone)
-        for s in activity_sets
-    ]
+    return [_to_read_schema(s, activity.timezone) for s in activity_sets]
 
 
 @core_decorators.handle_db_errors
@@ -95,9 +76,7 @@ def get_activities_sets(
     activity_ids: list[int],
     token_user_id: int,
     db: Session,
-    activities: list[
-        activity_models.Activity
-    ] | None = None,
+    activities: list[activity_models.Activity] | None = None,
 ) -> list[activity_sets_schema.ActivitySetsRead]:
     """
     Retrieve sets for multiple activities.
@@ -118,39 +97,21 @@ def get_activities_sets(
         return []
 
     if not activities:
-        stmt = (
-            select(activity_models.Activity)
-            .where(
-                activity_models.Activity.id.in_(
-                    activity_ids
-                )
-            )
-        )
+        stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
         activities = db.scalars(stmt).all()
 
     if not activities:
         return []
 
-    activity_map = {
-        activity.id: activity
-        for activity in activities
-    }
+    activity_map = {activity.id: activity for activity in activities}
 
-    allowed_ids = [
-        activity.id
-        for activity in activities
-        if activity.user_id == token_user_id
-    ]
+    allowed_ids = [activity.id for activity in activities if activity.user_id == token_user_id]
 
     if not allowed_ids:
         return []
 
-    stmt = (
-        select(activity_sets_models.ActivitySets)
-        .where(
-            activity_sets_models.ActivitySets
-            .activity_id.in_(allowed_ids)
-        )
+    stmt = select(activity_sets_models.ActivitySets).where(
+        activity_sets_models.ActivitySets.activity_id.in_(allowed_ids)
     )
     activity_sets = db.scalars(stmt).all()
 
@@ -185,9 +146,7 @@ def get_public_activity_sets(
     Raises:
         HTTPException: If database error occurs.
     """
-    activity = activity_crud.get_activity_by_id(
-        activity_id, db
-    )
+    activity = activity_crud.get_activity_by_id(activity_id, db)
 
     if not activity:
         return None
@@ -195,10 +154,7 @@ def get_public_activity_sets(
     if activity.hide_workout_sets_steps:
         return None
 
-    server_settings = (
-        server_settings_utils
-        .get_server_settings_or_404(db)
-    )
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
 
     if not server_settings.public_shareable_links:
         return None
@@ -206,29 +162,20 @@ def get_public_activity_sets(
     if activity.visibility != 0:
         return None
 
-    stmt = (
-        select(activity_sets_models.ActivitySets)
-        .where(
-            activity_sets_models.ActivitySets
-            .activity_id == activity_id,
-        )
+    stmt = select(activity_sets_models.ActivitySets).where(
+        activity_sets_models.ActivitySets.activity_id == activity_id,
     )
     activity_sets = db.scalars(stmt).all()
 
     if not activity_sets:
         return None
 
-    return [
-        _to_read_schema(s, activity.timezone)
-        for s in activity_sets
-    ]
+    return [_to_read_schema(s, activity.timezone) for s in activity_sets]
 
 
 @core_decorators.handle_db_errors
 def create_activity_sets(
-    activity_sets: list[
-        activity_sets_schema.ActivitySetsCreate | list
-    ],
+    activity_sets: list[activity_sets_schema.ActivitySetsCreate | list],
     activity_id: int,
     db: Session,
 ) -> None:
@@ -251,42 +198,28 @@ def create_activity_sets(
 
     for activity_set in activity_sets:
         if isinstance(activity_set, BaseModel):
-            db_activity_set = (
-                activity_sets_models.ActivitySets(
-                    activity_id=activity_id,
-                    duration=activity_set.duration,
-                    repetitions=(
-                        activity_set.repetitions
-                    ),
-                    weight=activity_set.weight,
-                    set_type=activity_set.set_type,
-                    start_time=(
-                        activity_set.start_time
-                    ),
-                    category=activity_set.category,
-                    category_subtype=(
-                        activity_set.category_subtype
-                    ),
-                )
+            db_activity_set = activity_sets_models.ActivitySets(
+                activity_id=activity_id,
+                duration=activity_set.duration,
+                repetitions=(activity_set.repetitions),
+                weight=activity_set.weight,
+                set_type=activity_set.set_type,
+                start_time=(activity_set.start_time),
+                category=activity_set.category,
+                category_subtype=(activity_set.category_subtype),
             )
         else:
-            category = _extract_value(
-                activity_set[5]
-            )
-            category_subtype = _extract_value(
-                activity_set[6]
-            )
-            db_activity_set = (
-                activity_sets_models.ActivitySets(
-                    activity_id=activity_id,
-                    duration=activity_set[0],
-                    repetitions=activity_set[1],
-                    weight=activity_set[2],
-                    set_type=activity_set[3],
-                    start_time=activity_set[4],
-                    category=category,
-                    category_subtype=category_subtype,
-                )
+            category = _extract_value(activity_set[5])
+            category_subtype = _extract_value(activity_set[6])
+            db_activity_set = activity_sets_models.ActivitySets(
+                activity_id=activity_id,
+                duration=activity_set[0],
+                repetitions=activity_set[1],
+                weight=activity_set[2],
+                set_type=activity_set[3],
+                start_time=activity_set[4],
+                category=category,
+                category_subtype=category_subtype,
             )
 
         sets.append(db_activity_set)

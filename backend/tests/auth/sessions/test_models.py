@@ -1,5 +1,3 @@
-import pytest
-
 import auth.sessions.models as users_session_models
 
 
@@ -103,13 +101,13 @@ class TestUsersSessionsModel:
         model = users_session_models.UsersSessions
 
         # Assert
-        assert model.id.type.python_type == str
-        assert model.refresh_token.type.python_type == str
-        assert model.ip_address.type.python_type == str
-        assert model.device_type.type.python_type == str
-        assert model.operating_system.type.python_type == str
-        assert model.browser.type.python_type == str
-        assert model.token_family_id.type.python_type == str
+        assert model.id.type.python_type is str
+        assert model.refresh_token.type.python_type is str
+        assert model.ip_address.type.python_type is str
+        assert model.device_type.type.python_type is str
+        assert model.operating_system.type.python_type is str
+        assert model.browser.type.python_type is str
+        assert model.token_family_id.type.python_type is str
 
     def test_users_sessions_model_string_lengths(self):
         """

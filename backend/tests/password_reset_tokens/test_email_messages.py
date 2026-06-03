@@ -2,15 +2,14 @@
 
 from unittest.mock import MagicMock
 
+import password_reset_tokens.email_messages as email_messages
+
 
 def _make_service(frontend_host: str = "https://endurain.example.com"):
     """Build a minimal AppriseService mock."""
     svc = MagicMock()
     svc.frontend_host = frontend_host
     return svc
-
-
-import password_reset_tokens.email_messages as email_messages
 
 
 class TestGetPasswordResetEmail:
@@ -39,17 +38,13 @@ class TestGetPasswordResetEmail:
     def test_html_contains_reset_link(self):
         """HTML body contains the reset link."""
         link = "https://example.com/reset?token=abc"
-        _, html_body, _ = email_messages.get_password_reset_email(
-            "Alice", link, _make_service(), locale="us"
-        )
+        _, html_body, _ = email_messages.get_password_reset_email("Alice", link, _make_service(), locale="us")
         assert link in html_body
 
     def test_text_contains_reset_link(self):
         """Plain-text body contains the reset link."""
         link = "https://example.com/reset?token=abc"
-        _, _, text_body = email_messages.get_password_reset_email(
-            "Alice", link, _make_service(), locale="us"
-        )
+        _, _, text_body = email_messages.get_password_reset_email("Alice", link, _make_service(), locale="us")
         assert link in text_body
 
     def test_html_lang_attribute_en_us(self):
@@ -183,4 +178,3 @@ class TestGetPasswordResetEmail:
         finally:
             core_i18n._load_catalog.cache_clear()
         assert subject_us != subject_pt
-

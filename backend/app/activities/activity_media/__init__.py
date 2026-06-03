@@ -28,16 +28,16 @@ from .models import ActivityMedia as ActivityMediaModel
 from .schema import ActivityMedia
 
 __all__ = [
-    # CRUD operations
-    "get_all_activity_media",
-    "get_activity_media",
-    "get_activities_media",
-    "create_activity_media",
-    "create_activity_medias",
-    "edit_activity_media_media_path",
-    "delete_activity_media",
-    # Database model
-    "ActivityMediaModel",
     # Pydantic schemas
     "ActivityMedia",
+    # Database model
+    "ActivityMediaModel",
+    "create_activity_media",
+    "create_activity_medias",
+    "delete_activity_media",
+    "edit_activity_media_media_path",
+    "get_activities_media",
+    "get_activity_media",
+    # CRUD operations
+    "get_all_activity_media",
 ]

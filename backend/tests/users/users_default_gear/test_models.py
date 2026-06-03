@@ -1,7 +1,5 @@
 """Tests for user default gear database models."""
 
-import pytest
-
 import users.users_default_gear.models as user_default_gear_models
 
 
@@ -15,10 +13,7 @@ class TestUsersDefaultGearModel:
         Test UsersDefaultGear model has correct table name.
         """
         # Assert
-        assert (
-            user_default_gear_models.UsersDefaultGear.__tablename__
-            == "users_default_gear"
-        )
+        assert user_default_gear_models.UsersDefaultGear.__tablename__ == "users_default_gear"
 
     def test_users_default_gear_model_columns_exist(self):
         """

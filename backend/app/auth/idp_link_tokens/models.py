@@ -3,11 +3,10 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from auth.identity_providers.models import IdentityProvider
@@ -94,6 +93,4 @@ class IdpLinkToken(Base):
 
     # Relationships
     users: Mapped["Users"] = relationship(foreign_keys=[user_id])
-    identity_provider: Mapped["IdentityProvider"] = relationship(
-        foreign_keys=[idp_id]
-    )
+    identity_provider: Mapped["IdentityProvider"] = relationship(foreign_keys=[idp_id])

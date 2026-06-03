@@ -1,23 +1,18 @@
+from datetime import UTC, date, datetime
 from typing import Annotated
-from fastapi import APIRouter, Depends, BackgroundTasks
-from sqlalchemy.orm import Session
-from datetime import datetime, timezone, date
 
 import auth.dependencies as auth_dependencies
-
-import users.users_integrations.crud as user_integrations_crud
-
-import garmin.utils as garmin_utils
-import garmin.schema as garmin_schema
-import garmin.activity_utils as garmin_activity_utils
-import garmin.health_utils as garmin_health_utils
-import garmin.gear_utils as garmin_gear_utils
-
-import websocket.manager as websocket_manager
-
-import core.logger as core_logger
-
 import core.database as core_database
+import core.logger as core_logger
+import garmin.activity_utils as garmin_activity_utils
+import garmin.gear_utils as garmin_gear_utils
+import garmin.health_utils as garmin_health_utils
+import garmin.schema as garmin_schema
+import garmin.utils as garmin_utils
+import users.users_integrations.crud as user_integrations_crud
+import websocket.manager as websocket_manager
+from fastapi import APIRouter, BackgroundTasks, Depends
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -33,9 +28,7 @@ async def garminconnect_link(
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
-    mfa_codes: Annotated[
-        garmin_schema.MFACodeStore, Depends(garmin_schema.get_mfa_store)
-    ],
+    mfa_codes: Annotated[garmin_schema.MFACodeStore, Depends(garmin_schema.get_mfa_store)],
     websocket_manager: Annotated[
         websocket_manager.WebSocketManager,
         Depends(websocket_manager.get_websocket_manager),
@@ -62,9 +55,7 @@ async def garminconnect_mfa_code(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    mfa_codes: Annotated[
-        garmin_schema.MFACodeStore, Depends(garmin_schema.get_mfa_store)
-    ],
+    mfa_codes: Annotated[garmin_schema.MFACodeStore, Depends(garmin_schema.get_mfa_store)],
 ):
     # Store the MFA code
     mfa_codes.add_code(token_user_id, mfa_request.mfa_code)
@@ -89,10 +80,8 @@ async def garminconnect_retrieve_activities_days(
     ],
     background_tasks: BackgroundTasks,
 ):
-    start_datetime = datetime.combine(
-        start_date, datetime.min.time(), tzinfo=timezone.utc
-    )
-    end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc)
+    start_datetime = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
+    end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=UTC)
 
     # Process Garmin Connect activities in the background
     background_tasks.add_task(
@@ -105,12 +94,8 @@ async def garminconnect_retrieve_activities_days(
     )
 
     # Return success message and status code 202
-    core_logger.print_to_log(
-        f"Garmin Connect activities will be processed in the background for user {token_user_id}"
-    )
-    return {
-        "detail": f"Garmin Connect activities will be processed in the background for for {token_user_id}"
-    }
+    core_logger.print_to_log(f"Garmin Connect activities will be processed in the background for user {token_user_id}")
+    return {"detail": f"Garmin Connect activities will be processed in the background for for {token_user_id}"}
 
 
 @router.get("/gear", status_code=202)
@@ -128,12 +113,8 @@ async def garminconnect_retrieve_gear(
     )
 
     # Return success message and status code 202
-    core_logger.print_to_log(
-        f"Garmin Connect gear will be processed in the background for user {token_user_id}"
-    )
-    return {
-        "detail": f"Garmin Connect gear will be processed in the background for for {token_user_id}"
-    }
+    core_logger.print_to_log(f"Garmin Connect gear will be processed in the background for user {token_user_id}")
+    return {"detail": f"Garmin Connect gear will be processed in the background for for {token_user_id}"}
 
 
 @router.get(
@@ -154,10 +135,8 @@ async def garminconnect_retrieve_health_days(
         Depends(websocket_manager.get_websocket_manager),
     ],
 ):
-    start_datetime = datetime.combine(
-        start_date, datetime.min.time(), tzinfo=timezone.utc
-    )
-    end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc)
+    start_datetime = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
+    end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=UTC)
 
     # Process Garmin Connect activities in the background
     background_tasks.add_task(
@@ -169,12 +148,8 @@ async def garminconnect_retrieve_health_days(
     )
 
     # Return success message and status code 202
-    core_logger.print_to_log(
-        f"Garmin Connect health data will be processed in the background for user {token_user_id}"
-    )
-    return {
-        "detail": f"Garmin Connect health data will be processed in the background for for {token_user_id}"
-    }
+    core_logger.print_to_log(f"Garmin Connect health data will be processed in the background for user {token_user_id}")
+    return {"detail": f"Garmin Connect health data will be processed in the background for for {token_user_id}"}
 
 
 @router.delete("/unlink")

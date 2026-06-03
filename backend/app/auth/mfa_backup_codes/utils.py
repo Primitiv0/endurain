@@ -2,10 +2,9 @@
 
 import secrets
 
-from sqlalchemy.orm import Session
-
 import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
 import auth.password_hasher as auth_password_hasher
+from sqlalchemy.orm import Session
 
 # Backup-code alphabet: uppercase ASCII + digits with visually ambiguous
 # characters removed (0, O, 1, I) to reduce user transcription errors.
@@ -23,10 +22,7 @@ def generate_backup_code() -> str:
     Returns:
         Formatted backup code, e.g. ``"A3K9-7BDF"``.
     """
-    code = "".join(
-        secrets.choice(_BACKUP_CODE_ALPHABET)
-        for _ in range(_BACKUP_CODE_LENGTH)
-    )
+    code = "".join(secrets.choice(_BACKUP_CODE_ALPHABET) for _ in range(_BACKUP_CODE_LENGTH))
     return f"{code[:4]}-{code[4:]}"
 
 
@@ -53,17 +49,13 @@ def verify_and_consume_backup_code(
         ``False`` otherwise.
     """
     # Get all unused codes for this user
-    unused_codes = mfa_backup_codes_crud.get_user_unused_backup_codes(
-        user_id, db
-    )
+    unused_codes = mfa_backup_codes_crud.get_user_unused_backup_codes(user_id, db)
 
     # Try each unused code (constant-time for each)
     for unused_code in unused_codes:
         if password_hasher.verify(code, unused_code.code_hash):
             # Valid code found - mark as used (by primary key)
-            mfa_backup_codes_crud.mark_backup_code_as_used(
-                unused_code.id, user_id, db
-            )
+            mfa_backup_codes_crud.mark_backup_code_as_used(unused_code.id, user_id, db)
             return True
 
     # No matching code found

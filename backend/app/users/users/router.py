@@ -1,26 +1,23 @@
 """User management router for authenticated operations."""
 
-from typing import Annotated, Callable
+from collections.abc import Callable
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, UploadFile, Security, status, Query
-from sqlalchemy.orm import Session
-
-import users.users.schema as users_schema
-import users.users.crud as users_crud
-import users.users.dependencies as users_dependencies
-import users.users.utils as users_utils
-import auth.sessions.crud as users_sessions_crud
-
-import auth.identity_links.crud as user_idp_crud
-
-import sign_up_tokens.utils as sign_up_tokens_utils
 import auth.dependencies as auth_dependencies
+import auth.identity_links.crud as user_idp_crud
 import auth.identity_service as auth_identity_service
 import auth.security_stores as auth_security_stores
-
+import auth.sessions.crud as users_sessions_crud
 import core.apprise as core_apprise
 import core.database as core_database
 import core.dependencies as core_dependencies
+import sign_up_tokens.utils as sign_up_tokens_utils
+import users.users.crud as users_crud
+import users.users.dependencies as users_dependencies
+import users.users.schema as users_schema
+import users.users.utils as users_utils
+from fastapi import APIRouter, Depends, Query, Security, UploadFile, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -35,9 +32,7 @@ async def read_users_all_pagination(
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -102,9 +97,7 @@ async def read_users_all_pagination(
     # Enrich with IDP count before serializing
     enriched_users = []
     for user in users:
-        idp_count = len(
-            user_idp_crud.get_user_identity_providers_by_user_id(user.id, db)
-        )
+        idp_count = len(user_idp_crud.get_user_identity_providers_by_user_id(user.id, db))
         user_read = users_schema.UsersRead.model_validate(user)
         user_read.external_auth_count = idp_count
 
@@ -131,9 +124,7 @@ async def read_users_all_pagination(
 )
 async def read_users_contain_username(
     username: str,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -160,9 +151,7 @@ async def read_users_contain_username(
 )
 async def read_users_username(
     username: str,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -189,9 +178,7 @@ async def read_users_username(
 )
 async def read_users_email(
     email: str,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -219,9 +206,7 @@ async def read_users_email(
 async def read_users_id(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -242,14 +227,10 @@ async def read_users_id(
     return users_crud.get_user_by_id(user_id, db)
 
 
-@router.post(
-    "", status_code=status.HTTP_201_CREATED, response_model=users_schema.UsersRead
-)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=users_schema.UsersRead)
 async def create_user(
     user: users_schema.UsersCreate,
-    _check_scope: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scope: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     identity_service: Annotated[
         auth_identity_service.IdentityService,
         Depends(auth_identity_service.get_identity_service),
@@ -289,9 +270,7 @@ async def upload_user_image(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     file: UploadFile,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -314,16 +293,12 @@ async def upload_user_image(
     return users_crud.get_user_by_id(user_id, db).photo_path
 
 
-@router.put(
-    "/{user_id}", status_code=status.HTTP_200_OK, response_model=users_schema.UsersRead
-)
+@router.put("/{user_id}", status_code=status.HTTP_200_OK, response_model=users_schema.UsersRead)
 async def edit_user(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     user_attributtes: users_schema.UsersRead,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -345,24 +320,18 @@ async def edit_user(
     db_user = await users_crud.edit_user(user_id, user_attributtes, db)
 
     # Enrich with IDP count before serializing
-    idp_count = len(
-        user_idp_crud.get_user_identity_providers_by_user_id(db_user.id, db)
-    )
+    idp_count = len(user_idp_crud.get_user_identity_providers_by_user_id(db_user.id, db))
     user_read = users_schema.UsersRead.model_validate(db_user)
     user_read.external_auth_count = idp_count
 
     return user_read
 
 
-@router.put(
-    "/{user_id}/approve", status_code=status.HTTP_200_OK, response_model=dict[str, str]
-)
+@router.put("/{user_id}/approve", status_code=status.HTTP_200_OK, response_model=dict[str, str])
 async def approve_user(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     email_service: Annotated[
         core_apprise.AppriseService,
         Depends(core_apprise.get_email_service),
@@ -394,16 +363,12 @@ async def approve_user(
     return {"message": f"User ID {user_id} approved successfully."}
 
 
-@router.put(
-    "/{user_id}/password", status_code=status.HTTP_200_OK, response_model=dict[str, str]
-)
+@router.put("/{user_id}/password", status_code=status.HTTP_200_OK, response_model=dict[str, str])
 async def edit_user_password(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     user_attributes: users_schema.UsersAdminEditPassword,
-    _check_scope: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scope: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     identity_service: Annotated[
         auth_identity_service.IdentityService,
         Depends(auth_identity_service.get_identity_service),
@@ -427,9 +392,7 @@ async def edit_user_password(
     Returns:
         Success message.
     """
-    users_crud.edit_user_password(
-        user_id, user_attributes.password, identity_service, db
-    )
+    users_crud.edit_user_password(user_id, user_attributes.password, identity_service, db)
     users_sessions_crud.delete_sessions_by_user(user_id, db)
     auth_security_stores.clear_pending_mfa_for_user(user_id)
 
@@ -437,15 +400,11 @@ async def edit_user_password(
     return {"message": f"User ID {user_id} password updated successfully"}
 
 
-@router.delete(
-    "/{user_id}/photo", status_code=status.HTTP_204_NO_CONTENT, response_model=None
-)
+@router.delete("/{user_id}/photo", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_user_photo(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -468,15 +427,11 @@ async def delete_user_photo(
     return None
 
 
-@router.delete(
-    "/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
-)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_user(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),

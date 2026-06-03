@@ -4,11 +4,10 @@ Tests for users.users_default_gear.utils module.
 This module tests utility functions for user default gear management.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
-import users.users_default_gear.utils as user_default_gear_utils
 import users.users_default_gear.models as user_default_gear_models
+import users.users_default_gear.utils as user_default_gear_utils
 
 
 class TestGetUserDefaultGearByActivityType:
@@ -25,9 +24,7 @@ class TestGetUserDefaultGearByActivityType:
         mock_crud.get_user_default_gear_by_user_id.return_value = mock_user_gear
 
         # Act
-        result = user_default_gear_utils.get_user_default_gear_by_activity_type(
-            user_id=1, activity_type=1, db=mock_db
-        )
+        result = user_default_gear_utils.get_user_default_gear_by_activity_type(user_id=1, activity_type=1, db=mock_db)
 
         # Assert
         assert result == 5
@@ -43,9 +40,7 @@ class TestGetUserDefaultGearByActivityType:
         mock_crud.get_user_default_gear_by_user_id.return_value = mock_user_gear
 
         # Act
-        result = user_default_gear_utils.get_user_default_gear_by_activity_type(
-            user_id=1, activity_type=4, db=mock_db
-        )
+        result = user_default_gear_utils.get_user_default_gear_by_activity_type(user_id=1, activity_type=4, db=mock_db)
 
         # Assert
         assert result == 6
@@ -76,9 +71,7 @@ class TestGetUserDefaultGearByActivityType:
         mock_crud.get_user_default_gear_by_user_id.return_value = None
 
         # Act
-        result = user_default_gear_utils.get_user_default_gear_by_activity_type(
-            user_id=1, activity_type=1, db=mock_db
-        )
+        result = user_default_gear_utils.get_user_default_gear_by_activity_type(user_id=1, activity_type=1, db=mock_db)
 
         # Assert
         assert result is None
@@ -94,9 +87,7 @@ class TestGetUserDefaultGearByActivityType:
         mock_crud.get_user_default_gear_by_user_id.return_value = mock_user_gear
 
         # Act
-        result = user_default_gear_utils.get_user_default_gear_by_activity_type(
-            user_id=1, activity_type=1, db=mock_db
-        )
+        result = user_default_gear_utils.get_user_default_gear_by_activity_type(user_id=1, activity_type=1, db=mock_db)
 
         # Assert
         assert result is None

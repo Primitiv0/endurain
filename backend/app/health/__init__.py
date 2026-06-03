@@ -24,30 +24,30 @@ Top-level exports:
 """
 
 from .constants import Interval
-from .utils import get_start_date_for_interval
 from .schema import (
-    HealthListResponse,
     HealthDashboardResponse,
-    HealthSleepDashboard,
-    HealthWeightDashboard,
-    HealthStepsDashboard,
     HealthFastingDashboard,
-    HealthWaterDashboard,
+    HealthListResponse,
     HealthPoopDashboard,
+    HealthSleepDashboard,
+    HealthStepsDashboard,
+    HealthWaterDashboard,
+    HealthWeightDashboard,
 )
+from .utils import get_start_date_for_interval
 
 __all__ = [
+    "HealthDashboardResponse",
+    "HealthFastingDashboard",
+    # Shared schemas
+    "HealthListResponse",
+    "HealthPoopDashboard",
+    "HealthSleepDashboard",
+    "HealthStepsDashboard",
+    "HealthWaterDashboard",
+    "HealthWeightDashboard",
     # Constants
     "Interval",
     # Utilities
     "get_start_date_for_interval",
-    # Shared schemas
-    "HealthListResponse",
-    "HealthDashboardResponse",
-    "HealthSleepDashboard",
-    "HealthWeightDashboard",
-    "HealthStepsDashboard",
-    "HealthFastingDashboard",
-    "HealthWaterDashboard",
-    "HealthPoopDashboard",
 ]

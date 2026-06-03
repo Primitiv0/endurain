@@ -6,8 +6,6 @@ Covers:
 - UniqueConstraint / index metadata.
 """
 
-import pytest
-
 from auth.mfa.models import AuthUserMFA
 
 
@@ -52,16 +50,12 @@ class TestAuthUserMFAModel:
 
     def test_unique_constraint_on_user_id(self):
         """UniqueConstraint uq_users_mfa_user_id is present."""
-        constraint_names = {
-            c.name for c in AuthUserMFA.__table__.constraints
-        }
+        constraint_names = {c.name for c in AuthUserMFA.__table__.constraints}
         assert "uq_users_mfa_user_id" in constraint_names
 
     def test_index_on_user_id(self):
         """Index ix_users_mfa_user_id is defined on the table."""
-        index_names = {
-            idx.name for idx in AuthUserMFA.__table__.indexes
-        }
+        index_names = {idx.name for idx in AuthUserMFA.__table__.indexes}
         assert "ix_users_mfa_user_id" in index_names
 
     def test_users_relationship_exists(self):

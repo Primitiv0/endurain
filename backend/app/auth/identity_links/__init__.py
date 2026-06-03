@@ -26,14 +26,14 @@ Exports:
 
 from .crud import (
     check_user_identity_providers_by_idp_id,
-    get_user_identity_providers_by_user_id,
-    get_user_identity_provider_by_user_id_and_idp_id,
-    get_user_identity_provider_by_subject_and_idp_id,
-    create_user_identity_provider,
-    update_user_identity_provider_last_login,
-    store_user_identity_provider_tokens,
     clear_user_identity_provider_refresh_token_by_user_id_and_idp_id,
+    create_user_identity_provider,
     delete_user_identity_provider,
+    get_user_identity_provider_by_subject_and_idp_id,
+    get_user_identity_provider_by_user_id_and_idp_id,
+    get_user_identity_providers_by_user_id,
+    store_user_identity_provider_tokens,
+    update_user_identity_provider_last_login,
 )
 from .models import UsersIdentityProvider
 from .schema import (
@@ -44,21 +44,11 @@ from .schema import (
     UsersIdentityProviderTokenUpdate,
 )
 from .utils import (
-    get_user_identity_provider_refresh_token_by_user_id_and_idp_id,
     enrich_user_identity_providers,
+    get_user_identity_provider_refresh_token_by_user_id_and_idp_id,
 )
 
 __all__ = [
-    # CRUD operations
-    "check_user_identity_providers_by_idp_id",
-    "get_user_identity_providers_by_user_id",
-    "get_user_identity_provider_by_user_id_and_idp_id",
-    "get_user_identity_provider_by_subject_and_idp_id",
-    "create_user_identity_provider",
-    "update_user_identity_provider_last_login",
-    "store_user_identity_provider_tokens",
-    "clear_user_identity_provider_refresh_token_by_user_id_and_idp_id",
-    "delete_user_identity_provider",
     # Database model
     "UsersIdentityProvider",
     # Pydantic schemas
@@ -67,7 +57,17 @@ __all__ = [
     "UsersIdentityProviderRead",
     "UsersIdentityProviderResponse",
     "UsersIdentityProviderTokenUpdate",
+    # CRUD operations
+    "check_user_identity_providers_by_idp_id",
+    "clear_user_identity_provider_refresh_token_by_user_id_and_idp_id",
+    "create_user_identity_provider",
+    "delete_user_identity_provider",
+    "enrich_user_identity_providers",
+    "get_user_identity_provider_by_subject_and_idp_id",
+    "get_user_identity_provider_by_user_id_and_idp_id",
     # Utility functions
     "get_user_identity_provider_refresh_token_by_user_id_and_idp_id",
-    "enrich_user_identity_providers",
+    "get_user_identity_providers_by_user_id",
+    "store_user_identity_provider_tokens",
+    "update_user_identity_provider_last_login",
 ]

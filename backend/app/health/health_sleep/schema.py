@@ -1,16 +1,17 @@
+from datetime import date as datetime_date
+from datetime import datetime
 from enum import Enum
+
+import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
-    model_validator,
+    Field,
+    StrictFloat,
     StrictInt,
     StrictStr,
-    StrictFloat,
-    Field,
+    model_validator,
 )
-from datetime import datetime, date as datetime_date
-
-import health.schema as health_schema
 
 
 class Source(Enum):
@@ -89,18 +90,10 @@ class HealthSleepStage(BaseModel):
         duration_seconds: The length of the sleep stage in seconds. Must be non-negative.
     """
 
-    stage_type: SleepStageType | None = Field(
-        default=None, description="Type of sleep stage"
-    )
-    start_time_gmt: datetime | None = Field(
-        default=None, description="Start time of the stage in GMT"
-    )
-    end_time_gmt: datetime | None = Field(
-        default=None, description="End time of the stage in GMT"
-    )
-    duration_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Duration of the stage in seconds"
-    )
+    stage_type: SleepStageType | None = Field(default=None, description="Type of sleep stage")
+    start_time_gmt: datetime | None = Field(default=None, description="Start time of the stage in GMT")
+    end_time_gmt: datetime | None = Field(default=None, description="End time of the stage in GMT")
+    duration_seconds: StrictInt | None = Field(default=None, ge=0, description="Duration of the stage in seconds")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -170,124 +163,56 @@ class HealthSleepBase(BaseModel):
                              for both GMT and local time zones.
     """
 
-    date: datetime_date | None = Field(
-        default=None, description="Calendar date of the sleep session"
-    )
-    sleep_start_time_gmt: datetime | None = Field(
-        default=None, description="Start time of sleep in GMT"
-    )
-    sleep_end_time_gmt: datetime | None = Field(
-        default=None, description="End time of sleep in GMT"
-    )
-    sleep_start_time_local: datetime | None = Field(
-        default=None, description="Start time of sleep in local time"
-    )
-    sleep_end_time_local: datetime | None = Field(
-        default=None, description="End time of sleep in local time"
-    )
-    total_sleep_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Total duration of sleep in seconds"
-    )
-    nap_time_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Duration of naps in seconds"
-    )
+    date: datetime_date | None = Field(default=None, description="Calendar date of the sleep session")
+    sleep_start_time_gmt: datetime | None = Field(default=None, description="Start time of sleep in GMT")
+    sleep_end_time_gmt: datetime | None = Field(default=None, description="End time of sleep in GMT")
+    sleep_start_time_local: datetime | None = Field(default=None, description="Start time of sleep in local time")
+    sleep_end_time_local: datetime | None = Field(default=None, description="End time of sleep in local time")
+    total_sleep_seconds: StrictInt | None = Field(default=None, ge=0, description="Total duration of sleep in seconds")
+    nap_time_seconds: StrictInt | None = Field(default=None, ge=0, description="Duration of naps in seconds")
     unmeasurable_sleep_seconds: StrictInt | None = Field(
         default=None, ge=0, description="Unmeasurable sleep duration in seconds"
     )
-    deep_sleep_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Duration of deep sleep in seconds"
-    )
-    light_sleep_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Duration of light sleep in seconds"
-    )
-    rem_sleep_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Duration of REM sleep in seconds"
-    )
-    awake_sleep_seconds: StrictInt | None = Field(
-        default=None, ge=0, description="Duration of awake time in seconds"
-    )
-    avg_heart_rate: StrictInt | None = Field(
-        default=None, ge=20, le=220, description="Average heart rate during sleep"
-    )
-    min_heart_rate: StrictInt | None = Field(
-        default=None, ge=20, le=220, description="Minimum heart rate during sleep"
-    )
-    max_heart_rate: StrictInt | None = Field(
-        default=None, ge=20, le=220, description="Maximum heart rate during sleep"
-    )
+    deep_sleep_seconds: StrictInt | None = Field(default=None, ge=0, description="Duration of deep sleep in seconds")
+    light_sleep_seconds: StrictInt | None = Field(default=None, ge=0, description="Duration of light sleep in seconds")
+    rem_sleep_seconds: StrictInt | None = Field(default=None, ge=0, description="Duration of REM sleep in seconds")
+    awake_sleep_seconds: StrictInt | None = Field(default=None, ge=0, description="Duration of awake time in seconds")
+    avg_heart_rate: StrictInt | None = Field(default=None, ge=20, le=220, description="Average heart rate during sleep")
+    min_heart_rate: StrictInt | None = Field(default=None, ge=20, le=220, description="Minimum heart rate during sleep")
+    max_heart_rate: StrictInt | None = Field(default=None, ge=20, le=220, description="Maximum heart rate during sleep")
     avg_spo2: StrictInt | None = Field(
         default=None,
         ge=70,
         le=100,
         description="Average SpO2 oxygen saturation percentage",
     )
-    lowest_spo2: StrictInt | None = Field(
-        default=None, ge=70, le=100, description="Lowest SpO2 reading during sleep"
-    )
-    highest_spo2: StrictInt | None = Field(
-        default=None, ge=70, le=100, description="Highest SpO2 reading during sleep"
-    )
-    avg_respiration: StrictInt | None = Field(
-        default=None, ge=0, description="Average respiration rate"
-    )
-    lowest_respiration: StrictInt | None = Field(
-        default=None, ge=0, description="Lowest respiration rate"
-    )
-    highest_respiration: StrictInt | None = Field(
-        default=None, ge=0, description="Highest respiration rate"
-    )
-    avg_stress_level: StrictInt | None = Field(
-        default=None, ge=0, le=100, description="Average stress level"
-    )
-    awake_count: StrictInt | None = Field(
-        default=None, ge=0, description="Number of times awake during sleep"
-    )
+    lowest_spo2: StrictInt | None = Field(default=None, ge=70, le=100, description="Lowest SpO2 reading during sleep")
+    highest_spo2: StrictInt | None = Field(default=None, ge=70, le=100, description="Highest SpO2 reading during sleep")
+    avg_respiration: StrictInt | None = Field(default=None, ge=0, description="Average respiration rate")
+    lowest_respiration: StrictInt | None = Field(default=None, ge=0, description="Lowest respiration rate")
+    highest_respiration: StrictInt | None = Field(default=None, ge=0, description="Highest respiration rate")
+    avg_stress_level: StrictInt | None = Field(default=None, ge=0, le=100, description="Average stress level")
+    awake_count: StrictInt | None = Field(default=None, ge=0, description="Number of times awake during sleep")
     restless_moments_count: StrictInt | None = Field(
         default=None, ge=0, description="Number of restless moments during sleep"
     )
-    sleep_score_overall: StrictInt | None = Field(
-        default=None, ge=0, le=100, description="Overall sleep score (0-100)"
-    )
-    sleep_score_duration: SleepScore | None = Field(
-        default=None, description="Sleep duration score"
-    )
-    sleep_score_quality: SleepScore | None = Field(
-        default=None, description="Sleep quality score"
-    )
+    sleep_score_overall: StrictInt | None = Field(default=None, ge=0, le=100, description="Overall sleep score (0-100)")
+    sleep_score_duration: SleepScore | None = Field(default=None, description="Sleep duration score")
+    sleep_score_quality: SleepScore | None = Field(default=None, description="Sleep quality score")
     garminconnect_sleep_id: StrictStr | None = Field(
         default=None, min_length=1, description="Garmin Connect sleep record ID"
     )
-    sleep_stages: list[HealthSleepStage] | None = Field(
-        default=None, description="List of sleep stages"
-    )
+    sleep_stages: list[HealthSleepStage] | None = Field(default=None, description="List of sleep stages")
     source: Source | None = Field(default=None, description="Source of the sleep data")
-    hrv_status: HRVStatus | None = Field(
-        default=None, description="Heart rate variability status"
-    )
-    resting_heart_rate: StrictInt | None = Field(
-        default=None, ge=20, le=220, description="Resting heart rate"
-    )
-    avg_skin_temp_deviation: StrictFloat | None = Field(
-        default=None, description="Average skin temperature deviation"
-    )
-    awake_count_score: SleepScore | None = Field(
-        default=None, description="Awake count score"
-    )
-    rem_percentage_score: SleepScore | None = Field(
-        default=None, description="REM percentage score"
-    )
-    deep_percentage_score: SleepScore | None = Field(
-        default=None, description="Deep sleep percentage score"
-    )
-    light_percentage_score: SleepScore | None = Field(
-        default=None, description="Light sleep percentage score"
-    )
-    avg_sleep_stress: StrictInt | None = Field(
-        default=None, ge=0, le=100, description="Average sleep stress"
-    )
-    sleep_stress_score: SleepScore | None = Field(
-        default=None, description="Sleep stress score"
-    )
+    hrv_status: HRVStatus | None = Field(default=None, description="Heart rate variability status")
+    resting_heart_rate: StrictInt | None = Field(default=None, ge=20, le=220, description="Resting heart rate")
+    avg_skin_temp_deviation: StrictFloat | None = Field(default=None, description="Average skin temperature deviation")
+    awake_count_score: SleepScore | None = Field(default=None, description="Awake count score")
+    rem_percentage_score: SleepScore | None = Field(default=None, description="REM percentage score")
+    deep_percentage_score: SleepScore | None = Field(default=None, description="Deep sleep percentage score")
+    light_percentage_score: SleepScore | None = Field(default=None, description="Light sleep percentage score")
+    avg_sleep_stress: StrictInt | None = Field(default=None, ge=0, le=100, description="Average sleep stress")
+    sleep_stress_score: SleepScore | None = Field(default=None, description="Sleep stress score")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -301,21 +226,15 @@ class HealthSleepBase(BaseModel):
         """Validate sleep start < end."""
         # Validate sleep start < sleep end (GMT)
         if (
-            self.sleep_start_time_gmt is not None
-            and self.sleep_end_time_gmt is not None
-        ):
-            if self.sleep_start_time_gmt >= self.sleep_end_time_gmt:
-                raise ValueError("Sleep start time must be before sleep end time")
+            self.sleep_start_time_gmt is not None and self.sleep_end_time_gmt is not None
+        ) and self.sleep_start_time_gmt >= self.sleep_end_time_gmt:
+            raise ValueError("Sleep start time must be before sleep end time")
 
         # Validate sleep start < sleep end (Local)
         if (
-            self.sleep_start_time_local is not None
-            and self.sleep_end_time_local is not None
-        ):
-            if self.sleep_start_time_local >= self.sleep_end_time_local:
-                raise ValueError(
-                    "Sleep start time (local) must be before sleep end time (local)"
-                )
+            self.sleep_start_time_local is not None and self.sleep_end_time_local is not None
+        ) and self.sleep_start_time_local >= self.sleep_end_time_local:
+            raise ValueError("Sleep start time (local) must be before sleep end time (local)")
 
         return self
 
@@ -353,9 +272,7 @@ class HealthSleepRead(HealthSleepBase):
         id (StrictInt): Unique identifier for the sleep record to update or retrieve.
     """
 
-    id: StrictInt = Field(
-        ..., description="Unique identifier for the sleep record to update"
-    )
+    id: StrictInt = Field(..., description="Unique identifier for the sleep record to update")
     user_id: StrictInt = Field(..., description="Foreign key reference to the user")
 
 
@@ -384,6 +301,4 @@ class HealthSleepListResponse(health_schema.HealthListResponse):
             sleep records.
     """
 
-    records: list[HealthSleepRead] = Field(
-        ..., description="List of health sleep records"
-    )
+    records: list[HealthSleepRead] = Field(..., description="List of health sleep records")

@@ -1,43 +1,36 @@
-import os
-
-from datetime import datetime, timedelta, timezone, date
-from typing import Annotated, Callable
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Security
-from sqlalchemy.orm import Session
-
 import asyncio
+import os
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, date, datetime
 from functools import partial
-
-from stravalib.exc import AccessUnauthorized
-
-import auth.dependencies as auth_dependencies
-
-import users.users_integrations.crud as user_integrations_crud
-
-import gears.gear.crud as gears_crud
+from typing import Annotated
 
 import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
-
-import strava.gear_utils as strava_gear_utils
-import strava.activity_utils as strava_activity_utils
-import strava.bulk_import_utils as strava_bulk_import_utils
-import strava.utils as strava_utils
-import strava.schema as strava_schema
-
+import auth.dependencies as auth_dependencies
 import core.config as core_config
 import core.cryptography as core_cryptography
-import core.logger as core_logger
 import core.database as core_database
-
+import core.logger as core_logger
+import gears.gear.crud as gears_crud
+import strava.activity_utils as strava_activity_utils
+import strava.bulk_import_utils as strava_bulk_import_utils
+import strava.gear_utils as strava_gear_utils
+import strava.schema as strava_schema
+import strava.utils as strava_utils
+import users.users_integrations.crud as user_integrations_crud
 import websocket.manager as websocket_manager
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status
+from sqlalchemy.orm import Session
+from stravalib.exc import AccessUnauthorized
 
 # Define the API router
 router = APIRouter()
 
 # Define the thread pool executor with 2 workers
 executor = ThreadPoolExecutor(max_workers=2)
+
 
 @router.put(
     "/link",
@@ -51,9 +44,7 @@ async def strava_link(
     ],
 ):
     # Get the user integrations by the state
-    user_integrations = user_integrations_crud.get_user_integrations_by_strava_state(
-        state, db
-    )
+    user_integrations = user_integrations_crud.get_user_integrations_by_strava_state(state, db)
 
     # Check if user integrations is None
     if user_integrations is None:
@@ -63,10 +54,7 @@ async def strava_link(
         )
 
     # Check if client ID and client secret are set
-    if (
-        user_integrations.strava_client_id is None
-        and user_integrations.strava_client_secret is None
-    ):
+    if user_integrations.strava_client_id is None and user_integrations.strava_client_secret is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Strava client ID and secret not set",
@@ -78,12 +66,8 @@ async def strava_link(
 
         # Exchange code for token
         tokens = strava_client.exchange_code_for_token(
-            client_id=core_cryptography.decrypt_token_fernet(
-                user_integrations.strava_client_id
-            ),
-            client_secret=core_cryptography.decrypt_token_fernet(
-                user_integrations.strava_client_secret
-            ),
+            client_id=core_cryptography.decrypt_token_fernet(user_integrations.strava_client_id),
+            client_secret=core_cryptography.decrypt_token_fernet(user_integrations.strava_client_secret),
             code=code,
         )
 
@@ -91,13 +75,9 @@ async def strava_link(
         user_integrations_crud.link_strava_account(user_integrations, tokens, db)
 
         # Return success message
-        return {
-            "detail": f"Strava linked successfully for user {user_integrations.user_id}"
-        }
+        return {"detail": f"Strava linked successfully for user {user_integrations.user_id}"}
     except Exception as err:
-        core_logger.print_to_log(
-            f"Unable to link Strava account: {err}", "error", exc=err
-        )
+        core_logger.print_to_log(f"Unable to link Strava account: {err}", "error", exc=err)
 
         # Clean up by setting Strava
         user_integrations_crud.unlink_strava_account(user_integrations.user_id, db)
@@ -135,10 +115,8 @@ async def strava_retrieve_activities_days(
     # db: Annotated[Session, Depends(core_database.get_db)],
     background_tasks: BackgroundTasks,
 ):
-    start_datetime = datetime.combine(
-        start_date, datetime.min.time(), tzinfo=timezone.utc
-    )
-    end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc)
+    start_datetime = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
+    end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=UTC)
 
     # Process strava activities in the background
     background_tasks.add_task(
@@ -150,12 +128,8 @@ async def strava_retrieve_activities_days(
     )
 
     # Return success message and status code 202
-    core_logger.print_to_log(
-        f"Strava activities will be processed in the background for user {token_user_id}"
-    )
-    return {
-        "detail": f"Strava activities will be processed in the background for for {token_user_id}"
-    }
+    core_logger.print_to_log(f"Strava activities will be processed in the background for user {token_user_id}")
+    return {"detail": f"Strava activities will be processed in the background for for {token_user_id}"}
 
 
 @router.get("/gear", status_code=201)
@@ -181,12 +155,8 @@ async def strava_retrieve_gear(
     )
 
     # Return success message and status code 202
-    core_logger.print_to_log(
-        f"Strava gear will be processed in the background for user {token_user_id}"
-    )
-    return {
-        "detail": f"Strava gear will be processed in the background for for {token_user_id}"
-    }
+    core_logger.print_to_log(f"Strava gear will be processed in the background for user {token_user_id}")
+    return {"detail": f"Strava gear will be processed in the background for for {token_user_id}"}
 
 
 @router.post("/import/bikes", status_code=201)
@@ -209,9 +179,7 @@ async def import_bikes_from_strava_export(
 
         # Transform bikes dict to list of Gear schema objects
         if bikes_dict:
-            bikes = strava_gear_utils.transform_csv_bike_gear_to_schema_gear(
-                bikes_dict, token_user_id
-            )
+            bikes = strava_gear_utils.transform_csv_bike_gear_to_schema_gear(bikes_dict, token_user_id)
 
             # Add bikes to the database
             if bikes:
@@ -225,9 +193,7 @@ async def import_bikes_from_strava_export(
 
         # Move the bikes file to the processed directory
         activities_utils.move_file(processed_dir, bikes_file_name, bikes_file_path)
-        core_logger.print_to_log_and_console(
-            f"{bikes_file_name} moved to: {processed_dir}."
-        )
+        core_logger.print_to_log_and_console(f"{bikes_file_name} moved to: {processed_dir}.")
 
         # Log completion of bike import
         core_logger.print_to_log_and_console("Bike import complete.")
@@ -235,9 +201,7 @@ async def import_bikes_from_strava_export(
         raise http_err
     except Exception as err:
         # Log the exception
-        core_logger.print_to_log_and_console(
-            f"Error in import_bikes_from_strava_export: {err}", "error"
-        )
+        core_logger.print_to_log_and_console(f"Error in import_bikes_from_strava_export: {err}", "error")
         # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -267,16 +231,14 @@ async def import_shoes_from_strava_export(
 
         # Transform shoes list to list of Gear schema objects
         if shoes_list:
-            shoes = strava_gear_utils.transform_csv_shoe_gear_to_schema_gear(
-                shoes_list, token_user_id, db
-            )
-            
+            shoes = strava_gear_utils.transform_csv_shoe_gear_to_schema_gear(shoes_list, token_user_id, db)
+
             core_logger.print_to_log_and_console("Shoe list converted to schema gear.", "debug")
 
             # Add shoes to the database
             if shoes:
                 gears_crud.create_multiple_gears(shoes, token_user_id, db)
- 
+
         core_logger.print_to_log_and_console("Shoes added to db.", "debug")
 
         # Define variables for moving the shoes file
@@ -287,9 +249,7 @@ async def import_shoes_from_strava_export(
 
         # Move the shoes file to the processed directory and log it.
         activities_utils.move_file(processed_dir, shoes_file_name, shoes_file_path)
-        core_logger.print_to_log_and_console(
-            f"{shoes_file_name} moved to: {processed_dir}."
-        )
+        core_logger.print_to_log_and_console(f"{shoes_file_name} moved to: {processed_dir}.")
 
         # Log completion of shoe import
         core_logger.print_to_log_and_console("Shoe import complete.")
@@ -297,9 +257,7 @@ async def import_shoes_from_strava_export(
         raise http_err
     except Exception as err:
         # Log the exception
-        core_logger.print_to_log_and_console(
-            f"Error in import_shoes_from_strava_export: {err}", "error"
-        )
+        core_logger.print_to_log_and_console(f"Error in import_shoes_from_strava_export: {err}", "error")
         # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -310,9 +268,7 @@ async def import_shoes_from_strava_export(
 @router.post("/import/activities", status_code=201)
 async def import_activities_and_media_from_strava_export(
     token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -324,18 +280,22 @@ async def import_activities_and_media_from_strava_export(
 ):
     try:
         # Get time of import initiation to pass to function for recording in import_data dictionary, ensuring all activities imported via this bulk import action share an identical import time.
-        import_time = datetime.now(timezone.utc).isoformat()
+        import_time = datetime.now(UTC).isoformat()
         core_logger.print_to_log_and_console(f"Strava bulk import: Initiated at {import_time}.", "info")
 
         # Parse activities data from activities.csv into a dictionary
         strava_activities_dict = strava_bulk_import_utils.iterate_over_activities_csv()
 
         if strava_activities_dict is None:
-            core_logger.print_to_log_and_console("ABORTING IMPORT: Aborting strava bulk import due to improperly parsed CSV.", "error")
+            core_logger.print_to_log_and_console(
+                "ABORTING IMPORT: Aborting strava bulk import due to improperly parsed CSV.", "error"
+            )
             return {"Strava import ABORTED due to lack of, or improperly parsed, activities.csv file."}
 
         # Create gear list here, so it does not have to be done separately for every single activity that is imported (AND because Strava has a wacked format for shoe naming in their export)
-        users_existing_gear_nickname_to_id = strava_bulk_import_utils.create_gear_dictionary_for_bulk_import(token_user_id, db)
+        users_existing_gear_nickname_to_id = strava_bulk_import_utils.create_gear_dictionary_for_bulk_import(
+            token_user_id, db
+        )
 
         # Queue files for processing.
         if users_existing_gear_nickname_to_id:
@@ -344,33 +304,35 @@ async def import_activities_and_media_from_strava_export(
                 executor,
                 partial(
                     strava_bulk_import_utils.queue_bulk_export_activities_for_import,
-                    token_user_id, 
+                    token_user_id,
                     ws_manager,
-                    db, 
-                    strava_activities_dict, 
-                    users_existing_gear_nickname_to_id, 
-                    import_time
+                    db,
+                    strava_activities_dict,
+                    users_existing_gear_nickname_to_id,
+                    import_time,
                 ),
             )
 
             # Log a success message that explains processing will continue elsewhere.
-            core_logger.print_to_log_and_console("Strava bulk import initiated. Processing of files will continue in the background.")
+            core_logger.print_to_log_and_console(
+                "Strava bulk import initiated. Processing of files will continue in the background."
+            )
         else:
-            core_logger.print_to_log_and_console("ABORTING IMPORT: Aborting strava bulk import due to failure in creating gear nickname to id dictionary.", "error")
+            core_logger.print_to_log_and_console(
+                "ABORTING IMPORT: Aborting strava bulk import due to failure in creating gear nickname to id dictionary.",
+                "error",
+            )
 
         # Return a success message
         return {"Strava bulk import initiated. Processing of files will continue in the background."}
     except Exception as err:
         # Log the exception
-        core_logger.print_to_log_and_console(
-            f"Error in strava_bulk_import: {err}", "error"
-        )
+        core_logger.print_to_log_and_console(f"Error in strava_bulk_import: {err}", "error")
         # Raise an HTTPException with a 500 Internal Server Error status code
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal Server Error",
         ) from err
-
 
 
 @router.put("/client")
@@ -391,9 +353,7 @@ async def strava_set_user_client(
     db: Annotated[Session, Depends(core_database.get_db)],
 ):
     # Set the user Strava client
-    user_integrations_crud.set_user_strava_client(
-        token_user_id, client.client_id, client.client_secret, db
-    )
+    user_integrations_crud.set_user_strava_client(token_user_id, client.client_id, client.client_secret, db)
 
     # Return success message
     return {f"Strava client for user {token_user_id} edited successfully"}

@@ -1,21 +1,18 @@
 """CRUD operations for identity providers."""
 
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
+import auth.identity_links.crud as user_identity_providers_crud
 import auth.identity_providers.models as idp_models
 import auth.identity_providers.schema as idp_schema
 import core.cryptography as core_cryptography
 import core.decorators as core_decorators
 import core.logger as core_logger
-import auth.identity_links.crud as user_identity_providers_crud
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_identity_provider(
-    idp_id: int, db: Session
-) -> idp_models.IdentityProvider | None:
+def get_identity_provider(idp_id: int, db: Session) -> idp_models.IdentityProvider | None:
     """
     Retrieve an identity provider by its ID.
 
@@ -29,16 +26,12 @@ def get_identity_provider(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(idp_models.IdentityProvider).where(
-        idp_models.IdentityProvider.id == idp_id
-    )
+    stmt = select(idp_models.IdentityProvider).where(idp_models.IdentityProvider.id == idp_id)
     return db.execute(stmt).scalar_one_or_none()
 
 
 @core_decorators.handle_db_errors
-def get_identity_provider_by_slug(
-    slug: str, db: Session
-) -> idp_models.IdentityProvider | None:
+def get_identity_provider_by_slug(slug: str, db: Session) -> idp_models.IdentityProvider | None:
     """
     Retrieve an identity provider by its slug.
 
@@ -52,9 +45,7 @@ def get_identity_provider_by_slug(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(idp_models.IdentityProvider).where(
-        idp_models.IdentityProvider.slug == slug
-    )
+    stmt = select(idp_models.IdentityProvider).where(idp_models.IdentityProvider.slug == slug)
     return db.execute(stmt).scalar_one_or_none()
 
 
@@ -72,9 +63,7 @@ def get_all_identity_providers(db: Session) -> list[idp_models.IdentityProvider]
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(idp_models.IdentityProvider).order_by(
-        idp_models.IdentityProvider.name
-    )
+    stmt = select(idp_models.IdentityProvider).order_by(idp_models.IdentityProvider.name)
     return list(db.execute(stmt).scalars().all())
 
 
@@ -102,9 +91,7 @@ def get_identity_providers_by_ids(
     if not idp_ids:
         return []
 
-    stmt = select(idp_models.IdentityProvider).where(
-        idp_models.IdentityProvider.id.in_(idp_ids)
-    )
+    stmt = select(idp_models.IdentityProvider).where(idp_models.IdentityProvider.id.in_(idp_ids))
     return list(db.execute(stmt).scalars().all())
 
 
@@ -131,9 +118,7 @@ def get_enabled_providers(db: Session) -> list[idp_models.IdentityProvider]:
 
 
 @core_decorators.handle_db_errors
-def create_identity_provider(
-    idp_data: idp_schema.IdentityProviderCreate, db: Session
-) -> idp_models.IdentityProvider:
+def create_identity_provider(idp_data: idp_schema.IdentityProviderCreate, db: Session) -> idp_models.IdentityProvider:
     """
     Create a new identity provider.
 
@@ -163,9 +148,7 @@ def create_identity_provider(
 
     # Encrypt sensitive fields
     encrypted_client_id = core_cryptography.encrypt_token_fernet(idp_data.client_id)
-    encrypted_client_secret = core_cryptography.encrypt_token_fernet(
-        idp_data.client_secret
-    )
+    encrypted_client_secret = core_cryptography.encrypt_token_fernet(idp_data.client_secret)
 
     db_idp = idp_models.IdentityProvider(
         name=idp_data.name,
@@ -190,9 +173,7 @@ def create_identity_provider(
     db.commit()
     db.refresh(db_idp)
 
-    core_logger.print_to_log(
-        f"Created identity provider: {db_idp.name} (ID: {db_idp.id})", "info"
-    )
+    core_logger.print_to_log(f"Created identity provider: {db_idp.name} (ID: {db_idp.id})", "info")
 
     return db_idp
 
@@ -230,7 +211,7 @@ def update_identity_provider(
     update_data = idp_data.model_dump(exclude_unset=True)
 
     # Normalize slug and check for conflicts
-    if "slug" in update_data and update_data["slug"]:
+    if update_data.get("slug"):
         new_slug = update_data["slug"].lower()
         update_data["slug"] = new_slug
         if new_slug != db_idp.slug:
@@ -238,20 +219,14 @@ def update_identity_provider(
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        f"Identity provider with slug '{new_slug}' already exists"
-                    ),
+                    detail=(f"Identity provider with slug '{new_slug}' already exists"),
                 )
 
     # Encrypt sensitive fields if present
     if update_data.get("client_id"):
-        update_data["client_id"] = core_cryptography.encrypt_token_fernet(
-            update_data["client_id"]
-        )
+        update_data["client_id"] = core_cryptography.encrypt_token_fernet(update_data["client_id"])
     if update_data.get("client_secret"):
-        update_data["client_secret"] = core_cryptography.encrypt_token_fernet(
-            update_data["client_secret"]
-        )
+        update_data["client_secret"] = core_cryptography.encrypt_token_fernet(update_data["client_secret"])
 
     for field, value in update_data.items():
         setattr(db_idp, field, value)
@@ -259,9 +234,7 @@ def update_identity_provider(
     db.commit()
     db.refresh(db_idp)
 
-    core_logger.print_to_log(
-        f"Updated identity provider: {db_idp.name} (ID: {db_idp.id})", "info"
-    )
+    core_logger.print_to_log(f"Updated identity provider: {db_idp.name} (ID: {db_idp.id})", "info")
 
     return db_idp
 
@@ -290,11 +263,7 @@ def delete_identity_provider(idp_id: int, db: Session) -> None:
         )
 
     # Check if any users are linked to this provider
-    db_user_idp = (
-        user_identity_providers_crud.check_user_identity_providers_by_idp_id(
-            idp_id, db
-        )
-    )
+    db_user_idp = user_identity_providers_crud.check_user_identity_providers_by_idp_id(idp_id, db)
     if db_user_idp:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -304,6 +273,4 @@ def delete_identity_provider(idp_id: int, db: Session) -> None:
     db.delete(db_idp)
     db.commit()
 
-    core_logger.print_to_log(
-        f"Deleted identity provider: {db_idp.name} (ID: {idp_id})", "info"
-    )
+    core_logger.print_to_log(f"Deleted identity provider: {db_idp.name} (ID: {idp_id})", "info")

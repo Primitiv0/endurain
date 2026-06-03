@@ -2,9 +2,10 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING
-from sqlalchemy import DateTime, ForeignKey, JSON, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from core.database import Base
+from sqlalchemy import JSON, DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
     from users.users.models import Users
@@ -73,9 +74,7 @@ class UsersIntegrations(Base):
         String(length=512),
         default=None,
         nullable=True,
-        comment=(
-            "Strava refresh token after link process encrypted at rest with Fernet key"
-        ),
+        comment=("Strava refresh token after link process encrypted at rest with Fernet key"),
     )
     strava_token_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

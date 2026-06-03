@@ -6,31 +6,26 @@ and mint CSRF tokens) and a singleton accessor used as a FastAPI dependency.
 
 import secrets
 import uuid
-
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 
-from datetime import datetime, timedelta, timezone
-
+import auth.constants as auth_constants
+import core.config as core_config
+import core.logger as core_logger
+import users.users.schema as users_schema
 from fastapi import HTTPException, status
 from joserfc import jwt
-from joserfc.jwt import Token
 from joserfc.errors import (
-    InvalidPayloadError,
-    MissingClaimError,
+    DecodeError,
     ExpiredTokenError,
-    InvalidTokenError,
     InsecureClaimError,
     InvalidClaimError,
-    DecodeError,
+    InvalidPayloadError,
+    InvalidTokenError,
+    MissingClaimError,
 )
 from joserfc.jwk import OctKey
-
-import auth.constants as auth_constants
-
-import users.users.schema as users_schema
-
-import core.logger as core_logger
-import core.config as core_config
+from joserfc.jwt import Token
 
 
 class TokenType(Enum):
@@ -80,8 +75,7 @@ class TokenManager:
         """
         if algorithm not in auth_constants.JWT_ALLOWED_ALGORITHMS:
             raise ValueError(
-                f"algorithm={algorithm!r} is not in the JWT allow-list "
-                f"{sorted(auth_constants.JWT_ALLOWED_ALGORITHMS)}."
+                f"algorithm={algorithm!r} is not in the JWT allow-list {sorted(auth_constants.JWT_ALLOWED_ALGORITHMS)}."
             )
         self.secret_key = secret_key
         self.algorithm = algorithm
@@ -348,16 +342,12 @@ class TokenManager:
         else:
             scope = auth_constants.ADMIN_ACCESS_SCOPE
 
-        exp = datetime.now(timezone.utc) + timedelta(
-            minutes=auth_constants.JWT_ACCESS_TOKEN_EXPIRE_MINUTES
-        )
+        exp = datetime.now(UTC) + timedelta(minutes=auth_constants.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
         if token_type == TokenType.REFRESH:
-            exp = datetime.now(timezone.utc) + timedelta(
-                days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS
-            )
+            exp = datetime.now(UTC) + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
 
         # Set now
-        now = int(datetime.now(timezone.utc).timestamp())
+        now = int(datetime.now(UTC).timestamp())
 
         scope_dict = {
             "sid": session_id,
@@ -414,6 +404,4 @@ if auth_constants.JWT_SECRET_KEY is None:
 if auth_constants.JWT_ALGORITHM is None:
     raise ValueError("JWT_ALGORITHM must be set in environment variables")
 
-token_manager = TokenManager(
-    auth_constants.JWT_SECRET_KEY, auth_constants.JWT_ALGORITHM
-)
+token_manager = TokenManager(auth_constants.JWT_SECRET_KEY, auth_constants.JWT_ALGORITHM)

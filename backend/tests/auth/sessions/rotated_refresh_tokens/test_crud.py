@@ -1,13 +1,13 @@
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 import auth.sessions.rotated_refresh_tokens.crud as rotated_token_crud
-import auth.sessions.rotated_refresh_tokens.schema as rotated_token_schema
-import auth.sessions.rotated_refresh_tokens.models as rotated_token_models
 import auth.sessions.rotated_refresh_tokens.models as _auth_rotated_token_models
+import auth.sessions.rotated_refresh_tokens.models as rotated_token_models
+import auth.sessions.rotated_refresh_tokens.schema as rotated_token_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetRotatedTokenByHash:
@@ -75,7 +75,7 @@ class TestCreateRotatedToken:
         Test successful rotated token creation.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         token_data = rotated_token_schema.RotatedRefreshTokenCreate(
             token_family_id="test-family-id",
             hashed_token="hashed-token-value",
@@ -105,7 +105,7 @@ class TestCreateRotatedToken:
         Test exception handling when database error occurs.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         token_data = rotated_token_schema.RotatedRefreshTokenCreate(
             token_family_id="test-family-id",
             hashed_token="hashed-token-value",
@@ -133,7 +133,7 @@ class TestDeleteExpiredTokens:
         Test successful deletion of expired tokens.
         """
         # Arrange
-        cutoff_time = datetime.now(timezone.utc)
+        cutoff_time = datetime.now(UTC)
         mock_result = MagicMock()
         mock_result.rowcount = 10
         mock_db.execute.return_value = mock_result
@@ -150,7 +150,7 @@ class TestDeleteExpiredTokens:
         Test when no expired tokens exist.
         """
         # Arrange
-        cutoff_time = datetime.now(timezone.utc)
+        cutoff_time = datetime.now(UTC)
         mock_result = MagicMock()
         mock_result.rowcount = 0
         mock_db.execute.return_value = mock_result
@@ -166,7 +166,7 @@ class TestDeleteExpiredTokens:
         Test exception handling when database error occurs.
         """
         # Arrange
-        cutoff_time = datetime.now(timezone.utc)
+        cutoff_time = datetime.now(UTC)
         mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
         # Act & Assert

@@ -15,34 +15,34 @@ Exports:
 """
 
 from .crud import (
-    get_user_default_gear_by_user_id,
     create_user_default_gear,
     edit_user_default_gear,
+    get_user_default_gear_by_user_id,
 )
 from .models import UsersDefaultGear as UsersDefaultGearModel
 from .schema import (
     UsersDefaultGearBase,
-    UsersDefaultGearUpdate,
     UsersDefaultGearRead,
+    UsersDefaultGearUpdate,
 )
 from .utils import (
-    get_user_default_gear_by_activity_type,
     ACTIVITY_TYPE_TO_GEAR_ATTR,
+    get_user_default_gear_by_activity_type,
 )
 
 __all__ = [
-    # CRUD operations
-    "get_user_default_gear_by_user_id",
-    "create_user_default_gear",
-    "edit_user_default_gear",
-    # Database model
-    "UsersDefaultGearModel",
-    # Pydantic schemas
-    "UsersDefaultGearBase",
-    "UsersDefaultGearUpdate",
-    "UsersDefaultGearRead",
-    # Utility functions
-    "get_user_default_gear_by_activity_type",
     # Constants
     "ACTIVITY_TYPE_TO_GEAR_ATTR",
+    # Pydantic schemas
+    "UsersDefaultGearBase",
+    # Database model
+    "UsersDefaultGearModel",
+    "UsersDefaultGearRead",
+    "UsersDefaultGearUpdate",
+    "create_user_default_gear",
+    "edit_user_default_gear",
+    # Utility functions
+    "get_user_default_gear_by_activity_type",
+    # CRUD operations
+    "get_user_default_gear_by_user_id",
 ]

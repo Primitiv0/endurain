@@ -6,14 +6,13 @@ import hmac
 import re
 from typing import Any
 
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-
+import auth.identity_links.crud as user_idp_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
 import core.config as core_config
 import core.logger as core_logger
-import auth.identity_links.crud as user_idp_crud
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 
 def validate_redirect_url(redirect: str | None) -> None:
@@ -41,10 +40,7 @@ def validate_redirect_url(redirect: str | None) -> None:
     if value.startswith("http://") or value.startswith("https://"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "External HTTP redirects are not allowed. "
-                "Use a relative path or a configured custom scheme."
-            ),
+            detail=("External HTTP redirects are not allowed. Use a relative path or a configured custom scheme."),
         )
 
     # Handle custom URI schemes (e.g., gadgetbridge://callback)
@@ -67,10 +63,7 @@ def validate_redirect_url(redirect: str | None) -> None:
     if not value.startswith("/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Redirect must be a relative path starting with '/' "
-                "or a configured custom URI scheme."
-            ),
+            detail=("Redirect must be a relative path starting with '/' or a configured custom URI scheme."),
         )
 
     # Reject path traversal sequences
@@ -136,9 +129,7 @@ def validate_pkce_challenge(code_challenge: str, code_challenge_method: str) -> 
         )
 
 
-def validate_pkce_verifier(
-    code_verifier: str, code_challenge: str, code_challenge_method: str
-) -> None:
+def validate_pkce_verifier(code_verifier: str, code_challenge: str, code_challenge_method: str) -> None:
     """
     Validate PKCE code_verifier and verify it matches the code_challenge.
 
@@ -177,9 +168,7 @@ def validate_pkce_verifier(
 
     # Compute SHA256 hash of verifier
     verifier_hash = hashlib.sha256(code_verifier.encode("ascii")).digest()
-    computed_challenge = (
-        base64.urlsafe_b64encode(verifier_hash).decode("ascii").rstrip("=")
-    )
+    computed_challenge = base64.urlsafe_b64encode(verifier_hash).decode("ascii").rstrip("=")
 
     # Constant-time comparison to prevent timing attacks
     if not _secure_compare(computed_challenge, code_challenge):
@@ -295,11 +284,7 @@ def get_idp_templates() -> list[idp_schema.IdentityProviderTemplate]:
     """
     templates = []
     for template_id, template_data in IDP_TEMPLATES.items():
-        templates.append(
-            idp_schema.IdentityProviderTemplate(
-                template_id=template_id, **template_data
-            )
-        )
+        templates.append(idp_schema.IdentityProviderTemplate(template_id=template_id, **template_data))
     return templates
 
 
@@ -367,9 +352,7 @@ async def refresh_idp_tokens_if_needed(user_id: int, db: Session) -> None:
                     )
 
                     # Attempt to refresh the IdP session
-                    result = await idp_service.idp_service.refresh_idp_session(
-                        user_id, link.idp_id, db
-                    )
+                    result = await idp_service.idp_service.refresh_idp_session(user_id, link.idp_id, db)
 
                     if result:
                         core_logger.print_to_log(
@@ -429,9 +412,7 @@ async def refresh_idp_tokens_if_needed(user_id: int, db: Session) -> None:
         # Don't raise - IdP token refresh is opportunistic and non-blocking
 
 
-async def clear_all_idp_tokens(
-    user_id: int, db: Session, revoke_at_idp: bool = False
-) -> None:
+async def clear_all_idp_tokens(user_id: int, db: Session, revoke_at_idp: bool = False) -> None:
     """
     Clear all IdP (Identity Provider) refresh tokens for a user.
 
@@ -474,9 +455,7 @@ async def clear_all_idp_tokens(
                 # Optionally attempt to revoke token at IdP first (RFC 7009)
                 if revoke_at_idp:
                     try:
-                        revoked = await idp_service.idp_service.revoke_idp_token(
-                            user_id, link.idp_id, db
-                        )
+                        revoked = await idp_service.idp_service.revoke_idp_token(user_id, link.idp_id, db)
                         if revoked:
                             core_logger.print_to_log(
                                 f"Revoked IdP token at provider for user {user_id}, idp {link.idp_id}",

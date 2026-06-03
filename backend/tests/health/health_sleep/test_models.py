@@ -1,4 +1,3 @@
-import pytest
 from datetime import date as datetime_date
 
 import health.health_sleep.models as health_sleep_models
@@ -81,14 +80,12 @@ class TestHealthSleepModel:
         Test HealthSleep model column types.
         """
         # Assert
-        assert health_sleep_models.HealthSleep.id.type.python_type == int
-        assert health_sleep_models.HealthSleep.user_id.type.python_type == int
-        assert health_sleep_models.HealthSleep.date.type.python_type == datetime_date
-        assert (
-            health_sleep_models.HealthSleep.total_sleep_seconds.type.python_type == int
-        )
-        assert health_sleep_models.HealthSleep.min_heart_rate.type.python_type == int
-        assert health_sleep_models.HealthSleep.awake_count.type.python_type == int
+        assert health_sleep_models.HealthSleep.id.type.python_type is int
+        assert health_sleep_models.HealthSleep.user_id.type.python_type is int
+        assert health_sleep_models.HealthSleep.date.type.python_type is datetime_date
+        assert health_sleep_models.HealthSleep.total_sleep_seconds.type.python_type is int
+        assert health_sleep_models.HealthSleep.min_heart_rate.type.python_type is int
+        assert health_sleep_models.HealthSleep.awake_count.type.python_type is int
 
     def test_health_sleep_model_relationship(self):
         """
@@ -106,8 +103,8 @@ class TestHealthSleepModel:
         avg_spo2_column = health_sleep_models.HealthSleep.avg_spo2
 
         # Assert
-        assert avg_heart_rate_column.type.python_type == int
-        assert avg_spo2_column.type.python_type == int
+        assert avg_heart_rate_column.type.python_type is int
+        assert avg_spo2_column.type.python_type is int
 
     def test_health_sleep_model_string_field_lengths(self):
         """

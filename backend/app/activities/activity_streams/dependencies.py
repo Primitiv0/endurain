@@ -16,10 +16,8 @@ def validate_activity_stream_type(
         HTTPException: If stream type is not 1-7.
     """
     core_dependencies.validate_type(
-        type=stream_type,
-        min=1,
-        max=7,
-        message=(
-            "Invalid activity stream type"
-        ),
+        type_value=stream_type,
+        min_value=1,
+        max_value=7,
+        message=("Invalid activity stream type"),
     )

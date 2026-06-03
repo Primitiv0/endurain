@@ -11,13 +11,10 @@ from pathlib import Path
 import pytest
 
 hypothesis = pytest.importorskip("hypothesis")
+from core.file_uploads import _resolve_upload_path  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
 from hypothesis import given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
-
-from fastapi import HTTPException  # noqa: E402
-
-from core.file_uploads import _resolve_upload_path  # noqa: E402
-
 
 # Filenames may contain anything a multipart parser could surface:
 # arbitrary unicode, NUL bytes, separators, leading dots, control
@@ -43,6 +40,4 @@ def test_resolve_upload_path_never_escapes(tmp_path_factory, filename):
     # Accepted: must resolve strictly under the upload directory.
     root = Path(upload_dir).resolve()
     resolved_resolved = Path(resolved).resolve()
-    assert resolved_resolved.parent == root or root in (
-        resolved_resolved.parents
-    )
+    assert resolved_resolved.parent == root or root in (resolved_resolved.parents)

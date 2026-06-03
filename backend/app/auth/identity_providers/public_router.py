@@ -1,30 +1,29 @@
 """Public (unauthenticated) HTTP routes for identity provider SSO flows."""
 
-from typing import Annotated, List
-from datetime import datetime, timezone
 import secrets
+from datetime import UTC, datetime
+from typing import Annotated
 from uuid import uuid4
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Query
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
 
-import core.database as core_database
-import core.rate_limit as core_rate_limit
-import auth.password_hasher as auth_password_hasher
-import auth.token_manager as auth_token_manager
-import auth.utils as auth_utils
-import auth.sessions.utils as users_session_utils
-import auth.sessions.crud as users_session_crud
-import users.users.utils as users_utils
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
 import auth.identity_providers.utils as idp_utils
-import users.users.schema as users_schema
-import core.config as core_config
-import core.logger as core_logger
 import auth.oauth_state.crud as oauth_state_crud
-
+import auth.password_hasher as auth_password_hasher
+import auth.sessions.crud as users_session_crud
+import auth.sessions.utils as users_session_utils
+import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
+import core.config as core_config
+import core.database as core_database
+import core.logger as core_logger
+import core.rate_limit as core_rate_limit
+import users.users.schema as users_schema
+import users.users.utils as users_utils
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -32,7 +31,7 @@ router = APIRouter()
 
 @router.get(
     "",
-    response_model=List[idp_schema.IdentityProviderPublic],
+    response_model=list[idp_schema.IdentityProviderPublic],
     status_code=status.HTTP_200_OK,
 )
 async def get_enabled_providers(db: Annotated[Session, Depends(core_database.get_db)]):
@@ -172,9 +171,7 @@ async def initiate_login(
             idp, request, db, redirect, oauth_state_id=state_id
         )
 
-        return RedirectResponse(
-            url=authorization_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
-        )
+        return RedirectResponse(url=authorization_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     except HTTPException:
         raise
     except Exception as err:
@@ -289,9 +286,7 @@ async def handle_callback(
             frontend_url = core_config.settings.ENDURAIN_HOST
             redirect_url = f"{frontend_url}/settings?tab=security&idp_link=success&idp_name={idp.name}"
 
-            core_logger.print_to_log(
-                f"IdP link successful for user {user.username}, IdP {idp.name}", "info"
-            )
+            core_logger.print_to_log(f"IdP link successful for user {user.username}, IdP {idp.name}", "info")
 
             return RedirectResponse(
                 url=redirect_url,
@@ -335,9 +330,7 @@ async def handle_callback(
             # Signal the frontend that this is a custom-scheme redirect.
             # The frontend will skip its own token exchange and instead
             # pass the session_id to the mobile app via the custom scheme.
-            is_custom_scheme = "://" in redirect_path and not redirect_path.startswith(
-                "http"
-            )
+            is_custom_scheme = "://" in redirect_path and not redirect_path.startswith("http")
             if is_custom_scheme:
                 redirect_url += "&external_redirect=true"
 
@@ -360,9 +353,7 @@ async def handle_callback(
         frontend_url = core_config.settings.ENDURAIN_HOST
         error_url = f"{frontend_url}/login?error=sso_failed"
 
-        return RedirectResponse(
-            url=error_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT
-        )
+        return RedirectResponse(url=error_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @router.post(
@@ -422,9 +413,7 @@ async def exchange_tokens_for_session(
     """
     try:
         # Retrieve session with OAuth state relationship
-        session_with_state = users_session_crud.get_session_with_oauth_state(
-            session_id, db
-        )
+        session_with_state = users_session_crud.get_session_with_oauth_state(session_id, db)
 
         if not session_with_state:
             core_logger.print_to_log(
@@ -499,14 +488,10 @@ async def exchange_tokens_for_session(
         ) = auth_utils.create_tokens(user_read, token_manager, session_id)
 
         # Calculate expires_in from access token expiration
-        expires_in = int(
-            (access_token_exp - datetime.now(timezone.utc)).total_seconds()
-        )
+        expires_in = int((access_token_exp - datetime.now(UTC)).total_seconds())
 
         # Calculate refresh_token_expires_in from refresh token expiration
-        refresh_token_expires_in = int(
-            (refresh_token_exp - datetime.now(timezone.utc)).total_seconds()
-        )
+        refresh_token_expires_in = int((refresh_token_exp - datetime.now(UTC)).total_seconds())
 
         # Capture the stored client_type from the OAuth state BEFORE
         # claiming the session — claim_session_for_token_exchange
@@ -573,10 +558,7 @@ async def exchange_tokens_for_session(
             # different value, reject the exchange — this is either
             # a misbehaving client or an attacker trying to flip the
             # response shape. We do NOT silently downgrade.
-            if (
-                header_client_type is not None
-                and header_client_type != stored_client_type
-            ):
+            if header_client_type is not None and header_client_type != stored_client_type:
                 core_logger.print_to_log(
                     "Token exchange client_type mismatch for session "
                     f"{session_id[:8]}...: stored={stored_client_type}, "

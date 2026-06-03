@@ -2,6 +2,12 @@
 
 from typing import Annotated
 
+import auth.identity_service as auth_identity_service
+import core.apprise as core_apprise
+import core.database as core_database
+import core.rate_limit as core_rate_limit
+import password_reset_tokens.schema as password_reset_tokens_schema
+import password_reset_tokens.utils as password_reset_tokens_utils
 from fastapi import (
     APIRouter,
     Depends,
@@ -10,15 +16,6 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
-
-import password_reset_tokens.schema as password_reset_tokens_schema
-import password_reset_tokens.utils as password_reset_tokens_utils
-
-import auth.identity_service as auth_identity_service
-
-import core.database as core_database
-import core.apprise as core_apprise
-import core.rate_limit as core_rate_limit
 
 # Define the API router
 router = APIRouter()
@@ -58,17 +55,12 @@ async def request_password_reset(
         HTTPException: 500 if sending the reset email fails.
         HTTPException: 503 if email service is not configured.
     """
-    success = await password_reset_tokens_utils.send_password_reset_email(
-        request_data.email, email_service, db
-    )
+    success = await password_reset_tokens_utils.send_password_reset_email(request_data.email, email_service, db)
 
     # if the email was sent successfully send a generic success message
     if success:
         return password_reset_tokens_schema.PasswordResetResponse(
-            message=(
-                "If the email exists in the system, "
-                "a password reset link has been sent."
-            )
+            message=("If the email exists in the system, a password reset link has been sent.")
         )
 
     # If the email sending failed, raise an error
@@ -117,6 +109,4 @@ async def confirm_password_reset(
         confirm_data.token, confirm_data.new_password, identity_service, db
     )
 
-    return password_reset_tokens_schema.PasswordResetResponse(
-        message="Password reset successful"
-    )
+    return password_reset_tokens_schema.PasswordResetResponse(message="Password reset successful")

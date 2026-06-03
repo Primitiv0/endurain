@@ -4,11 +4,10 @@ from collections.abc import Callable
 from functools import wraps
 from typing import cast
 
+import core.logger as core_logger
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
-
-import core.logger as core_logger
 
 
 def handle_db_errors[T, **P](func: Callable[P, T]) -> Callable[P, T]:
@@ -53,8 +52,7 @@ def handle_db_errors[T, **P](func: Callable[P, T]) -> Callable[P, T]:
                     # leak partial state into subsequent
                     # operations on the same connection.
                     core_logger.print_to_log(
-                        f"Rollback failed in {func.__name__}: "
-                        f"{type(rollback_err).__name__}",
+                        f"Rollback failed in {func.__name__}: {type(rollback_err).__name__}",
                         "error",
                         exc=rollback_err,
                     )
@@ -64,8 +62,7 @@ def handle_db_errors[T, **P](func: Callable[P, T]) -> Callable[P, T]:
             # SQL statement and parameter values, which can
             # leak PII / credentials into logs (OWASP A09).
             core_logger.print_to_log(
-                f"Database error in {func.__name__}: "
-                f"{type(db_err).__name__}",
+                f"Database error in {func.__name__}: {type(db_err).__name__}",
                 "error",
                 exc=db_err,
             )

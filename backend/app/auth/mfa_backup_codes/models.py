@@ -1,12 +1,11 @@
 """SQLAlchemy ORM models for MFA backup codes."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from users.users.models import Users
@@ -68,7 +67,7 @@ class MFABackupCode(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         comment="When this code was generated",
     )
     expires_at: Mapped[datetime | None] = mapped_column(

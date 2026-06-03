@@ -1,9 +1,8 @@
 """Tests for websocket.manager module."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-
 import websocket.manager as websocket_manager
 
 
@@ -43,9 +42,7 @@ class TestWebSocketManager:
         assert manager.active_connections[user_id] == mock_websocket
 
         # Verify logging
-        mock_log.assert_called_once_with(
-            f"WebSocket connected for user {user_id}", "debug"
-        )
+        mock_log.assert_called_once_with(f"WebSocket connected for user {user_id}", "debug")
 
     @patch("websocket.manager.core_logger.print_to_log")
     async def test_connect_multiple_users(self, mock_log, manager):

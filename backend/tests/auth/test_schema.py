@@ -6,20 +6,19 @@ including login requests, MFA management, and failed attempt tracking.
 """
 
 import hashlib
-from types import SimpleNamespace
+from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatch
-from datetime import datetime, timedelta, timezone
 from threading import Event, Thread
-
-import pytest
-from fastapi import HTTPException
-from pydantic import ValidationError
-from redis import RedisError
+from types import SimpleNamespace
 
 import auth.router as auth_router
 import auth.schema as auth_schema
 import auth.security_stores as auth_security_stores
 import core.redis as core_redis
+import pytest
+from fastapi import HTTPException
+from pydantic import ValidationError
+from redis import RedisError
 
 
 class FakeRedis:
@@ -225,17 +224,13 @@ class TestMFARequiredResponse:
 
     def test_mfa_required_response_custom_message(self):
         """Test MFA required response with custom message."""
-        response = auth_schema.MFARequiredResponse(
-            username="testuser", message="Custom MFA message"
-        )
+        response = auth_schema.MFARequiredResponse(username="testuser", message="Custom MFA message")
         assert response.mfa_required is True
         assert response.message == "Custom MFA message"
 
     def test_mfa_required_response_explicit_false(self):
         """Test MFA required response with explicit False."""
-        response = auth_schema.MFARequiredResponse(
-            mfa_required=False, username="testuser"
-        )
+        response = auth_schema.MFARequiredResponse(mfa_required=False, username="testuser")
         assert response.mfa_required is False
 
 
@@ -246,13 +241,9 @@ class TestUsernameLogIdentifier:
         """Test log identifier does not contain raw username."""
         raw_username = " Test.User%2BOne@example.com "
         normalized_username = "test.user one@example.com"
-        expected_digest = hashlib.sha256(
-            normalized_username.encode()
-        ).hexdigest()
+        expected_digest = hashlib.sha256(normalized_username.encode()).hexdigest()
 
-        log_identifier = auth_security_stores.username_log_identifier(
-            raw_username
-        )
+        log_identifier = auth_security_stores.username_log_identifier(raw_username)
 
         assert log_identifier == f"username_hash={expected_digest}"
         assert "Test.User" not in log_identifier
@@ -323,7 +314,7 @@ class TestPendingMFALogin:
         assert store.is_locked_out("testuser") is True
         lockout_time = store.get_lockout_time("testuser")
         assert lockout_time is not None
-        assert lockout_time > datetime.now(timezone.utc)
+        assert lockout_time > datetime.now(UTC)
 
     def test_record_failed_attempt_uses_lock(self):
         """Test in-memory MFA attempt updates use the store lock."""
@@ -414,7 +405,7 @@ class TestFailedLoginAttempts:
         assert tracker.is_locked_out("testuser") is True
         lockout_time = tracker.get_lockout_time("testuser")
         assert lockout_time is not None
-        assert lockout_time > datetime.now(timezone.utc)
+        assert lockout_time > datetime.now(UTC)
 
     def test_lockout_after_10_failures(self):
         """Test 30-minute lockout after 10 failed login attempts."""
@@ -515,14 +506,10 @@ class TestRedisAuthSecurityStores:
     def test_auth_store_unavailable_maps_to_http_503(self):
         """Test auth store outage returns a controlled API error."""
         with pytest.raises(HTTPException) as exc_info:
-            auth_router._raise_auth_security_store_unavailable(
-                auth_security_stores.AuthSecurityStoreUnavailable()
-            )
+            auth_router._raise_auth_security_store_unavailable(auth_security_stores.AuthSecurityStoreUnavailableError())
 
         assert exc_info.value.status_code == 503
-        assert exc_info.value.detail == (
-            "Authentication temporarily unavailable"
-        )
+        assert exc_info.value.detail == ("Authentication temporarily unavailable")
 
     def test_redis_failed_login_attempts_lockout(self):
         """Test Redis login attempts lock after 5 failures."""
@@ -549,29 +536,21 @@ class TestRedisAuthSecurityStores:
 
     def test_redis_failed_login_attempts_get_failure_is_sanitized(self):
         """Test Redis get errors become auth-store outage errors."""
-        tracker = auth_security_stores.RedisFailedLoginAttempts(
-            FailingRedis("get")
-        )
+        tracker = auth_security_stores.RedisFailedLoginAttempts(FailingRedis("get"))
 
-        with pytest.raises(
-            auth_security_stores.AuthSecurityStoreUnavailable
-        ) as exc_info:
+        with pytest.raises(auth_security_stores.AuthSecurityStoreUnavailableError) as exc_info:
             tracker.is_locked_out("testuser")
 
         assert isinstance(
             exc_info.value.__cause__,
-            core_redis.RedisStorageUnavailable,
+            core_redis.RedisStorageUnavailableError,
         )
 
     def test_redis_failed_login_attempts_script_failure_is_sanitized(self):
         """Test Redis script errors become auth-store outage errors."""
-        tracker = auth_security_stores.RedisFailedLoginAttempts(
-            FailingRedis("script")
-        )
+        tracker = auth_security_stores.RedisFailedLoginAttempts(FailingRedis("script"))
 
-        with pytest.raises(
-            auth_security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(auth_security_stores.AuthSecurityStoreUnavailableError):
             tracker.record_failed_attempt("testuser")
 
     def test_redis_pending_mfa_login_lifecycle(self):
@@ -598,29 +577,21 @@ class TestRedisAuthSecurityStores:
 
     def test_redis_pending_mfa_set_failure_is_sanitized(self):
         """Test Redis pending MFA set errors are sanitized."""
-        store = auth_security_stores.RedisPendingMFALogin(
-            FailingRedis("set")
-        )
+        store = auth_security_stores.RedisPendingMFALogin(FailingRedis("set"))
 
-        with pytest.raises(
-            auth_security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(auth_security_stores.AuthSecurityStoreUnavailableError):
             store.add_pending_login("testuser", 123)
 
     def test_redis_pending_mfa_claim_failure_is_sanitized(self):
         """Test Redis pending MFA claim errors are sanitized."""
-        store = auth_security_stores.RedisPendingMFALogin(
-            FailingRedis("getdel")
-        )
+        store = auth_security_stores.RedisPendingMFALogin(FailingRedis("getdel"))
 
-        with pytest.raises(
-            auth_security_stores.AuthSecurityStoreUnavailable
-        ) as exc_info:
+        with pytest.raises(auth_security_stores.AuthSecurityStoreUnavailableError) as exc_info:
             store.claim_pending_login("testuser")
 
         assert isinstance(
             exc_info.value.__cause__,
-            core_redis.RedisStorageUnavailable,
+            core_redis.RedisStorageUnavailableError,
         )
 
     def test_redis_pending_mfa_invalid_user_id_is_evicted(self):
@@ -649,9 +620,7 @@ class TestRedisAuthSecurityStores:
 
     def test_create_auth_security_stores_memory_uri(self):
         """Test memory URI creates memory-backed stores."""
-        failed_store, pending_store = (
-            auth_security_stores.create_auth_security_stores("memory://")
-        )
+        failed_store, pending_store = auth_security_stores.create_auth_security_stores("memory://")
 
         assert isinstance(
             failed_store,
@@ -661,9 +630,7 @@ class TestRedisAuthSecurityStores:
 
     def test_create_auth_security_stores_blank_uri(self):
         """Test blank URI falls back to memory-backed stores."""
-        failed_store, pending_store = (
-            auth_security_stores.create_auth_security_stores("")
-        )
+        failed_store, pending_store = auth_security_stores.create_auth_security_stores("")
 
         assert isinstance(
             failed_store,
@@ -679,11 +646,7 @@ class TestRedisAuthSecurityStores:
             lambda storage_uri, purpose: FakeRedis(),
         )
 
-        failed_store, pending_store = (
-            auth_security_stores.create_auth_security_stores(
-                "redis://localhost:6379/0"
-            )
-        )
+        failed_store, pending_store = auth_security_stores.create_auth_security_stores("redis://localhost:6379/0")
 
         assert isinstance(
             failed_store,
@@ -697,9 +660,7 @@ class TestRedisAuthSecurityStores:
     def test_create_auth_security_stores_rejects_unknown_uri(self):
         """Test unsupported storage URIs are rejected."""
         with pytest.raises(ValueError) as exc_info:
-            auth_security_stores.create_auth_security_stores(
-                "postgresql://localhost/db"
-            )
+            auth_security_stores.create_auth_security_stores("postgresql://localhost/db")
 
         assert "Unsupported AUTH_SECURITY_STORAGE_URI" in str(exc_info.value)
 
@@ -716,10 +677,7 @@ class TestRedisAuthSecurityStores:
             "redis://localhost:6379/0",
         )
 
-        assert (
-            auth_security_stores.get_auth_security_storage_uri()
-            == "redis://localhost:6379/0"
-        )
+        assert auth_security_stores.get_auth_security_storage_uri() == "redis://localhost:6379/0"
 
     def test_auth_security_uri_prefers_specific_uri(self, monkeypatch):
         """Test auth-specific URI overrides the rate limit URI."""
@@ -734,10 +692,7 @@ class TestRedisAuthSecurityStores:
             "redis://localhost:6379/0",
         )
 
-        assert (
-            auth_security_stores.get_auth_security_storage_uri()
-            == "memory://"
-        )
+        assert auth_security_stores.get_auth_security_storage_uri() == "memory://"
 
 
 class TestAuthRouterErrors:
@@ -771,10 +726,7 @@ class TestAuthRouterErrors:
             )
 
         assert exc_info.value.status_code == 400
-        assert exc_info.value.detail == (
-            "code_challenge and code_challenge_method must be "
-            "provided together"
-        )
+        assert exc_info.value.detail == ("code_challenge and code_challenge_method must be provided together")
 
     @pytest.mark.asyncio
     async def test_mfa_verify_rejects_partial_pkce_params(self):
@@ -804,10 +756,7 @@ class TestAuthRouterErrors:
             )
 
         assert exc_info.value.status_code == 400
-        assert exc_info.value.detail == (
-            "code_challenge and code_challenge_method must be "
-            "provided together"
-        )
+        assert exc_info.value.detail == ("code_challenge and code_challenge_method must be provided together")
 
     @pytest.mark.asyncio
     async def test_invalid_mfa_response_hides_attempt_count(
@@ -875,9 +824,7 @@ class TestAuthRouterErrors:
             )
 
         assert exc_info.value.status_code == 400
-        assert exc_info.value.detail == (
-            "Invalid MFA code, backup code or backup code already used."
-        )
+        assert exc_info.value.detail == ("Invalid MFA code, backup code or backup code already used.")
         assert "Failed attempts" not in exc_info.value.detail
         assert raw_username not in " ".join(log_messages)
         assert "username_hash=" in " ".join(log_messages)
@@ -933,9 +880,7 @@ class TestAuthRouterErrors:
             )
 
         assert exc_info.value.status_code == 400
-        assert exc_info.value.detail == (
-            "No pending MFA login found for this username"
-        )
+        assert exc_info.value.detail == ("No pending MFA login found for this username")
 
 
 class TestDependencyFunctions:
@@ -1077,13 +1022,11 @@ class TestDependencyFunctions:
 
     def test_pending_mfa_login_lockout_expired_auto_reset(self):
         """Test that expired lockout is automatically reset when checking."""
-        from unittest.mock import patch
-        from datetime import timedelta
 
         store = auth_security_stores.PendingMFALogin()
 
         # Simulate lockout in the past
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         store._failed_attempts["testuser"] = (5, past_time)
 
         # Check if locked out - should return False and reset
@@ -1092,12 +1035,11 @@ class TestDependencyFunctions:
 
     def test_failed_login_attempts_lockout_expired_auto_reset(self):
         """Test that expired lockout is automatically reset when checking."""
-        from datetime import timedelta
 
         store = auth_security_stores.FailedLoginAttempts()
 
         # Simulate lockout in the past
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         store._attempts["testuser"] = (5, past_time)
 
         # Check if locked out - should return False and reset
@@ -1106,12 +1048,11 @@ class TestDependencyFunctions:
 
     def test_pending_mfa_get_lockout_time_expired(self):
         """Test get_lockout_time returns None for expired lockouts."""
-        from datetime import timedelta
 
         store = auth_security_stores.PendingMFALogin()
 
         # Simulate expired lockout
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         store._failed_attempts["testuser"] = (5, past_time)
 
         # Should return None for expired lockout
@@ -1119,12 +1060,11 @@ class TestDependencyFunctions:
 
     def test_failed_login_attempts_get_lockout_time_expired(self):
         """Test get_lockout_time returns None for expired lockouts."""
-        from datetime import timedelta
 
         store = auth_security_stores.FailedLoginAttempts()
 
         # Simulate expired lockout
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         store._attempts["testuser"] = (5, past_time)
 
         # Should return None for expired lockout

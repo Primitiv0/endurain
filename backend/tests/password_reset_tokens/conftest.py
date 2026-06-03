@@ -2,15 +2,14 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
 import auth.password_hasher as auth_password_hasher
 import core.apprise as core_apprise
 import core.database as core_database
 import password_reset_tokens.router as prt_router
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture
@@ -26,20 +25,12 @@ def fast_api_app() -> FastAPI:
     app.include_router(prt_router.router)
 
     mock_db = MagicMock(spec=Session)
-    mock_email_svc = MagicMock(
-        spec=core_apprise.AppriseService
-    )
+    mock_email_svc = MagicMock(spec=core_apprise.AppriseService)
     hasher = auth_password_hasher.get_password_hasher()
 
-    app.dependency_overrides[core_database.get_db] = (
-        lambda: mock_db
-    )
-    app.dependency_overrides[
-        core_apprise.get_email_service
-    ] = lambda: mock_email_svc
-    app.dependency_overrides[
-        auth_password_hasher.get_password_hasher
-    ] = lambda: hasher
+    app.dependency_overrides[core_database.get_db] = lambda: mock_db
+    app.dependency_overrides[core_apprise.get_email_service] = lambda: mock_email_svc
+    app.dependency_overrides[auth_password_hasher.get_password_hasher] = lambda: hasher
 
     return app
 

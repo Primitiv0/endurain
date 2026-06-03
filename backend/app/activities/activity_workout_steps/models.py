@@ -3,10 +3,9 @@
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity.models import Activity
@@ -50,10 +49,7 @@ class ActivityWorkoutSteps(Base):
         ),
         nullable=False,
         index=True,
-        comment=(
-            "Activity ID that the activity"
-            " workout steps belongs"
-        ),
+        comment=("Activity ID that the activity workout steps belongs"),
     )
     message_index: Mapped[int] = mapped_column(
         nullable=False,
@@ -64,12 +60,10 @@ class ActivityWorkoutSteps(Base):
         nullable=False,
         comment="Workout step duration type",
     )
-    duration_value: Mapped[Decimal | None] = (
-        mapped_column(
-            Numeric(precision=20, scale=10),
-            nullable=True,
-            comment="Workout step duration value",
-        )
+    duration_value: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=20, scale=10),
+        nullable=True,
+        comment="Workout step duration value",
     )
     target_type: Mapped[str | None] = mapped_column(
         String(250),
@@ -90,45 +84,28 @@ class ActivityWorkoutSteps(Base):
         nullable=True,
         comment="Workout step notes",
     )
-    exercise_category: Mapped[int | None] = (
-        mapped_column(
-            nullable=True,
-            comment=(
-                "Workout step exercise category"
-            ),
-        )
+    exercise_category: Mapped[int | None] = mapped_column(
+        nullable=True,
+        comment=("Workout step exercise category"),
     )
     exercise_name: Mapped[int | None] = mapped_column(
         nullable=True,
         comment="Exercise name ID",
     )
-    exercise_weight: Mapped[Decimal | None] = (
-        mapped_column(
-            Numeric(precision=20, scale=10),
-            nullable=True,
-            comment=(
-                "Workout step exercise weight"
-            ),
-        )
+    exercise_weight: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=20, scale=10),
+        nullable=True,
+        comment=("Workout step exercise weight"),
     )
-    weight_display_unit: Mapped[str | None] = (
-        mapped_column(
-            String(250),
-            nullable=True,
-            comment=(
-                "Workout step weight display unit"
-            ),
-        )
+    weight_display_unit: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True,
+        comment=("Workout step weight display unit"),
     )
-    secondary_target_value: Mapped[str | None] = (
-        mapped_column(
-            String(250),
-            nullable=True,
-            comment=(
-                "Workout step secondary"
-                " target value"
-            ),
-        )
+    secondary_target_value: Mapped[str | None] = mapped_column(
+        String(250),
+        nullable=True,
+        comment=("Workout step secondary target value"),
     )
 
     # Define a relationship to the Activity model

@@ -1,41 +1,34 @@
+import profile.utils as profile_utils
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
+import auth.identity_providers.utils as idp_utils
+import auth.password_hasher as auth_password_hasher
+import auth.schema as auth_schema
+import auth.security as auth_security
+import auth.security_stores as auth_security_stores
+import auth.sessions.crud as users_session_crud
+import auth.sessions.rotated_refresh_tokens.utils as users_session_rotated_tokens_utils
+import auth.sessions.utils as users_session_utils
+import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
+import core.database as core_database
+import core.logger as core_logger
+import core.rate_limit as core_rate_limit
+import users.users.crud as users_crud
+import users.users.utils as users_utils
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
-    Response,
-    Request,
     Query,
+    Request,
+    Response,
+    status,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-
-import auth.security as auth_security
-import auth.utils as auth_utils
-import auth.password_hasher as auth_password_hasher
-import auth.token_manager as auth_token_manager
-import auth.schema as auth_schema
-import auth.security_stores as auth_security_stores
-
-import auth.identity_providers.utils as idp_utils
-
-import users.users.crud as users_crud
-import users.users.utils as users_utils
-
-import auth.sessions.utils as users_session_utils
-import auth.sessions.crud as users_session_crud
-
-import auth.sessions.rotated_refresh_tokens.utils as users_session_rotated_tokens_utils
-
-import profile.utils as profile_utils
-
-import core.database as core_database
-import core.logger as core_logger
-import core.rate_limit as core_rate_limit
 
 # Define the API router
 router = APIRouter()
@@ -63,23 +56,18 @@ def _validate_pkce_query_params(
     if client_type != "mobile":
         return
 
-    has_any_pkce_param = (
-        code_challenge is not None or code_challenge_method is not None
-    )
+    has_any_pkce_param = code_challenge is not None or code_challenge_method is not None
     has_complete_pkce_params = bool(code_challenge and code_challenge_method)
 
     if has_any_pkce_param and not has_complete_pkce_params:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "code_challenge and code_challenge_method must be "
-                "provided together"
-            ),
+            detail=("code_challenge and code_challenge_method must be provided together"),
         )
 
 
 def _raise_auth_security_store_unavailable(
-    err: auth_security_stores.AuthSecurityStoreUnavailable,
+    err: auth_security_stores.AuthSecurityStoreUnavailableError,
 ) -> None:
     """
     Return a controlled response when auth security storage is down.
@@ -194,35 +182,25 @@ async def login_for_access_token(
     # Check if username is locked out from too many failed login attempts
     try:
         if failed_attempts.is_locked_out(form_data.username):
-            lockout_until = failed_attempts.get_lockout_time(
-                form_data.username
-            )
+            lockout_until = failed_attempts.get_lockout_time(form_data.username)
             if lockout_until:
-                seconds_remaining = int(
-                    (
-                        lockout_until - datetime.now(timezone.utc)
-                    ).total_seconds()
-                )
+                seconds_remaining = int((lockout_until - datetime.now(UTC)).total_seconds())
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Account locked due to too many failed login attempts. Try again in {seconds_remaining} seconds.",
                 )
-    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+    except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
 
     # Authenticate user
     try:
-        user = auth_utils.authenticate_user(
-            form_data.username, form_data.password, password_hasher, db
-        )
+        user = auth_utils.authenticate_user(form_data.username, form_data.password, password_hasher, db)
     except HTTPException as err:
         # Record failed attempt on authentication errors (401 Unauthorized)
         if err.status_code == 401:
             try:
                 failed_attempts.record_failed_attempt(form_data.username)
-            except (
-                auth_security_stores.AuthSecurityStoreUnavailable
-            ) as store_err:
+            except auth_security_stores.AuthSecurityStoreUnavailableError as store_err:
                 _raise_auth_security_store_unavailable(store_err)
         raise err
 
@@ -234,7 +212,7 @@ async def login_for_access_token(
         # Store the user for pending MFA verification
         try:
             pending_mfa_store.add_pending_login(form_data.username, user.id)
-        except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        except auth_security_stores.AuthSecurityStoreUnavailableError as err:
             _raise_auth_security_store_unavailable(err)
 
         # Don't reset failed login attempts yet - wait for MFA verification
@@ -259,7 +237,7 @@ async def login_for_access_token(
     # Reset failed login attempts counter
     try:
         failed_attempts.reset_attempts(form_data.username)
-    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+    except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
 
     # Mobile clients with PKCE use secure token exchange flow
@@ -277,18 +255,12 @@ async def login_for_access_token(
         )
 
     # Web clients and mobile without PKCE get tokens directly
-    return auth_utils.complete_login(
-        response, request, user, client_type, password_hasher, token_manager, db
-    )
+    return auth_utils.complete_login(response, request, user, client_type, password_hasher, token_manager, db)
 
 
 @router.post(
     "/mfa/verify",
-    response_model=(
-        auth_schema.MobileSessionResponse
-        | auth_schema.TokenResponseWeb
-        | auth_schema.TokenResponseMobile
-    ),
+    response_model=(auth_schema.MobileSessionResponse | auth_schema.TokenResponseWeb | auth_schema.TokenResponseMobile),
 )
 @core_rate_limit.limiter.limit(core_rate_limit.SENSITIVE)
 async def verify_mfa_and_login(
@@ -356,33 +328,25 @@ async def verify_mfa_and_login(
         code_challenge_method,
     )
 
-    username_log_id = auth_security_stores.username_log_identifier(
-        mfa_request.username
-    )
+    username_log_id = auth_security_stores.username_log_identifier(mfa_request.username)
 
     # Check if user is locked out from too many failed attempts
     try:
         if pending_mfa_store.is_locked_out(mfa_request.username):
-            lockout_until = pending_mfa_store.get_lockout_time(
-                mfa_request.username
-            )
+            lockout_until = pending_mfa_store.get_lockout_time(mfa_request.username)
             if lockout_until:
-                seconds_remaining = int(
-                    (
-                        lockout_until - datetime.now(timezone.utc)
-                    ).total_seconds()
-                )
+                seconds_remaining = int((lockout_until - datetime.now(UTC)).total_seconds())
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Too many failed MFA attempts. Account locked for {seconds_remaining} seconds.",
                 )
-    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+    except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
 
     # Check if there's a pending MFA login for this username
     try:
         user_id = pending_mfa_store.get_pending_login(mfa_request.username)
-    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+    except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
     if not user_id:
         # Run a dummy Argon2 verify so the wall-clock latency of the
@@ -401,19 +365,14 @@ async def verify_mfa_and_login(
         )
 
     # Verify the MFA code (TOTP or backup code)
-    if not profile_utils.verify_user_mfa(
-        user_id, mfa_request.mfa_code, password_hasher, db
-    ):
+    if not profile_utils.verify_user_mfa(user_id, mfa_request.mfa_code, password_hasher, db):
         # Record failed attempt and apply lockout if threshold exceeded
         try:
-            failed_count = pending_mfa_store.record_failed_attempt(
-                mfa_request.username
-            )
-        except auth_security_stores.AuthSecurityStoreUnavailable as err:
+            failed_count = pending_mfa_store.record_failed_attempt(mfa_request.username)
+        except auth_security_stores.AuthSecurityStoreUnavailableError as err:
             _raise_auth_security_store_unavailable(err)
         core_logger.print_to_log(
-            f"Invalid MFA code for {username_log_id}. "
-            f"Failed attempts: {failed_count}",
+            f"Invalid MFA code for {username_log_id}. Failed attempts: {failed_count}",
             "warning",
         )
         raise HTTPException(
@@ -422,15 +381,12 @@ async def verify_mfa_and_login(
         )
 
     try:
-        claimed_user_id = pending_mfa_store.claim_pending_login(
-            mfa_request.username
-        )
-    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+        claimed_user_id = pending_mfa_store.claim_pending_login(mfa_request.username)
+    except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
     if claimed_user_id != user_id:
         core_logger.print_to_log(
-            f"Pending MFA login for {username_log_id} was missing "
-            "or already claimed",
+            f"Pending MFA login for {username_log_id} was missing or already claimed",
             "warning",
         )
         raise HTTPException(
@@ -441,9 +397,7 @@ async def verify_mfa_and_login(
     # Get the user and complete login
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        core_logger.print_to_log(
-            f"User ID {user_id} not found during MFA verification", "warning"
-        )
+        core_logger.print_to_log(f"User ID {user_id} not found during MFA verification", "warning")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unable to authenticate",
@@ -457,7 +411,7 @@ async def verify_mfa_and_login(
     try:
         pending_mfa_store.reset_failed_attempts(mfa_request.username)
         failed_attempts.reset_attempts(mfa_request.username)
-    except auth_security_stores.AuthSecurityStoreUnavailable as err:
+    except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
 
     # Mobile clients with PKCE use secure token exchange flow
@@ -475,24 +429,18 @@ async def verify_mfa_and_login(
         )
 
     # Web clients and mobile without PKCE get tokens directly
-    return auth_utils.complete_login(
-        response, request, user, client_type, password_hasher, token_manager, db
-    )
+    return auth_utils.complete_login(response, request, user, client_type, password_hasher, token_manager, db)
 
 
 @router.post(
     "/refresh",
-    response_model=(
-        auth_schema.TokenResponseWeb | auth_schema.TokenResponseMobile
-    ),
+    response_model=(auth_schema.TokenResponseWeb | auth_schema.TokenResponseMobile),
 )
 @core_rate_limit.limiter.limit(core_rate_limit.WRITE)
 async def refresh_token(
     response: Response,
     request: Request,
-    _validate_refresh_token: Annotated[
-        Callable, Depends(auth_security.validate_refresh_token)
-    ],
+    _validate_refresh_token: Annotated[Callable, Depends(auth_security.validate_refresh_token)],
     token_user_id: Annotated[
         int,
         Depends(auth_security.get_sub_from_refresh_token),
@@ -518,9 +466,7 @@ async def refresh_token(
         Depends(core_database.get_db),
     ],
     client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
-    x_csrf_token: Annotated[
-        str | None, Depends(auth_security.header_csrf_token_scheme)
-    ] = None,
+    x_csrf_token: Annotated[str | None, Depends(auth_security.header_csrf_token_scheme)] = None,
 ):
     """
     Handles the refresh token process for user sessions.
@@ -583,16 +529,18 @@ async def refresh_token(
     # - CSRF protection at this endpoint is defense-in-depth; the primary
     #   protections are HttpOnly + SameSite=Strict on the refresh cookie,
     #   which prevent a cross-site attacker from issuing this POST at all.
-    if client_type == "web" and x_csrf_token and session.csrf_token_hash is not None:
+    if (
+        client_type == "web"
+        and x_csrf_token
+        and session.csrf_token_hash is not None
+        and not users_session_utils.verify_csrf_token(x_csrf_token, session.csrf_token_hash)
+    ):
         # CSRF token was provided: validate it
-        if not users_session_utils.verify_csrf_token(
-            x_csrf_token, session.csrf_token_hash
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid CSRF token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid CSRF token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Verify session has a refresh token (not pending PKCE exchange)
     if not session.refresh_token:
@@ -604,15 +552,11 @@ async def refresh_token(
 
     # Check for token reuse BEFORE validating token
     # Uses HMAC-SHA256 internally for deterministic, secure lookup
-    is_reused, in_grace = users_session_rotated_tokens_utils.check_token_reuse(
-        refresh_token_value, db
-    )
+    is_reused, in_grace = users_session_rotated_tokens_utils.check_token_reuse(refresh_token_value, db)
 
     if is_reused and not in_grace:
         # Token theft detected - invalidate entire family
-        users_session_rotated_tokens_utils.invalidate_token_family(
-            session.token_family_id, db
-        )
+        users_session_rotated_tokens_utils.invalidate_token_family(session.token_family_id, db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token reuse detected. All sessions invalidated.",
@@ -632,9 +576,7 @@ async def refresh_token(
     user = users_crud.get_user_by_id(token_user_id, db)
 
     if user is None:
-        core_logger.print_to_log(
-            f"User ID {token_user_id} not found during token refresh", "warning"
-        )
+        core_logger.print_to_log(f"User ID {token_user_id} not found during token refresh", "warning")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unable to authenticate",
@@ -690,31 +632,27 @@ async def refresh_token(
         # Return access token and CSRF token in body
         # expires_in / refresh_token_expires_in are seconds-until-expiry
         # per RFC 6749 §5.1
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return {
             "session_id": session_id,
             "access_token": new_access_token,
             "csrf_token": new_csrf_token,
             "token_type": "bearer",
             "expires_in": int((new_access_token_exp - now).total_seconds()),
-            "refresh_token_expires_in": int(
-                (new_refresh_token_exp - now).total_seconds()
-            ),
+            "refresh_token_expires_in": int((new_refresh_token_exp - now).total_seconds()),
         }
     else:
         # Mobile: All tokens in JSON response body
         # expires_in / refresh_token_expires_in are seconds-until-expiry
         # per RFC 6749 §5.1
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return {
             "session_id": session_id,
             "access_token": new_access_token,
             "refresh_token": new_refresh_token,
             "token_type": "bearer",
             "expires_in": int((new_access_token_exp - now).total_seconds()),
-            "refresh_token_expires_in": int(
-                (new_refresh_token_exp - now).total_seconds()
-            ),
+            "refresh_token_expires_in": int((new_refresh_token_exp - now).total_seconds()),
         }
 
 
@@ -723,9 +661,7 @@ async def refresh_token(
 async def logout(
     response: Response,
     request: Request,
-    _validate_refresh_token: Annotated[
-        Callable, Depends(auth_security.validate_refresh_token)
-    ],
+    _validate_refresh_token: Annotated[Callable, Depends(auth_security.validate_refresh_token)],
     token_session_id: Annotated[
         str,
         Depends(auth_security.get_sid_from_refresh_token),

@@ -1,12 +1,10 @@
 """CRUD operations for notifications."""
 
-from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
-
+import core.decorators as core_decorators
 import notifications.models as notifications_models
 import notifications.schema as notifications_schema
-
-import core.decorators as core_decorators
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -54,9 +52,7 @@ def get_user_notifications(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(notifications_models.Notification).where(
-        notifications_models.Notification.user_id == user_id
-    )
+    stmt = select(notifications_models.Notification).where(notifications_models.Notification.user_id == user_id)
     return db.execute(stmt).scalars().all()
 
 

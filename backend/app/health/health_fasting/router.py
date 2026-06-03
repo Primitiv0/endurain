@@ -5,22 +5,18 @@ This module defines the API endpoints for managing fasting sessions,
 including CRUD operations, active fast tracking, and statistics.
 """
 
-from typing import Annotated, Callable
-from datetime import timedelta
-
-from fastapi import APIRouter, Depends, Security, HTTPException, status, Query
-from sqlalchemy.orm import Session
-
-import health.constants as health_constants
-
-import health.health_fasting.schema as health_fasting_schema
-import health.health_fasting.crud as health_fasting_crud
-import health.health_fasting.utils as health_fasting_utils
+from collections.abc import Callable
+from typing import Annotated
 
 import auth.dependencies as auth_dependencies
-
 import core.database as core_database
 import core.dependencies as core_dependencies
+import health.constants as health_constants
+import health.health_fasting.crud as health_fasting_crud
+import health.health_fasting.schema as health_fasting_schema
+import health.health_fasting.utils as health_fasting_utils
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -32,9 +28,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def read_health_fasting_all_pagination(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
@@ -89,12 +83,8 @@ async def read_health_fasting_all_pagination(
         HTTPException: If the user lacks required 'health:read' scope or if
             pagination values are invalid.
     """
-    total = health_fasting_crud.get_health_fasting_number_by_user_id(
-        token_user_id, db, interval
-    )
-    records = health_fasting_crud.get_health_fasting_by_user_id(
-        token_user_id, db, page_number, num_records, interval
-    )
+    total = health_fasting_crud.get_health_fasting_number_by_user_id(token_user_id, db, interval)
+    records = health_fasting_crud.get_health_fasting_by_user_id(token_user_id, db, page_number, num_records, interval)
 
     return health_fasting_schema.HealthFastingListResponse(
         total=total,
@@ -110,9 +100,7 @@ async def read_health_fasting_all_pagination(
     status_code=status.HTTP_200_OK,
 )
 async def read_active_fasting(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -142,9 +130,7 @@ async def read_active_fasting(
     status_code=status.HTTP_200_OK,
 )
 async def read_fasting_stats(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -166,20 +152,14 @@ async def read_fasting_stats(
         HealthFastingStatsResponse with statistics.
     """
     total_fasts = health_fasting_crud.get_completed_fasting_count(token_user_id, db)
-    total_fasting_seconds = health_fasting_crud.get_total_fasting_seconds(
-        token_user_id, db
-    )
+    total_fasting_seconds = health_fasting_crud.get_total_fasting_seconds(token_user_id, db)
     avg_duration = health_fasting_crud.get_avg_fasting_duration(token_user_id, db)
 
     # Calculate streaks
-    current_streak, longest_streak = health_fasting_utils.calculate_streaks(
-        token_user_id, db
-    )
+    current_streak, longest_streak = health_fasting_utils.calculate_streaks(token_user_id, db)
 
     # Calculate completion rate
-    total_started = health_fasting_crud.get_health_fasting_number_by_user_id(
-        token_user_id, db
-    )
+    total_started = health_fasting_crud.get_health_fasting_number_by_user_id(token_user_id, db)
     completion_rate = (total_fasts / total_started * 100) if total_started > 0 else 0.0
 
     return health_fasting_schema.HealthFastingStatsResponse(
@@ -199,9 +179,7 @@ async def read_fasting_stats(
 )
 async def read_health_fasting_by_id(
     health_fasting_id: int,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -226,9 +204,7 @@ async def read_health_fasting_by_id(
     Raises:
         HTTPException: If record not found.
     """
-    record = health_fasting_crud.get_health_fasting_by_id_and_user_id(
-        health_fasting_id, token_user_id, db
-    )
+    record = health_fasting_crud.get_health_fasting_by_id_and_user_id(health_fasting_id, token_user_id, db)
 
     if record is None:
         raise HTTPException(
@@ -246,9 +222,7 @@ async def read_health_fasting_by_id(
 )
 async def create_health_fasting(
     health_fasting: health_fasting_schema.HealthFastingCreate,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -279,8 +253,7 @@ async def create_health_fasting(
     if active_fast is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already has an active fasting session. "
-            "Complete or cancel it before starting a new one.",
+            detail="User already has an active fasting session. Complete or cancel it before starting a new one.",
         )
 
     return health_fasting_crud.create_health_fasting(token_user_id, health_fasting, db)
@@ -293,9 +266,7 @@ async def create_health_fasting(
 )
 async def edit_health_fasting(
     health_fasting: health_fasting_schema.HealthFastingUpdate,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -328,9 +299,7 @@ async def edit_health_fasting(
 async def complete_health_fasting(
     health_fasting_id: int,
     complete_data: health_fasting_schema.HealthFastingComplete,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -353,9 +322,7 @@ async def complete_health_fasting(
     Returns:
         Updated HealthFastingRead record.
     """
-    return health_fasting_crud.complete_health_fasting(
-        token_user_id, health_fasting_id, complete_data, db
-    )
+    return health_fasting_crud.complete_health_fasting(token_user_id, health_fasting_id, complete_data, db)
 
 
 @router.delete(
@@ -365,9 +332,7 @@ async def complete_health_fasting(
 )
 async def delete_health_fasting(
     health_fasting_id: int,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),

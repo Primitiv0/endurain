@@ -1,18 +1,16 @@
 """Notification API route handlers."""
 
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, status, Security
-from sqlalchemy.orm import Session
+from collections.abc import Callable
+from typing import Annotated
 
 import auth.dependencies as auth_dependencies
-
-import notifications.dependencies as notifications_dependencies
-import notifications.crud as notifications_crud
-import notifications.schema as notifications_schema
-
 import core.database as core_database
 import core.dependencies as core_dependencies
+import notifications.crud as notifications_crud
+import notifications.dependencies as notifications_dependencies
+import notifications.schema as notifications_schema
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -23,9 +21,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def read_notifications_number(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -61,9 +57,7 @@ async def read_notifications_by_id(
         Callable,
         Depends(notifications_dependencies.validate_notification_id),
     ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -87,13 +81,11 @@ async def read_notifications_by_id(
     Returns:
         Notification object or None if not found.
     """
-    return notifications_crud.get_user_notification_by_id(
-        notification_id, token_user_id, db
-    )
+    return notifications_crud.get_user_notification_by_id(notification_id, token_user_id, db)
 
 
 @router.get(
-    "/page_number/{page_number}" "/num_records/{num_records}",
+    "/page_number/{page_number}/num_records/{num_records}",
     response_model=(list[notifications_schema.NotificationRead] | None),
     status_code=status.HTTP_200_OK,
 )
@@ -104,9 +96,7 @@ async def read_notifications_user_pagination(
         Callable,
         Depends(core_dependencies.validate_pagination_values),
     ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -150,9 +140,7 @@ async def mark_notification_as_read(
         Callable,
         Depends(notifications_dependencies.validate_notification_id),
     ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),

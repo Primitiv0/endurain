@@ -1,21 +1,19 @@
 """CRUD operations for IdP link tokens."""
 
-from datetime import datetime, timezone
-
-from sqlalchemy import delete as sa_delete, select, update as sa_update
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
 import auth.idp_link_tokens.models as idp_link_token_models
 import auth.idp_link_tokens.schema as idp_link_token_schema
-
 import core.decorators as core_decorators
 import core.logger as core_logger
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_idp_link_token_by_hash(
-    token_hash: str, db: Session
-) -> idp_link_token_models.IdpLinkToken | None:
+def get_idp_link_token_by_hash(token_hash: str, db: Session) -> idp_link_token_models.IdpLinkToken | None:
     """Retrieve a valid IdP link token by token hash.
 
     Args:
@@ -32,8 +30,7 @@ def get_idp_link_token_by_hash(
     stmt = select(idp_link_token_models.IdpLinkToken).where(
         idp_link_token_models.IdpLinkToken.token_hash == token_hash,
         idp_link_token_models.IdpLinkToken.used.is_(False),
-        idp_link_token_models.IdpLinkToken.expires_at
-        > datetime.now(timezone.utc),
+        idp_link_token_models.IdpLinkToken.expires_at > datetime.now(UTC),
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -84,8 +81,7 @@ def mark_token_as_used(token_hash: str, db: Session) -> bool:
         .where(
             idp_link_token_models.IdpLinkToken.token_hash == token_hash,
             idp_link_token_models.IdpLinkToken.used.is_(False),
-            idp_link_token_models.IdpLinkToken.expires_at
-            > datetime.now(timezone.utc),
+            idp_link_token_models.IdpLinkToken.expires_at > datetime.now(UTC),
         )
         .values(used=True)
     )
@@ -112,15 +108,12 @@ def delete_expired_tokens(db: Session) -> int:
         HTTPException: 500 error if database operation fails.
     """
     stmt = sa_delete(idp_link_token_models.IdpLinkToken).where(
-        idp_link_token_models.IdpLinkToken.expires_at
-        < datetime.now(timezone.utc)
+        idp_link_token_models.IdpLinkToken.expires_at < datetime.now(UTC)
     )
     result = db.execute(stmt)
     db.commit()
 
     deleted_count = result.rowcount
     if deleted_count > 0:
-        core_logger.print_to_log(
-            f"Deleted {deleted_count} expired IdP link token(s)", "debug"
-        )
+        core_logger.print_to_log(f"Deleted {deleted_count} expired IdP link token(s)", "debug")
     return deleted_count

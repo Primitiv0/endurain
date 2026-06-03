@@ -3,16 +3,14 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import pytest
-from fastapi import HTTPException, Request, WebSocket, status, WebSocketException
-from fastapi.security import SecurityScopes
-
 import auth.security as auth_security
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
-
+import pytest
 from auth.identity_service import IdentityService
 from auth.principal import AccessTokenCred, ApiKeyCred, Principal
+from fastapi import HTTPException, Request, WebSocket, WebSocketException, status
+from fastapi.security import SecurityScopes
 from joserfc.errors import MissingClaimError
 
 
@@ -43,11 +41,7 @@ def _make_principal(
         is_active=True,
         is_superuser=False,
         scopes=scopes if scopes is not None else frozenset(["profile"]),
-        credential=(
-            credential
-            if credential is not None
-            else AccessTokenCred(session_id="session-id")
-        ),
+        credential=(credential if credential is not None else AccessTokenCred(session_id="session-id")),
     )
 
 
@@ -133,9 +127,7 @@ class TestGetToken:
                 token_type="refresh",
             )
         assert exc_info.value.status_code == 401
-        assert (
-            "Refresh token missing from Authorization header" in exc_info.value.detail
-        )
+        assert "Refresh token missing from Authorization header" in exc_info.value.detail
 
     def test_invalid_token_type_raises_error(self):
         """Test that invalid token type raises 403."""
@@ -193,9 +185,7 @@ class TestGetSubFromAccessToken:
         mock_service = MagicMock(spec=IdentityService)
         mock_service.resolve_from_access_token.return_value = principal
 
-        result = auth_security.get_sub_from_access_token(
-            request, "fake_token", mock_service
-        )
+        result = auth_security.get_sub_from_access_token(request, "fake_token", mock_service)
 
         assert result == sample_user_read.id
         assert isinstance(result, int)
@@ -208,13 +198,9 @@ class TestGetSubFromAccessToken:
         mock_service = MagicMock(spec=IdentityService)
         mock_service.resolve_from_access_token.return_value = principal
 
-        auth_security.get_sub_from_access_token(
-            request, "fake_token", mock_service
-        )
+        auth_security.get_sub_from_access_token(request, "fake_token", mock_service)
         # Second call should hit cache
-        result2 = auth_security.get_sub_from_access_token(
-            request, "fake_token", mock_service
-        )
+        result2 = auth_security.get_sub_from_access_token(request, "fake_token", mock_service)
 
         assert result2 == sample_user_read.id
         mock_service.resolve_from_access_token.assert_called_once()
@@ -229,9 +215,7 @@ class TestGetSubFromAccessToken:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sub_from_access_token(
-                request, "invalid.token", mock_service
-            )
+            auth_security.get_sub_from_access_token(request, "invalid.token", mock_service)
         assert exc_info.value.status_code == 401
 
 
@@ -242,15 +226,11 @@ class TestGetSidFromAccessToken:
         """Test extracting session ID via IdentityService."""
         session_id = "test-session-123"
         request = _mock_request_with_state()
-        principal = _make_principal(
-            credential=AccessTokenCred(session_id=session_id)
-        )
+        principal = _make_principal(credential=AccessTokenCred(session_id=session_id))
         mock_service = MagicMock(spec=IdentityService)
         mock_service.resolve_from_access_token.return_value = principal
 
-        sid = auth_security.get_sid_from_access_token(
-            request, "fake_token", mock_service
-        )
+        sid = auth_security.get_sid_from_access_token(request, "fake_token", mock_service)
 
         assert sid == session_id
         assert isinstance(sid, str)
@@ -258,16 +238,12 @@ class TestGetSidFromAccessToken:
     def test_get_sid_non_access_token_cred_raises_error(self):
         """Non-AccessTokenCred credential raises 401."""
         request = _mock_request_with_state()
-        principal = _make_principal(
-            credential=ApiKeyCred(api_key_id=1, key_prefix="prefix")
-        )
+        principal = _make_principal(credential=ApiKeyCred(api_key_id=1, key_prefix="prefix"))
         mock_service = MagicMock(spec=IdentityService)
         mock_service.resolve_from_access_token.return_value = principal
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sid_from_access_token(
-                request, "fake_token", mock_service
-            )
+            auth_security.get_sid_from_access_token(request, "fake_token", mock_service)
         assert exc_info.value.status_code == 401
         assert "credential type" in exc_info.value.detail
 
@@ -281,9 +257,7 @@ class TestGetSidFromAccessToken:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sid_from_access_token(
-                request, "invalid.token", mock_service
-            )
+            auth_security.get_sid_from_access_token(request, "invalid.token", mock_service)
         assert exc_info.value.status_code == 401
 
 
@@ -326,9 +300,7 @@ class TestRefreshTokenValidation:
         token_manager = MagicMock()
         token_manager.validate_token_expiration.side_effect = raise_missing_claim
 
-        with pytest.raises(
-            auth_utils.ClearRefreshTokenCookieHTTPException
-        ) as exc_info:
+        with pytest.raises(auth_utils.ClearRefreshTokenCookieHTTPException) as exc_info:
             auth_security.validate_refresh_token(
                 "legacy-refresh-token",
                 token_manager,
@@ -398,9 +370,7 @@ class TestCheckScopes:
         assert exc_info.value.status_code == 403
         assert "Missing permissions" in exc_info.value.detail
 
-    def test_check_scopes_with_no_required_scopes(
-        self, token_manager, sample_user_read
-    ):
+    def test_check_scopes_with_no_required_scopes(self, token_manager, sample_user_read):
         """Test that no required scopes passes validation."""
         _, access_token = token_manager.create_token(
             "session-id", sample_user_read, auth_token_manager.TokenType.ACCESS
@@ -440,9 +410,7 @@ class TestGetAndReturnTokens:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sub_from_access_token(
-                request, "fake_token", mock_service
-            )
+            auth_security.get_sub_from_access_token(request, "fake_token", mock_service)
         assert exc_info.value.status_code == 401
 
     def test_get_sub_from_access_token_for_browser_redirect_service_raises(self):
@@ -455,24 +423,18 @@ class TestGetAndReturnTokens:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sub_from_access_token_for_browser_redirect(
-                request, "fake_token", mock_service
-            )
+            auth_security.get_sub_from_access_token_for_browser_redirect(request, "fake_token", mock_service)
         assert exc_info.value.status_code == 401
 
     def test_get_sid_from_access_token_wrong_cred_type(self):
         """Non-AccessTokenCred raises 401 for SID extraction."""
         request = _mock_request_with_state()
-        principal = _make_principal(
-            credential=ApiKeyCred(api_key_id=99, key_prefix="key_")
-        )
+        principal = _make_principal(credential=ApiKeyCred(api_key_id=99, key_prefix="key_"))
         mock_service = MagicMock(spec=IdentityService)
         mock_service.resolve_from_access_token.return_value = principal
 
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sid_from_access_token(
-                request, "fake_token", mock_service
-            )
+            auth_security.get_sid_from_access_token(request, "fake_token", mock_service)
         assert exc_info.value.status_code == 401
         assert "credential type" in exc_info.value.detail
 
@@ -480,9 +442,7 @@ class TestGetAndReturnTokens:
         """
         Test that non-integer sub in refresh token raises error.
         """
-        with patch.object(
-            token_manager, "get_token_claim", return_value="not_an_integer"
-        ):
+        with patch.object(token_manager, "get_token_claim", return_value="not_an_integer"):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.get_sub_from_refresh_token("fake_token", token_manager)
             assert exc_info.value.status_code == 401
@@ -519,9 +479,7 @@ class TestGetAndReturnTokens:
             side_effect=RuntimeError("Test error"),
         ):
             with pytest.raises(HTTPException) as exc_info:
-                auth_security.validate_access_token_for_browser_redirect(
-                    "fake_token", token_manager
-                )
+                auth_security.validate_access_token_for_browser_redirect("fake_token", token_manager)
             assert exc_info.value.status_code == 500
 
     def test_validate_refresh_token_generic_exception(self, token_manager):
@@ -543,8 +501,10 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(token_manager, "validate_token_expiration"), \
-             patch.object(token_manager, "get_token_claim", return_value="not_a_list"):
+        with (
+            patch.object(token_manager, "validate_token_expiration"),
+            patch.object(token_manager, "get_token_claim", return_value="not_a_list"),
+        ):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.check_scopes("fake_token", token_manager, security_scopes)
             assert exc_info.value.status_code == 403
@@ -559,18 +519,16 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(token_manager, "validate_token_expiration"), \
-             patch.object(
-            token_manager, "get_token_claim", return_value=["profile", "invalid"]
+        with (
+            patch.object(token_manager, "validate_token_expiration"),
+            patch.object(token_manager, "get_token_claim", return_value=["profile", "invalid"]),
+            patch("auth.security.set", side_effect=RuntimeError("Test error")),
         ):
             # Trigger the exception handling path by providing valid scope
             # but then simulating an error in the middle of processing
-            with patch("auth.security.set", side_effect=RuntimeError("Test error")):
-                with pytest.raises(HTTPException) as exc_info:
-                    auth_security.check_scopes(
-                        "fake_token", token_manager, security_scopes
-                    )
-                assert exc_info.value.status_code == 500
+            with pytest.raises(HTTPException) as exc_info:
+                auth_security.check_scopes("fake_token", token_manager, security_scopes)
+            assert exc_info.value.status_code == 500
 
     def test_check_scopes_for_browser_redirect_invalid_format(self, token_manager):
         """
@@ -578,12 +536,12 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(token_manager, "validate_token_expiration"), \
-             patch.object(token_manager, "get_token_claim", return_value="not_a_list"):
+        with (
+            patch.object(token_manager, "validate_token_expiration"),
+            patch.object(token_manager, "get_token_claim", return_value="not_a_list"),
+        ):
             with pytest.raises(HTTPException) as exc_info:
-                auth_security.check_scopes_for_browser_redirect(
-                    "fake_token", token_manager, security_scopes
-                )
+                auth_security.check_scopes_for_browser_redirect("fake_token", token_manager, security_scopes)
             assert exc_info.value.status_code == 403
 
     def test_check_scopes_for_browser_redirect_generic_exception(self, token_manager):
@@ -595,17 +553,15 @@ class TestGetAndReturnTokens:
         """
         security_scopes = SecurityScopes(scopes=["profile"])
 
-        with patch.object(token_manager, "validate_token_expiration"), \
-             patch.object(
-            token_manager, "get_token_claim", return_value=["profile", "invalid"]
+        with (
+            patch.object(token_manager, "validate_token_expiration"),
+            patch.object(token_manager, "get_token_claim", return_value=["profile", "invalid"]),
+            patch("auth.security.set", side_effect=RuntimeError("Test error")),
         ):
             # Trigger the exception handling path
-            with patch("auth.security.set", side_effect=RuntimeError("Test error")):
-                with pytest.raises(HTTPException) as exc_info:
-                    auth_security.check_scopes_for_browser_redirect(
-                        "fake_token", token_manager, security_scopes
-                    )
-                assert exc_info.value.status_code == 500
+            with pytest.raises(HTTPException) as exc_info:
+                auth_security.check_scopes_for_browser_redirect("fake_token", token_manager, security_scopes)
+            assert exc_info.value.status_code == 500
 
     def test_validate_websocket_access_token_invalid_sub_claim(self, token_manager):
         """
@@ -613,19 +569,15 @@ class TestGetAndReturnTokens:
         """
         mock_websocket = MagicMock(spec=WebSocket)
 
-        with patch.object(
-            token_manager, "validate_token_expiration", return_value=None
+        with (
+            patch.object(token_manager, "validate_token_expiration", return_value=None),
+            patch.object(token_manager, "get_token_claim", return_value=None),
         ):
-            with patch.object(token_manager, "get_token_claim", return_value=None):
-                with pytest.raises(WebSocketException) as exc_info:
-                    import asyncio
+            with pytest.raises(WebSocketException) as exc_info:
+                import asyncio
 
-                    asyncio.run(
-                        auth_security.validate_websocket_access_token(
-                            mock_websocket, "fake_token", token_manager
-                        )
-                    )
-                assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
+                asyncio.run(auth_security.validate_websocket_access_token(mock_websocket, "fake_token", token_manager))
+            assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
 
     def test_validate_websocket_access_token_list_sub_claim(self, token_manager):
         """
@@ -633,21 +585,15 @@ class TestGetAndReturnTokens:
         """
         mock_websocket = MagicMock(spec=WebSocket)
 
-        with patch.object(
-            token_manager, "validate_token_expiration", return_value=None
+        with (
+            patch.object(token_manager, "validate_token_expiration", return_value=None),
+            patch.object(token_manager, "get_token_claim", return_value=["1", "2"]),
         ):
-            with patch.object(
-                token_manager, "get_token_claim", return_value=["1", "2"]
-            ):
-                with pytest.raises(WebSocketException) as exc_info:
-                    import asyncio
+            with pytest.raises(WebSocketException) as exc_info:
+                import asyncio
 
-                    asyncio.run(
-                        auth_security.validate_websocket_access_token(
-                            mock_websocket, "fake_token", token_manager
-                        )
-                    )
-                assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
+                asyncio.run(auth_security.validate_websocket_access_token(mock_websocket, "fake_token", token_manager))
+            assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
 
     def test_validate_websocket_access_token_http_exception(self, token_manager):
         """
@@ -663,11 +609,7 @@ class TestGetAndReturnTokens:
             with pytest.raises(WebSocketException) as exc_info:
                 import asyncio
 
-                asyncio.run(
-                    auth_security.validate_websocket_access_token(
-                        mock_websocket, "fake_token", token_manager
-                    )
-                )
+                asyncio.run(auth_security.validate_websocket_access_token(mock_websocket, "fake_token", token_manager))
             assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
 
     def test_validate_websocket_access_token_generic_exception(self, token_manager):
@@ -684,11 +626,7 @@ class TestGetAndReturnTokens:
             with pytest.raises(WebSocketException) as exc_info:
                 import asyncio
 
-                asyncio.run(
-                    auth_security.validate_websocket_access_token(
-                        mock_websocket, "fake_token", token_manager
-                    )
-                )
+                asyncio.run(auth_security.validate_websocket_access_token(mock_websocket, "fake_token", token_manager))
             assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
 
 
@@ -698,9 +636,7 @@ class TestGetAccessTokenForBrowserRedirect:
     def test_get_access_token_for_browser_redirect_defaults_client_type(self):
         """Test that client_type defaults to 'web' when None."""
         # When client_type is None, it should default to "web"
-        result = auth_security.get_access_token_for_browser_redirect(
-            access_token="test_token", client_type=None
-        )
+        result = auth_security.get_access_token_for_browser_redirect(access_token="test_token", client_type=None)
         assert result == "test_token"
 
 
@@ -712,24 +648,18 @@ class TestValidateAccessTokenExceptionPaths:
         with patch.object(
             token_manager,
             "validate_token_expiration",
-            side_effect=HTTPException(
-                status_code=401, detail="Token expired - please refresh"
-            ),
+            side_effect=HTTPException(status_code=401, detail="Token expired - please refresh"),
         ):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.validate_access_token("expired_token", token_manager)
             assert "expired" in exc_info.value.detail.lower()
 
-    def test_validate_access_token_with_non_expired_error_logs_error(
-        self, token_manager
-    ):
+    def test_validate_access_token_with_non_expired_error_logs_error(self, token_manager):
         """Test that non-expired error logs at error level."""
         with patch.object(
             token_manager,
             "validate_token_expiration",
-            side_effect=HTTPException(
-                status_code=401, detail="Invalid token signature"
-            ),
+            side_effect=HTTPException(status_code=401, detail="Invalid token signature"),
         ):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.validate_access_token("invalid_token", token_manager)
@@ -763,9 +693,7 @@ class TestGetSubFromAccessTokenExceptionPath:
             detail="Invalid token: 'sub' claim must be an integer",
         )
         with pytest.raises(HTTPException) as exc_info:
-            auth_security.get_sub_from_access_token(
-                request, "test_token", mock_svc
-            )
+            auth_security.get_sub_from_access_token(request, "test_token", mock_svc)
         assert exc_info.value.status_code == 401
         assert "must be an integer" in exc_info.value.detail
 
@@ -777,9 +705,10 @@ class TestCheckScopesExceptionPaths:
         """Test that HTTPException from scope check is re-raised."""
         security_scopes = SecurityScopes(scopes=["users:write"])
 
-        with patch.object(
-            token_manager, "get_token_claim", return_value="invalid scope format"
-        ), patch.object(token_manager, "validate_token_expiration"):
+        with (
+            patch.object(token_manager, "get_token_claim", return_value="invalid scope format"),
+            patch.object(token_manager, "validate_token_expiration"),
+        ):
             with pytest.raises(HTTPException) as exc_info:
                 auth_security.check_scopes("test_token", token_manager, security_scopes)
             assert exc_info.value.status_code == 403

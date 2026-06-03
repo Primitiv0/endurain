@@ -1,5 +1,3 @@
-import pytest
-
 import users.users_privacy_settings.models as user_privacy_settings_models
 
 
@@ -13,10 +11,7 @@ class TestUsersPrivacySettingsModel:
         Test UsersPrivacySettings model has correct table name.
         """
         # Assert
-        assert (
-            user_privacy_settings_models.UsersPrivacySettings.__tablename__
-            == "users_privacy_settings"
-        )
+        assert user_privacy_settings_models.UsersPrivacySettings.__tablename__ == "users_privacy_settings"
 
     def test_users_privacy_settings_model_columns_exist(self):
         """
@@ -94,21 +89,21 @@ class TestUsersPrivacySettingsModel:
         model = user_privacy_settings_models.UsersPrivacySettings
 
         # Assert
-        assert model.id.type.python_type == int
+        assert model.id.type.python_type is int
         # user_id has ForeignKey, skip type check
-        assert model.default_activity_visibility.type.python_type == str
-        assert model.hide_activity_start_time.type.python_type == bool
-        assert model.hide_activity_location.type.python_type == bool
-        assert model.hide_activity_map.type.python_type == bool
-        assert model.hide_activity_hr.type.python_type == bool
-        assert model.hide_activity_power.type.python_type == bool
-        assert model.hide_activity_cadence.type.python_type == bool
-        assert model.hide_activity_elevation.type.python_type == bool
-        assert model.hide_activity_speed.type.python_type == bool
-        assert model.hide_activity_pace.type.python_type == bool
-        assert model.hide_activity_laps.type.python_type == bool
-        assert model.hide_activity_workout_sets_steps.type.python_type == bool
-        assert model.hide_activity_gear.type.python_type == bool
+        assert model.default_activity_visibility.type.python_type is str
+        assert model.hide_activity_start_time.type.python_type is bool
+        assert model.hide_activity_location.type.python_type is bool
+        assert model.hide_activity_map.type.python_type is bool
+        assert model.hide_activity_hr.type.python_type is bool
+        assert model.hide_activity_power.type.python_type is bool
+        assert model.hide_activity_cadence.type.python_type is bool
+        assert model.hide_activity_elevation.type.python_type is bool
+        assert model.hide_activity_speed.type.python_type is bool
+        assert model.hide_activity_pace.type.python_type is bool
+        assert model.hide_activity_laps.type.python_type is bool
+        assert model.hide_activity_workout_sets_steps.type.python_type is bool
+        assert model.hide_activity_gear.type.python_type is bool
 
     def test_users_privacy_settings_model_relationship(self):
         """
@@ -122,9 +117,7 @@ class TestUsersPrivacySettingsModel:
         Test UsersPrivacySettings model has correct default visibility.
         """
         # Arrange
-        visibility_column = (
-            user_privacy_settings_models.UsersPrivacySettings.default_activity_visibility
-        )
+        visibility_column = user_privacy_settings_models.UsersPrivacySettings.default_activity_visibility
 
         # Assert
         assert visibility_column.default.arg == "public"

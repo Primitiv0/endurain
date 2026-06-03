@@ -4,11 +4,11 @@ Tests for auth.mfa_backup_codes.schema module.
 This module tests Pydantic schemas for MFA backup codes.
 """
 
-import pytest
-from datetime import datetime, timezone
-from pydantic import ValidationError
+from datetime import UTC, datetime
 
 import auth.mfa_backup_codes.schema as mfa_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestMFABackupCodesResponse:
@@ -16,7 +16,7 @@ class TestMFABackupCodesResponse:
 
     def test_valid_backup_codes_response(self):
         """Test valid backup codes response."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         codes = ["ABC123XYZ", "DEF456UVW", "GHI789RST", "JKL012MNO", "PQR345ABC"]
         response = mfa_schema.MFABackupCodesResponse(codes=codes, created_at=now)
 
@@ -26,7 +26,7 @@ class TestMFABackupCodesResponse:
 
     def test_backup_codes_response_with_10_codes(self):
         """Test backup codes response with 10 codes (typical use case)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         codes = [f"CODE{i:05d}ABC" for i in range(10)]
         response = mfa_schema.MFABackupCodesResponse(codes=codes, created_at=now)
 
@@ -36,7 +36,7 @@ class TestMFABackupCodesResponse:
 
     def test_backup_codes_response_empty_list(self):
         """Test backup codes response with empty list raises validation error."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with pytest.raises(ValidationError):
             mfa_schema.MFABackupCodesResponse(codes=[], created_at=now)
 
@@ -46,10 +46,8 @@ class TestMFABackupCodeStatus:
 
     def test_valid_backup_code_status_with_codes(self):
         """Test valid backup code status with codes."""
-        now = datetime.now(timezone.utc)
-        status = mfa_schema.MFABackupCodeStatus(
-            has_codes=True, total=10, unused=7, used=3, created_at=now
-        )
+        now = datetime.now(UTC)
+        status = mfa_schema.MFABackupCodeStatus(has_codes=True, total=10, unused=7, used=3, created_at=now)
 
         assert status.has_codes is True
         assert status.total == 10
@@ -59,9 +57,7 @@ class TestMFABackupCodeStatus:
 
     def test_backup_code_status_without_codes(self):
         """Test backup code status when user has no codes."""
-        status = mfa_schema.MFABackupCodeStatus(
-            has_codes=False, total=0, unused=0, used=0, created_at=None
-        )
+        status = mfa_schema.MFABackupCodeStatus(has_codes=False, total=0, unused=0, used=0, created_at=None)
 
         assert status.has_codes is False
         assert status.total == 0
@@ -71,10 +67,8 @@ class TestMFABackupCodeStatus:
 
     def test_backup_code_status_all_used(self):
         """Test backup code status when all codes are used."""
-        now = datetime.now(timezone.utc)
-        status = mfa_schema.MFABackupCodeStatus(
-            has_codes=True, total=10, unused=0, used=10, created_at=now
-        )
+        now = datetime.now(UTC)
+        status = mfa_schema.MFABackupCodeStatus(has_codes=True, total=10, unused=0, used=10, created_at=now)
 
         assert status.has_codes is True
         assert status.total == 10
@@ -83,10 +77,8 @@ class TestMFABackupCodeStatus:
 
     def test_backup_code_status_all_unused(self):
         """Test backup code status when all codes are unused."""
-        now = datetime.now(timezone.utc)
-        status = mfa_schema.MFABackupCodeStatus(
-            has_codes=True, total=10, unused=10, used=0, created_at=now
-        )
+        now = datetime.now(UTC)
+        status = mfa_schema.MFABackupCodeStatus(has_codes=True, total=10, unused=10, used=0, created_at=now)
 
         assert status.has_codes is True
         assert status.unused == 10
@@ -100,8 +92,6 @@ class TestMFABackupCodeStatus:
 
     def test_backup_code_status_created_at_optional(self):
         """Test that created_at is optional and defaults to None."""
-        status = mfa_schema.MFABackupCodeStatus(
-            has_codes=False, total=0, unused=0, used=0
-        )
+        status = mfa_schema.MFABackupCodeStatus(has_codes=False, total=0, unused=0, used=0)
 
         assert status.created_at is None

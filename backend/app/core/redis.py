@@ -2,15 +2,13 @@
 
 from typing import NoReturn
 
-from redis import Redis, RedisError
-
 import core.logger as core_logger
-
+from redis import Redis, RedisError
 
 DEFAULT_REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
 
 
-class RedisStorageUnavailable(RuntimeError):
+class RedisStorageUnavailableError(RuntimeError):
     """
     Raised when Redis-backed storage cannot be reached.
 
@@ -33,16 +31,14 @@ def raise_redis_storage_unavailable(
         err: Redis client exception.
 
     Raises:
-        RedisStorageUnavailable: Always raised.
+        RedisStorageUnavailableError: Always raised.
     """
     core_logger.print_to_log(
         f"Redis operation failed for {purpose}: {operation}",
         "error",
         exc=err,
     )
-    raise RedisStorageUnavailable(
-        f"Redis storage unavailable for {purpose}"
-    ) from err
+    raise RedisStorageUnavailableError(f"Redis storage unavailable for {purpose}") from err
 
 
 def is_redis_storage_uri(storage_uri: str) -> bool:
@@ -143,7 +139,5 @@ def create_redis_client(
         )
         redis_client.ping()
     except (RedisError, ValueError) as redis_error:
-        raise RuntimeError(
-            f"Unable to initialize Redis storage for {purpose}."
-        ) from redis_error
+        raise RuntimeError(f"Unable to initialize Redis storage for {purpose}.") from redis_error
     return redis_client

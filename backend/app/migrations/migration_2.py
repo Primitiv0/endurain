@@ -1,18 +1,13 @@
 """Migration 2: populate activity timezones and health BMI."""
 
-from timezonefinder import TimezoneFinder
-from sqlalchemy.orm import Session
-
 import activities.activity.crud as activities_crud
-
 import activities.activity_streams.crud as activity_streams_crud
-
-import migrations.crud as migrations_crud
-
-import health.health_weight.crud as health_weight_crud
-
-import core.logger as core_logger
 import core.config as core_config
+import core.logger as core_logger
+import health.health_weight.crud as health_weight_crud
+import migrations.crud as migrations_crud
+from sqlalchemy.orm import Session
+from timezonefinder import TimezoneFinder
 
 
 def process_migration_2(db: Session) -> None:
@@ -65,10 +60,8 @@ def process_migration_2(db: Session) -> None:
 
                 # Get activity stream
                 try:
-                    activity_stream_coord = (
-                        activity_streams_crud.get_activity_stream_by_type(
-                            activity.id, 7, activity.user_id, db
-                        )
+                    activity_stream_coord = activity_streams_crud.get_activity_stream_by_type(
+                        activity.id, 7, activity.user_id, db
                     )
                 except Exception as err:
                     core_logger.print_to_log_and_console(
@@ -117,9 +110,7 @@ def process_migration_2(db: Session) -> None:
                 # Update the weight in the database
                 health_weight_crud.edit_health_weight(data.user_id, data, db)
 
-                core_logger.print_to_log_and_console(
-                    f"Migration 2 - Processed BMI: {data.id}"
-                )
+                core_logger.print_to_log_and_console(f"Migration 2 - Processed BMI: {data.id}")
 
             except Exception as err:
                 health_weight_processed_with_no_errors = False

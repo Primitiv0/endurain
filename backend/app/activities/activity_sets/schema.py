@@ -2,6 +2,7 @@
 
 from datetime import datetime
 
+import core.timezone as core_timezone
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -11,8 +12,6 @@ from pydantic import (
     StrictStr,
     field_serializer,
 )
-
-import core.timezone as core_timezone
 
 
 class ActivitySetsBase(BaseModel):
@@ -69,9 +68,7 @@ class ActivitySetsRead(ActivitySetsBase):
     id: StrictInt
     activity_id: StrictInt
     start_time: datetime  # type: ignore[assignment]
-    timezone: StrictStr | None = Field(
-        default=None, exclude=True
-    )
+    timezone: StrictStr | None = Field(default=None, exclude=True)
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -80,9 +77,7 @@ class ActivitySetsRead(ActivitySetsBase):
     )
 
     @field_serializer("start_time")
-    def serialize_start_time(
-        self, value: datetime
-    ) -> str:
+    def serialize_start_time(self, value: datetime) -> str:
         """
         Format start_time with activity timezone.
 
@@ -92,6 +87,4 @@ class ActivitySetsRead(ActivitySetsBase):
         Returns:
             Formatted datetime string.
         """
-        return core_timezone.format_aware_datetime(
-            value, self.timezone
-        )
+        return core_timezone.format_aware_datetime(value, self.timezone)

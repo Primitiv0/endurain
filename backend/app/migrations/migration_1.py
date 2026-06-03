@@ -1,17 +1,14 @@
 """Migration 1: compute elapsed time, HR, power, cadence, speed."""
 
 from datetime import datetime
-from sqlalchemy.orm import Session
 
 import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
-
 import activities.activity_streams.crud as activity_streams_crud
-
+import core.logger as core_logger
 import migrations.crud as migrations_crud
 from migrations.schema import StreamType
-
-import core.logger as core_logger
+from sqlalchemy.orm import Session
 
 
 def process_migration_1(db: Session) -> None:
@@ -34,9 +31,7 @@ def process_migration_1(db: Session) -> None:
     try:
         activities = activities_crud.get_all_activities(db)
     except Exception as err:
-        core_logger.print_to_log_and_console(
-            f"Migration 1 - Error fetching activities: {err}", "error", exc=err
-        )
+        core_logger.print_to_log_and_console(f"Migration 1 - Error fetching activities: {err}", "error", exc=err)
         return
 
     if activities:
@@ -44,13 +39,9 @@ def process_migration_1(db: Session) -> None:
             try:
                 # Ensure start_time and end_time are datetime objects
                 if isinstance(activity.start_time, str):
-                    activity.start_time = datetime.strptime(
-                        activity.start_time, "%Y-%m-%d %H:%M:%S"
-                    )
+                    activity.start_time = datetime.strptime(activity.start_time, "%Y-%m-%d %H:%M:%S")
                 if isinstance(activity.end_time, str):
-                    activity.end_time = datetime.strptime(
-                        activity.end_time, "%Y-%m-%d %H:%M:%S"
-                    )
+                    activity.end_time = datetime.strptime(activity.end_time, "%Y-%m-%d %H:%M:%S")
 
                 # Initialize additional fields
                 metrics: dict[str, float | None] = {
@@ -67,9 +58,7 @@ def process_migration_1(db: Session) -> None:
 
                 # Get activity streams
                 try:
-                    activity_streams = activity_streams_crud.get_activity_streams(
-                        activity.id, activity.user_id, db
-                    )
+                    activity_streams = activity_streams_crud.get_activity_streams(activity.id, activity.user_id, db)
                 except Exception as err:
                     core_logger.print_to_log_and_console(
                         f"Migration 1 - Failed to fetch streams for activity {activity.id}: {err}",
@@ -102,22 +91,16 @@ def process_migration_1(db: Session) -> None:
                     proc = stream_processing.get(stream_type)
                     if proc is not None:
                         attr_avg, attr_max, stream_key = proc[:3]
-                        metrics[attr_avg], metrics[attr_max] = (
-                            activities_utils.calculate_avg_and_max(
-                                stream.stream_waypoints,
-                                stream_key,
-                            )
+                        metrics[attr_avg], metrics[attr_max] = activities_utils.calculate_avg_and_max(
+                            stream.stream_waypoints,
+                            stream_key,
                         )
                         # Special handling for normalized power
                         if stream_type == StreamType.POWER:
-                            metrics["np"] = activities_utils.calculate_np(
-                                stream.stream_waypoints
-                            )
+                            metrics["np"] = activities_utils.calculate_np(stream.stream_waypoints)
 
                 # Calculate elapsed time once
-                elapsed_time_seconds = (
-                    activity.end_time - activity.start_time
-                ).total_seconds()
+                elapsed_time_seconds = (activity.end_time - activity.start_time).total_seconds()
 
                 # Set fields on the activity object
                 activity.total_elapsed_time = elapsed_time_seconds

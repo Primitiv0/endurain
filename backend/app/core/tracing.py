@@ -56,7 +56,5 @@ def setup_tracing(app: FastAPI) -> None:
     )
     resource = Resource.create({"service.name": "backend_api"})
     trace.set_tracer_provider(TracerProvider(resource=resource))
-    trace.get_tracer_provider().add_span_processor(
-        BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
-    )
+    trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
     FastAPIInstrumentor.instrument_app(app)

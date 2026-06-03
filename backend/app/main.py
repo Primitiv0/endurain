@@ -11,43 +11,34 @@ from alembic.config import Config
 # transitively imports it runs.
 os.environ["SILENCE_TOKEN_WARNINGS"] = "TRUE"
 
+import activities.activity.utils as activities_utils
+import auth.idp_link_tokens.utils as idp_link_token_utils
+import auth.oauth_state.utils as oauth_state_utils
+import auth.utils as auth_utils
+import core.config as core_config
+import core.logger as core_logger
+import core.middleware as core_middleware
+import core.middleware_request_id as core_middleware_request_id
+import core.migrations as core_migrations
+import core.rate_limit as core_rate_limit
+import core.scheduler as core_scheduler
+import core.tracing as core_tracing
+import garmin.activity_utils as garmin_activity_utils
+import garmin.health_utils as garmin_health_utils
+import password_reset_tokens.utils as password_reset_tokens_utils
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
+import sign_up_tokens.utils as sign_up_tokens_utils
+import strava.activity_utils as strava_activity_utils
+import strava.utils as strava_utils
+from core.database import SessionLocal
+from core.database import engine as core_db_engine
+from core.routes import router as api_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-
-import core.logger as core_logger
-import core.config as core_config
-import core.scheduler as core_scheduler
-import core.tracing as core_tracing
-import core.middleware as core_middleware
-import core.middleware_request_id as core_middleware_request_id
-import core.migrations as core_migrations
-import core.rate_limit as core_rate_limit
-
-import garmin.activity_utils as garmin_activity_utils
-import garmin.health_utils as garmin_health_utils
-
-import strava.activity_utils as strava_activity_utils
-import strava.utils as strava_utils
-
-import password_reset_tokens.utils as password_reset_tokens_utils
-
-import sign_up_tokens.utils as sign_up_tokens_utils
-
-import auth.oauth_state.utils as oauth_state_utils
-import auth.idp_link_tokens.utils as idp_link_token_utils
-import auth.utils as auth_utils
-
-import activities.activity.utils as activities_utils
-
-import server_settings.utils as server_settings_utils
-import server_settings.schema as server_settings_schema
-
-from core.database import SessionLocal, engine as core_db_engine
-from core.routes import router as api_router
-
 
 _DEPLOYED_ENVIRONMENTS = {"production", "demo"}
 
@@ -114,10 +105,7 @@ def _refresh_strava_tokens() -> None:
 
 async def _retrieve_recent_garmin_activities() -> None:
     """Backfill the last day of Garmin Connect activities."""
-    await (
-        garmin_activity_utils
-        .retrieve_garminconnect_users_activities_for_days(1)
-    )
+    await garmin_activity_utils.retrieve_garminconnect_users_activities_for_days(1)
 
 
 async def _retrieve_recent_strava_activities() -> None:
@@ -155,25 +143,18 @@ def _init_allowed_tile_domains(fastapi_app: FastAPI) -> None:
     """
     with SessionLocal() as db:
         try:
-            fastapi_app.state.allowed_tile_domains = (
-                server_settings_utils.get_allowed_tile_domains(db)
-            )
+            fastapi_app.state.allowed_tile_domains = server_settings_utils.get_allowed_tile_domains(db)
             allowed_tile_domains = fastapi_app.state.allowed_tile_domains
-            core_logger.print_to_log_and_console(
-                f"Allowed tile domains: {allowed_tile_domains}"
-            )
+            core_logger.print_to_log_and_console(f"Allowed tile domains: {allowed_tile_domains}")
         except Exception as err:
             core_logger.print_to_log(
-                "Error initializing tile domains, using defaults: "
-                f"{type(err).__name__}",
+                f"Error initializing tile domains, using defaults: {type(err).__name__}",
                 "error",
                 exc=err,
             )
             # Fallback to built-in providers so CSP
             # remains restrictive but functional.
-            fastapi_app.state.allowed_tile_domains = (
-                server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
-            )
+            fastapi_app.state.allowed_tile_domains = server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
 
 
 async def startup_event(fastapi_app: FastAPI) -> None:
@@ -188,9 +169,7 @@ async def startup_event(fastapi_app: FastAPI) -> None:
     failure cannot prevent the backend from serving
     requests.
     """
-    core_logger.print_to_log_and_console(
-        f"Backend startup event - {core_config.API_VERSION}"
-    )
+    core_logger.print_to_log_and_console(f"Backend startup event - {core_config.API_VERSION}")
 
     # Phase 1: critical pre-flight tasks.
     _run_alembic_migrations()
@@ -201,47 +180,28 @@ async def startup_event(fastapi_app: FastAPI) -> None:
     core_logger.print_to_log_and_console("Refreshing Strava tokens on startup")
     _safe_run("refresh_strava_tokens", _refresh_strava_tokens)
 
-    core_logger.print_to_log_and_console(
-        "Retrieving last day activities from Garmin Connect on startup"
-    )
-    await _safe_run_async(
-        "retrieve_recent_garmin_activities", _retrieve_recent_garmin_activities
-    )
+    core_logger.print_to_log_and_console("Retrieving last day activities from Garmin Connect on startup")
+    await _safe_run_async("retrieve_recent_garmin_activities", _retrieve_recent_garmin_activities)
 
-    core_logger.print_to_log_and_console(
-        "Retrieving last day activities from Strava on startup"
-    )
-    await _safe_run_async(
-        "retrieve_recent_strava_activities", _retrieve_recent_strava_activities
-    )
+    core_logger.print_to_log_and_console("Retrieving last day activities from Strava on startup")
+    await _safe_run_async("retrieve_recent_strava_activities", _retrieve_recent_strava_activities)
 
-    core_logger.print_to_log_and_console(
-        "Retrieving last day health stats from Garmin Connect on startup"
-    )
+    core_logger.print_to_log_and_console("Retrieving last day health stats from Garmin Connect on startup")
     await _safe_run_async(
         "retrieve_recent_garmin_health",
         _retrieve_recent_garmin_health,
     )
 
-    core_logger.print_to_log_and_console(
-        "Purging expired tokens "
-        "(password reset, sign-up, OAuth state, IdP link)"
-    )
+    core_logger.print_to_log_and_console("Purging expired tokens (password reset, sign-up, OAuth state, IdP link)")
     _safe_run("purge_expired_tokens", _purge_expired_tokens)
 
-    core_logger.print_to_log_and_console(
-        "Generating missing activity map thumbnails"
-    )
+    core_logger.print_to_log_and_console("Generating missing activity map thumbnails")
     _safe_run("generate_missing_thumbnails", _generate_missing_thumbnails)
 
-    core_logger.print_to_log_and_console(
-        "Initializing allowed tile domains for Content Security Policy"
-    )
+    core_logger.print_to_log_and_console("Initializing allowed tile domains for Content Security Policy")
     _init_allowed_tile_domains(fastapi_app)
 
-    core_logger.print_to_log_and_console(
-        f"Allowed trusted proxies: {core_config.settings.TRUSTED_PROXIES}"
-    )
+    core_logger.print_to_log_and_console(f"Allowed trusted proxies: {core_config.settings.TRUSTED_PROXIES}")
 
 
 def shutdown_event() -> None:
@@ -255,8 +215,7 @@ def shutdown_event() -> None:
         core_db_engine.dispose()
     except Exception as err:
         core_logger.print_to_log_and_console(
-            "Error disposing database engine on shutdown: "
-            f"{type(err).__name__}",
+            f"Error disposing database engine on shutdown: {type(err).__name__}",
             "error",
         )
 

@@ -4,11 +4,10 @@ from datetime import datetime as datetime_type
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity.models import Activity
@@ -74,10 +73,7 @@ class Gear(Base):
         String(250),
         index=True,
         nullable=False,
-        comment=(
-            "Gear nickname"
-            " (May include spaces)"
-        ),
+        comment=("Gear nickname (May include spaces)"),
     )
     gear_type: Mapped[int] = mapped_column(
         nullable=False,
@@ -92,10 +88,7 @@ class Gear(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        comment=(
-            "User ID that the gear"
-            " belongs to"
-        ),
+        comment=("User ID that the gear belongs to"),
     )
     created_at: Mapped[datetime_type] = mapped_column(
         DateTime(timezone=True),
@@ -105,18 +98,13 @@ class Gear(Base):
     )
     active: Mapped[bool] = mapped_column(
         nullable=False,
-        comment=(
-            "Whether the gear is active"
-            " (true - yes, false - no)"
-        ),
+        comment=("Whether the gear is active (true - yes, false - no)"),
     )
     initial_kms: Mapped[Decimal] = mapped_column(
         Numeric(precision=11, scale=2),
         nullable=False,
         default=0,
-        comment=(
-            "Initial kilometers of the gear"
-        ),
+        comment=("Initial kilometers of the gear"),
     )
     purchase_value: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=11, scale=2),

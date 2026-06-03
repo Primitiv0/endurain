@@ -11,13 +11,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Query, Request, status, WebSocket
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer, SecurityScopes
-
 import auth.constants as auth_constants
 import auth.identity_service as auth_identity_service
 import core.logger as core_logger
-
+from fastapi import Depends, HTTPException, Query, Request, WebSocket, status
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer, SecurityScopes
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",
@@ -132,9 +130,7 @@ def get_sub_from_access_token(
     Returns:
         Authenticated user's ID.
     """
-    principal = _resolve_and_cache_principal(
-        access_token, request, identity_service
-    )
+    principal = _resolve_and_cache_principal(access_token, request, identity_service)
     return principal.user_id
 
 
@@ -158,9 +154,7 @@ def check_scopes(
     Raises:
         HTTPException: 403 if required scopes are missing.
     """
-    principal = _resolve_and_cache_principal(
-        access_token, request, identity_service
-    )
+    principal = _resolve_and_cache_principal(access_token, request, identity_service)
     identity_service.check_scope(principal, frozenset(security_scopes.scopes))
 
 
@@ -203,9 +197,7 @@ async def validate_access_token_or_api_key(
     if raw_key is not None:
         principal = identity_service.resolve_from_api_key(raw_key, request)
         request.state.principal = principal
-        return AuthContext(
-            principal.user_id, list(principal.scopes), "api_key"
-        )
+        return AuthContext(principal.user_id, list(principal.scopes), "api_key")
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -246,20 +238,14 @@ def check_auth_scopes(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Unauthorized Access - Missing permissions: {missing}",
-            headers={
-                "WWW-Authenticate": (
-                    f'Bearer scope="{security_scopes.scopes}"'
-                )
-            },
+            headers={"WWW-Authenticate": (f'Bearer scope="{security_scopes.scopes}"')},
         )
 
 
 async def validate_websocket_access_token(
     websocket: WebSocket,
     access_token: str = Query(..., alias="access_token"),
-    identity_service: auth_identity_service.IdentityService = Depends(
-        auth_identity_service.get_identity_service
-    ),
+    identity_service: auth_identity_service.IdentityService = Depends(auth_identity_service.get_identity_service),
 ) -> int:
     """Validate a WebSocket access token through IdentityService.
 

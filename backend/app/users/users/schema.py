@@ -1,18 +1,19 @@
 """User schema definitions for request and response models."""
 
-from enum import Enum
 from datetime import date as datetime_date
+from enum import Enum
+
+import server_settings.schema as server_settings_schema
 from pydantic import (
     BaseModel,
+    ConfigDict,
     EmailStr,
-    field_validator,
+    Field,
+    StrictBool,
     StrictInt,
     StrictStr,
-    StrictBool,
-    ConfigDict,
-    Field,
+    field_validator,
 )
-import server_settings.schema as server_settings_schema
 
 
 class Gender(Enum):
@@ -303,51 +304,23 @@ class UsersMe(UsersRead):
         hide_activity_gear: Hide gear setting.
     """
 
-    is_strava_linked: StrictInt | None = Field(
-        default=None, description="Whether Strava is linked"
-    )
-    is_garminconnect_linked: StrictInt | None = Field(
-        default=None, description="Whether Garmin Connect is linked"
-    )
-    default_activity_visibility: StrictStr | None = Field(
-        default=None, description="Default activity visibility"
-    )
-    hide_activity_start_time: StrictBool | None = Field(
-        default=None, description="Hide activity start time"
-    )
-    hide_activity_location: StrictBool | None = Field(
-        default=None, description="Hide activity location"
-    )
-    hide_activity_map: StrictBool | None = Field(
-        default=None, description="Hide activity map"
-    )
-    hide_activity_hr: StrictBool | None = Field(
-        default=None, description="Hide activity heart rate"
-    )
-    hide_activity_power: StrictBool | None = Field(
-        default=None, description="Hide activity power"
-    )
-    hide_activity_cadence: StrictBool | None = Field(
-        default=None, description="Hide activity cadence"
-    )
-    hide_activity_elevation: StrictBool | None = Field(
-        default=None, description="Hide activity elevation"
-    )
-    hide_activity_speed: StrictBool | None = Field(
-        default=None, description="Hide activity speed"
-    )
-    hide_activity_pace: StrictBool | None = Field(
-        default=None, description="Hide activity pace"
-    )
-    hide_activity_laps: StrictBool | None = Field(
-        default=None, description="Hide activity laps"
-    )
+    is_strava_linked: StrictInt | None = Field(default=None, description="Whether Strava is linked")
+    is_garminconnect_linked: StrictInt | None = Field(default=None, description="Whether Garmin Connect is linked")
+    default_activity_visibility: StrictStr | None = Field(default=None, description="Default activity visibility")
+    hide_activity_start_time: StrictBool | None = Field(default=None, description="Hide activity start time")
+    hide_activity_location: StrictBool | None = Field(default=None, description="Hide activity location")
+    hide_activity_map: StrictBool | None = Field(default=None, description="Hide activity map")
+    hide_activity_hr: StrictBool | None = Field(default=None, description="Hide activity heart rate")
+    hide_activity_power: StrictBool | None = Field(default=None, description="Hide activity power")
+    hide_activity_cadence: StrictBool | None = Field(default=None, description="Hide activity cadence")
+    hide_activity_elevation: StrictBool | None = Field(default=None, description="Hide activity elevation")
+    hide_activity_speed: StrictBool | None = Field(default=None, description="Hide activity speed")
+    hide_activity_pace: StrictBool | None = Field(default=None, description="Hide activity pace")
+    hide_activity_laps: StrictBool | None = Field(default=None, description="Hide activity laps")
     hide_activity_workout_sets_steps: StrictBool | None = Field(
         default=None, description="Hide activity workout sets and steps"
     )
-    hide_activity_gear: StrictBool | None = Field(
-        default=None, description="Hide activity gear"
-    )
+    hide_activity_gear: StrictBool | None = Field(default=None, description="Hide activity gear")
     has_local_password: StrictBool | None = Field(
         default=None,
         description=(
@@ -484,10 +457,7 @@ class StepUpVerification(BaseModel):
         default=None,
         min_length=1,
         max_length=250,
-        description=(
-            "Current password (step-up verification). Required"
-            " when the account has a local password."
-        ),
+        description=("Current password (step-up verification). Required when the account has a local password."),
     )
     mfa_code: StrictStr | None = Field(
         default=None,

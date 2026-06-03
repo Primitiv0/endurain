@@ -4,6 +4,7 @@ from datetime import datetime as datetime_type
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import (
     DateTime,
     ForeignKey,
@@ -16,8 +17,6 @@ from sqlalchemy.orm import (
     relationship,
 )
 from sqlalchemy.sql import func
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from gears.gear.models import Gear
@@ -53,19 +52,13 @@ class GearComponents(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        comment=(
-            "User ID that the gear"
-            " component belongs to"
-        ),
+        comment=("User ID that the gear component belongs to"),
     )
     gear_id: Mapped[int] = mapped_column(
         ForeignKey("gear.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment=(
-            "Gear ID associated with"
-            " this component"
-        ),
+        comment=("Gear ID associated with this component"),
     )
     type: Mapped[str] = mapped_column(
         String(250),
@@ -75,63 +68,37 @@ class GearComponents(Base):
     brand: Mapped[str] = mapped_column(
         String(250),
         nullable=False,
-        comment=(
-            "Gear component brand"
-            " (May include spaces)"
-        ),
+        comment=("Gear component brand (May include spaces)"),
     )
     model: Mapped[str] = mapped_column(
         String(250),
         nullable=False,
-        comment=(
-            "Gear component model"
-            " (May include spaces)"
-        ),
+        comment=("Gear component model (May include spaces)"),
     )
     purchase_date: Mapped[datetime_type] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=func.now(),
-        comment=(
-            "Gear component purchase"
-            " date (DateTime)"
-        ),
+        comment=("Gear component purchase date (DateTime)"),
     )
-    retired_date: Mapped[datetime_type | None] = (
-        mapped_column(
-            DateTime(timezone=True),
-            nullable=True,
-            comment=(
-                "Gear component retired"
-                " date (DateTime)"
-            ),
-        )
+    retired_date: Mapped[datetime_type | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment=("Gear component retired date (DateTime)"),
     )
     active: Mapped[bool] = mapped_column(
         nullable=False,
         default=False,
-        comment=(
-            "Whether the gear component"
-            " is active"
-            " (true - yes, false - no)"
-        ),
+        comment=("Whether the gear component is active (true - yes, false - no)"),
     )
     expected_kms: Mapped[int | None] = mapped_column(
         nullable=True,
-        comment=(
-            "Expected kilometers of"
-            " the gear component"
-        ),
+        comment=("Expected kilometers of the gear component"),
     )
-    purchase_value: Mapped[Decimal | None] = (
-        mapped_column(
-            Numeric(precision=11, scale=2),
-            nullable=True,
-            comment=(
-                "Purchase value of"
-                " the gear component"
-            ),
-        )
+    purchase_value: Mapped[Decimal | None] = mapped_column(
+        Numeric(precision=11, scale=2),
+        nullable=True,
+        comment=("Purchase value of the gear component"),
     )
 
     users: Mapped["Users"] = relationship(

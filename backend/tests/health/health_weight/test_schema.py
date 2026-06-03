@@ -1,8 +1,8 @@
-import pytest
 from datetime import date as datetime_date
-from pydantic import ValidationError
 
 import health.health_weight.schema as health_weight_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestHealthWeightSchema:
@@ -89,9 +89,7 @@ class TestHealthWeightSchema:
         Test HealthWeightBase schema with various float values.
         """
         # Arrange & Act
-        health_weight = health_weight_schema.HealthWeightBase(
-            weight=75.567, bmi=24.523, body_fat=18.234
-        )
+        health_weight = health_weight_schema.HealthWeightBase(weight=75.567, bmi=24.523, body_fat=18.234)
 
         # Assert
         assert health_weight.weight == 75.567
@@ -103,9 +101,7 @@ class TestHealthWeightSchema:
         Test HealthWeightBase schema with integer values for float fields.
         """
         # Arrange & Act
-        health_weight = health_weight_schema.HealthWeightBase(
-            weight=75, bmi=24, body_fat=18
-        )
+        health_weight = health_weight_schema.HealthWeightBase(weight=75, bmi=24, body_fat=18)
 
         # Assert
         assert health_weight.weight == 75
@@ -118,9 +114,7 @@ class TestHealthWeightSchema:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            health_weight_schema.HealthWeightBase(
-                weight=75.5, extra_field="not allowed"
-            )
+            health_weight_schema.HealthWeightBase(weight=75.5, extra_field="not allowed")
 
         assert "extra_field" in str(exc_info.value)
 
@@ -148,9 +142,7 @@ class TestHealthWeightSchema:
             source = "garmin"
 
         # Act
-        health_weight = health_weight_schema.HealthWeightRead.model_validate(
-            MockORMModel()
-        )
+        health_weight = health_weight_schema.HealthWeightRead.model_validate(MockORMModel())
 
         # Assert
         assert health_weight.id == 1
@@ -177,9 +169,7 @@ class TestHealthWeightSchema:
         Test date field validation.
         """
         # Arrange & Act
-        health_weight = health_weight_schema.HealthWeightBase(
-            date=datetime_date(2024, 12, 31)
-        )
+        health_weight = health_weight_schema.HealthWeightBase(date=datetime_date(2024, 12, 31))
 
         # Assert
         assert health_weight.date == datetime_date(2024, 12, 31)
@@ -227,9 +217,7 @@ class TestSourceEnum:
         Test Source enum can be used in HealthWeightBase schema.
         """
         # Arrange & Act
-        health_weight = health_weight_schema.HealthWeightBase(
-            source=health_weight_schema.Source.GARMIN
-        )
+        health_weight = health_weight_schema.HealthWeightBase(source=health_weight_schema.Source.GARMIN)
 
         # Assert
         assert health_weight.source == "garmin"

@@ -112,9 +112,7 @@ class JsonFormatter(logging.Formatter):
             Single-line JSON string representing the record.
         """
         entry: dict = {
-            "timestamp": datetime.fromtimestamp(
-                record.created, tz=UTC
-            ).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -124,11 +122,7 @@ class JsonFormatter(logging.Formatter):
             entry["request_id"] = rid
         if record.exc_info:
             entry["exception"] = self.formatException(record.exc_info)
-        context = {
-            k: v
-            for k, v in record.__dict__.items()
-            if k not in _STDLIB_RECORD_ATTRS
-        }
+        context = {k: v for k, v in record.__dict__.items() if k not in _STDLIB_RECORD_ATTRS}
         if context:
             entry["context"] = context
         return json.dumps(entry, default=str)
@@ -143,10 +137,7 @@ class _DevFormatter(logging.Formatter):
     so engineers can see structured context at a glance.
     """
 
-    _BASE = (
-        "%(asctime)s - %(name)s - %(levelname)s"
-        " - [%(request_id)s] - %(message)s"
-    )
+    _BASE = "%(asctime)s - %(name)s - %(levelname)s - [%(request_id)s] - %(message)s"
 
     def __init__(self) -> None:
         super().__init__(self._BASE)
@@ -162,11 +153,7 @@ class _DevFormatter(logging.Formatter):
             Formatted string with optional context suffix.
         """
         base = super().format(record)
-        context = {
-            k: v
-            for k, v in record.__dict__.items()
-            if k not in _STDLIB_RECORD_ATTRS
-        }
+        context = {k: v for k, v in record.__dict__.items() if k not in _STDLIB_RECORD_ATTRS}
         if not context:
             return base
         ctx_str = " ".join(f"{k}={v!r}" for k, v in context.items())
@@ -349,30 +336,7 @@ def print_to_log(
         main_logger.critical(message)
 
 
-def print_to_console(message: str, log_level: str = "info"):
-    """
-    Prints a message to the console only (without logging to file).
-
-    Args:
-        message (str): The message to print.
-        log_level (str, optional): The log level to display ('info', 'error',
-            'warning', 'debug'). Defaults to "info".
-    """
-    if log_level == "info":
-        print(f"INFO:     {message}")
-    elif log_level == "error":
-        print(f"ERROR:    {message}")
-    elif log_level == "warning":
-        print(f"WARNING:  {message}")
-    elif log_level == "debug":
-        print(f"DEBUG:    {message}")
-    elif log_level == "critical":
-        print(f"CRITICAL: {message}")
-
-
-def print_to_log_and_console(
-    message: str, log_level: str = "info", exc: Exception | None = None
-):
+def print_to_log_and_console(message: str, log_level: str = "info", exc: Exception | None = None):
     """
     Logs a message to both the main logger and the console.
 

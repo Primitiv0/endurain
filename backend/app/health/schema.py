@@ -1,11 +1,12 @@
+from datetime import datetime
+
 from pydantic import (
     BaseModel,
     ConfigDict,
-    StrictInt,
-    StrictFloat,
     Field,
+    StrictFloat,
+    StrictInt,
 )
-from datetime import datetime
 
 
 class HealthListResponse(BaseModel):

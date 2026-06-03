@@ -1,12 +1,11 @@
 """Tests for temporary MFA setup secret storage."""
 
+import profile.mfa_store as profile_mfa_store
 from fnmatch import fnmatch
 
+import core.redis as core_redis
 import pytest
 from redis import RedisError
-
-import core.redis as core_redis
-import profile.mfa_store as profile_mfa_store
 
 
 class FakeRedis:
@@ -285,21 +284,19 @@ class TestRedisMFASecretStore:
         """Test Redis get errors become MFA-store outage errors."""
         store = profile_mfa_store.RedisMFASecretStore(FailingRedis("get"))
 
-        with pytest.raises(
-            profile_mfa_store.MFASecretStoreUnavailable
-        ) as exc_info:
+        with pytest.raises(profile_mfa_store.MFASecretStoreUnavailableError) as exc_info:
             store.get_secret(123)
 
         assert isinstance(
             exc_info.value.__cause__,
-            core_redis.RedisStorageUnavailable,
+            core_redis.RedisStorageUnavailableError,
         )
 
     def test_redis_set_failure_is_sanitized(self) -> None:
         """Test Redis set errors become MFA-store outage errors."""
         store = profile_mfa_store.RedisMFASecretStore(FailingRedis("set"))
 
-        with pytest.raises(profile_mfa_store.MFASecretStoreUnavailable):
+        with pytest.raises(profile_mfa_store.MFASecretStoreUnavailableError):
             store.add_secret(123, "secret-value")
 
 
@@ -326,18 +323,14 @@ class TestMFASecretStoreFactory:
             lambda storage_uri, purpose: FakeRedis(),
         )
 
-        store = profile_mfa_store.create_mfa_secret_store(
-            "redis://localhost:6379/0"
-        )
+        store = profile_mfa_store.create_mfa_secret_store("redis://localhost:6379/0")
 
         assert isinstance(store, profile_mfa_store.RedisMFASecretStore)
 
     def test_create_mfa_secret_store_rejects_unknown_uri(self) -> None:
         """Test unsupported storage URIs are rejected."""
         with pytest.raises(ValueError) as exc_info:
-            profile_mfa_store.create_mfa_secret_store(
-                "postgresql://localhost/db"
-            )
+            profile_mfa_store.create_mfa_secret_store("postgresql://localhost/db")
 
         assert "Unsupported MFA secret storage URI" in str(exc_info.value)
 
@@ -357,10 +350,7 @@ class TestMFASecretStoreFactory:
             "redis://localhost:6379/0",
         )
 
-        assert (
-            profile_mfa_store.get_mfa_secret_storage_uri()
-            == "redis://localhost:6379/0"
-        )
+        assert profile_mfa_store.get_mfa_secret_storage_uri() == "redis://localhost:6379/0"
 
     def test_mfa_secret_uri_prefers_auth_specific_uri(
         self,

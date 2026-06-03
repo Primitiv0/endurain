@@ -1,9 +1,9 @@
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-import auth.sessions.rotated_refresh_tokens.utils as rotated_token_utils
 import auth.sessions.rotated_refresh_tokens.models as rotated_token_models
+import auth.sessions.rotated_refresh_tokens.utils as rotated_token_utils
+import pytest
 
 
 class TestHmacHashToken:
@@ -116,9 +116,7 @@ class TestCheckTokenReuse:
         mock_db = MagicMock()
 
         # Act
-        is_reused, in_grace = rotated_token_utils.check_token_reuse(
-            "raw-token", mock_db
-        )
+        is_reused, in_grace = rotated_token_utils.check_token_reuse("raw-token", mock_db)
 
         # Assert
         assert is_reused is False
@@ -132,7 +130,7 @@ class TestCheckTokenReuse:
         """
         # Arrange
         mock_hash.return_value = "hashed-token"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_rotated_token = MagicMock(spec=rotated_token_models.RotatedRefreshToken)
         mock_rotated_token.expires_at = now + timedelta(seconds=30)
         mock_rotated_token.token_family_id = "family-id"
@@ -141,9 +139,7 @@ class TestCheckTokenReuse:
         mock_db = MagicMock()
 
         # Act
-        is_reused, in_grace = rotated_token_utils.check_token_reuse(
-            "raw-token", mock_db
-        )
+        is_reused, in_grace = rotated_token_utils.check_token_reuse("raw-token", mock_db)
 
         # Assert
         assert is_reused is True
@@ -157,7 +153,7 @@ class TestCheckTokenReuse:
         """
         # Arrange
         mock_hash.return_value = "hashed-token"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_rotated_token = MagicMock(spec=rotated_token_models.RotatedRefreshToken)
         mock_rotated_token.expires_at = now - timedelta(seconds=30)
         mock_rotated_token.token_family_id = "family-id"
@@ -167,9 +163,7 @@ class TestCheckTokenReuse:
         mock_db = MagicMock()
 
         # Act
-        is_reused, in_grace = rotated_token_utils.check_token_reuse(
-            "raw-token", mock_db
-        )
+        is_reused, in_grace = rotated_token_utils.check_token_reuse("raw-token", mock_db)
 
         # Assert
         assert is_reused is True
@@ -197,9 +191,7 @@ class TestInvalidateTokenFamily:
 
         # Assert
         assert result == 2
-        mock_session_crud.delete_sessions_by_family.assert_called_once_with(
-            "family-id", mock_db
-        )
+        mock_session_crud.delete_sessions_by_family.assert_called_once_with("family-id", mock_db)
         mock_token_crud.delete_by_family.assert_called_once_with("family-id", mock_db)
 
 
@@ -210,9 +202,7 @@ class TestCleanupExpiredRotatedTokens:
 
     @patch("auth.sessions.rotated_refresh_tokens.utils.SessionLocal")
     @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
-    def test_cleanup_expired_rotated_tokens_success(
-        self, mock_crud, mock_session_local
-    ):
+    def test_cleanup_expired_rotated_tokens_success(self, mock_crud, mock_session_local):
         """
         Test successful cleanup of expired tokens.
         """
@@ -230,9 +220,7 @@ class TestCleanupExpiredRotatedTokens:
     @patch("auth.sessions.rotated_refresh_tokens.utils.SessionLocal")
     @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
     @patch("auth.sessions.rotated_refresh_tokens.utils.core_logger")
-    def test_cleanup_expired_rotated_tokens_error_handling(
-        self, mock_logger, mock_crud, mock_session_local
-    ):
+    def test_cleanup_expired_rotated_tokens_error_handling(self, mock_logger, mock_crud, mock_session_local):
         """
         Test error handling in cleanup.
         """

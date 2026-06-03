@@ -29,27 +29,20 @@ never use a module-level singleton.
 from __future__ import annotations
 
 import hmac
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Protocol, runtime_checkable
 
-from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-
-import auth.password_hasher as auth_password_hasher
-import auth.token_manager as auth_token_manager
-import auth.utils as auth_utils
-
-import users.users.schema as users_schema
-import users.users.utils as users_utils
 import auth.api_keys.crud as users_api_keys_crud
 import auth.api_keys.utils as users_api_keys_utils
 import auth.identity_links.crud as auth_identity_links_crud
+import auth.password_hasher as auth_password_hasher
 import auth.sessions.crud as users_sessions_crud
-
+import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
 import core.database as core_database
 import core.logger as core_logger
-
+import users.users.schema as users_schema
+import users.users.utils as users_utils
 from auth.principal import (
     AccessTokenCred,
     ApiKeyCred,
@@ -58,10 +51,13 @@ from auth.principal import (
     Principal,
     SessionCookieCred,
 )
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 __all__ = [
-    "IdentityService",
     "DefaultIdentityService",
+    "IdentityService",
     "get_identity_service",
 ]
 
@@ -404,13 +400,7 @@ class DefaultIdentityService:
         self,
         user: object,
         scopes: list[str],
-        credential: (
-            PasswordCred
-            | AccessTokenCred
-            | ApiKeyCred
-            | SessionCookieCred
-            | OAuthCred
-        ),
+        credential: (PasswordCred | AccessTokenCred | ApiKeyCred | SessionCookieCred | OAuthCred),
     ) -> Principal:
         """Build a ``Principal`` from an ORM user row.
 
@@ -494,14 +484,9 @@ class DefaultIdentityService:
                 auth_token_manager.TokenType.ACCESS,
             )
         except HTTPException as http_err:
-            log_level = (
-                "debug"
-                if "expired" in http_err.detail.lower()
-                else "error"
-            )
+            log_level = "debug" if "expired" in http_err.detail.lower() else "error"
             core_logger.print_to_log(
-                f"Access token validation failed: "
-                f"{http_err.detail}",
+                f"Access token validation failed: {http_err.detail}",
                 log_level,
                 exc=http_err,
                 context={"access_token": "[REDACTED]"},
@@ -526,9 +511,7 @@ class DefaultIdentityService:
         if not isinstance(sid, str):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=(
-                    "Invalid token: 'sid' claim must be a string"
-                ),
+                detail=("Invalid token: 'sid' claim must be a string"),
             )
 
         user = users_utils.get_user_by_id_or_404(sub, self._db)
@@ -563,9 +546,7 @@ class DefaultIdentityService:
                 revoked, or expired.
         """
         computed_hash = users_api_keys_utils.hash_api_key(raw_key)
-        db_key = users_api_keys_crud.get_api_key_by_hash(
-            computed_hash, self._db
-        )
+        db_key = users_api_keys_crud.get_api_key_by_hash(computed_hash, self._db)
 
         # Constant-time comparison prevents timing attacks
         # even when the key is not found.
@@ -590,21 +571,19 @@ class DefaultIdentityService:
                 headers={"WWW-Authenticate": "ApiKey"},
             )
 
-        if db_key.expires_at is not None:
-            if datetime.now(timezone.utc) > db_key.expires_at:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="API key has expired",
-                    headers={"WWW-Authenticate": "ApiKey"},
-                )
+        if db_key.expires_at is not None and datetime.now(UTC) > db_key.expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key has expired",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
 
         # Best-effort last_used_at update; never fails the request.
         try:
             users_api_keys_crud.update_last_used(db_key.id, self._db)
         except SQLAlchemyError as err:
             core_logger.print_to_log(
-                f"Failed to update last_used_at for "
-                f"API key {db_key.id}: {err}",
+                f"Failed to update last_used_at for API key {db_key.id}: {err}",
                 "warning",
                 exc=err,
             )
@@ -616,11 +595,7 @@ class DefaultIdentityService:
                 "key_prefix": db_key.key_prefix,
                 "user_id": db_key.user_id,
                 "endpoint": request.url.path,
-                "ip": (
-                    request.client.host
-                    if request.client
-                    else "unknown"
-                ),
+                "ip": (request.client.host if request.client else "unknown"),
             },
         )
 
@@ -652,9 +627,7 @@ class DefaultIdentityService:
             HTTPException: 401 if the session is not
                 found or has expired.
         """
-        db_session = users_sessions_crud.get_session_by_id_not_expired(
-            session_id, self._db
-        )
+        db_session = users_sessions_crud.get_session_by_id_not_expired(session_id, self._db)
         if db_session is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -662,9 +635,7 @@ class DefaultIdentityService:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        user = users_utils.get_user_by_id_or_404(
-            db_session.user_id, self._db
-        )
+        user = users_utils.get_user_by_id_or_404(db_session.user_id, self._db)
         users_utils.check_user_is_active(user)
 
         return self._build_principal(
@@ -691,9 +662,7 @@ class DefaultIdentityService:
                 access_token, refresh_token_exp,
                 refresh_token, csrf_token)``.
         """
-        return auth_utils.create_tokens(
-            user, self._token_manager, session_id
-        )
+        return auth_utils.create_tokens(user, self._token_manager, session_id)
 
     def revoke_session(
         self,
@@ -711,9 +680,7 @@ class DefaultIdentityService:
             HTTPException: 404 if the session is not
                 found for this user.
         """
-        users_sessions_crud.delete_session(
-            session_id, user_id, self._db
-        )
+        users_sessions_crud.delete_session(session_id, user_id, self._db)
 
     def revoke_api_key(
         self,
@@ -731,9 +698,7 @@ class DefaultIdentityService:
             HTTPException: 404 if the key is not found
                 for this user.
         """
-        users_api_keys_crud.revoke_api_key(
-            api_key_id, user_id, self._db
-        )
+        users_api_keys_crud.revoke_api_key(api_key_id, user_id, self._db)
 
     def link_external_identity(
         self,
@@ -782,10 +747,7 @@ class DefaultIdentityService:
         if not deleted:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=(
-                    f"Identity link not found for user "
-                    f"{user_id} and IdP {idp_id}"
-                ),
+                detail=(f"Identity link not found for user {user_id} and IdP {idp_id}"),
             )
 
     def check_scope(
@@ -808,10 +770,7 @@ class DefaultIdentityService:
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    f"Unauthorized Access - "
-                    f"Missing permissions: {missing}"
-                ),
+                detail=(f"Unauthorized Access - Missing permissions: {missing}"),
             )
 
     def validate_and_hash_password(

@@ -7,14 +7,12 @@ scenarios, and FastAPI dependency functions.
 """
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from fnmatch import fnmatch
 
+import auth.security_stores as security_stores
 import pytest
 from redis import RedisError
-
-import auth.security_stores as security_stores
-
 
 # ---------------------------------------------------------------------------
 # Redis test doubles
@@ -60,17 +58,13 @@ class FakeRedis:
 
             lockout_until = self.values.get(lockout_key)
             if lockout_until and int(lockout_until) > now_epoch:
-                current_count = int(
-                    self.values.get(attempts_key) or 0
-                )
+                current_count = int(self.values.get(attempts_key) or 0)
                 return [current_count, int(lockout_until), 0]
 
             if lockout_until:
                 self.delete(lockout_key)
 
-            failed_count = (
-                int(self.values.get(attempts_key) or 0) + 1
-            )
+            failed_count = int(self.values.get(attempts_key) or 0) + 1
             self.values[attempts_key] = str(failed_count)
             self.expirations[attempts_key] = attempts_ttl
 
@@ -335,9 +329,7 @@ class TestNormalizeUsernameKey:
 
     def test_url_decodes_percent_at(self):
         """Percent-encoded @ sign is decoded to literal @."""
-        result = security_stores.normalize_username_key(
-            "test%40example.com"
-        )
+        result = security_stores.normalize_username_key("test%40example.com")
         assert result == "test@example.com"
 
     def test_url_decodes_percent_20_space(self):
@@ -360,9 +352,7 @@ class TestNormalizeUsernameKey:
 
     def test_combined_casing_whitespace_and_url_encoding(self):
         """All transformations apply together in correct order."""
-        result = security_stores.normalize_username_key(
-            "  Test%40Example.COM  "
-        )
+        result = security_stores.normalize_username_key("  Test%40Example.COM  ")
         assert result == "test@example.com"
 
     def test_empty_string_returns_empty_string(self):
@@ -401,9 +391,7 @@ class TestUsernameLogIdentifier:
 
     def test_does_not_contain_raw_username(self):
         """Raw username must not appear in the log identifier."""
-        identifier = security_stores.username_log_identifier(
-            "supersensitive@example.com"
-        )
+        identifier = security_stores.username_log_identifier("supersensitive@example.com")
         assert "supersensitive" not in identifier
         assert "example.com" not in identifier
 
@@ -417,12 +405,8 @@ class TestUsernameLogIdentifier:
 
     def test_same_canonical_form_same_identifier(self):
         """Different raw forms that normalize identically match."""
-        ident_a = security_stores.username_log_identifier(
-            "Alice%40Example.COM"
-        )
-        ident_b = security_stores.username_log_identifier(
-            "alice@example.com"
-        )
+        ident_a = security_stores.username_log_identifier("Alice%40Example.COM")
+        ident_b = security_stores.username_log_identifier("alice@example.com")
         assert ident_a == ident_b
 
     def test_different_usernames_different_identifiers(self):
@@ -491,7 +475,7 @@ class TestRedisFailedLoginAttempts:
             store.record_failed_attempt("alice")
         lockout_time = store.get_lockout_time("alice")
         assert lockout_time is not None
-        assert lockout_time > datetime.now(timezone.utc)
+        assert lockout_time > datetime.now(UTC)
 
     def test_count_does_not_increment_while_locked(self):
         """record_failed_attempt returns the same count during lockout."""
@@ -681,7 +665,7 @@ class TestRedisPendingMFAStore:
             store.record_failed_attempt("alice")
         lockout_time = store.get_lockout_time("alice")
         assert lockout_time is not None
-        assert lockout_time > datetime.now(timezone.utc)
+        assert lockout_time > datetime.now(UTC)
 
     def test_reset_failed_attempts_clears_mfa_lockout(self):
         """reset_failed_attempts removes the MFA lockout."""
@@ -718,7 +702,7 @@ class TestRedisPendingMFAStore:
 
 class TestRedisFailureScenarios:
     """
-    Tests that Redis failures surface as AuthSecurityStoreUnavailable.
+    Tests that Redis failures surface as AuthSecurityStoreUnavailableError.
 
     Each test uses FailingRedis to inject a RedisError at the
     specific operation that each method relies on.
@@ -728,169 +712,139 @@ class TestRedisFailureScenarios:
 
     def test_record_failed_attempt_raises_on_script_error(self):
         """
-        record_failed_attempt raises AuthSecurityStoreUnavailable
+        record_failed_attempt raises AuthSecurityStoreUnavailableError
         when the Lua script call fails.
         """
         store = _make_failed_login_store(FailingRedis("script"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.record_failed_attempt("alice")
 
     def test_is_locked_out_raises_on_get_error(self):
         """
-        is_locked_out raises AuthSecurityStoreUnavailable when
+        is_locked_out raises AuthSecurityStoreUnavailableError when
         the Redis GET fails.
         """
         store = _make_failed_login_store(FailingRedis("get"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.is_locked_out("alice")
 
     def test_get_lockout_time_raises_on_get_error(self):
         """
-        get_lockout_time raises AuthSecurityStoreUnavailable when
+        get_lockout_time raises AuthSecurityStoreUnavailableError when
         the Redis GET fails.
         """
         store = _make_failed_login_store(FailingRedis("get"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.get_lockout_time("alice")
 
     def test_reset_attempts_raises_on_delete_error(self):
         """
-        reset_attempts raises AuthSecurityStoreUnavailable when
+        reset_attempts raises AuthSecurityStoreUnavailableError when
         the Redis DELETE fails.
         """
         store = _make_failed_login_store(FailingRedis("delete"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.reset_attempts("alice")
 
     def test_failed_login_clear_all_raises_on_scan_error(self):
         """
-        clear_all raises AuthSecurityStoreUnavailable when the
+        clear_all raises AuthSecurityStoreUnavailableError when the
         Redis SCAN fails.
         """
         store = _make_failed_login_store(FailingRedis("scan_iter"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.clear_all()
 
     # -- RedisPendingMFALogin --
 
     def test_add_pending_login_raises_on_set_error(self):
         """
-        add_pending_login raises AuthSecurityStoreUnavailable when
+        add_pending_login raises AuthSecurityStoreUnavailableError when
         the Redis SET fails.
         """
         store = _make_pending_mfa_store(FailingRedis("set"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.add_pending_login("alice", 42)
 
     def test_get_pending_login_raises_on_get_error(self):
         """
-        get_pending_login raises AuthSecurityStoreUnavailable when
+        get_pending_login raises AuthSecurityStoreUnavailableError when
         the Redis GET fails.
         """
         store = _make_pending_mfa_store(FailingRedis("get"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.get_pending_login("alice")
 
     def test_claim_pending_login_raises_on_getdel_error(self):
         """
-        claim_pending_login raises AuthSecurityStoreUnavailable
+        claim_pending_login raises AuthSecurityStoreUnavailableError
         when the Redis GETDEL fails.
         """
         store = _make_pending_mfa_store(FailingRedis("getdel"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.claim_pending_login("alice")
 
     def test_delete_pending_login_raises_on_delete_error(self):
         """
-        delete_pending_login raises AuthSecurityStoreUnavailable
+        delete_pending_login raises AuthSecurityStoreUnavailableError
         when the Redis DELETE fails.
         """
         store = _make_pending_mfa_store(FailingRedis("delete"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.delete_pending_login("alice")
 
     def test_pending_mfa_record_failed_raises_on_script_error(self):
         """
-        record_failed_attempt raises AuthSecurityStoreUnavailable
+        record_failed_attempt raises AuthSecurityStoreUnavailableError
         when the Lua script call fails (MFA store).
         """
         store = _make_pending_mfa_store(FailingRedis("script"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.record_failed_attempt("alice")
 
     def test_pending_mfa_is_locked_out_raises_on_get_error(self):
         """
-        is_locked_out raises AuthSecurityStoreUnavailable when
+        is_locked_out raises AuthSecurityStoreUnavailableError when
         the Redis GET fails (MFA store).
         """
         store = _make_pending_mfa_store(FailingRedis("get"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.is_locked_out("alice")
 
     def test_pending_mfa_get_lockout_time_raises_on_get_error(self):
         """
-        get_lockout_time raises AuthSecurityStoreUnavailable when
+        get_lockout_time raises AuthSecurityStoreUnavailableError when
         the Redis GET fails (MFA store).
         """
         store = _make_pending_mfa_store(FailingRedis("get"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.get_lockout_time("alice")
 
     def test_pending_mfa_reset_raises_on_delete_error(self):
         """
-        reset_failed_attempts raises AuthSecurityStoreUnavailable
+        reset_failed_attempts raises AuthSecurityStoreUnavailableError
         when the Redis DELETE fails (MFA store).
         """
         store = _make_pending_mfa_store(FailingRedis("delete"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.reset_failed_attempts("alice")
 
     def test_clear_for_user_raises_on_scan_error(self):
         """
-        clear_for_user raises AuthSecurityStoreUnavailable when
+        clear_for_user raises AuthSecurityStoreUnavailableError when
         the Redis SCAN fails.
         """
         store = _make_pending_mfa_store(FailingRedis("scan_iter"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.clear_for_user(42)
 
     def test_pending_mfa_clear_all_raises_on_scan_error(self):
         """
-        clear_all raises AuthSecurityStoreUnavailable when the
+        clear_all raises AuthSecurityStoreUnavailableError when the
         Redis SCAN fails (MFA store).
         """
         store = _make_pending_mfa_store(FailingRedis("scan_iter"))
-        with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable
-        ):
+        with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
             store.clear_all()
 
 
@@ -944,29 +898,27 @@ class TestDependencyFunctions:
 
 
 # ---------------------------------------------------------------------------
-# Tests: AuthSecurityStoreUnavailable exception
+# Tests: AuthSecurityStoreUnavailableError exception
 # ---------------------------------------------------------------------------
 
 
-class TestAuthSecurityStoreUnavailable:
-    """Tests for the AuthSecurityStoreUnavailable exception class."""
+class TestAuthSecurityStoreUnavailableError:
+    """Tests for the AuthSecurityStoreUnavailableError exception class."""
 
     def test_is_runtime_error_subclass(self):
-        """AuthSecurityStoreUnavailable is a subclass of RuntimeError."""
-        exc = security_stores.AuthSecurityStoreUnavailable("test")
+        """AuthSecurityStoreUnavailableError is a subclass of RuntimeError."""
+        exc = security_stores.AuthSecurityStoreUnavailableError("test")
         assert isinstance(exc, RuntimeError)
 
     def test_can_be_raised_and_caught(self):
         """The exception can be raised and caught by type."""
         with pytest.raises(
-            security_stores.AuthSecurityStoreUnavailable,
+            security_stores.AuthSecurityStoreUnavailableError,
             match="unavailable",
         ):
-            raise security_stores.AuthSecurityStoreUnavailable(
-                "unavailable"
-            )
+            raise security_stores.AuthSecurityStoreUnavailableError("unavailable")
 
     def test_has_descriptive_message(self):
         """The exception preserves the message argument."""
-        exc = security_stores.AuthSecurityStoreUnavailable("oops")
+        exc = security_stores.AuthSecurityStoreUnavailableError("oops")
         assert "oops" in str(exc)

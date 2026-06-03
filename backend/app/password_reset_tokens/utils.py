@@ -1,32 +1,27 @@
 """Utility functions for password reset token operations."""
 
-from datetime import datetime, timedelta, timezone
+import hashlib
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
+
+import auth.security_stores as auth_security_stores
+import auth.sessions.crud as users_sessions_crud
+import core.apprise as core_apprise
+import core.i18n as core_i18n
+import core.logger as core_logger
+import password_reset_tokens.crud as password_reset_tokens_crud
+import password_reset_tokens.schema as password_reset_tokens_schema
+import users.users.crud as users_crud
+from core.database import SessionLocal
 from fastapi import (
     HTTPException,
     status,
 )
-from uuid import uuid4
-import hashlib
-
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-
 from password_reset_tokens import (
     email_messages as password_reset_tokens_email_messages,
 )
-import password_reset_tokens.schema as password_reset_tokens_schema
-import password_reset_tokens.crud as password_reset_tokens_crud
-
-import users.users.crud as users_crud
-import auth.sessions.crud as users_sessions_crud
-
-import auth.security_stores as auth_security_stores
-
-import core.apprise as core_apprise
-import core.i18n as core_i18n
-import core.logger as core_logger
-
-from core.database import SessionLocal
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 
 def create_password_reset_token(user_id: int, db: Session) -> str:
@@ -49,8 +44,8 @@ def create_password_reset_token(user_id: int, db: Session) -> str:
         id=str(uuid4()),
         user_id=user_id,
         token_hash=token_hash,
-        created_at=datetime.now(timezone.utc),
-        expires_at=(datetime.now(timezone.utc) + timedelta(hours=1)),
+        created_at=datetime.now(UTC),
+        expires_at=(datetime.now(UTC) + timedelta(hours=1)),
         used=False,
     )
 
@@ -61,9 +56,7 @@ def create_password_reset_token(user_id: int, db: Session) -> str:
     return token
 
 
-async def send_password_reset_email(
-    email: str, email_service: core_apprise.AppriseService, db: Session
-) -> bool:
+async def send_password_reset_email(email: str, email_service: core_apprise.AppriseService, db: Session) -> bool:
     """
     Send a password reset email to the given address.
 
@@ -105,10 +98,8 @@ async def send_password_reset_email(
 
     # Build localized email using the user's preferred language
     locale = core_i18n.normalize_locale(user.preferred_language)
-    subject, html_content, text_content = (
-        password_reset_tokens_email_messages.get_password_reset_email(
-            user.name, reset_link, email_service, locale
-        )
+    subject, html_content, text_content = password_reset_tokens_email_messages.get_password_reset_email(
+        user.name, reset_link, email_service, locale
     )
 
     # Send email
@@ -145,9 +136,7 @@ def use_password_reset_token(
     # Hash the provided token to find the database record
     token_hash = hashlib.sha256(token.encode()).hexdigest()
 
-    token_user_id = password_reset_tokens_crud.claim_password_reset_token(
-        token_hash, db
-    )
+    token_user_id = password_reset_tokens_crud.claim_password_reset_token(token_hash, db)
     if token_user_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -162,12 +151,8 @@ def use_password_reset_token(
             db,
             commit=False,
         )
-        password_reset_tokens_crud.mark_user_password_reset_tokens_used(
-            token_user_id, db
-        )
-        users_sessions_crud.delete_sessions_by_user(
-            token_user_id, db, commit=False
-        )
+        password_reset_tokens_crud.mark_user_password_reset_tokens_used(token_user_id, db)
+        users_sessions_crud.delete_sessions_by_user(token_user_id, db, commit=False)
         db.commit()
     except HTTPException:
         db.rollback()
@@ -197,12 +182,8 @@ def delete_invalid_tokens_from_db() -> None:
     # Create a new database session using context manager
     with SessionLocal() as db:
         # Get num tokens deleted
-        num_deleted = (
-            password_reset_tokens_crud.delete_expired_password_reset_tokens(db)
-        )
+        num_deleted = password_reset_tokens_crud.delete_expired_password_reset_tokens(db)
 
         # Log the number of deleted tokens
         if num_deleted > 0:
-            core_logger.print_to_log_and_console(
-                f"Deleted {num_deleted} expired password reset tokens", "info"
-            )
+            core_logger.print_to_log_and_console(f"Deleted {num_deleted} expired password reset tokens", "info")

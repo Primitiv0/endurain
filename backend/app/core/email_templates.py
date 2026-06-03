@@ -5,13 +5,10 @@ import html
 import core.i18n as core_i18n
 
 # Bootstrap-derived brand colours used across email templates.
-LINK_COLOR_PRIMARY = "#0d6efd"  # blue  – password reset
-LINK_COLOR_SUCCESS = "#198754"  # green – sign-up flows
+LINK_COLOR_PRIMARY = "#0d6efd"  # blue  - password reset
+LINK_COLOR_SUCCESS = "#198754"  # green - sign-up flows
 
-_LOGO_URL = (
-    "https://codeberg.org/endurain-project/endurain/raw/branch/master/"
-    "frontend/app/public/logo/logo.png"
-)
+_LOGO_URL = "https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.png"
 
 
 def html_header(title: str, heading: str, lang: str = "en") -> str:

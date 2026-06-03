@@ -1,19 +1,18 @@
 """Authentication security stores for login and MFA lockout."""
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import Lock
 from typing import NoReturn
 from urllib.parse import unquote
 
-from redis import Redis, RedisError
-
 import core.config as core_config
 import core.logger as core_logger
 import core.redis as core_redis
+from redis import Redis, RedisError
 
 
-class AuthSecurityStoreUnavailable(RuntimeError):
+class AuthSecurityStoreUnavailableError(RuntimeError):
     """
     Raised when auth security storage cannot be reached.
 
@@ -31,7 +30,7 @@ def _raise_store_unavailable(operation: str, err: RedisError) -> NoReturn:
         err: Redis client exception.
 
     Raises:
-        AuthSecurityStoreUnavailable: Always raised.
+        AuthSecurityStoreUnavailableError: Always raised.
     """
     try:
         core_redis.raise_redis_storage_unavailable(
@@ -39,10 +38,8 @@ def _raise_store_unavailable(operation: str, err: RedisError) -> NoReturn:
             operation,
             err,
         )
-    except core_redis.RedisStorageUnavailable as store_err:
-        raise AuthSecurityStoreUnavailable(
-            "Auth security storage is unavailable"
-        ) from store_err
+    except core_redis.RedisStorageUnavailableError as store_err:
+        raise AuthSecurityStoreUnavailableError("Auth security storage is unavailable") from store_err
 
 
 def normalize_username_key(username: str) -> str:
@@ -143,7 +140,7 @@ class PendingMFALogin:
         """
         username = normalize_username_key(username)
         with self._store_lock:
-            self._store[username] = (user_id, datetime.now(timezone.utc))
+            self._store[username] = (user_id, datetime.now(UTC))
 
     def get_pending_login(self, username: str) -> int | None:
         """
@@ -165,14 +162,13 @@ class PendingMFALogin:
                 return None
 
             user_id, created_at = entry
-            age = (datetime.now(timezone.utc) - created_at).total_seconds()
+            age = (datetime.now(UTC) - created_at).total_seconds()
             if age > self.PENDING_MFA_TTL_SECONDS:
                 del self._store[username]
 
         if age > self.PENDING_MFA_TTL_SECONDS:
             core_logger.print_to_log(
-                f"Pending MFA entry for '{username}' expired "
-                f"after {int(age)}s and was evicted.",
+                f"Pending MFA entry for '{username}' expired after {int(age)}s and was evicted.",
                 "info",
             )
             return None
@@ -199,13 +195,12 @@ class PendingMFALogin:
                 return None
 
             user_id, created_at = entry
-            age = (datetime.now(timezone.utc) - created_at).total_seconds()
+            age = (datetime.now(UTC) - created_at).total_seconds()
             del self._store[username]
 
         if age > self.PENDING_MFA_TTL_SECONDS:
             core_logger.print_to_log(
-                f"Pending MFA entry for '{username}' expired "
-                f"after {int(age)}s and was evicted.",
+                f"Pending MFA entry for '{username}' expired after {int(age)}s and was evicted.",
                 "info",
             )
             return None
@@ -248,11 +243,7 @@ class PendingMFALogin:
             None.
         """
         with self._store_lock:
-            matching = [
-                username
-                for username, (entry_user_id, _) in self._store.items()
-                if entry_user_id == user_id
-            ]
+            matching = [username for username, (entry_user_id, _) in self._store.items() if entry_user_id == user_id]
             for username in matching:
                 del self._store[username]
         return len(matching)
@@ -285,13 +276,12 @@ class PendingMFALogin:
         Raises:
             None.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._store_lock:
             expired = [
                 username
                 for username, (_, created_at) in self._store.items()
-                if (now - created_at).total_seconds()
-                > self.PENDING_MFA_TTL_SECONDS
+                if (now - created_at).total_seconds() > self.PENDING_MFA_TTL_SECONDS
             ]
             for username in expired:
                 del self._store[username]
@@ -324,7 +314,7 @@ class PendingMFALogin:
             if lockout_until is None:
                 return False
 
-            if datetime.now(timezone.utc) > lockout_until:
+            if datetime.now(UTC) > lockout_until:
                 del self._failed_attempts[username]
                 return False
 
@@ -349,7 +339,7 @@ class PendingMFALogin:
                 return None
 
             _, lockout_until = self._failed_attempts[username]
-            if lockout_until and datetime.now(timezone.utc) <= lockout_until:
+            if lockout_until and datetime.now(UTC) <= lockout_until:
                 return lockout_until
 
             return None
@@ -367,7 +357,7 @@ class PendingMFALogin:
         Raises:
             None.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         username = normalize_username_key(username)
         with self._failed_attempts_lock:
             if username in self._failed_attempts:
@@ -479,7 +469,7 @@ class FailedLoginAttempts:
             if lockout_until is None:
                 return False
 
-            if datetime.now(timezone.utc) > lockout_until:
+            if datetime.now(UTC) > lockout_until:
                 del self._attempts[username]
                 return False
 
@@ -504,7 +494,7 @@ class FailedLoginAttempts:
                 return None
 
             _, lockout_until = self._attempts[username]
-            if lockout_until and datetime.now(timezone.utc) <= lockout_until:
+            if lockout_until and datetime.now(UTC) <= lockout_until:
                 return lockout_until
 
             return None
@@ -522,7 +512,7 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         username = normalize_username_key(username)
         with self._attempts_lock:
             if username in self._attempts:
@@ -642,7 +632,7 @@ def _now_epoch() -> int:
     Raises:
         None.
     """
-    return int(datetime.now(timezone.utc).timestamp())
+    return int(datetime.now(UTC).timestamp())
 
 
 def _datetime_from_epoch(epoch_seconds: int) -> datetime:
@@ -659,7 +649,7 @@ def _datetime_from_epoch(epoch_seconds: int) -> datetime:
         OSError: When the timestamp cannot be converted.
         ValueError: When the timestamp is outside the valid range.
     """
-    return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc)
+    return datetime.fromtimestamp(epoch_seconds, tz=UTC)
 
 
 def _username_digest(username: str) -> str:
@@ -705,11 +695,7 @@ def get_auth_security_storage_uri() -> str:
     Raises:
         None.
     """
-    return (
-        core_config.settings.AUTH_SECURITY_STORAGE_URI
-        or core_config.settings.RATE_LIMIT_STORAGE_URI
-        or "memory://"
-    )
+    return core_config.settings.AUTH_SECURITY_STORAGE_URI or core_config.settings.RATE_LIMIT_STORAGE_URI or "memory://"
 
 
 class _RedisProgressiveLockout:
@@ -752,9 +738,7 @@ class _RedisProgressiveLockout:
         self._display_name = display_name
         self._thresholds = thresholds
         self._attempts_ttl_seconds = attempts_ttl_seconds
-        self._record_failure = redis_client.register_script(
-            _REDIS_RECORD_FAILURE_SCRIPT
-        )
+        self._record_failure = redis_client.register_script(_REDIS_RECORD_FAILURE_SCRIPT)
 
     def _attempts_key(self, username: str) -> str:
         """
@@ -770,10 +754,7 @@ class _RedisProgressiveLockout:
             None.
         """
         username_digest = _username_digest(username)
-        return (
-            f"{_REDIS_AUTH_KEY_PREFIX}:{self._name}:"
-            f"attempts:{username_digest}"
-        )
+        return f"{_REDIS_AUTH_KEY_PREFIX}:{self._name}:attempts:{username_digest}"
 
     def _lockout_key(self, username: str) -> str:
         """
@@ -789,10 +770,7 @@ class _RedisProgressiveLockout:
             None.
         """
         username_digest = _username_digest(username)
-        return (
-            f"{_REDIS_AUTH_KEY_PREFIX}:{self._name}:"
-            f"lockout:{username_digest}"
-        )
+        return f"{_REDIS_AUTH_KEY_PREFIX}:{self._name}:lockout:{username_digest}"
 
     def _duration_label(self, failed_count: int) -> str:
         """
@@ -807,9 +785,7 @@ class _RedisProgressiveLockout:
         Raises:
             None.
         """
-        for threshold, _lockout_seconds, duration_label in reversed(
-            self._thresholds
-        ):
+        for threshold, _lockout_seconds, duration_label in reversed(self._thresholds):
             if failed_count >= threshold:
                 return duration_label
         return "unknown"
@@ -887,11 +863,7 @@ class _RedisProgressiveLockout:
             str(_now_epoch()),
             str(self._attempts_ttl_seconds),
         ]
-        script_args.extend(
-            str(threshold_value)
-            for threshold in self._thresholds
-            for threshold_value in threshold[:2]
-        )
+        script_args.extend(str(threshold_value) for threshold in self._thresholds for threshold_value in threshold[:2])
 
         try:
             script_result = self._record_failure(
@@ -1240,9 +1212,8 @@ class RedisPendingMFALogin:
                 count=100,
             ):
                 stored_value = self._redis.get(redis_key)
-                if stored_value == target_value:
-                    if self._redis.delete(redis_key):
-                        removed += 1
+                if stored_value == target_value and self._redis.delete(redis_key):
+                    removed += 1
         except RedisError as err:
             _raise_store_unavailable(
                 "clear pending MFA logins for user",
@@ -1395,15 +1366,10 @@ def create_auth_security_stores(
         )
 
     storage_scheme = normalized_storage_uri.split(":", 1)[0]
-    raise ValueError(
-        "Unsupported AUTH_SECURITY_STORAGE_URI scheme: "
-        f"{storage_scheme or 'unknown'}"
-    )
+    raise ValueError(f"Unsupported AUTH_SECURITY_STORAGE_URI scheme: {storage_scheme or 'unknown'}")
 
 
-failed_login_attempts, pending_mfa_store = create_auth_security_stores(
-    get_auth_security_storage_uri()
-)
+failed_login_attempts, pending_mfa_store = create_auth_security_stores(get_auth_security_storage_uri())
 
 
 def get_pending_mfa_store() -> PendingMFAStore:
@@ -1470,10 +1436,9 @@ def clear_pending_mfa_for_user(user_id: int) -> int:
     """
     try:
         return pending_mfa_store.clear_for_user(user_id)
-    except AuthSecurityStoreUnavailable as err:
+    except AuthSecurityStoreUnavailableError as err:
         core_logger.print_to_log(
-            "Failed to clear pending MFA entries during password change; "
-            "entries will expire naturally via TTL",
+            "Failed to clear pending MFA entries during password change; entries will expire naturally via TTL",
             "warning",
             exc=err,
         )

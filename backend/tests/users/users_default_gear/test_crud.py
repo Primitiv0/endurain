@@ -4,15 +4,15 @@ Tests for users.users_default_gear.crud module.
 This module tests CRUD operations for user default gear.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
 
+import pytest
 import users.users_default_gear.crud as user_default_gear_crud
-import users.users_default_gear.schema as user_default_gear_schema
 import users.users_default_gear.models as user_default_gear_models
+import users.users_default_gear.schema as user_default_gear_schema
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture
@@ -37,9 +37,7 @@ class TestGetUserDefaultGearByUserId:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = user_default_gear_crud.get_user_default_gear_by_user_id(
-            user_id, mock_db
-        )
+        result = user_default_gear_crud.get_user_default_gear_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == mock_gear
@@ -54,9 +52,7 @@ class TestGetUserDefaultGearByUserId:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = user_default_gear_crud.get_user_default_gear_by_user_id(
-            user_id, mock_db
-        )
+        result = user_default_gear_crud.get_user_default_gear_by_user_id(user_id, mock_db)
 
         # Assert
         assert result is None
@@ -97,7 +93,7 @@ class TestCreateUserDefaultGear:
             "UsersDefaultGear",
             return_value=mock_created_gear,
         ):
-            result = user_default_gear_crud.create_user_default_gear(user_id, mock_db)
+            user_default_gear_crud.create_user_default_gear(user_id, mock_db)
 
         # Assert
         mock_db.add.assert_called_once()
@@ -112,13 +108,15 @@ class TestCreateUserDefaultGear:
         mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
         # Act & Assert
-        with patch.object(
-            user_default_gear_models,
-            "UsersDefaultGear",
-            return_value=mock_db_gear,
+        with (
+            patch.object(
+                user_default_gear_models,
+                "UsersDefaultGear",
+                return_value=mock_db_gear,
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                user_default_gear_crud.create_user_default_gear(user_id, mock_db)
+            user_default_gear_crud.create_user_default_gear(user_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         # Decorator should call rollback when catching SQLAlchemyError
@@ -145,9 +143,7 @@ class TestEditUserDefaultGear:
         mock_get_gear.return_value = mock_db_gear
 
         # Act
-        result = user_default_gear_crud.edit_user_default_gear(
-            gear_update, user_id, mock_db
-        )
+        result = user_default_gear_crud.edit_user_default_gear(gear_update, user_id, mock_db)
 
         # Assert
         assert result == mock_db_gear

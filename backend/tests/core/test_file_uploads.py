@@ -10,10 +10,8 @@ import zipfile
 import zlib
 from pathlib import Path
 
-import pytest
-from fastapi import HTTPException, UploadFile
-
 import core.file_uploads as core_file_uploads
+import pytest
 from core.file_uploads import (
     UploadKind,
     _resolve_upload_path,
@@ -27,20 +25,20 @@ from core.file_uploads import (
     validate_bytes,
     validate_upload,
 )
+from fastapi import HTTPException, UploadFile
 from safeuploads.exceptions import (
     CompressionSecurityError,
     ExtensionSecurityError,
+    FilenameSecurityError,
     FileProcessingError,
     FileSignatureError,
     FileSizeError,
     FileValidationError,
-    FilenameSecurityError,
     MimeTypeError,
     UnicodeSecurityError,
     WindowsReservedNameError,
     ZipBombError,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: minimal valid payloads per UploadKind
@@ -63,15 +61,9 @@ def _make_png_bytes() -> bytes:
         struct.pack(">I", len(compressed))
         + b"IDAT"
         + compressed
-        + struct.pack(
-            ">I", zlib.crc32(b"IDAT" + compressed) & 0xFFFFFFFF
-        )
+        + struct.pack(">I", zlib.crc32(b"IDAT" + compressed) & 0xFFFFFFFF)
     )
-    iend = (
-        struct.pack(">I", 0)
-        + b"IEND"
-        + struct.pack(">I", zlib.crc32(b"IEND") & 0xFFFFFFFF)
-    )
+    iend = struct.pack(">I", 0) + b"IEND" + struct.pack(">I", zlib.crc32(b"IEND") & 0xFFFFFFFF)
     return sig + ihdr + idat + iend
 
 
@@ -90,7 +82,7 @@ def _make_gpx_bytes() -> bytes:
         b'<gpx version="1.1" creator="endurain-tests"'
         b' xmlns="http://www.topografix.com/GPX/1/1">\n'
         b"  <trk><name>t</name><trkseg>"
-        b"<trkpt lat=\"0\" lon=\"0\"></trkpt>"
+        b'<trkpt lat="0" lon="0"></trkpt>'
         b"</trkseg></trk>\n"
         b"</gpx>\n"
     )
@@ -178,9 +170,7 @@ def test_resolve_upload_path_accepts_safe(tmp_path: Path):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind,filename,builder", _KIND_CASES)
-async def test_validate_upload_accepts_valid_payload(
-    kind: UploadKind, filename: str, builder
-):
+async def test_validate_upload_accepts_valid_payload(kind: UploadKind, filename: str, builder):
     """Each kind validates without raising on a well-formed payload."""
     upload = _upload(filename, builder())
     try:
@@ -191,9 +181,7 @@ async def test_validate_upload_accepts_valid_payload(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind,filename,_b", _KIND_CASES)
-async def test_validate_upload_rejects_garbage(
-    kind: UploadKind, filename: str, _b
-):
+async def test_validate_upload_rejects_garbage(kind: UploadKind, filename: str, _b):
     """Garbage bytes with a valid extension are rejected."""
     upload = _upload(filename, b"not a real payload")
     with pytest.raises(HTTPException) as exc:
@@ -352,12 +340,10 @@ async def test_failed_validation_emits_audit_record(caplog):
             await upload.close()
 
     failure_records = [
-        record
-        for record in caplog.records
-        if getattr(record, "audit_event_type", "") == "validation_failure"
+        record for record in caplog.records if getattr(record, "audit_event_type", "") == "validation_failure"
     ]
     assert len(failure_records) == 1
-    assert getattr(failure_records[0], "audit_correlation_id")
+    assert failure_records[0].audit_correlation_id
 
 
 # ---------------------------------------------------------------------------
@@ -367,9 +353,7 @@ async def test_failed_validation_emits_audit_record(caplog):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind,filename,builder", _KIND_CASES)
-async def test_validate_bytes_accepts_valid_payload(
-    kind: UploadKind, filename: str, builder
-):
+async def test_validate_bytes_accepts_valid_payload(kind: UploadKind, filename: str, builder):
     """Valid in-memory bytes pass per-kind validation."""
     await validate_bytes(builder(), kind=kind, filename=filename)
 
@@ -378,9 +362,7 @@ async def test_validate_bytes_accepts_valid_payload(
 async def test_validate_bytes_rejects_garbage():
     """Garbage bytes with a valid extension are rejected."""
     with pytest.raises(HTTPException) as exc:
-        await validate_bytes(
-            b"not a real zip", kind=UploadKind.ZIP, filename="x.zip"
-        )
+        await validate_bytes(b"not a real zip", kind=UploadKind.ZIP, filename="x.zip")
     assert exc.value.status_code in {400, 413}
 
 
@@ -481,9 +463,7 @@ async def test_extract_validated_zip_happy_path(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_extract_validated_zip_rejects_zip_slip(tmp_path: Path):
     """A traversal entry name aborts extraction with 400."""
-    payload = _build_zip_with_entries(
-        [("../escape.gpx", _make_gpx_bytes())]
-    )
+    payload = _build_zip_with_entries([("../escape.gpx", _make_gpx_bytes())])
     zip_path = tmp_path / "evil.zip"
     zip_path.write_bytes(payload)
     dest = tmp_path / "out"
@@ -500,9 +480,7 @@ async def test_extract_validated_zip_rejects_absolute_entry(
     tmp_path: Path,
 ):
     """An absolute entry name is treated as a zip-slip attempt."""
-    payload = _build_zip_with_entries(
-        [("/abs/path.gpx", _make_gpx_bytes())]
-    )
+    payload = _build_zip_with_entries([("/abs/path.gpx", _make_gpx_bytes())])
     zip_path = tmp_path / "abs.zip"
     zip_path.write_bytes(payload)
     dest = tmp_path / "out"
@@ -517,9 +495,7 @@ async def test_extract_validated_zip_rejects_windows_drive_entry(
     tmp_path: Path,
 ):
     """A Windows-drive entry name is treated as unsafe."""
-    payload = _build_zip_with_entries(
-        [("C:/abs/path.gpx", _make_gpx_bytes())]
-    )
+    payload = _build_zip_with_entries([("C:/abs/path.gpx", _make_gpx_bytes())])
     zip_path = tmp_path / "drive.zip"
     zip_path.write_bytes(payload)
     dest = tmp_path / "out"
@@ -560,9 +536,7 @@ async def test_extract_validated_zip_refuses_existing_target(
     dest.mkdir()
     existing = dest / "keep.gpx"
     existing.write_bytes(b"original")
-    payload = _build_zip_with_entries(
-        [("keep.gpx", _make_gpx_bytes())]
-    )
+    payload = _build_zip_with_entries([("keep.gpx", _make_gpx_bytes())])
     zip_path = tmp_path / "overwrite.zip"
     zip_path.write_bytes(payload)
 
@@ -571,9 +545,7 @@ async def test_extract_validated_zip_refuses_existing_target(
 
     assert exc.value.status_code == 400
     assert existing.read_bytes() == b"original"
-    assert not any(
-        path.name.startswith(".extract-") for path in dest.iterdir()
-    )
+    assert not any(path.name.startswith(".extract-") for path in dest.iterdir())
 
 
 @pytest.mark.asyncio
@@ -628,17 +600,13 @@ async def test_extract_validated_zip_per_entry_validation_drops_bad(
 @pytest.mark.asyncio
 async def test_extract_validated_zip_max_entries_enforced(tmp_path: Path):
     """max_entries cap aborts before any file is written."""
-    payload = _build_zip_with_entries(
-        [(f"f{i}.gpx", _make_gpx_bytes()) for i in range(5)]
-    )
+    payload = _build_zip_with_entries([(f"f{i}.gpx", _make_gpx_bytes()) for i in range(5)])
     zip_path = tmp_path / "many.zip"
     zip_path.write_bytes(payload)
     dest = tmp_path / "out"
 
     with pytest.raises(HTTPException) as exc:
-        await extract_validated_zip(
-            zip_path, dest_dir=dest, max_entries=2
-        )
+        await extract_validated_zip(zip_path, dest_dir=dest, max_entries=2)
     assert exc.value.status_code == 400
     # Nothing should have been extracted on entry-count rejection.
     assert not any(dest.iterdir()) if dest.exists() else True

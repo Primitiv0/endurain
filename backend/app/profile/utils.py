@@ -10,26 +10,26 @@ This module provides helper functions for:
 - Performance configuration management
 """
 
-import json
-import pyotp
-import qrcode
 import base64
-import zipfile
-import time
-import psutil
-from io import BytesIO
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from typing import Any, TypeVar
-
-import core.cryptography as core_cryptography
-import core.logger as core_logger
+import json
 import profile.schema as profile_schema
-import users.users.crud as users_crud
-import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
+import time
+import zipfile
+from io import BytesIO
 from profile.exceptions import (
     MemoryAllocationError,
 )
+from typing import Any, TypeVar
+
+import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import psutil
+import pyotp
+import qrcode
+import users.users.crud as users_crud
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 # Type variable for performance config classes
 T_PerformanceConfig = TypeVar("T_PerformanceConfig", bound="BasePerformanceConfig")
@@ -90,14 +90,10 @@ class BasePerformanceConfig:
                 config_dict = tier_configs[tier]
                 return cls(**config_dict)
             else:
-                core_logger.print_to_log(
-                    f"Unknown memory tier '{tier}', using default config", "warning"
-                )
+                core_logger.print_to_log(f"Unknown memory tier '{tier}', using default config", "warning")
                 return cls()
         except Exception as err:
-            core_logger.print_to_log(
-                f"Failed to create auto config, using defaults: {err}", "warning"
-            )
+            core_logger.print_to_log(f"Failed to create auto config, using defaults: {err}", "warning")
             return cls()
 
 
@@ -179,9 +175,7 @@ def setup_user_mfa(user_id: int, db: Session) -> profile_schema.MFASetupResponse
     """
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if user.auth_mfa and user.auth_mfa.mfa_enabled:
         raise HTTPException(
@@ -195,9 +189,7 @@ def setup_user_mfa(user_id: int, db: Session) -> profile_schema.MFASetupResponse
     # Generate QR code
     qr_code = generate_qr_code(secret, user.username)
 
-    return profile_schema.MFASetupResponse(
-        secret=secret, qr_code=qr_code, app_name="Endurain"
-    )
+    return profile_schema.MFASetupResponse(secret=secret, qr_code=qr_code, app_name="Endurain")
 
 
 def enable_user_mfa(
@@ -226,9 +218,7 @@ def enable_user_mfa(
     """
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if user.auth_mfa and user.auth_mfa.mfa_enabled:
         raise HTTPException(
@@ -238,9 +228,7 @@ def enable_user_mfa(
 
     # Verify the MFA code
     if not verify_totp(secret, mfa_code):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
 
     # Encrypt the secret before storing
     encrypted_secret = core_cryptography.encrypt_token_fernet(secret)
@@ -282,9 +270,7 @@ def disable_user_mfa(user_id: int, db: Session) -> None:
     """
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if not (user.auth_mfa and user.auth_mfa.mfa_enabled):
         raise HTTPException(
@@ -327,9 +313,7 @@ def verify_user_mfa(
     """
     user = users_crud.get_user_by_id(user_id, db)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     mfa_row = user.auth_mfa
     if not mfa_row or not mfa_row.mfa_enabled or not mfa_row.mfa_secret:
@@ -347,19 +331,13 @@ def verify_user_mfa(
                 return False
 
             if verify_totp(secret, normalized_code):
-                core_logger.print_to_log(
-                    f"User {user_id} verified MFA with TOTP", "debug"
-                )
+                core_logger.print_to_log(f"User {user_id} verified MFA with TOTP", "debug")
                 return True
         except (ValueError, pyotp.OTPError) as err:
-            core_logger.print_to_log(
-                f"Error in TOTP verification: {err}", "error", exc=err
-            )
+            core_logger.print_to_log(f"Error in TOTP verification: {err}", "error", exc=err)
             return False
         except Exception as err:
-            core_logger.print_to_log(
-                f"Unknown error in TOTP verification: {err}", "error", exc=err
-            )
+            core_logger.print_to_log(f"Unknown error in TOTP verification: {err}", "error", exc=err)
             return False
 
     # Try backup code (9 alphanumeric characters with dash XXXX-XXXX)
@@ -371,9 +349,7 @@ def verify_user_mfa(
             ):
                 return True
         except Exception as err:
-            core_logger.print_to_log(
-                f"Error in backup code verification: {err}", "error", exc=err
-            )
+            core_logger.print_to_log(f"Error in backup code verification: {err}", "error", exc=err)
             return False
 
     # Invalid format or code didn't match
@@ -395,11 +371,7 @@ def is_mfa_enabled_for_user(user_id: int, db: Session) -> bool:
     if not user:
         return False
     mfa_row = user.auth_mfa
-    return bool(
-        mfa_row
-        and mfa_row.mfa_enabled
-        and mfa_row.mfa_secret is not None
-    )
+    return bool(mfa_row and mfa_row.mfa_enabled and mfa_row.mfa_secret is not None)
 
 
 # Export utility functions
@@ -436,9 +408,7 @@ def write_json_to_zip(
         ensure_ascii: Whether to ensure ASCII encoding.
     """
     if data:
-        counts[filename.split("/")[-1].replace(".json", "")] = (
-            len(data) if isinstance(data, (list, tuple)) else 1
-        )
+        counts[filename.split("/")[-1].replace(".json", "")] = len(data) if isinstance(data, (list, tuple)) else 1
         zipf.writestr(
             filename,
             json.dumps(data, default=str, ensure_ascii=ensure_ascii),
@@ -523,9 +493,7 @@ def check_memory_usage(
             "file streaming",
         ]
 
-    is_memory_intensive = any(
-        op in operation.lower() for op in memory_intensive_operations
-    )
+    is_memory_intensive = any(op in operation.lower() for op in memory_intensive_operations)
 
     # Use a higher threshold for memory-intensive operations
     effective_limit = max_memory_mb
@@ -543,8 +511,7 @@ def check_memory_usage(
     # Warn at 90%
     if current_memory > max_memory_mb * 0.9:
         core_logger.print_to_log(
-            f"High memory usage: {current_memory:.1f}MB "
-            f"(limit: {max_memory_mb}MB) during {operation}",
+            f"High memory usage: {current_memory:.1f}MB (limit: {max_memory_mb}MB) during {operation}",
             "info",
         )
 
@@ -602,7 +569,5 @@ def detect_system_memory_tier() -> tuple[str, int]:
         else:  # Low memory system
             return "low", available_mb
     except Exception as err:
-        core_logger.print_to_log(
-            f"Failed to detect system memory, using defaults: {err}", "warning"
-        )
+        core_logger.print_to_log(f"Failed to detect system memory, using defaults: {err}", "warning")
         return "medium", 1024  # Default to medium tier with 1GB

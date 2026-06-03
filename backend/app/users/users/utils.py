@@ -1,22 +1,19 @@
 import os
 
-from fastapi import HTTPException, status, UploadFile
-from sqlalchemy.orm import Session
-
-import users.users.crud as users_crud
-import users.users.schema as users_schema
-import users.users.models as users_models
-
-import users.users_integrations.crud as user_integrations_crud
-import users.users_default_gear.crud as user_default_gear_crud
-import users.users_privacy_settings.crud as users_privacy_settings_crud
-import health.health_targets.crud as health_targets_crud
 import auth.mfa.crud as auth_mfa_crud
+import core.config as core_config
+import core.file_uploads as core_file_uploads
+import health.health_targets.crud as health_targets_crud
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
-
-import core.file_uploads as core_file_uploads
-import core.config as core_config
+import users.users.crud as users_crud
+import users.users.models as users_models
+import users.users.schema as users_schema
+import users.users_default_gear.crud as user_default_gear_crud
+import users.users_integrations.crud as user_integrations_crud
+import users.users_privacy_settings.crud as users_privacy_settings_crud
+from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
 
 
 def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
@@ -123,9 +120,7 @@ def verify_step_up_credentials(
                 detail="MFA code required for this operation",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        if not profile_utils.verify_user_mfa(
-            user_id, mfa_code, identity_service, db
-        ):
+        if not profile_utils.verify_user_mfa(user_id, mfa_code, identity_service, db):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Step-up verification failed",
@@ -160,10 +155,7 @@ def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
 def check_password_and_hash(
     password: str,
     identity_service: object,
-    server_settings: (
-        server_settings_models.ServerSettings
-        | server_settings_schema.ServerSettingsRead
-    ),
+    server_settings: (server_settings_models.ServerSettings | server_settings_schema.ServerSettingsRead),
     user_access_type: str,
 ) -> str:
     """
@@ -248,9 +240,7 @@ def create_user_default_data(user_id: int, db: Session) -> None:
     auth_mfa_crud.create_users_mfa_row(user_id, db)
 
 
-_ALLOWED_USER_IMAGE_EXTENSIONS: frozenset[str] = frozenset(
-    {".png", ".jpg", ".jpeg", ".webp"}
-)
+_ALLOWED_USER_IMAGE_EXTENSIONS: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".webp"})
 
 
 async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> str:
@@ -300,11 +290,7 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
     )
 
     # Update user photo path in database
-    return str(
-        await users_crud.update_user_photo(
-            user_id, db, os.path.join(core_config.USER_IMAGES_DIR, filename)
-        )
-    )
+    return str(await users_crud.update_user_photo(user_id, db, os.path.join(core_config.USER_IMAGES_DIR, filename)))
 
 
 async def delete_user_photo_filesystem(user_id: int) -> None:
@@ -317,6 +303,4 @@ async def delete_user_photo_filesystem(user_id: int) -> None:
     Returns:
         None
     """
-    await core_file_uploads.delete_files_by_pattern(
-        core_config.USER_IMAGES_DIR, f"{user_id}.*"
-    )
+    await core_file_uploads.delete_files_by_pattern(core_config.USER_IMAGES_DIR, f"{user_id}.*")

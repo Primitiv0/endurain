@@ -2,10 +2,9 @@
 
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from users.users.models import Users
@@ -35,10 +34,6 @@ class Follower(Base):
     )
 
     # Define a relationship to the Users model
-    follower: Mapped["Users"] = relationship(
-        foreign_keys=[follower_id], back_populates="followers"
-    )
+    follower: Mapped["Users"] = relationship(foreign_keys=[follower_id], back_populates="followers")
     # Define a relationship to the Users model
-    following: Mapped["Users"] = relationship(
-        foreign_keys=[following_id], back_populates="following"
-    )
+    following: Mapped["Users"] = relationship(foreign_keys=[following_id], back_populates="following")

@@ -1,16 +1,13 @@
 """Activity exercise titles CRUD operations."""
 
+import activities.activity_exercise_titles.models as activity_exercise_titles_models
+import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
+import core.decorators as core_decorators
+import server_settings.utils as server_settings_utils
 from fastapi import HTTPException, status
 from sqlalchemy import select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
-import activities.activity_exercise_titles.models as activity_exercise_titles_models
-import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
-
-import server_settings.utils as server_settings_utils
-
-import core.decorators as core_decorators
 
 
 @core_decorators.handle_db_errors
@@ -82,20 +79,15 @@ def get_activity_exercise_title_by_exercise_name(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(
-        activity_exercise_titles_models.ActivityExerciseTitles
-    ).where(
-        activity_exercise_titles_models.ActivityExerciseTitles.exercise_name
-        == exercise_name
+    stmt = select(activity_exercise_titles_models.ActivityExerciseTitles).where(
+        activity_exercise_titles_models.ActivityExerciseTitles.exercise_name == exercise_name
     )
     return db.execute(stmt).scalar_one_or_none()
 
 
 @core_decorators.handle_db_errors
 def create_activity_exercise_titles(
-    activity_exercise_titles: list[
-        activity_exercise_titles_schema.ActivityExerciseTitles
-    ],
+    activity_exercise_titles: list[activity_exercise_titles_schema.ActivityExerciseTitles],
     db: Session,
 ) -> None:
     """
@@ -117,17 +109,10 @@ def create_activity_exercise_titles(
 
     model = activity_exercise_titles_models.ActivityExerciseTitles
 
-    incoming_keys = {
-        (t.exercise_name, t.exercise_category)
-        for t in activity_exercise_titles
-    }
+    incoming_keys = {(t.exercise_name, t.exercise_category) for t in activity_exercise_titles}
 
-    existing_stmt = select(
-        model.exercise_name, model.exercise_category
-    ).where(
-        tuple_(model.exercise_name, model.exercise_category).in_(
-            incoming_keys
-        )
+    existing_stmt = select(model.exercise_name, model.exercise_category).where(
+        tuple_(model.exercise_name, model.exercise_category).in_(incoming_keys)
     )
     existing_keys = set(db.execute(existing_stmt).all())
 
@@ -151,8 +136,5 @@ def create_activity_exercise_titles(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Duplicate entry error. Check if "
-                "(exercise_name, exercise_category) is unique"
-            ),
+            detail=("Duplicate entry error. Check if (exercise_name, exercise_category) is unique"),
         ) from integrity_error

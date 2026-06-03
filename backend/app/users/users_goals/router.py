@@ -2,17 +2,14 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
-
+import auth.dependencies as auth_dependencies
+import core.database as core_database
+import users.users_goals.crud as user_goals_crud
 import users.users_goals.dependencies as user_goals_dependencies
 import users.users_goals.schema as user_goals_schema
-import users.users_goals.crud as user_goals_crud
 import users.users_goals.utils as user_goals_utils
-
-import auth.dependencies as auth_dependencies
-
-import core.database as core_database
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -132,9 +129,7 @@ async def update_user_goal(
     return user_goals_crud.update_user_goal(token_user_id, user_goal, db)
 
 
-@router.delete(
-    "/{goal_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None
-)
+@router.delete("/{goal_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_user_goal(
     goal_id: int,
     token_user_id: Annotated[int, Depends(auth_dependencies.get_sub_from_access_token)],

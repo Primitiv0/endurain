@@ -1,15 +1,14 @@
 """Public user router for unauthenticated user info access."""
 
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session
-
-import users.users.schema as users_schema
-import users.users.crud as users_crud
-import users.users.dependencies as users_dependencies
+from collections.abc import Callable
+from typing import Annotated
 
 import core.database as core_database
+import users.users.crud as users_crud
+import users.users.dependencies as users_dependencies
+import users.users.schema as users_schema
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

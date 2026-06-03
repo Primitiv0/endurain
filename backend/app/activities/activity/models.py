@@ -4,17 +4,16 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import (
+    DECIMAL,
     JSON,
     BigInteger,
-    DECIMAL,
     DateTime,
     ForeignKey,
     String,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity_laps.models import ActivityLaps
@@ -129,9 +128,7 @@ class Activity(Base):
     )
     activity_type: Mapped[int] = mapped_column(
         nullable=False,
-        comment=(
-            "Gear type (1 - mountain bike, 2 - gravel bike, ...)"
-        ),
+        comment=("Gear type (1 - mountain bike, 2 - gravel bike, ...)"),
     )
     start_time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -239,10 +236,7 @@ class Activity(Base):
     )
     calories: Mapped[int | None] = mapped_column(
         nullable=True,
-        comment=(
-            "The number of kilocalories consumed during this "
-            "activity"
-        ),
+        comment=("The number of kilocalories consumed during this activity"),
     )
     visibility: Mapped[int] = mapped_column(
         nullable=False,
@@ -285,11 +279,7 @@ class Activity(Base):
     is_hidden: Mapped[bool] = mapped_column(
         nullable=False,
         default=False,
-        comment=(
-            "Indicates if the activity is hidden (e.g., "
-            "duplicate activity waiting to be reviewed by "
-            "the user)"
-        ),
+        comment=("Indicates if the activity is hidden (e.g., duplicate activity waiting to be reviewed by the user)"),
     )
     hide_start_time: Mapped[bool] = mapped_column(
         nullable=False,
@@ -344,25 +334,17 @@ class Activity(Base):
     tracker_manufacturer: Mapped[str | None] = mapped_column(
         String(250),
         nullable=True,
-        comment=(
-            "Tracker manufacturer (e.g., Garmin, Suunto, Polar)"
-        ),
+        comment=("Tracker manufacturer (e.g., Garmin, Suunto, Polar)"),
     )
     tracker_model: Mapped[str | None] = mapped_column(
         String(250),
         nullable=True,
-        comment=(
-            "Tracker model (e.g., Forerunner 245, Ambit3 Peak, "
-            "Vantage V2)"
-        ),
+        comment=("Tracker model (e.g., Forerunner 245, Ambit3 Peak, Vantage V2)"),
     )
     map_thumbnail_path: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
-        comment=(
-            "Relative path to the pre-generated static map "
-            "thumbnail image"
-        ),
+        comment=("Relative path to the pre-generated static map thumbnail image"),
     )
 
     # Define a relationship to the Users model

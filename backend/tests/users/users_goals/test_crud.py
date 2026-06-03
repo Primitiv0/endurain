@@ -1,13 +1,13 @@
 """Tests for user goals CRUD operations."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+import users.users_goals.crud as user_goals_crud
+import users.users_goals.models as user_goals_models
+import users.users_goals.schema as user_goals_schema
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
-
-import users.users_goals.crud as user_goals_crud
-import users.users_goals.schema as user_goals_schema
-import users.users_goals.models as user_goals_models
 
 
 class TestGetUserGoalsByUserId:
@@ -82,9 +82,7 @@ class TestGetUserGoalByUserAndGoalId:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = user_goals_crud.get_user_goal_by_user_and_goal_id(
-            user_id, goal_id, mock_db
-        )
+        result = user_goals_crud.get_user_goal_by_user_and_goal_id(user_id, goal_id, mock_db)
 
         # Assert
         assert result == mock_goal
@@ -99,9 +97,7 @@ class TestGetUserGoalByUserAndGoalId:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = user_goals_crud.get_user_goal_by_user_and_goal_id(
-            user_id, goal_id, mock_db
-        )
+        result = user_goals_crud.get_user_goal_by_user_and_goal_id(user_id, goal_id, mock_db)
 
         # Assert
         assert result is None

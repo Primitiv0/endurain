@@ -1,23 +1,19 @@
 import threading
-from datetime import datetime, timedelta, timezone
+import time
+from datetime import UTC, datetime, timedelta
+
+import activities.activity.crud as activities_crud
+import activities.activity.schema as activities_schema
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import users.users.crud as users_crud
+import users.users_integrations.crud as user_integrations_crud
+import users.users_integrations.models as user_integrations_models
+from core.database import SessionLocal
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from stravalib.client import Client as StravaClient
 from stravalib.exc import Fault as StravaFault
-import time
-
-import core.cryptography as core_cryptography
-import core.logger as core_logger
-
-import activities.activity.schema as activities_schema
-import activities.activity.crud as activities_crud
-
-import users.users_integrations.crud as user_integrations_crud
-import users.users_integrations.models as user_integrations_models
-
-import users.users.crud as users_crud
-
-from core.database import SessionLocal
 
 
 class StravaRateLimitTracker:
@@ -41,9 +37,7 @@ class StravaRateLimitTracker:
         self._short_term_reset: datetime | None = None
         self._long_term_reset: datetime | None = None
 
-    def mark_rate_limited(
-        self, is_long_term: bool = False
-    ) -> None:
+    def mark_rate_limited(self, is_long_term: bool = False) -> None:
         """
         Record that a rate limit was hit.
 
@@ -51,30 +45,26 @@ class StravaRateLimitTracker:
             is_long_term: True for daily limit,
                 False for 15-min limit.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
             if is_long_term:
                 # Reset at next UTC midnight
-                tomorrow = (
-                    now + timedelta(days=1)
-                ).replace(
-                    hour=0, minute=0,
-                    second=0, microsecond=0,
+                tomorrow = (now + timedelta(days=1)).replace(
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
                 )
                 self._long_term_reset = tomorrow
                 core_logger.print_to_log(
-                    "Strava daily rate limit hit. "
-                    f"Skipping until {tomorrow}",
+                    f"Strava daily rate limit hit. Skipping until {tomorrow}",
                     "warning",
                 )
             else:
-                reset_at = now + timedelta(
-                    seconds=self.SHORT_TERM_COOLDOWN_SECONDS
-                )
+                reset_at = now + timedelta(seconds=self.SHORT_TERM_COOLDOWN_SECONDS)
                 self._short_term_reset = reset_at
                 core_logger.print_to_log(
-                    "Strava 15-min rate limit hit. "
-                    f"Skipping until {reset_at}",
+                    f"Strava 15-min rate limit hit. Skipping until {reset_at}",
                     "warning",
                 )
 
@@ -85,17 +75,11 @@ class StravaRateLimitTracker:
         Returns:
             True if currently rate-limited.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         with self._lock:
-            if (
-                self._long_term_reset
-                and now < self._long_term_reset
-            ):
+            if self._long_term_reset and now < self._long_term_reset:
                 return True
-            if (
-                self._short_term_reset
-                and now < self._short_term_reset
-            ):
+            if self._short_term_reset and now < self._short_term_reset:
                 return True
             # Clear expired entries
             self._long_term_reset = None
@@ -119,19 +103,13 @@ def is_strava_rate_limit_error(err: Exception) -> bool:
     """
     if isinstance(err, StravaFault):
         response = getattr(err, "response", None)
-        if response is not None:
-            if getattr(response, "status_code", 0) == 429:
-                return True
+        if response is not None and getattr(response, "status_code", 0) == 429:
+            return True
     err_str = str(err).lower()
-    return (
-        "rate limit" in err_str
-        or "429" in err_str
-    )
+    return "rate limit" in err_str or "429" in err_str
 
 
-def _noop_rate_limiter(
-    response_headers: dict, method: str
-) -> None:
+def _noop_rate_limiter(response_headers: dict, method: str) -> None:
     """
     No-op rate limiter replacement for stravalib.
 
@@ -146,8 +124,7 @@ def refresh_strava_tokens(is_startup: bool = False):
     # Skip if Strava rate limit is active
     if rate_limit_tracker.is_rate_limited():
         core_logger.print_to_log(
-            "Strava rate limit active, skipping"
-            " token refresh",
+            "Strava rate limit active, skipping token refresh",
             "warning",
         )
         return
@@ -165,15 +142,11 @@ def refresh_strava_tokens(is_startup: bool = False):
 
 def refresh_user_strava_token(user_id: int, db: Session, is_startup: bool = False):
     # Get the user integrations by user ID
-    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(
-        user_id, db
-    )
+    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(user_id, db)
 
     if user_integrations is None:
         # Log an informational event if the user integrations are not found
-        core_logger.print_to_log(
-            f"User {user_id}: User integrations not found. Will skip processing"
-        )
+        core_logger.print_to_log(f"User {user_id}: User integrations not found. Will skip processing")
 
         # Return early since we cannot refresh tokens without user integrations
         return
@@ -186,53 +159,35 @@ def refresh_user_strava_token(user_id: int, db: Session, is_startup: bool = Fals
         and user_integrations.strava_client_id is not None
         and user_integrations.strava_client_secret is not None
     ):
-        refresh_time = user_integrations.strava_token_expires_at.replace(
-            tzinfo=timezone.utc
-        ) - timedelta(minutes=60)
+        refresh_time = user_integrations.strava_token_expires_at.replace(tzinfo=UTC) - timedelta(minutes=60)
 
-        if datetime.now(timezone.utc) > refresh_time:
+        if datetime.now(UTC) > refresh_time:
             try:
                 strava_client = create_strava_client(user_integrations)
                 tokens = strava_client.refresh_access_token(
-                    client_id=core_cryptography.decrypt_token_fernet(
-                        user_integrations.strava_client_id
-                    ),
-                    client_secret=core_cryptography.decrypt_token_fernet(
-                        user_integrations.strava_client_secret
-                    ),
-                    refresh_token=core_cryptography.decrypt_token_fernet(
-                        user_integrations.strava_refresh_token
-                    ),
+                    client_id=core_cryptography.decrypt_token_fernet(user_integrations.strava_client_id),
+                    client_secret=core_cryptography.decrypt_token_fernet(user_integrations.strava_client_secret),
+                    refresh_token=core_cryptography.decrypt_token_fernet(user_integrations.strava_refresh_token),
                 )
 
                 # Update the user integrations with the tokens
-                user_integrations_crud.link_strava_account(
-                    user_integrations, tokens, db
-                )
+                user_integrations_crud.link_strava_account(user_integrations, tokens, db)
 
                 core_logger.print_to_log(f"User {user_id}: Strava tokens refreshed")
             except Exception as err:
                 # Check for rate limit errors
                 if is_strava_rate_limit_error(err):
                     err_str = str(err).lower()
-                    is_long = (
-                        "long" in err_str
-                        or "daily" in err_str
-                    )
-                    rate_limit_tracker.mark_rate_limited(
-                        is_long_term=is_long
-                    )
+                    is_long = "long" in err_str or "daily" in err_str
+                    rate_limit_tracker.mark_rate_limited(is_long_term=is_long)
                     core_logger.print_to_log(
-                        f"User {user_id}: Strava rate limit hit during token"
-                        " refresh",
+                        f"User {user_id}: Strava rate limit hit during token refresh",
                         "warning",
                     )
                     return
 
                 # Log the exception
-                core_logger.print_to_log(
-                    f"Error in refresh_strava_token: {err}", "error"
-                )
+                core_logger.print_to_log(f"Error in refresh_strava_token: {err}", "error")
 
                 # Raise an HTTPException with a 500 Internal Server Error status code
                 if not is_startup:
@@ -242,25 +197,17 @@ def refresh_user_strava_token(user_id: int, db: Session, is_startup: bool = Fals
                     ) from err
     else:
         # Log an informational event if the user does not have a Strava token
-        core_logger.print_to_log(
-            f"User {user_id}: No Strava token found. Will skip processing"
-        )
+        core_logger.print_to_log(f"User {user_id}: No Strava token found. Will skip processing")
 
 
-def fetch_and_validate_activity(
-    activity_id: int, user_id: int, db: Session
-) -> activities_schema.Activity | None:
+def fetch_and_validate_activity(activity_id: int, user_id: int, db: Session) -> activities_schema.Activity | None:
     # Get the activity by Strava ID from the user
-    activity_db = activities_crud.get_activity_by_strava_id_from_user_id(
-        activity_id, user_id, db
-    )
+    activity_db = activities_crud.get_activity_by_strava_id_from_user_id(activity_id, user_id, db)
 
     # Check if activity is None
     if activity_db:
         # Log an informational event if the activity already exists
-        core_logger.print_to_log(
-            f"User {user_id}: Activity {activity_id} already exists. Will skip processing"
-        )
+        core_logger.print_to_log(f"User {user_id}: Activity {activity_id} already exists. Will skip processing")
 
         # Return None
         return activity_db
@@ -272,9 +219,7 @@ def fetch_user_integrations_and_validate_token(
     user_id: int, db: Session
 ) -> user_integrations_models.UsersIntegrations | None:
     # Get the user integrations by user ID
-    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(
-        user_id, db
-    )
+    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(user_id, db)
 
     # Check if user integrations is None
     if user_integrations is None:
@@ -307,16 +252,12 @@ def create_strava_client(
     try:
         client = StravaClient(
             access_token=(
-                core_cryptography.decrypt_token_fernet(
-                    user_integrations.strava_token
-                )
+                core_cryptography.decrypt_token_fernet(user_integrations.strava_token)
                 if user_integrations.strava_token
                 else None
             ),
             refresh_token=(
-                core_cryptography.decrypt_token_fernet(
-                    user_integrations.strava_refresh_token
-                )
+                core_cryptography.decrypt_token_fernet(user_integrations.strava_refresh_token)
                 if user_integrations.strava_refresh_token
                 else None
             ),
@@ -325,13 +266,9 @@ def create_strava_client(
         )
         # Replace the no-op limiter with our own no-op
         # to suppress stravalib rate limit warnings
-        client.protocol.rate_limiter = (
-            _noop_rate_limiter
-        )
+        client.protocol.rate_limiter = _noop_rate_limiter
         return client
     except Exception as err:
         # Log the error and re-raise the exception
-        core_logger.print_to_log_and_console(
-            f"Error in create_strava_client: {err}", "error", err
-        )
+        core_logger.print_to_log_and_console(f"Error in create_strava_client: {err}", "error", err)
         raise err

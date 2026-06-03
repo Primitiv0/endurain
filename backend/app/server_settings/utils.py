@@ -1,19 +1,17 @@
 from urllib.parse import urlparse
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 import core.cryptography as core_cryptography
 import core.logger as core_logger
-
 import server_settings.crud as server_settings_crud
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
-
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 TILE_MAPS_TEMPLATES = {
     "openstreetmap": {
         "name": "OpenStreetMap",
-        "url_template": "https://{s}.tile.openstreetmap.org/" "{z}/{x}/{y}.png",
+        "url_template": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
         "attribution": '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         "map_background_color": "#e8e8e8",
         "requires_api_key_frontend": False,
@@ -101,14 +99,10 @@ def get_server_settings_for_admin(
     # Decrypt the API key if it exists
     decrypted_api_key = None
     if server_settings.tileserver_api_key:
-        decrypted_api_key = core_cryptography.decrypt_token_fernet(
-            server_settings.tileserver_api_key
-        )
+        decrypted_api_key = core_cryptography.decrypt_token_fernet(server_settings.tileserver_api_key)
 
     # Convert ORM model to schema and override the decrypted API key
-    settings_schema = server_settings_schema.ServerSettingsRead.model_validate(
-        server_settings
-    )
+    settings_schema = server_settings_schema.ServerSettingsRead.model_validate(server_settings)
     return settings_schema.model_copy(update={"tileserver_api_key": decrypted_api_key})
 
 
@@ -122,11 +116,7 @@ def get_tile_maps_templates() -> list[server_settings_schema.TileMapsTemplate]:
     """
     templates = []
     for template_id, template_data in TILE_MAPS_TEMPLATES.items():
-        templates.append(
-            server_settings_schema.TileMapsTemplate(
-                template_id=template_id, **template_data
-            )
-        )
+        templates.append(server_settings_schema.TileMapsTemplate(template_id=template_id, **template_data))
     return templates
 
 
@@ -190,9 +180,7 @@ def get_allowed_tile_domains(db: Session) -> list[str]:
         List of domain patterns for CSP (e.g., ['https://*.tile.openstreetmap.org', 'https://*.stadiamaps.com']).
     """
     # Start with built-in providers
-    allowed_domains: list[str] = (
-        server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
-    )
+    allowed_domains: list[str] = server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
 
     # Add custom tile server domain if configured
     try:

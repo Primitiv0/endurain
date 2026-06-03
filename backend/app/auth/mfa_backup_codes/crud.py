@@ -1,23 +1,19 @@
 """CRUD operations for MFA backup codes."""
 
-from datetime import datetime, timezone
-
-from fastapi import HTTPException, status
-from sqlalchemy import delete, or_, select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
 import auth.mfa_backup_codes.models as mfa_backup_codes_models
 import auth.mfa_backup_codes.utils as mfa_backup_codes_utils
 import auth.password_hasher as auth_password_hasher
-
 import core.decorators as core_decorators
 import core.logger as core_logger
+from fastapi import HTTPException, status
+from sqlalchemy import delete, or_, select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_user_backup_codes(
-    user_id: int, db: Session
-) -> list[mfa_backup_codes_models.MFABackupCode]:
+def get_user_backup_codes(user_id: int, db: Session) -> list[mfa_backup_codes_models.MFABackupCode]:
     """Retrieve all MFA backup codes for a user.
 
     Args:
@@ -37,9 +33,7 @@ def get_user_backup_codes(
 
 
 @core_decorators.handle_db_errors
-def get_user_unused_backup_codes(
-    user_id: int, db: Session
-) -> list[mfa_backup_codes_models.MFABackupCode]:
+def get_user_unused_backup_codes(user_id: int, db: Session) -> list[mfa_backup_codes_models.MFABackupCode]:
     """Retrieve all unused MFA backup codes for a user.
 
     Args:
@@ -52,7 +46,7 @@ def get_user_unused_backup_codes(
     Raises:
         HTTPException: If a database error occurs.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     stmt = select(mfa_backup_codes_models.MFABackupCode).where(
         mfa_backup_codes_models.MFABackupCode.user_id == user_id,
         mfa_backup_codes_models.MFABackupCode.used.is_(False),
@@ -94,9 +88,7 @@ def create_backup_codes(
     # Remove any existing codes within the same transaction so that a failure
     # below leaves the user's previous backup codes intact.
     db.execute(
-        delete(mfa_backup_codes_models.MFABackupCode).where(
-            mfa_backup_codes_models.MFABackupCode.user_id == user_id
-        )
+        delete(mfa_backup_codes_models.MFABackupCode).where(mfa_backup_codes_models.MFABackupCode.user_id == user_id)
     )
 
     plaintext_codes: list[str] = []
@@ -107,24 +99,20 @@ def create_backup_codes(
             mfa_backup_codes_models.MFABackupCode(
                 user_id=user_id,
                 code_hash=code_hash,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
         )
         plaintext_codes.append(code)
 
     db.commit()
 
-    core_logger.print_to_log(
-        f"Created backup codes for user ID {user_id}", "info"
-    )
+    core_logger.print_to_log(f"Created backup codes for user ID {user_id}", "info")
 
     return plaintext_codes
 
 
 @core_decorators.handle_db_errors
-def mark_backup_code_as_used(
-    code_id: int, user_id: int, db: Session
-) -> None:
+def mark_backup_code_as_used(code_id: int, user_id: int, db: Session) -> None:
     """Mark a single backup code as used by primary key.
 
     Args:
@@ -150,13 +138,11 @@ def mark_backup_code_as_used(
         )
 
     db_code.used = True
-    db_code.used_at = datetime.now(timezone.utc)
+    db_code.used_at = datetime.now(UTC)
     db.commit()
     db.refresh(db_code)
 
-    core_logger.print_to_log(
-        f"Marked backup code as used for user ID {user_id}", "info"
-    )
+    core_logger.print_to_log(f"Marked backup code as used for user ID {user_id}", "info")
 
 
 @core_decorators.handle_db_errors
@@ -173,15 +159,11 @@ def delete_user_backup_codes(user_id: int, db: Session) -> int:
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = delete(mfa_backup_codes_models.MFABackupCode).where(
-        mfa_backup_codes_models.MFABackupCode.user_id == user_id
-    )
+    stmt = delete(mfa_backup_codes_models.MFABackupCode).where(mfa_backup_codes_models.MFABackupCode.user_id == user_id)
     result = db.execute(stmt)
     db.commit()
 
     num_deleted = result.rowcount or 0
-    core_logger.print_to_log(
-        f"Deleted {num_deleted} backup codes for user ID: {user_id}", "info"
-    )
+    core_logger.print_to_log(f"Deleted {num_deleted} backup codes for user ID: {user_id}", "info")
 
     return num_deleted

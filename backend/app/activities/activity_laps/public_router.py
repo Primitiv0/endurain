@@ -1,16 +1,14 @@
 """Public (unauthenticated) routes for activity laps."""
 
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
-import activities.activity_laps.schema as activity_laps_schema
-import activities.activity_laps.crud as activity_laps_crud
+from collections.abc import Callable
+from typing import Annotated
 
 import activities.activity.dependencies as activities_dependencies
-
+import activities.activity_laps.crud as activity_laps_crud
+import activities.activity_laps.schema as activity_laps_schema
 import core.database as core_database
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 
@@ -21,9 +19,7 @@ router = APIRouter()
 )
 async def read_public_activities_laps_for_activity_all(
     activity_id: int,
-    validate_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
+    validate_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[activity_laps_schema.ActivityLapsRead] | None:
     """

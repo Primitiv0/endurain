@@ -2,21 +2,18 @@
 
 from typing import Annotated
 
+import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
+import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
+import core.database as core_database
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-
-import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
-import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
-
-import core.database as core_database
 
 router = APIRouter()
 
 
 @router.get(
     "/all",
-    response_model=list[activity_exercise_titles_schema.ActivityExerciseTitles]
-    | None,
+    response_model=list[activity_exercise_titles_schema.ActivityExerciseTitles] | None,
 )
 async def read_public_activities_exercise_titles_all(
     db: Annotated[Session, Depends(core_database.get_db)],

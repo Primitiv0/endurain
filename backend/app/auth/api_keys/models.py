@@ -2,9 +2,10 @@
 
 from datetime import datetime
 from typing import TYPE_CHECKING
+
+from core.database import Base
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from core.database import Base
 
 if TYPE_CHECKING:
     from users.users.models import Users
@@ -55,7 +56,7 @@ class UsersApiKeys(Base):
     key_prefix: Mapped[str] = mapped_column(
         String(8),
         nullable=False,
-        comment=("First 8 chars of the random key part, " "used for UI identification"),
+        comment=("First 8 chars of the random key part, used for UI identification"),
     )
     key_hash: Mapped[str] = mapped_column(
         String(64),
@@ -87,7 +88,7 @@ class UsersApiKeys(Base):
     is_active: Mapped[bool] = mapped_column(
         default=True,
         nullable=False,
-        comment=("Whether the key is active. False = revoked " "(soft delete)"),
+        comment=("Whether the key is active. False = revoked (soft delete)"),
     )
 
     # Relationship to Users model

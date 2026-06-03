@@ -1,17 +1,14 @@
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, Security, HTTPException, status, Query
-from sqlalchemy.orm import Session
-
-import health.constants as health_constants
-
-import health.health_steps.schema as health_steps_schema
-import health.health_steps.crud as health_steps_crud
+from collections.abc import Callable
+from typing import Annotated
 
 import auth.dependencies as auth_dependencies
-
 import core.database as core_database
 import core.dependencies as core_dependencies
+import health.constants as health_constants
+import health.health_steps.crud as health_steps_crud
+import health.health_steps.schema as health_steps_schema
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -23,9 +20,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def read_health_steps_all_pagination(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
@@ -81,12 +76,8 @@ async def read_health_steps_all_pagination(
             pagination values are invalid.
     """
     # Get the total count and paginated records from the database
-    total = health_steps_crud.get_health_steps_number_by_user_id(
-        token_user_id, db, interval
-    )
-    records = health_steps_crud.get_health_steps_by_user_id(
-        token_user_id, db, page_number, num_records, interval
-    )
+    total = health_steps_crud.get_health_steps_number_by_user_id(token_user_id, db, interval)
+    records = health_steps_crud.get_health_steps_by_user_id(token_user_id, db, page_number, num_records, interval)
 
     # Pydantic will convert ORM models to HealthStepsRead via from_attributes=True
     return health_steps_schema.HealthStepsListResponse(
@@ -104,9 +95,7 @@ async def read_health_steps_all_pagination(
 )
 async def create_health_steps(
     health_steps: health_steps_schema.HealthStepsCreate,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -145,9 +134,7 @@ async def create_health_steps(
     date_str = health_steps.date.isoformat()
 
     # Check if health_steps for this date already exists
-    steps_for_date = health_steps_crud.get_health_steps_by_date_and_user_id(
-        token_user_id, date_str, db
-    )
+    steps_for_date = health_steps_crud.get_health_steps_by_date_and_user_id(token_user_id, date_str, db)
 
     if steps_for_date:
         # Convert to update schema with the existing ID and user_id
@@ -155,9 +142,7 @@ async def create_health_steps(
             id=steps_for_date.id, user_id=token_user_id, **health_steps.model_dump()
         )
         # Updates the health_steps in the database and returns it
-        return health_steps_crud.edit_health_steps(
-            token_user_id, health_steps_update, db
-        )
+        return health_steps_crud.edit_health_steps(token_user_id, health_steps_update, db)
     else:
         # Creates the health_steps in the database and returns it
         return health_steps_crud.create_health_steps(token_user_id, health_steps, db)
@@ -170,9 +155,7 @@ async def create_health_steps(
 )
 async def edit_health_steps(
     health_steps: health_steps_schema.HealthStepsUpdate,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -209,14 +192,10 @@ async def edit_health_steps(
     return health_steps_crud.edit_health_steps(token_user_id, health_steps, db)
 
 
-@router.delete(
-    "/{health_steps_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT
-)
+@router.delete("/{health_steps_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_health_steps(
     health_steps_id: int,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),

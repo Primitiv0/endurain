@@ -1,6 +1,5 @@
-from fastapi import HTTPException, status
-
 import websocket.manager as websocket_manager
+from fastapi import HTTPException, status
 
 
 async def notify_frontend(

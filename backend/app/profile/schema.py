@@ -4,8 +4,8 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    StrictStr,
     StrictBool,
+    StrictStr,
     field_validator,
 )
 
@@ -83,10 +83,7 @@ class MFADisableRequest(MFARequest):
         default=None,
         min_length=1,
         max_length=250,
-        description=(
-            "Current password (step-up verification). Required"
-            " when the account has a local password."
-        ),
+        description=("Current password (step-up verification). Required when the account has a local password."),
     )
 
 
@@ -128,10 +125,7 @@ class MFASetupRequest(BaseModel):
         default=None,
         min_length=1,
         max_length=250,
-        description=(
-            "Current password (step-up verification). Required"
-            " when the account has a local password."
-        ),
+        description=("Current password (step-up verification). Required when the account has a local password."),
     )
 
     model_config = ConfigDict(

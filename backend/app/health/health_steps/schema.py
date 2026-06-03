@@ -1,8 +1,8 @@
-from enum import Enum
-from pydantic import BaseModel, ConfigDict, StrictInt, Field, model_validator
 from datetime import date as datetime_date
+from enum import Enum
 
 import health.schema as health_schema
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 
 class Source(Enum):
@@ -35,12 +35,8 @@ class HealthStepsBase(BaseModel):
         - use_enum_values: Uses enum values instead of enum objects in serialization.
     """
 
-    date: datetime_date | None = Field(
-        default=None, description="Calendar date of the steps"
-    )
-    steps: StrictInt | None = Field(
-        default=None, ge=0, description="Number of steps taken"
-    )
+    date: datetime_date | None = Field(default=None, description="Calendar date of the steps")
+    steps: StrictInt | None = Field(default=None, ge=0, description="Number of steps taken")
     source: Source | None = Field(default=None, description="Source of the steps data")
 
     model_config = ConfigDict(
@@ -84,9 +80,7 @@ class HealthStepsRead(HealthStepsBase):
         user_id (StrictInt): Foreign key reference to the user. Required field.
     """
 
-    id: StrictInt = Field(
-        ..., description="Unique identifier for the steps record to update"
-    )
+    id: StrictInt = Field(..., description="Unique identifier for the steps record to update")
     user_id: StrictInt = Field(..., description="Foreign key reference to the user")
 
 
@@ -113,6 +107,4 @@ class HealthStepsListResponse(health_schema.HealthListResponse):
             steps records.
     """
 
-    records: list[HealthStepsRead] = Field(
-        ..., description="List of health steps records"
-    )
+    records: list[HealthStepsRead] = Field(..., description="List of health steps records")

@@ -11,10 +11,9 @@ import ipaddress
 import socket
 from urllib.parse import urlparse
 
-from fastapi import HTTPException, Request, status
-
 import core.config as core_config
 import core.logger as core_logger
+from fastapi import HTTPException, Request, status
 
 
 def _is_trusted_peer(peer_ip: str) -> bool:
@@ -231,13 +230,13 @@ def reject_private_url(url: str, *, purpose: str | None = None) -> None:
         ip_text = sockaddr[0]
         try:
             addr = ipaddress.ip_address(ip_text)
-        except ValueError:
+        except ValueError as err:
             # Defensive: if the resolver hands back
             # something we can't parse, treat as unsafe.
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="URL resolves to an unparseable address",
-            )
+            ) from err
         if _is_private_or_reserved(addr):
             if _is_ssrf_allowlisted(hostname, addr):
                 # Audit trail: every allowlisted private

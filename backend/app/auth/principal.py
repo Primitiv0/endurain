@@ -14,16 +14,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Union
 
 __all__ = [
-    "PasswordCred",
     "AccessTokenCred",
-    "ApiKeyCred",
-    "SessionCookieCred",
-    "OAuthCred",
     "AnyCredential",
+    "ApiKeyCred",
+    "OAuthCred",
+    "PasswordCred",
     "Principal",
+    "SessionCookieCred",
 ]
 
 
@@ -102,13 +101,7 @@ class OAuthCred:
 
 
 #: Union of all credential variant types.
-AnyCredential = Union[
-    PasswordCred,
-    AccessTokenCred,
-    ApiKeyCred,
-    SessionCookieCred,
-    OAuthCred,
-]
+AnyCredential = PasswordCred | AccessTokenCred | ApiKeyCred | SessionCookieCred | OAuthCred
 
 
 # ---------------------------------------------------------------------------
@@ -188,8 +181,5 @@ class Principal:
         if isinstance(self.credential, ApiKeyCred):
             return self.credential.api_key_id
         if isinstance(self.credential, OAuthCred):
-            return (
-                f"{self.credential.provider}"
-                f":{self.credential.external_id}"
-            )
+            return f"{self.credential.provider}:{self.credential.external_id}"
         return None

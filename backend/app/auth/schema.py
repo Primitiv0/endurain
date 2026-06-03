@@ -76,10 +76,7 @@ class MobileSessionResponse(BaseModel):
 
     session_id: StrictStr
     mfa_required: StrictBool = False
-    message: StrictStr = (
-        "Complete authentication by exchanging tokens at "
-        "/public/idp/session/{session_id}/tokens"
-    )
+    message: StrictStr = "Complete authentication by exchanging tokens at /public/idp/session/{session_id}/tokens"
 
 
 class TokenResponseWeb(BaseModel):

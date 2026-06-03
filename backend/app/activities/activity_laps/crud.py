@@ -1,18 +1,13 @@
 """Activity laps CRUD operations."""
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-import activities.activity.models as activity_models
 import activities.activity.crud as activity_crud
-
+import activities.activity.models as activity_models
 import activities.activity_laps.models as activity_laps_models
 import activities.activity_laps.schema as activity_laps_schema
-
-import server_settings.utils as server_settings_utils
-
 import core.decorators as core_decorators
-
+import server_settings.utils as server_settings_utils
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 _LAP_COLUMNS: tuple[str, ...] = (
     "start_time",
@@ -69,10 +64,7 @@ def _to_read_schema(
     Returns:
         An ActivityLapsRead schema instance.
     """
-    schema = (
-        activity_laps_schema.ActivityLapsRead
-        .model_validate(orm_lap)
-    )
+    schema = activity_laps_schema.ActivityLapsRead.model_validate(orm_lap)
     schema.timezone = timezone
     return schema
 
@@ -98,35 +90,23 @@ def get_activity_laps(
     Raises:
         HTTPException: If database error occurs.
     """
-    activity = activity_crud.get_activity_by_id(
-        activity_id, db
-    )
+    activity = activity_crud.get_activity_by_id(activity_id, db)
 
     if not activity:
         return None
 
-    if (
-        token_user_id != activity.user_id
-        and activity.hide_laps
-    ):
+    if token_user_id != activity.user_id and activity.hide_laps:
         return None
 
-    stmt = (
-        select(activity_laps_models.ActivityLaps)
-        .where(
-            activity_laps_models.ActivityLaps
-            .activity_id == activity_id,
-        )
+    stmt = select(activity_laps_models.ActivityLaps).where(
+        activity_laps_models.ActivityLaps.activity_id == activity_id,
     )
     activity_laps = db.scalars(stmt).all()
 
     if not activity_laps:
         return None
 
-    return [
-        _to_read_schema(lap, activity.timezone)
-        for lap in activity_laps
-    ]
+    return [_to_read_schema(lap, activity.timezone) for lap in activity_laps]
 
 
 @core_decorators.handle_db_errors
@@ -134,9 +114,7 @@ def get_activities_laps(
     activity_ids: list[int],
     token_user_id: int,
     db: Session,
-    prefetched_activities: list[
-        activity_models.Activity
-    ] | None = None,
+    prefetched_activities: list[activity_models.Activity] | None = None,
 ) -> list[activity_laps_schema.ActivityLapsRead]:
     """
     Retrieve laps for multiple activities.
@@ -160,39 +138,21 @@ def get_activities_laps(
 
     activities_list = prefetched_activities
     if not activities_list:
-        stmt = (
-            select(activity_models.Activity)
-            .where(
-                activity_models.Activity.id.in_(
-                    activity_ids
-                )
-            )
-        )
+        stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
         activities_list = db.scalars(stmt).all()
 
     if not activities_list:
         return []
 
-    activity_map = {
-        activity.id: activity
-        for activity in activities_list
-    }
+    activity_map = {activity.id: activity for activity in activities_list}
 
-    allowed_ids = [
-        activity.id
-        for activity in activities_list
-        if activity.user_id == token_user_id
-    ]
+    allowed_ids = [activity.id for activity in activities_list if activity.user_id == token_user_id]
 
     if not allowed_ids:
         return []
 
-    stmt = (
-        select(activity_laps_models.ActivityLaps)
-        .where(
-            activity_laps_models.ActivityLaps
-            .activity_id.in_(allowed_ids)
-        )
+    stmt = select(activity_laps_models.ActivityLaps).where(
+        activity_laps_models.ActivityLaps.activity_id.in_(allowed_ids)
     )
     activity_laps = db.scalars(stmt).all()
 
@@ -227,9 +187,7 @@ def get_public_activity_laps(
     Raises:
         HTTPException: If database error occurs.
     """
-    activity = activity_crud.get_activity_by_id(
-        activity_id, db
-    )
+    activity = activity_crud.get_activity_by_id(activity_id, db)
 
     if not activity:
         return None
@@ -237,10 +195,7 @@ def get_public_activity_laps(
     if activity.hide_laps:
         return None
 
-    server_settings = (
-        server_settings_utils
-        .get_server_settings_or_404(db)
-    )
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
 
     if not server_settings.public_shareable_links:
         return None
@@ -248,22 +203,15 @@ def get_public_activity_laps(
     if activity.visibility != 0:
         return None
 
-    stmt = (
-        select(activity_laps_models.ActivityLaps)
-        .where(
-            activity_laps_models.ActivityLaps
-            .activity_id == activity_id,
-        )
+    stmt = select(activity_laps_models.ActivityLaps).where(
+        activity_laps_models.ActivityLaps.activity_id == activity_id,
     )
     activity_laps = db.scalars(stmt).all()
 
     if not activity_laps:
         return None
 
-    return [
-        _to_read_schema(lap, activity.timezone)
-        for lap in activity_laps
-    ]
+    return [_to_read_schema(lap, activity.timezone) for lap in activity_laps]
 
 
 @core_decorators.handle_db_errors

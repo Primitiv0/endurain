@@ -1,23 +1,20 @@
 """Temporary MFA setup secret storage with TTL."""
 
 import hashlib
-import time
 import threading
-
+import time
 from typing import NoReturn
 
-from redis import Redis, RedisError
-
 import core.config as core_config
-import core.logger as core_logger
 import core.cryptography as core_cryptography
+import core.logger as core_logger
 import core.redis as core_redis
-
+from redis import Redis, RedisError
 
 _REDIS_MFA_SECRET_KEY_PREFIX = "endurain:auth:mfa:setup_secret"
 
 
-class MFASecretStoreUnavailable(RuntimeError):
+class MFASecretStoreUnavailableError(RuntimeError):
     """
     Raised when MFA secret storage cannot be reached.
 
@@ -35,7 +32,7 @@ def _raise_store_unavailable(operation: str, err: RedisError) -> NoReturn:
         err: Redis client exception.
 
     Raises:
-        MFASecretStoreUnavailable: Always raised.
+        MFASecretStoreUnavailableError: Always raised.
     """
     try:
         core_redis.raise_redis_storage_unavailable(
@@ -43,10 +40,8 @@ def _raise_store_unavailable(operation: str, err: RedisError) -> NoReturn:
             operation,
             err,
         )
-    except core_redis.RedisStorageUnavailable as store_err:
-        raise MFASecretStoreUnavailable(
-            "MFA secret storage is unavailable"
-        ) from store_err
+    except core_redis.RedisStorageUnavailableError as store_err:
+        raise MFASecretStoreUnavailableError("MFA secret storage is unavailable") from store_err
 
 
 def get_mfa_secret_storage_uri() -> str:
@@ -59,11 +54,7 @@ def get_mfa_secret_storage_uri() -> str:
     Raises:
         None.
     """
-    return (
-        core_config.settings.AUTH_SECURITY_STORAGE_URI
-        or core_config.settings.RATE_LIMIT_STORAGE_URI
-        or "memory://"
-    )
+    return core_config.settings.AUTH_SECURITY_STORAGE_URI or core_config.settings.RATE_LIMIT_STORAGE_URI or "memory://"
 
 
 class MFASecretStore:
@@ -125,23 +116,19 @@ class MFASecretStore:
                 current_time = time.time()
                 with self._lock:
                     expired_users = [
-                        user_id
-                        for user_id, data in self._store.items()
-                        if current_time > data["expires_at"]
+                        user_id for user_id, data in self._store.items() if current_time > data["expires_at"]
                     ]
                     for user_id in expired_users:
                         del self._store[user_id]
                         core_logger.print_to_log(
-                            "Cleaned up expired MFA secret for user "
-                            f"{user_id}",
+                            f"Cleaned up expired MFA secret for user {user_id}",
                             "debug",
                         )
 
                 time.sleep(30)
             except Exception as err:
                 core_logger.print_to_log(
-                    "Error in MFA secret cleanup thread: "
-                    f"{type(err).__name__}",
+                    f"Error in MFA secret cleanup thread: {type(err).__name__}",
                     "error",
                     exc=err,
                 )
@@ -175,8 +162,7 @@ class MFASecretStore:
             _log_secret_stored(user_id, self._ttl_seconds)
         except Exception as err:
             core_logger.print_to_log(
-                "Failed to add MFA secret for user "
-                f"{user_id}: {type(err).__name__}",
+                f"Failed to add MFA secret for user {user_id}: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -203,9 +189,7 @@ class MFASecretStore:
                 # Check if expired
                 if time.time() > data["expires_at"]:
                     del self._store[user_id]
-                    core_logger.print_to_log(
-                        f"MFA secret expired for user {user_id}", "debug"
-                    )
+                    core_logger.print_to_log(f"MFA secret expired for user {user_id}", "debug")
                     return None
 
                 # Decrypt and return
@@ -215,8 +199,7 @@ class MFASecretStore:
 
         except Exception as err:
             core_logger.print_to_log(
-                "Failed to get MFA secret for user "
-                f"{user_id}: {type(err).__name__}",
+                f"Failed to get MFA secret for user {user_id}: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -239,8 +222,7 @@ class MFASecretStore:
                     )
         except Exception as err:
             core_logger.print_to_log(
-                "Failed to delete MFA secret for user "
-                f"{user_id}: {type(err).__name__}",
+                f"Failed to delete MFA secret for user {user_id}: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -268,8 +250,7 @@ class MFASecretStore:
                 return True
         except Exception as err:
             core_logger.print_to_log(
-                "Failed to check MFA secret for user "
-                f"{user_id}: {type(err).__name__}",
+                f"Failed to check MFA secret for user {user_id}: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -286,13 +267,10 @@ class MFASecretStore:
             with self._lock:
                 cleared_count = len(self._store)
                 self._store.clear()
-                core_logger.print_to_log(
-                    f"Cleared {cleared_count} MFA secrets from store", "info"
-                )
+                core_logger.print_to_log(f"Cleared {cleared_count} MFA secrets from store", "info")
         except Exception as err:
             core_logger.print_to_log(
-                "Failed to clear MFA secret store: "
-                f"{type(err).__name__}",
+                f"Failed to clear MFA secret store: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -309,11 +287,7 @@ class MFASecretStore:
             with self._lock:
                 current_time = time.time()
                 total_count = len(self._store)
-                expired_count = sum(
-                    1
-                    for data in self._store.values()
-                    if current_time > data["expires_at"]
-                )
+                expired_count = sum(1 for data in self._store.values() if current_time > data["expires_at"])
 
                 return {
                     "total_secrets": total_count,
@@ -323,8 +297,7 @@ class MFASecretStore:
                 }
         except Exception as err:
             core_logger.print_to_log(
-                "Failed to get MFA secret store stats: "
-                f"{type(err).__name__}",
+                f"Failed to get MFA secret store stats: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -339,10 +312,7 @@ class MFASecretStore:
         """
         stats = self.get_stats()
         active_secrets = stats.get("active_secrets", 0)
-        return (
-            "MFASecretStore("
-            f"active={active_secrets}, ttl={self._ttl_seconds}s)"
-        )
+        return f"MFASecretStore(active={active_secrets}, ttl={self._ttl_seconds}s)"
 
 
 def _user_id_digest(user_id: int) -> str:
@@ -399,8 +369,7 @@ def _decrypt_secret(encrypted_secret: str, user_id: int) -> str | None:
         return core_cryptography.decrypt_token_fernet(encrypted_secret)
     except Exception as err:
         core_logger.print_to_log(
-            "Failed to decrypt MFA secret for user "
-            f"{user_id}: {type(err).__name__}",
+            f"Failed to decrypt MFA secret for user {user_id}: {type(err).__name__}",
             "error",
             exc=err,
         )
@@ -422,8 +391,7 @@ def _log_secret_stored(user_id: int, ttl_seconds: int) -> None:
         None.
     """
     core_logger.print_to_log(
-        "Securely stored MFA secret for user "
-        f"{user_id} (expires in {ttl_seconds}s)",
+        f"Securely stored MFA secret for user {user_id} (expires in {ttl_seconds}s)",
         "debug",
     )
 
@@ -479,7 +447,7 @@ class RedisMFASecretStore:
             None.
 
         Raises:
-            MFASecretStoreUnavailable: When Redis access fails.
+            MFASecretStoreUnavailableError: When Redis access fails.
             ValueError: If encryption fails.
             HTTPException: If Fernet encryption fails.
         """
@@ -505,7 +473,7 @@ class RedisMFASecretStore:
             Decrypted MFA secret, or None when missing or invalid.
 
         Raises:
-            MFASecretStoreUnavailable: When Redis access fails.
+            MFASecretStoreUnavailableError: When Redis access fails.
         """
         try:
             encrypted_secret = self._redis.get(self._secret_key(user_id))
@@ -530,8 +498,7 @@ class RedisMFASecretStore:
             self._redis.delete(self._secret_key(user_id))
         except RedisError as err:
             core_logger.print_to_log(
-                "Failed to delete MFA setup secret from Redis; "
-                "entry will expire naturally via TTL",
+                "Failed to delete MFA setup secret from Redis; entry will expire naturally via TTL",
                 "warning",
                 exc=err,
             )
@@ -547,7 +514,7 @@ class RedisMFASecretStore:
             True if a secret exists, False otherwise.
 
         Raises:
-            MFASecretStoreUnavailable: When Redis access fails.
+            MFASecretStoreUnavailableError: When Redis access fails.
         """
         try:
             return self._redis.get(self._secret_key(user_id)) is not None
@@ -562,7 +529,7 @@ class RedisMFASecretStore:
             None.
 
         Raises:
-            MFASecretStoreUnavailable: When Redis access fails.
+            MFASecretStoreUnavailableError: When Redis access fails.
         """
         key_pattern = f"{_REDIS_MFA_SECRET_KEY_PREFIX}:*"
         try:
@@ -592,7 +559,7 @@ class RedisMFASecretStore:
                 "error",
                 exc=err,
             )
-            return {"error": "MFASecretStoreUnavailable"}
+            return {"error": "MFASecretStoreUnavailableError"}
         return {
             "total_secrets": total_count,
             "expired_secrets": 0,
@@ -609,10 +576,7 @@ class RedisMFASecretStore:
         """
         stats = self.get_stats()
         active_secrets = stats.get("active_secrets", 0)
-        return (
-            "RedisMFASecretStore("
-            f"active={active_secrets}, ttl={self._ttl_seconds}s)"
-        )
+        return f"RedisMFASecretStore(active={active_secrets}, ttl={self._ttl_seconds}s)"
 
 
 MFASecretStoreBackend = MFASecretStore | RedisMFASecretStore
@@ -645,10 +609,7 @@ def create_mfa_secret_store(
         return RedisMFASecretStore(redis_client)
 
     storage_scheme = normalized_storage_uri.split(":", 1)[0]
-    raise ValueError(
-        "Unsupported MFA secret storage URI scheme: "
-        f"{storage_scheme or 'unknown'}"
-    )
+    raise ValueError(f"Unsupported MFA secret storage URI scheme: {storage_scheme or 'unknown'}")
 
 
 def get_mfa_secret_store() -> MFASecretStoreBackend:

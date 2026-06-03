@@ -1,18 +1,14 @@
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
+import core.decorators as core_decorators
 import health.health_targets.models as health_targets_models
 import health.health_targets.schema as health_targets_schema
-
-import core.decorators as core_decorators
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_health_targets_by_user_id(
-    user_id: int, db: Session
-) -> health_targets_models.HealthTargets | None:
+def get_health_targets_by_user_id(user_id: int, db: Session) -> health_targets_models.HealthTargets | None:
     """
     Retrieve health targets for a specific user.
 
@@ -27,16 +23,12 @@ def get_health_targets_by_user_id(
         HTTPException: 500 error if database query fails.
     """
     # Get the health_targets from the database
-    stmt = select(health_targets_models.HealthTargets).where(
-        health_targets_models.HealthTargets.user_id == user_id
-    )
+    stmt = select(health_targets_models.HealthTargets).where(health_targets_models.HealthTargets.user_id == user_id)
     return db.execute(stmt).scalar_one_or_none()
 
 
 @core_decorators.handle_db_errors
-def create_health_targets(
-    user_id: int, db: Session
-) -> health_targets_models.HealthTargets:
+def create_health_targets(user_id: int, db: Session) -> health_targets_models.HealthTargets:
     """
     Create new health targets for a user.
 
@@ -71,8 +63,7 @@ def create_health_targets(
         # Raise an HTTPException with a 409 Conflict status code
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Duplicate entry error. Check if there is "
-            "already an entry created for the user",
+            detail="Duplicate entry error. Check if there is already an entry created for the user",
         ) from integrity_error
 
 

@@ -1,6 +1,7 @@
 """User privacy settings Pydantic schemas and validators."""
 
 from enum import Enum
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -57,42 +58,20 @@ class UsersPrivacySettingsBase(BaseModel):
         default=ActivityVisibility.PUBLIC,
         description="Default activity visibility (public, followers, private)",
     )
-    hide_activity_start_time: StrictBool | None = Field(
-        default=False, description="Hide activity start time"
-    )
-    hide_activity_location: StrictBool | None = Field(
-        default=False, description="Hide activity location"
-    )
-    hide_activity_map: StrictBool | None = Field(
-        default=False, description="Hide activity map"
-    )
-    hide_activity_hr: StrictBool | None = Field(
-        default=False, description="Hide activity heart rate"
-    )
-    hide_activity_power: StrictBool | None = Field(
-        default=False, description="Hide activity power"
-    )
-    hide_activity_cadence: StrictBool | None = Field(
-        default=False, description="Hide activity cadence"
-    )
-    hide_activity_elevation: StrictBool | None = Field(
-        default=False, description="Hide activity elevation"
-    )
-    hide_activity_speed: StrictBool | None = Field(
-        default=False, description="Hide activity speed"
-    )
-    hide_activity_pace: StrictBool | None = Field(
-        default=False, description="Hide activity pace"
-    )
-    hide_activity_laps: StrictBool | None = Field(
-        default=False, description="Hide activity laps"
-    )
+    hide_activity_start_time: StrictBool | None = Field(default=False, description="Hide activity start time")
+    hide_activity_location: StrictBool | None = Field(default=False, description="Hide activity location")
+    hide_activity_map: StrictBool | None = Field(default=False, description="Hide activity map")
+    hide_activity_hr: StrictBool | None = Field(default=False, description="Hide activity heart rate")
+    hide_activity_power: StrictBool | None = Field(default=False, description="Hide activity power")
+    hide_activity_cadence: StrictBool | None = Field(default=False, description="Hide activity cadence")
+    hide_activity_elevation: StrictBool | None = Field(default=False, description="Hide activity elevation")
+    hide_activity_speed: StrictBool | None = Field(default=False, description="Hide activity speed")
+    hide_activity_pace: StrictBool | None = Field(default=False, description="Hide activity pace")
+    hide_activity_laps: StrictBool | None = Field(default=False, description="Hide activity laps")
     hide_activity_workout_sets_steps: StrictBool | None = Field(
         default=False, description="Hide activity workout sets and steps"
     )
-    hide_activity_gear: StrictBool | None = Field(
-        default=False, description="Hide activity gear"
-    )
+    hide_activity_gear: StrictBool | None = Field(default=False, description="Hide activity gear")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -128,9 +107,5 @@ class UsersPrivacySettingsRead(UsersPrivacySettingsBase):
         user_id: Foreign key reference to the user.
     """
 
-    id: StrictInt = Field(
-        ..., ge=1, description="Unique identifier for privacy settings"
-    )
-    user_id: StrictInt = Field(
-        ..., ge=1, description="Foreign key reference to the user"
-    )
+    id: StrictInt = Field(..., ge=1, description="Unique identifier for privacy settings")
+    user_id: StrictInt = Field(..., ge=1, description="Foreign key reference to the user")

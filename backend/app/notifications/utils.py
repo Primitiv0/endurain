@@ -1,22 +1,18 @@
 """Utility functions for notification creation."""
 
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-
-from core.database import SessionLocal
 import core.logger as core_logger
-
 import notifications.constants as notifications_constants
 import notifications.crud as notifications_crud
 import notifications.models as notifications_models
 import notifications.schema as notifications_schema
-
 import users.users.crud as users_crud
 import users.users.models as users_models
 import users.users.utils as users_utils
-
 import websocket.manager as websocket_manager
 import websocket.utils as websocket_utils
+from core.database import SessionLocal
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 
 async def _create_and_notify(
@@ -125,7 +121,7 @@ async def create_new_duplicate_start_time_activity_notification(
                         "activity_id": activity_id,
                     },
                 ),
-                "NEW_DUPLICATE_ACTIVITY_START_TIME" "_NOTIFICATION",
+                "NEW_DUPLICATE_ACTIVITY_START_TIME_NOTIFICATION",
                 user_id,
                 websocket_manager,
                 db,
@@ -134,8 +130,7 @@ async def create_new_duplicate_start_time_activity_notification(
             raise http_err
         except Exception as err:
             core_logger.print_to_log(
-                "Error in create_new_duplicate_start_time_activity"
-                f"_notification: {err}",
+                f"Error in create_new_duplicate_start_time_activity_notification: {err}",
                 "error",
                 exc=err,
             )
@@ -233,16 +228,14 @@ async def create_accepted_follower_request_notification(
         return await _create_and_notify(
             notifications_schema.NotificationCreate(
                 user_id=target_user_id,
-                type=(
-                    notifications_constants.NotificationType.NEW_FOLLOWER_REQUEST_ACCEPTED
-                ),
+                type=(notifications_constants.NotificationType.NEW_FOLLOWER_REQUEST_ACCEPTED),
                 options={
                     "user_id": user_id,
                     "user_name": user.name,
                     "user_username": user.username,
                 },
             ),
-            "NEW_FOLLOWER_REQUEST_ACCEPTED" "_NOTIFICATION",
+            "NEW_FOLLOWER_REQUEST_ACCEPTED_NOTIFICATION",
             user_id,
             websocket_manager,
             db,
@@ -286,16 +279,14 @@ async def create_admin_new_sign_up_approval_request_notification(
             await _create_and_notify(
                 notifications_schema.NotificationCreate(
                     user_id=admin.id,
-                    type=(
-                        notifications_constants.NotificationType.ADMIN_NEW_SIGN_UP_APPROVAL_REQUEST
-                    ),
+                    type=(notifications_constants.NotificationType.ADMIN_NEW_SIGN_UP_APPROVAL_REQUEST),
                     options={
                         "user_id": user.id,
                         "user_name": user.name,
                         "user_username": (user.username),
                     },
                 ),
-                "ADMIN_NEW_SIGN_UP_APPROVAL" "_REQUEST_NOTIFICATION",
+                "ADMIN_NEW_SIGN_UP_APPROVAL_REQUEST_NOTIFICATION",
                 admin.id,
                 websocket_manager,
                 db,
@@ -304,8 +295,7 @@ async def create_admin_new_sign_up_approval_request_notification(
         raise http_err
     except Exception as err:
         core_logger.print_to_log(
-            "Error in create_admin_new_sign_up_approval_request"
-            f"_notification: {err}",
+            f"Error in create_admin_new_sign_up_approval_request_notification: {err}",
             "error",
             exc=err,
         )
@@ -334,9 +324,7 @@ async def create_garmin_token_expired_notification(
             await _create_and_notify(
                 notifications_schema.NotificationCreate(
                     user_id=user_id,
-                    type=(
-                        notifications_constants.NotificationType.GARMIN_TOKEN_EXPIRED
-                    ),
+                    type=(notifications_constants.NotificationType.GARMIN_TOKEN_EXPIRED),
                     options={},
                 ),
                 "GARMIN_TOKEN_EXPIRED_NOTIFICATION",

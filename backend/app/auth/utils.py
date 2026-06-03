@@ -5,35 +5,28 @@ Provides credential verification, JWT/CSRF token creation, and the
 both password and PKCE login flows.
 """
 
-from datetime import datetime, timedelta, timezone
-from fastapi import (
-    HTTPException,
-    status,
-    Response,
-    Request,
-)
-from fastapi.responses import JSONResponse
 import secrets
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy.orm import Session
-
 import auth.constants as auth_constants
-import auth.password_hasher as auth_password_hasher
-import auth.token_manager as auth_token_manager
-import auth.schema as auth_schema
-
-import auth.oauth_state.crud as oauth_state_crud
-
 import auth.identity_providers.utils as idp_utils
-
+import auth.oauth_state.crud as oauth_state_crud
+import auth.password_hasher as auth_password_hasher
+import auth.schema as auth_schema
+import auth.sessions.utils as users_session_utils
+import auth.token_manager as auth_token_manager
+import core.config as core_config
 import users.users.crud as users_crud
 import users.users.schema as users_schema
-
-import auth.sessions.utils as users_session_utils
-
-import core.config as core_config
-
+from fastapi import (
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
 REFRESH_TOKEN_COOKIE_NAME = "endurain_refresh_token"
 REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
@@ -102,9 +95,7 @@ def authenticate_user(
         )
 
     # Verify password and get updated hash if applicable
-    is_password_valid, updated_hash = password_hasher.verify_and_update(
-        password, user.password
-    )
+    is_password_valid, updated_hash = password_hasher.verify_and_update(password, user.password)
     if not is_password_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -114,9 +105,7 @@ def authenticate_user(
 
     # Update user hash if applicable
     if updated_hash:
-        users_crud.edit_user_password(
-            user.id, updated_hash, password_hasher, db, is_hashed=True
-        )
+        users_crud.edit_user_password(user.id, updated_hash, password_hasher, db, is_hashed=True)
 
     # Return the user if the password is correct
     return user
@@ -150,9 +139,7 @@ def create_tokens(
         session_id = str(uuid4())
 
     # Create the access, refresh tokens and csrf token
-    access_token_exp, access_token = token_manager.create_token(
-        session_id, user, auth_token_manager.TokenType.ACCESS
-    )
+    access_token_exp, access_token = token_manager.create_token(session_id, user, auth_token_manager.TokenType.ACCESS)
 
     refresh_token_exp, refresh_token = token_manager.create_token(
         session_id, user, auth_token_manager.TokenType.REFRESH
@@ -199,8 +186,7 @@ def set_refresh_token_cookie(
     response.set_cookie(
         key=REFRESH_TOKEN_COOKIE_NAME,
         value=refresh_token,
-        expires=datetime.now(timezone.utc)
-        + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
+        expires=datetime.now(UTC) + timedelta(days=auth_constants.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
         httponly=True,
         path=REFRESH_TOKEN_COOKIE_PATH,
         secure=_is_secure_cookie_environment(),
@@ -331,7 +317,7 @@ def complete_login(
         # Return access token and CSRF token in body for in-memory storage
         # expires_in / refresh_token_expires_in are seconds-until-expiry
         # per RFC 6749 §5.1
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return {
             "session_id": session_id,
             "access_token": access_token,
@@ -344,7 +330,7 @@ def complete_login(
         # Mobile: All tokens in JSON response body for secure platform storage
         # expires_in / refresh_token_expires_in are seconds-until-expiry
         # per RFC 6749 §5.1
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return {
             "session_id": session_id,
             "access_token": access_token,
@@ -439,8 +425,5 @@ def create_mobile_pkce_session_response(
     return auth_schema.MobileSessionResponse(
         session_id=session_id,
         mfa_required=False,
-        message=(
-            "Complete authentication by exchanging tokens at "
-            "/public/idp/session/{session_id}/tokens"
-        ),
+        message=("Complete authentication by exchanging tokens at /public/idp/session/{session_id}/tokens"),
     )

@@ -1,7 +1,5 @@
 """Tests for user goals database models."""
 
-import pytest
-
 import users.users_goals.models as user_goals_models
 
 
@@ -92,8 +90,8 @@ class TestUserGoalModel:
         model = user_goals_models.UsersGoal
 
         # Assert
-        assert model.id.type.python_type == int
-        assert model.user_id.type.python_type == int
-        assert model.interval.type.python_type == str
-        assert model.activity_type.type.python_type == str
-        assert model.goal_type.type.python_type == str
+        assert model.id.type.python_type is int
+        assert model.user_id.type.python_type is int
+        assert model.interval.type.python_type is str
+        assert model.activity_type.type.python_type is str
+        assert model.goal_type.type.python_type is str

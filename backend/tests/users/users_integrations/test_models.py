@@ -1,7 +1,5 @@
 """Tests for user_integrations.models module."""
 
-import pytest
-
 from users.users_integrations.models import UsersIntegrations
 
 
@@ -154,9 +152,7 @@ class TestUsersIntegrationsModel:
         indexes = UsersIntegrations.__table__.indexes
 
         # Assert
-        user_id_indexes = [
-            idx for idx in indexes if "user_id" in [col.name for col in idx.columns]
-        ]
+        user_id_indexes = [idx for idx in indexes if "user_id" in [col.name for col in idx.columns]]
         assert len(user_id_indexes) > 0
 
 

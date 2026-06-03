@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TypedDict
-
-from geopy.distance import geodesic
-from timezonefinder import TimezoneFinder
 
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
 import users.users_privacy_settings.utils as users_privacy_settings_utils
+from geopy.distance import geodesic
+from timezonefinder import TimezoneFinder
 
 # ISO 8601 datetime format used throughout the import pipeline
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
@@ -50,9 +49,7 @@ def build_activity_privacy_kwargs(
     """
     ups = user_privacy_settings
     return {
-        "visibility": users_privacy_settings_utils.visibility_to_int(
-            ups.default_activity_visibility
-        ),
+        "visibility": users_privacy_settings_utils.visibility_to_int(ups.default_activity_visibility),
         "hide_start_time": ups.hide_activity_start_time or False,
         "hide_location": ups.hide_activity_location or False,
         "hide_map": ups.hide_activity_map or False,
@@ -181,11 +178,7 @@ def filter_waypoints_by_time_range(
     """
     start_dt = datetime.strptime(start_time, _DT_FMT)
     end_dt = datetime.strptime(end_time, _DT_FMT)
-    return [
-        wp
-        for wp in waypoints
-        if start_dt <= datetime.strptime(wp["time"], _DT_FMT) <= end_dt
-    ]
+    return [wp for wp in waypoints if start_dt <= datetime.strptime(wp["time"], _DT_FMT) <= end_dt]
 
 
 def _compute_lap_metrics(
@@ -278,9 +271,7 @@ def _compute_lap_metrics(
         )
         norm_power = activities_utils.calculate_np(lap_power)
 
-    elapsed = (
-        datetime.strptime(end_time, _DT_FMT) - datetime.strptime(start_time, _DT_FMT)
-    ).total_seconds()
+    elapsed = (datetime.strptime(end_time, _DT_FMT) - datetime.strptime(start_time, _DT_FMT)).total_seconds()
 
     return {
         "start_time": start_time,
@@ -408,22 +399,18 @@ def filter_streams_by_time_range(
     """
     # Normalise bounds to UTC-aware for consistent comparisons.
     if start_time.tzinfo is None:
-        start_time = start_time.replace(tzinfo=timezone.utc)
+        start_time = start_time.replace(tzinfo=UTC)
     if end_time.tzinfo is None:
-        end_time = end_time.replace(tzinfo=timezone.utc)
+        end_time = end_time.replace(tzinfo=UTC)
 
     def _parse_wp_time(time_str: str) -> datetime:
         dt = datetime.strptime(time_str, _DT_FMT)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt
 
     return {
-        key: [
-            wp
-            for wp in waypoints
-            if start_time <= _parse_wp_time(wp["time"]) <= end_time
-        ]
+        key: [wp for wp in waypoints if start_time <= _parse_wp_time(wp["time"]) <= end_time]
         for key, waypoints in streams.items()
     }
 
@@ -481,8 +468,6 @@ def calculate_power_metrics(
         Tuple of ``(avg_power, max_power, normalized_power)``.  Any
         value may be ``None`` if the stream contains no valid readings.
     """
-    avg_power, max_power = activities_utils.calculate_avg_and_max(
-        power_waypoints, "power"
-    )
+    avg_power, max_power = activities_utils.calculate_avg_and_max(power_waypoints, "power")
     normalized_power = activities_utils.calculate_np(power_waypoints)
     return avg_power, max_power, normalized_power

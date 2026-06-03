@@ -23,8 +23,6 @@ def validate_view_type(view_type: str) -> None:
     """
     if view_type not in _VALID_VIEW_TYPES:
         raise HTTPException(
-            status_code=(
-                status.HTTP_422_UNPROCESSABLE_ENTITY
-            ),
+            status_code=(status.HTTP_422_UNPROCESSABLE_ENTITY),
             detail="Invalid view type field",
         )

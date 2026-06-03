@@ -1,8 +1,8 @@
-import pytest
-from datetime import datetime, timezone
-from pydantic import ValidationError
+from datetime import UTC, datetime
 
 import auth.sessions.rotated_refresh_tokens.schema as rotated_token_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestRotatedRefreshTokenCreateSchema:
@@ -15,7 +15,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate schema with valid data.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         token = rotated_token_schema.RotatedRefreshTokenCreate(
@@ -38,7 +38,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate requires token_family_id.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -56,7 +56,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate requires hashed_token.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -74,7 +74,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate rotation_count must be >= 0.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -93,7 +93,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate token_family_id max length.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         long_family_id = "a" * 40  # Exceeds 36 character limit
 
         # Act & Assert
@@ -113,7 +113,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate hashed_token max length.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         long_token = "a" * 260  # Exceeds 255 character limit
 
         # Act & Assert
@@ -133,7 +133,7 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate forbids extra fields.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -153,19 +153,14 @@ class TestRotatedRefreshTokenCreateSchema:
         Test RotatedRefreshTokenCreate has from_attributes config.
         """
         # Assert
-        assert (
-            rotated_token_schema.RotatedRefreshTokenCreate.model_config.get(
-                "from_attributes"
-            )
-            is True
-        )
+        assert rotated_token_schema.RotatedRefreshTokenCreate.model_config.get("from_attributes") is True
 
     def test_create_schema_strict_int_validation(self):
         """
         Test RotatedRefreshTokenCreate enforces strict int types.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -190,7 +185,7 @@ class TestRotatedRefreshTokenReadSchema:
         Test RotatedRefreshTokenRead includes id field.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         token = rotated_token_schema.RotatedRefreshTokenRead(
@@ -210,7 +205,7 @@ class TestRotatedRefreshTokenReadSchema:
         Test RotatedRefreshTokenRead requires id field.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -229,7 +224,7 @@ class TestRotatedRefreshTokenReadSchema:
         Test RotatedRefreshTokenRead id must be >= 1.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -259,9 +254,4 @@ class TestRotatedRefreshTokenReadSchema:
         Test RotatedRefreshTokenRead has from_attributes config.
         """
         # Assert
-        assert (
-            rotated_token_schema.RotatedRefreshTokenRead.model_config.get(
-                "from_attributes"
-            )
-            is True
-        )
+        assert rotated_token_schema.RotatedRefreshTokenRead.model_config.get("from_attributes") is True

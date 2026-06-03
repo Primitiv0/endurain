@@ -1,14 +1,12 @@
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
-
-import health.health_targets.schema as health_targets_schema
-import health.health_targets.crud as health_targets_crud
+from collections.abc import Callable
+from typing import Annotated
 
 import auth.dependencies as auth_dependencies
-
 import core.database as core_database
+import health.health_targets.crud as health_targets_crud
+import health.health_targets.schema as health_targets_schema
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -20,9 +18,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def read_health_targets_all(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -66,9 +62,7 @@ async def read_health_targets_all(
 )
 async def update_health_targets(
     health_targets: health_targets_schema.HealthTargetsUpdate,
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),

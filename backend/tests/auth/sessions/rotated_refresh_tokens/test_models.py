@@ -1,5 +1,3 @@
-import pytest
-
 import auth.sessions.rotated_refresh_tokens.models as rotated_token_models
 
 
@@ -13,10 +11,7 @@ class TestRotatedRefreshTokenModel:
         Test RotatedRefreshToken model has correct table name.
         """
         # Assert
-        assert (
-            rotated_token_models.RotatedRefreshToken.__tablename__
-            == "rotated_refresh_tokens"
-        )
+        assert rotated_token_models.RotatedRefreshToken.__tablename__ == "rotated_refresh_tokens"
 
     def test_rotated_refresh_token_model_columns_exist(self):
         """
@@ -47,9 +42,7 @@ class TestRotatedRefreshTokenModel:
         Test RotatedRefreshToken model has correct foreign key.
         """
         # Arrange
-        token_family_id_column = (
-            rotated_token_models.RotatedRefreshToken.token_family_id
-        )
+        token_family_id_column = rotated_token_models.RotatedRefreshToken.token_family_id
 
         # Assert
         assert token_family_id_column.nullable is False
@@ -77,10 +70,10 @@ class TestRotatedRefreshTokenModel:
         model = rotated_token_models.RotatedRefreshToken
 
         # Assert
-        assert model.id.type.python_type == int
-        assert model.token_family_id.type.python_type == str
-        assert model.hashed_token.type.python_type == str
-        assert model.rotation_count.type.python_type == int
+        assert model.id.type.python_type is int
+        assert model.token_family_id.type.python_type is str
+        assert model.hashed_token.type.python_type is str
+        assert model.rotation_count.type.python_type is int
 
     def test_rotated_refresh_token_model_string_lengths(self):
         """

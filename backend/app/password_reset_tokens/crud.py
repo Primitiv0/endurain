@@ -1,14 +1,14 @@
 """CRUD operations for password reset tokens."""
 
-from datetime import datetime, timezone
-
-from sqlalchemy import delete as sa_delete, select, update as sa_update
-from sqlalchemy.orm import Session
-
-import password_reset_tokens.schema as password_reset_tokens_schema
-import password_reset_tokens.models as password_reset_tokens_models
+from datetime import UTC, datetime
 
 import core.decorators as core_decorators
+import password_reset_tokens.models as password_reset_tokens_models
+import password_reset_tokens.schema as password_reset_tokens_schema
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -63,11 +63,9 @@ def get_password_reset_token_by_hash(
         HTTPException: 500 error if database query fails.
     """
     stmt = select(password_reset_tokens_models.PasswordResetToken).where(
-        password_reset_tokens_models.PasswordResetToken.token_hash
-        == token_hash,
+        password_reset_tokens_models.PasswordResetToken.token_hash == token_hash,
         password_reset_tokens_models.PasswordResetToken.used.is_(False),
-        password_reset_tokens_models.PasswordResetToken.expires_at
-        > datetime.now(timezone.utc),
+        password_reset_tokens_models.PasswordResetToken.expires_at > datetime.now(UTC),
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -90,11 +88,9 @@ def claim_password_reset_token(token_hash: str, db: Session) -> int | None:
     stmt = (
         sa_update(password_reset_tokens_models.PasswordResetToken)
         .where(
-            password_reset_tokens_models.PasswordResetToken.token_hash
-            == token_hash,
+            password_reset_tokens_models.PasswordResetToken.token_hash == token_hash,
             password_reset_tokens_models.PasswordResetToken.used.is_(False),
-            password_reset_tokens_models.PasswordResetToken.expires_at
-            > datetime.now(timezone.utc),
+            password_reset_tokens_models.PasswordResetToken.expires_at > datetime.now(UTC),
         )
         .values(used=True)
         .returning(password_reset_tokens_models.PasswordResetToken.user_id)
@@ -172,8 +168,7 @@ def delete_expired_password_reset_tokens(db: Session) -> int:
         HTTPException: 500 error if database operation fails.
     """
     stmt = sa_delete(password_reset_tokens_models.PasswordResetToken).where(
-        password_reset_tokens_models.PasswordResetToken.expires_at
-        < datetime.now(timezone.utc)
+        password_reset_tokens_models.PasswordResetToken.expires_at < datetime.now(UTC)
     )
     result = db.execute(stmt)
     db.commit()

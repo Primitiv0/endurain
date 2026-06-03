@@ -42,9 +42,7 @@ def get_signup_confirmation_email(
     color = core_email_templates.LINK_COLOR_SUCCESS
     # Defense in depth: percent-encode then HTML-escape the link
     # before it lands in href and visible-text contexts.
-    safe_signup_link = html.escape(
-        url_quote(signup_link, safe=":/?=&%#@"), quote=True
-    )
+    safe_signup_link = html.escape(url_quote(signup_link, safe=":/?=&%#@"), quote=True)
 
     body_inner = f"""
             <p>{tr("signup_confirmation.greeting", name=safe_name)}</p>
@@ -130,10 +128,7 @@ def get_admin_signup_notification_email(
     # URL-encode username for query-string safety, then HTML-escape
     # the assembled URL before placing it into href and text contexts.
     encoded_username = url_quote(sign_up_user_username, safe="")
-    admin_link = (
-        f"{email_service.frontend_host}"
-        f"/settings?tab=users&username={encoded_username}"
-    )
+    admin_link = f"{email_service.frontend_host}/settings?tab=users&username={encoded_username}"
     safe_admin_link = html.escape(admin_link, quote=True)
 
     body_inner = f"""

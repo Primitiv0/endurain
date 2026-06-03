@@ -1,38 +1,35 @@
 """CRUD operations for activities."""
 
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from urllib.parse import unquote
 
 import activities.activity.models as activities_models
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
-
-import followers.models as followers_models
-
 import core.logger as core_logger
 import core.sanitization as core_sanitization
-
+import followers.models as followers_models
 import notifications.utils as notifications_utils
-
 import server_settings.utils as server_settings_utils
-
 import websocket.manager as websocket_manager
-
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import (
     and_,
-    delete as sa_delete,
     desc,
     func,
     or_,
     select,
+)
+from sqlalchemy import (
+    delete as sa_delete,
+)
+from sqlalchemy import (
     update as sa_update,
 )
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-
 
 # Mapping from frontend sort keys to model columns
 SORT_MAP = {
@@ -74,10 +71,8 @@ def _visible_to_requester_condition(requester_user_id: int | None):
         accepted_follower_exists = (
             select(followers_models.Follower.follower_id)
             .where(
-                followers_models.Follower.follower_id
-                == requester_user_id,
-                followers_models.Follower.following_id
-                == activities_models.Activity.user_id,
+                followers_models.Follower.follower_id == requester_user_id,
+                followers_models.Follower.following_id == activities_models.Activity.user_id,
                 followers_models.Follower.is_accepted.is_(True),
             )
             .exists()
@@ -115,9 +110,7 @@ def _apply_activity_visibility_filter(
     """
     if user_is_owner:
         return stmt
-    return stmt.where(
-        _visible_to_requester_condition(requester_user_id)
-    )
+    return stmt.where(_visible_to_requester_condition(requester_user_id))
 
 
 def _internal_server_error(err: Exception, context: str) -> HTTPException:
@@ -130,9 +123,7 @@ def _internal_server_error(err: Exception, context: str) -> HTTPException:
     Returns:
         HTTPException with a 500 status code.
     """
-    core_logger.print_to_log(
-        f"Error in {context}: {err}", "error", exc=err
-    )
+    core_logger.print_to_log(f"Error in {context}: {err}", "error", exc=err)
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Internal Server Error",
@@ -165,11 +156,7 @@ def _serialize_and_mask(
     result: list[activities_schema.Activity] = []
     for orm_activity in activities:
         schema = activities_utils.serialize_activity(orm_activity)
-        is_owner = (
-            not force_non_owner
-            and requester_user_id is not None
-            and orm_activity.user_id == requester_user_id
-        )
+        is_owner = not force_non_owner and requester_user_id is not None and orm_activity.user_id == requester_user_id
         activities_utils.apply_visibility_mask(
             schema,
             is_owner=is_owner,
@@ -198,18 +185,10 @@ def _apply_name_search(
     pattern = f"%{activities_utils.escape_like(raw)}%"
     return stmt.where(
         or_(
-            func.lower(activities_models.Activity.name).like(
-                pattern, escape="\\"
-            ),
-            func.lower(activities_models.Activity.town).like(
-                pattern, escape="\\"
-            ),
-            func.lower(activities_models.Activity.city).like(
-                pattern, escape="\\"
-            ),
-            func.lower(activities_models.Activity.country).like(
-                pattern, escape="\\"
-            ),
+            func.lower(activities_models.Activity.name).like(pattern, escape="\\"),
+            func.lower(activities_models.Activity.town).like(pattern, escape="\\"),
+            func.lower(activities_models.Activity.city).like(pattern, escape="\\"),
+            func.lower(activities_models.Activity.country).like(pattern, escape="\\"),
         )
     )
 
@@ -233,16 +212,10 @@ def get_all_activities(
         HTTPException: 500 on database error.
     """
     try:
-        activities = (
-            db.execute(select(activities_models.Activity))
-            .scalars()
-            .all()
-        )
+        activities = db.execute(select(activities_models.Activity)).scalars().all()
         if not activities:
             return None
-        return [
-            activities_utils.serialize_activity(a) for a in activities
-        ]
+        return [activities_utils.serialize_activity(a) for a in activities]
     except SQLAlchemyError as err:
         raise _internal_server_error(err, "get_all_activities") from err
 
@@ -262,16 +235,10 @@ def get_all_activities_no_serialize(
         HTTPException: 500 on database error.
     """
     try:
-        activities = (
-            db.execute(select(activities_models.Activity))
-            .scalars()
-            .all()
-        )
+        activities = db.execute(select(activities_models.Activity)).scalars().all()
         return list(activities) if activities else None
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_all_activities_no_serialize"
-        ) from err
+        raise _internal_server_error(err, "get_all_activities_no_serialize") from err
 
 
 def get_user_activities(
@@ -305,33 +272,21 @@ def get_user_activities(
         HTTPException: 500 on database error.
     """
     try:
-        stmt = select(activities_models.Activity).where(
-            activities_models.Activity.user_id == user_id
-        )
+        stmt = select(activities_models.Activity).where(activities_models.Activity.user_id == user_id)
         stmt = _apply_activity_visibility_filter(
             stmt,
             user_is_owner=user_is_owner,
             requester_user_id=requester_user_id,
         )
         if activity_type:
-            stmt = stmt.where(
-                activities_models.Activity.activity_type == activity_type
-            )
+            stmt = stmt.where(activities_models.Activity.activity_type == activity_type)
         if start_date:
-            stmt = stmt.where(
-                func.date(activities_models.Activity.start_time)
-                >= start_date
-            )
+            stmt = stmt.where(func.date(activities_models.Activity.start_time) >= start_date)
         if end_date:
-            stmt = stmt.where(
-                func.date(activities_models.Activity.start_time)
-                <= end_date
-            )
+            stmt = stmt.where(func.date(activities_models.Activity.start_time) <= end_date)
         if name_search:
             stmt = _apply_name_search(stmt, name_search)
-        stmt = stmt.order_by(
-            desc(activities_models.Activity.start_time)
-        )
+        stmt = stmt.order_by(desc(activities_models.Activity.start_time))
 
         activities = db.execute(stmt).scalars().all()
         if not activities:
@@ -365,9 +320,7 @@ def get_user_activities_by_user_id_and_garminconnect_gear_set(
             select(activities_models.Activity)
             .where(
                 activities_models.Activity.user_id == user_id,
-                activities_models.Activity.garminconnect_gear_id.isnot(
-                    None
-                ),
+                activities_models.Activity.garminconnect_gear_id.isnot(None),
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
@@ -375,7 +328,8 @@ def get_user_activities_by_user_id_and_garminconnect_gear_set(
         if not activities:
             return None
         return _serialize_and_mask(
-            list(activities), requester_user_id=user_id,
+            list(activities),
+            requester_user_id=user_id,
         )
     except SQLAlchemyError as err:
         raise _internal_server_error(
@@ -432,19 +386,11 @@ def get_user_activities_with_pagination(
             requester_user_id=requester_user_id,
         )
         if activity_type:
-            stmt = stmt.where(
-                activities_models.Activity.activity_type == activity_type
-            )
+            stmt = stmt.where(activities_models.Activity.activity_type == activity_type)
         if start_date:
-            stmt = stmt.where(
-                func.date(activities_models.Activity.start_time)
-                >= start_date
-            )
+            stmt = stmt.where(func.date(activities_models.Activity.start_time) >= start_date)
         if end_date:
-            stmt = stmt.where(
-                func.date(activities_models.Activity.start_time)
-                <= end_date
-            )
+            stmt = stmt.where(func.date(activities_models.Activity.start_time) <= end_date)
         if name_search:
             stmt = _apply_name_search(stmt, name_search)
 
@@ -456,30 +402,17 @@ def get_user_activities_with_pagination(
                 func.coalesce(activities_models.Activity.city, ""),
                 func.coalesce(activities_models.Activity.town, ""),
             ]
-            order_cols = [
-                col.asc() if sort_ascending else col.desc()
-                for col in location_cols
-            ]
+            order_cols = [col.asc() if sort_ascending else col.desc() for col in location_cols]
             stmt = stmt.order_by(*order_cols)
         else:
-            sort_column = SORT_MAP.get(
-                sort_by, activities_models.Activity.start_time
-            )
+            sort_column = SORT_MAP.get(sort_by, activities_models.Activity.start_time)
             if sort_column in _NUMERIC_SORT_COLUMNS:
                 ordered = func.coalesce(sort_column, -999999)
-                stmt = stmt.order_by(
-                    ordered.asc() if sort_ascending else ordered.desc()
-                )
+                stmt = stmt.order_by(ordered.asc() if sort_ascending else ordered.desc())
             else:
-                stmt = stmt.order_by(
-                    sort_column.asc()
-                    if sort_ascending
-                    else sort_column.desc()
-                )
+                stmt = stmt.order_by(sort_column.asc() if sort_ascending else sort_column.desc())
 
-        stmt = stmt.offset((page_number - 1) * num_records).limit(
-            num_records
-        )
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
         activities = db.execute(stmt).scalars().all()
         if not activities:
@@ -490,14 +423,10 @@ def get_user_activities_with_pagination(
             force_non_owner=not user_is_owner,
         )
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_user_activities_with_pagination"
-        ) from err
+        raise _internal_server_error(err, "get_user_activities_with_pagination") from err
 
 
-def get_distinct_activity_types_for_user(
-    user_id: int, db: Session
-) -> dict[int, str]:
+def get_distinct_activity_types_for_user(user_id: int, db: Session) -> dict[int, str]:
     """Map distinct activity types owned by a user to names.
 
     Args:
@@ -519,16 +448,12 @@ def get_distinct_activity_types_for_user(
         )
         type_ids = db.execute(stmt).scalars().all()
         return {
-            type_id: activities_utils.ACTIVITY_ID_TO_NAME.get(
-                type_id, "Unknown"
-            )
+            type_id: activities_utils.ACTIVITY_ID_TO_NAME.get(type_id, "Unknown")
             for type_id in type_ids
             if type_id is not None
         }
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_distinct_activity_types_for_user"
-        ) from err
+        raise _internal_server_error(err, "get_distinct_activity_types_for_user") from err
 
 
 def get_user_activities_per_timeframe(
@@ -562,10 +487,8 @@ def get_user_activities_per_timeframe(
             select(activities_models.Activity)
             .where(
                 activities_models.Activity.user_id == user_id,
-                func.date(activities_models.Activity.start_time)
-                >= start.date(),
-                func.date(activities_models.Activity.start_time)
-                <= end.date(),
+                func.date(activities_models.Activity.start_time) >= start.date(),
+                func.date(activities_models.Activity.start_time) <= end.date(),
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
@@ -583,9 +506,7 @@ def get_user_activities_per_timeframe(
             force_non_owner=not user_is_owner,
         )
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_user_activities_per_timeframe"
-        ) from err
+        raise _internal_server_error(err, "get_user_activities_per_timeframe") from err
 
 
 def get_user_activities_per_timeframe_and_activity_type(
@@ -622,10 +543,8 @@ def get_user_activities_per_timeframe_and_activity_type(
             .where(
                 activities_models.Activity.user_id == user_id,
                 activities_models.Activity.activity_type == activity_type,
-                func.date(activities_models.Activity.start_time)
-                >= start.date(),
-                func.date(activities_models.Activity.start_time)
-                <= end.date(),
+                func.date(activities_models.Activity.start_time) >= start.date(),
+                func.date(activities_models.Activity.start_time) <= end.date(),
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
@@ -685,20 +604,14 @@ def get_user_activities_per_timeframe_and_activity_types(
             select(activities_models.Activity)
             .where(
                 activities_models.Activity.user_id == user_id,
-                activities_models.Activity.activity_type.in_(
-                    activity_types
-                ),
-                func.date(activities_models.Activity.start_time)
-                >= start.date(),
-                func.date(activities_models.Activity.start_time)
-                <= end.date(),
+                activities_models.Activity.activity_type.in_(activity_types),
+                func.date(activities_models.Activity.start_time) >= start.date(),
+                func.date(activities_models.Activity.start_time) <= end.date(),
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
         if exclude_hidden:
-            stmt = stmt.where(
-                activities_models.Activity.is_hidden.is_(False)
-            )
+            stmt = stmt.where(activities_models.Activity.is_hidden.is_(False))
         stmt = _apply_activity_visibility_filter(
             stmt,
             user_is_owner=user_is_owner,
@@ -744,8 +657,7 @@ def get_user_following_activities_per_timeframe(
             select(activities_models.Activity)
             .join(
                 followers_models.Follower,
-                followers_models.Follower.following_id
-                == activities_models.Activity.user_id,
+                followers_models.Follower.following_id == activities_models.Activity.user_id,
             )
             .where(
                 and_(
@@ -755,23 +667,17 @@ def get_user_following_activities_per_timeframe(
                 activities_models.Activity.visibility.in_([0, 1]),
                 activities_models.Activity.is_hidden.is_(False),
                 activities_models.Activity.strava_activity_id.is_(None),
-                func.date(activities_models.Activity.start_time)
-                >= start.date(),
-                func.date(activities_models.Activity.start_time)
-                <= end.date(),
+                func.date(activities_models.Activity.start_time) >= start.date(),
+                func.date(activities_models.Activity.start_time) <= end.date(),
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
         activities = db.execute(stmt).scalars().all()
         if not activities:
             return None
-        return _serialize_and_mask(
-            list(activities), force_non_owner=True
-        )
+        return _serialize_and_mask(list(activities), force_non_owner=True)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_user_following_activities_per_timeframe"
-        ) from err
+        raise _internal_server_error(err, "get_user_following_activities_per_timeframe") from err
 
 
 def get_user_following_activities_with_pagination(
@@ -796,8 +702,7 @@ def get_user_following_activities_with_pagination(
             select(activities_models.Activity)
             .join(
                 followers_models.Follower,
-                followers_models.Follower.following_id
-                == activities_models.Activity.user_id,
+                followers_models.Follower.following_id == activities_models.Activity.user_id,
             )
             .where(
                 and_(
@@ -815,18 +720,12 @@ def get_user_following_activities_with_pagination(
         activities = db.execute(stmt).scalars().all()
         if not activities:
             return None
-        return _serialize_and_mask(
-            list(activities), force_non_owner=True
-        )
+        return _serialize_and_mask(list(activities), force_non_owner=True)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_user_following_activities_with_pagination"
-        ) from err
+        raise _internal_server_error(err, "get_user_following_activities_with_pagination") from err
 
 
-def get_user_following_activities(
-    user_id: int, db: Session
-) -> list[activities_schema.Activity] | None:
+def get_user_following_activities(user_id: int, db: Session) -> list[activities_schema.Activity] | None:
     """Get all activities from users a user follows.
 
     Args:
@@ -844,8 +743,7 @@ def get_user_following_activities(
             select(activities_models.Activity)
             .join(
                 followers_models.Follower,
-                followers_models.Follower.following_id
-                == activities_models.Activity.user_id,
+                followers_models.Follower.following_id == activities_models.Activity.user_id,
             )
             .where(
                 and_(
@@ -860,13 +758,9 @@ def get_user_following_activities(
         activities = db.execute(stmt).scalars().all()
         if not activities:
             return None
-        return [
-            activities_utils.serialize_activity(a) for a in activities
-        ]
+        return [activities_utils.serialize_activity(a) for a in activities]
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_user_following_activities"
-        ) from err
+        raise _internal_server_error(err, "get_user_following_activities") from err
 
 
 def get_gear_activities_count_by_user_id(
@@ -899,9 +793,7 @@ def get_gear_activities_count_by_user_id(
         count = db.execute(stmt).scalar()
         return count or 0
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_gear_activities_count_by_user_id"
-        ) from err
+        raise _internal_server_error(err, "get_gear_activities_count_by_user_id") from err
 
 
 def get_user_activities_by_gear_id_and_user_id(
@@ -933,12 +825,11 @@ def get_user_activities_by_gear_id_and_user_id(
         if not activities:
             return None
         return _serialize_and_mask(
-            list(activities), requester_user_id=user_id,
+            list(activities),
+            requester_user_id=user_id,
         )
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_user_activities_by_gear_id_and_user_id"
-        ) from err
+        raise _internal_server_error(err, "get_user_activities_by_gear_id_and_user_id") from err
 
 
 def get_user_activities_by_gear_id_and_user_id_with_pagination(
@@ -978,7 +869,8 @@ def get_user_activities_by_gear_id_and_user_id_with_pagination(
         if not activities:
             return None
         return _serialize_and_mask(
-            list(activities), requester_user_id=user_id,
+            list(activities),
+            requester_user_id=user_id,
         )
     except SQLAlchemyError as err:
         raise _internal_server_error(
@@ -1015,19 +907,13 @@ def get_activity_by_id_from_user_id_or_has_visibility(
         if not activity:
             return None
         schema = activities_utils.serialize_activity(activity)
-        activities_utils.apply_visibility_mask(
-            schema, is_owner=(activity.user_id == user_id)
-        )
+        activities_utils.apply_visibility_mask(schema, is_owner=(activity.user_id == user_id))
         return schema
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_id_from_user_id_or_has_visibility"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_id_from_user_id_or_has_visibility") from err
 
 
-def get_activity_by_id_if_is_public(
-    activity_id: int, db: Session
-) -> activities_schema.Activity | None:
+def get_activity_by_id_if_is_public(activity_id: int, db: Session) -> activities_schema.Activity | None:
     """Get an activity by ID if it is publicly shareable.
 
     Args:
@@ -1041,9 +927,7 @@ def get_activity_by_id_if_is_public(
         HTTPException: 500 on database error.
     """
     try:
-        server_settings = (
-            server_settings_utils.get_server_settings_or_404(db)
-        )
+        server_settings = server_settings_utils.get_server_settings_or_404(db)
         if not server_settings.public_shareable_links:
             return None
 
@@ -1055,19 +939,13 @@ def get_activity_by_id_if_is_public(
         if not activity:
             return None
         schema = activities_utils.serialize_activity(activity)
-        activities_utils.apply_visibility_mask(
-            schema, is_owner=False
-        )
+        activities_utils.apply_visibility_mask(schema, is_owner=False)
         return schema
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_id_if_is_public"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_id_if_is_public") from err
 
 
-def get_activity_by_id(
-    activity_id: int, db: Session
-) -> activities_schema.Activity | None:
+def get_activity_by_id(activity_id: int, db: Session) -> activities_schema.Activity | None:
     """Get an activity by ID without permission checks.
 
     Args:
@@ -1089,9 +967,7 @@ def get_activity_by_id(
             return None
         return activities_utils.serialize_activity(activity)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_id"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_id") from err
 
 
 def get_activity_by_start_time(
@@ -1114,7 +990,7 @@ def get_activity_by_start_time(
         if isinstance(start_time, str):
             start_time = datetime.fromisoformat(start_time)
         if start_time.tzinfo is None:
-            start_time = start_time.replace(tzinfo=timezone.utc)
+            start_time = start_time.replace(tzinfo=UTC)
         stmt = select(activities_models.Activity).where(
             activities_models.Activity.user_id == user_id,
             activities_models.Activity.start_time == start_time,
@@ -1124,14 +1000,10 @@ def get_activity_by_start_time(
             return None
         return activities_utils.serialize_activity(activity)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_start_time"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_start_time") from err
 
 
-def get_activity_by_id_from_user_id(
-    activity_id: int, user_id: int, db: Session
-) -> activities_schema.Activity | None:
+def get_activity_by_id_from_user_id(activity_id: int, user_id: int, db: Session) -> activities_schema.Activity | None:
     """Get a user's activity by ID.
 
     Args:
@@ -1155,9 +1027,7 @@ def get_activity_by_id_from_user_id(
             return None
         return activities_utils.serialize_activity(activity)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_id_from_user_id"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_id_from_user_id") from err
 
 
 def get_activity_by_strava_id_from_user_id(
@@ -1179,17 +1049,14 @@ def get_activity_by_strava_id_from_user_id(
     try:
         stmt = select(activities_models.Activity).where(
             activities_models.Activity.user_id == user_id,
-            activities_models.Activity.strava_activity_id
-            == activity_strava_id,
+            activities_models.Activity.strava_activity_id == activity_strava_id,
         )
         activity = db.execute(stmt).scalar_one_or_none()
         if not activity:
             return None
         return activities_utils.serialize_activity(activity)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_strava_id_from_user_id"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_strava_id_from_user_id") from err
 
 
 def get_activity_by_garminconnect_id_from_user_id(
@@ -1211,22 +1078,17 @@ def get_activity_by_garminconnect_id_from_user_id(
     try:
         stmt = select(activities_models.Activity).where(
             activities_models.Activity.user_id == user_id,
-            activities_models.Activity.garminconnect_activity_id
-            == activity_garminconnect_id,
+            activities_models.Activity.garminconnect_activity_id == activity_garminconnect_id,
         )
         activity = db.execute(stmt).scalar_one_or_none()
         if not activity:
             return None
         return activities_utils.serialize_activity(activity)
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activity_by_garminconnect_id_from_user_id"
-        ) from err
+        raise _internal_server_error(err, "get_activity_by_garminconnect_id_from_user_id") from err
 
 
-def get_activities_if_contains_name(
-    name: str, user_id: int, db: Session
-) -> list[activities_schema.Activity] | None:
+def get_activities_if_contains_name(name: str, user_id: int, db: Session) -> list[activities_schema.Activity] | None:
     """Search a user's activities by partial name match.
 
     Args:
@@ -1242,16 +1104,12 @@ def get_activities_if_contains_name(
     """
     try:
         partial_name = unquote(name).replace("+", " ").lower()
-        pattern = (
-            f"%{activities_utils.escape_like(partial_name)}%"
-        )
+        pattern = f"%{activities_utils.escape_like(partial_name)}%"
         stmt = (
             select(activities_models.Activity)
             .where(
                 activities_models.Activity.user_id == user_id,
-                func.lower(activities_models.Activity.name).like(
-                    pattern, escape="\\"
-                ),
+                func.lower(activities_models.Activity.name).like(pattern, escape="\\"),
             )
             .order_by(desc(activities_models.Activity.start_time))
         )
@@ -1259,12 +1117,11 @@ def get_activities_if_contains_name(
         if not activities:
             return None
         return _serialize_and_mask(
-            list(activities), requester_user_id=user_id,
+            list(activities),
+            requester_user_id=user_id,
         )
     except SQLAlchemyError as err:
-        raise _internal_server_error(
-            err, "get_activities_if_contains_name"
-        ) from err
+        raise _internal_server_error(err, "get_activities_if_contains_name") from err
 
 
 async def create_activity(
@@ -1289,17 +1146,11 @@ async def create_activity(
         HTTPException: 500 on database error.
     """
     try:
-        activity_start_time_exists = get_activity_by_start_time(
-            activity.start_time, activity.user_id, db
-        )
+        activity_start_time_exists = get_activity_by_start_time(activity.start_time, activity.user_id, db)
         if activity_start_time_exists:
             activity.is_hidden = True
 
-        new_activity = (
-            activities_utils.transform_schema_activity_to_model_activity(
-                activity
-            )
-        )
+        new_activity = activities_utils.transform_schema_activity_to_model_activity(activity)
 
         db.add(new_activity)
         db.commit()
@@ -1342,14 +1193,11 @@ def set_activity_thumbnail_path(
         HTTPException: 500 on database error.
     """
     try:
-        stmt = select(activities_models.Activity).where(
-            activities_models.Activity.id == activity_id
-        )
+        stmt = select(activities_models.Activity).where(activities_models.Activity.id == activity_id)
         db_activity = db.execute(stmt).scalar_one_or_none()
         if db_activity is None:
             core_logger.print_to_log(
-                f"Activity {activity_id} not found when setting "
-                "thumbnail path",
+                f"Activity {activity_id} not found when setting thumbnail path",
                 "warning",
             )
             return
@@ -1357,9 +1205,7 @@ def set_activity_thumbnail_path(
         db.commit()
     except SQLAlchemyError as err:
         db.rollback()
-        raise _internal_server_error(
-            err, "set_activity_thumbnail_path"
-        ) from err
+        raise _internal_server_error(err, "set_activity_thumbnail_path") from err
 
 
 def clear_all_activity_thumbnail_paths(db: Session) -> None:
@@ -1372,11 +1218,7 @@ def clear_all_activity_thumbnail_paths(db: Session) -> None:
         None
     """
     try:
-        db.execute(
-            sa_update(activities_models.Activity).values(
-                map_thumbnail_path=None
-            )
-        )
+        db.execute(sa_update(activities_models.Activity).values(map_thumbnail_path=None))
         db.commit()
     except SQLAlchemyError as err:
         db.rollback()
@@ -1400,9 +1242,7 @@ def get_activities_with_thumbnail(
         an empty list on error.
     """
     try:
-        stmt = select(activities_models.Activity).where(
-            activities_models.Activity.map_thumbnail_path.isnot(None)
-        )
+        stmt = select(activities_models.Activity).where(activities_models.Activity.map_thumbnail_path.isnot(None))
         return list(db.execute(stmt).scalars().all())
     except SQLAlchemyError as err:
         core_logger.print_to_log(
@@ -1426,9 +1266,7 @@ def get_activities_without_thumbnail(
         an empty list on error.
     """
     try:
-        stmt = select(activities_models.Activity).where(
-            activities_models.Activity.map_thumbnail_path.is_(None)
-        )
+        stmt = select(activities_models.Activity).where(activities_models.Activity.map_thumbnail_path.is_(None))
         return list(db.execute(stmt).scalars().all())
     except SQLAlchemyError as err:
         core_logger.print_to_log(
@@ -1441,8 +1279,7 @@ def get_activities_without_thumbnail(
 
 def edit_activity(
     user_id: int,
-    activity_attributes: activities_schema.ActivityEdit
-    | activities_schema.Activity,
+    activity_attributes: activities_schema.ActivityEdit | activities_schema.Activity,
     db: Session,
 ) -> activities_schema.Activity:
     """Apply partial updates to a user's activity.
@@ -1478,25 +1315,13 @@ def edit_activity(
         # fields (e.g. private_notes=None) without being silently
         # discarded as the previous `vars()` filter did.
         if not isinstance(activity_attributes, BaseModel):
-            raise TypeError(
-                "activity_attributes must be a Pydantic model"
-            )
-        activity_data = activity_attributes.model_dump(
-            exclude_unset=True
-        )
+            raise TypeError("activity_attributes must be a Pydantic model")
+        activity_data = activity_attributes.model_dump(exclude_unset=True)
 
         if "description" in activity_data:
-            activity_data["description"] = (
-                core_sanitization.sanitize_markdown(
-                    activity_data["description"]
-                )
-            )
+            activity_data["description"] = core_sanitization.sanitize_markdown(activity_data["description"])
         if "private_notes" in activity_data:
-            activity_data["private_notes"] = (
-                core_sanitization.sanitize_markdown(
-                    activity_data["private_notes"]
-                )
-            )
+            activity_data["private_notes"] = core_sanitization.sanitize_markdown(activity_data["private_notes"])
 
         # ``id`` is the primary key — never overwrite it
         activity_data.pop("id", None)
@@ -1514,9 +1339,7 @@ def edit_activity(
         raise _internal_server_error(err, "edit_activity") from err
 
 
-def edit_user_activities_visibility(
-    user_id: int, visibility: int, db: Session
-) -> int:
+def edit_user_activities_visibility(user_id: int, visibility: int, db: Session) -> int:
     """Bulk-update the visibility for every activity of a user.
 
     Args:
@@ -1541,9 +1364,7 @@ def edit_user_activities_visibility(
         return result.rowcount or 0
     except SQLAlchemyError as err:
         db.rollback()
-        raise _internal_server_error(
-            err, "edit_user_activities_visibility"
-        ) from err
+        raise _internal_server_error(err, "edit_user_activities_visibility") from err
 
 
 def bulk_set_activities_gear_id(
@@ -1594,9 +1415,7 @@ def bulk_set_activities_gear_id(
         return total
     except SQLAlchemyError as err:
         db.rollback()
-        raise _internal_server_error(
-            err, "bulk_set_activities_gear_id"
-        ) from err
+        raise _internal_server_error(err, "bulk_set_activities_gear_id") from err
 
 
 def update_activity_gear_id(
@@ -1632,9 +1451,7 @@ def update_activity_gear_id(
         db.commit()
     except SQLAlchemyError as err:
         db.rollback()
-        raise _internal_server_error(
-            err, "update_activity_gear_id"
-        ) from err
+        raise _internal_server_error(err, "update_activity_gear_id") from err
 
 
 def delete_activity(activity_id: int, db: Session) -> None:
@@ -1652,10 +1469,7 @@ def delete_activity(activity_id: int, db: Session) -> None:
             500 on database error.
     """
     try:
-        stmt = (
-            sa_delete(activities_models.Activity)
-            .where(activities_models.Activity.id == activity_id)
-        )
+        stmt = sa_delete(activities_models.Activity).where(activities_models.Activity.id == activity_id)
         result = db.execute(stmt)
         if result.rowcount == 0:
             raise HTTPException(
@@ -1671,9 +1485,7 @@ def delete_activity(activity_id: int, db: Session) -> None:
         raise _internal_server_error(err, "delete_activity") from err
 
 
-def delete_all_strava_activities_for_user(
-    user_id: int, db: Session
-) -> int:
+def delete_all_strava_activities_for_user(user_id: int, db: Session) -> int:
     """Delete every Strava-synced activity owned by a user.
 
     Args:
@@ -1697,6 +1509,4 @@ def delete_all_strava_activities_for_user(
         return result.rowcount or 0
     except SQLAlchemyError as err:
         db.rollback()
-        raise _internal_server_error(
-            err, "delete_all_strava_activities_for_user"
-        ) from err
+        raise _internal_server_error(err, "delete_all_strava_activities_for_user") from err

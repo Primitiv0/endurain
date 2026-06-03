@@ -1,10 +1,7 @@
 """Tests for user_identity_providers.models module."""
 
-import pytest
-from datetime import datetime, timezone
-from sqlalchemy import inspect
-
 from auth.identity_links.models import UsersIdentityProvider
+from sqlalchemy import inspect
 
 
 class TestUserIdentityProviderModel:
@@ -30,9 +27,7 @@ class TestUserIdentityProviderModel:
 
         # Assert
         # Check for foreign key relationships
-        fk_columns = [
-            col.name for col in mapper.columns if hasattr(col, "foreign_keys")
-        ]
+        fk_columns = [col.name for col in mapper.columns if hasattr(col, "foreign_keys")]
         assert "user_id" in fk_columns or "idp_id" in fk_columns
 
     def test_user_identity_provider_model_nullable_fields(self):

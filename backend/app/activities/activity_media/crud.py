@@ -1,19 +1,17 @@
 """CRUD operations for activity media records."""
 
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
 import activities.activity_media.models as activity_media_models
 import activities.activity_media.schema as activity_media_schema
-
 import core.config as core_config
 import core.decorators as core_decorators
 import core.file_uploads as core_file_uploads
 import core.logger as core_logger
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -55,9 +53,7 @@ def get_activity_media(
     Raises:
         HTTPException: If a database error occurs.
     """
-    activity = activity_crud.get_activity_by_id_from_user_id(
-        activity_id, token_user_id, db
-    )
+    activity = activity_crud.get_activity_by_id_from_user_id(activity_id, token_user_id, db)
     if not activity:
         return None
 
@@ -100,19 +96,13 @@ def get_activities_media(
         return []
 
     if not activities:
-        stmt = select(activity_models.Activity).where(
-            activity_models.Activity.id.in_(activity_ids)
-        )
+        stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
         activities = list(db.scalars(stmt).all())
 
     if not activities:
         return []
 
-    allowed_ids = [
-        activity.id
-        for activity in activities
-        if activity.user_id == token_user_id
-    ]
+    allowed_ids = [activity.id for activity in activities if activity.user_id == token_user_id]
     if not allowed_ids:
         return []
 
@@ -123,9 +113,7 @@ def get_activities_media(
 
 
 @core_decorators.handle_db_errors
-def create_activity_media(
-    activity_id: int, media_path: str, db: Session
-) -> activity_media_models.ActivityMedia:
+def create_activity_media(activity_id: int, media_path: str, db: Session) -> activity_media_models.ActivityMedia:
     """
     Create a new activity media record.
 
@@ -156,10 +144,7 @@ def create_activity_media(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Duplicate entry error. Check if path and file name are "
-                "unique."
-            ),
+            detail=("Duplicate entry error. Check if path and file name are unique."),
         ) from integrity_error
 
 
@@ -238,9 +223,7 @@ def edit_activity_media_media_path(
 
 
 @core_decorators.handle_db_errors
-def delete_activity_media(
-    activity_media_id: int, token_user_id: int, db: Session
-) -> None:
+def delete_activity_media(activity_media_id: int, token_user_id: int, db: Session) -> None:
     """
     Delete an activity media record and its underlying file.
 
@@ -273,9 +256,7 @@ def delete_activity_media(
             detail="Activity media not found",
         )
 
-    activity = activity_crud.get_activity_by_id_from_user_id(
-        activity_media.activity_id, token_user_id, db
-    )
+    activity = activity_crud.get_activity_by_id_from_user_id(activity_media.activity_id, token_user_id, db)
     if not activity:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -302,7 +283,6 @@ def delete_activity_media(
             )
         except HTTPException as fs_err:
             core_logger.print_to_log(
-                "Refused to remove activity media outside media dir "
-                f"for id {activity_media_id}: {fs_err.detail}",
+                f"Refused to remove activity media outside media dir for id {activity_media_id}: {fs_err.detail}",
                 "warning",
             )

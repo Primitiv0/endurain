@@ -1,9 +1,7 @@
-import pytest
 from datetime import datetime
-from unittest.mock import MagicMock
 
-import health.health_sleep.sleep_scoring as sleep_scoring
 import health.health_sleep.schema as health_sleep_schema
+import health.health_sleep.sleep_scoring as sleep_scoring
 
 
 class TestCalculateSleepDurationHours:
@@ -83,9 +81,7 @@ class TestCalculateSleepScoreDuration:
         total_seconds = 28800  # 8 hours
 
         # Act
-        score, label = sleep_scoring.calculate_sleep_score_duration(
-            start_time, end_time, total_seconds
-        )
+        score, label = sleep_scoring.calculate_sleep_score_duration(start_time, end_time, total_seconds)
 
         # Assert
         assert score == 100
@@ -181,9 +177,7 @@ class TestCalculateSleepScoreQuality:
         Test quality score with None total sleep.
         """
         # Act
-        score, label = sleep_scoring.calculate_sleep_score_quality(
-            None, None, None, None, None
-        )
+        score, label = sleep_scoring.calculate_sleep_score_quality(None, None, None, None, None)
 
         # Assert
         assert score == 0
@@ -300,9 +294,7 @@ class TestCalculateRemPercentageScore:
         rem_seconds = 6480  # 22.5%
 
         # Act
-        score, label = sleep_scoring.calculate_rem_percentage_score(
-            rem_seconds, total_seconds
-        )
+        score, label = sleep_scoring.calculate_rem_percentage_score(rem_seconds, total_seconds)
 
         # Assert
         assert score >= 90
@@ -317,9 +309,7 @@ class TestCalculateRemPercentageScore:
         rem_seconds = 6048  # 21%
 
         # Act
-        score, label = sleep_scoring.calculate_rem_percentage_score(
-            rem_seconds, total_seconds
-        )
+        score, label = sleep_scoring.calculate_rem_percentage_score(rem_seconds, total_seconds)
 
         # Assert
         assert score >= 80
@@ -351,9 +341,7 @@ class TestCalculateDeepPercentageScore:
         deep_seconds = 5184  # 18%
 
         # Act
-        score, label = sleep_scoring.calculate_deep_percentage_score(
-            deep_seconds, total_seconds
-        )
+        score, label = sleep_scoring.calculate_deep_percentage_score(deep_seconds, total_seconds)
 
         # Assert
         assert score >= 90
@@ -385,9 +373,7 @@ class TestCalculateLightPercentageScore:
         light_seconds = 14400  # 50%
 
         # Act
-        score, label = sleep_scoring.calculate_light_percentage_score(
-            light_seconds, total_seconds
-        )
+        score, label = sleep_scoring.calculate_light_percentage_score(light_seconds, total_seconds)
 
         # Assert
         assert score >= 90

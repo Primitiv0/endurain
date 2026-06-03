@@ -27,26 +27,13 @@ import core.config as core_config
 JWT_ALLOWED_ALGORITHMS: Final[frozenset[str]] = frozenset({"HS256"})
 JWT_ALGORITHM: Final[str] = os.environ.get("ALGORITHM", "HS256")
 if JWT_ALGORITHM not in JWT_ALLOWED_ALGORITHMS:
-    raise ValueError(
-        f"ALGORITHM={JWT_ALGORITHM!r} is not in the allow-list "
-        f"{sorted(JWT_ALLOWED_ALGORITHMS)}."
-    )
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = int(
-    os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 15)
-)
-JWT_REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = int(
-    os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", 7)
-)
+    raise ValueError(f"ALGORITHM={JWT_ALGORITHM!r} is not in the allow-list {sorted(JWT_ALLOWED_ALGORITHMS)}.")
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES: Final[int] = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 15))
+JWT_REFRESH_TOKEN_EXPIRE_DAYS: Final[int] = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 JWT_SECRET_KEY: Final[str | None] = core_config.read_secret("SECRET_KEY")
-SESSION_IDLE_TIMEOUT_ENABLED: Final[bool] = (
-    os.getenv("SESSION_IDLE_TIMEOUT_ENABLED", "false").lower() == "true"
-)
-SESSION_IDLE_TIMEOUT_HOURS: Final[int] = int(
-    os.environ.get("SESSION_IDLE_TIMEOUT_HOURS", 1)
-)
-SESSION_ABSOLUTE_TIMEOUT_HOURS: Final[int] = int(
-    os.environ.get("SESSION_ABSOLUTE_TIMEOUT_HOURS", 24)
-)
+SESSION_IDLE_TIMEOUT_ENABLED: Final[bool] = os.getenv("SESSION_IDLE_TIMEOUT_ENABLED", "false").lower() == "true"
+SESSION_IDLE_TIMEOUT_HOURS: Final[int] = int(os.environ.get("SESSION_IDLE_TIMEOUT_HOURS", 1))
+SESSION_ABSOLUTE_TIMEOUT_HOURS: Final[int] = int(os.environ.get("SESSION_ABSOLUTE_TIMEOUT_HOURS", 24))
 
 if JWT_ACCESS_TOKEN_EXPIRE_MINUTES <= 0:
     raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must be positive")
@@ -119,10 +106,7 @@ REGULAR_ACCESS_SCOPE: Final[tuple[str, ...]] = (
     + SERVER_SETTINGS_REGULAR_SCOPE
 )
 ADMIN_ACCESS_SCOPE: Final[tuple[str, ...]] = (
-    REGULAR_ACCESS_SCOPE
-    + USERS_ADMIN_SCOPE
-    + IDENTITY_PROVIDERS_ADMIN_SCOPE
-    + SERVER_SETTINGS_ADMIN_SCOPE
+    REGULAR_ACCESS_SCOPE + USERS_ADMIN_SCOPE + IDENTITY_PROVIDERS_ADMIN_SCOPE + SERVER_SETTINGS_ADMIN_SCOPE
 )
 
 # Startup invariant: every scope advertised in SCOPE_DICT (which feeds the

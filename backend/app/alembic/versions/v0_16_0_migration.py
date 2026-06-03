@@ -6,7 +6,7 @@ Create Date: 2025-10-05 22:47:48.949687
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
@@ -14,9 +14,9 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "2af2c0629b37"
-down_revision: Union[str, None] = "3c4d5e6f7a8b"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "3c4d5e6f7a8b"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -44,9 +44,7 @@ def upgrade() -> None:
             nullable=False,
             comment="Display name of the IdP",
         ),
-        sa.Column(
-            "slug", sa.String(length=50), nullable=False, comment="URL-safe identifier"
-        ),
+        sa.Column("slug", sa.String(length=50), nullable=False, comment="URL-safe identifier"),
         sa.Column(
             "provider_type",
             sa.String(length=50),
@@ -153,21 +151,15 @@ def upgrade() -> None:
         ["enabled"],
         unique=False,
     )
-    op.create_index(
-        op.f("ix_identity_providers_id"), "identity_providers", ["id"], unique=False
-    )
-    op.create_index(
-        op.f("ix_identity_providers_slug"), "identity_providers", ["slug"], unique=True
-    )
+    op.create_index(op.f("ix_identity_providers_id"), "identity_providers", ["id"], unique=False)
+    op.create_index(op.f("ix_identity_providers_slug"), "identity_providers", ["slug"], unique=True)
 
     # Create table users_identity_providers
     op.create_table(
         "users_identity_providers",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False, comment="User ID"),
-        sa.Column(
-            "idp_id", sa.Integer(), nullable=False, comment="Identity Provider ID"
-        ),
+        sa.Column("idp_id", sa.Integer(), nullable=False, comment="Identity Provider ID"),
         sa.Column(
             "idp_subject",
             sa.String(length=500),
@@ -205,9 +197,7 @@ def upgrade() -> None:
             nullable=True,
             comment="Last refresh",
         ),
-        sa.ForeignKeyConstraint(
-            ["idp_id"], ["identity_providers.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["idp_id"], ["identity_providers.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -311,12 +301,8 @@ def upgrade() -> None:
             nullable=False,
             comment="User ID that the health_steps belongs",
         ),
-        sa.Column(
-            "date", sa.Date(), nullable=False, comment="Health steps date (date)"
-        ),
-        sa.Column(
-            "steps", sa.Integer(), nullable=False, comment="Number of steps taken"
-        ),
+        sa.Column("date", sa.Date(), nullable=False, comment="Health steps date (date)"),
+        sa.Column("steps", sa.Integer(), nullable=False, comment="Number of steps taken"),
         sa.Column(
             "source",
             sa.String(length=250),
@@ -326,9 +312,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_health_steps_user_id"), "health_steps", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_steps_user_id"), "health_steps", ["user_id"], unique=False)
 
     # Migrate data from health_data to health_weight
     op.create_table(
@@ -382,18 +366,14 @@ def upgrade() -> None:
             nullable=True,
             comment="Muscle mass percentage",
         ),
-        sa.Column(
-            "physique_rating", sa.Integer(), nullable=True, comment="Physique rating"
-        ),
+        sa.Column("physique_rating", sa.Integer(), nullable=True, comment="Physique rating"),
         sa.Column(
             "visceral_fat",
             sa.DECIMAL(precision=10, scale=2),
             nullable=True,
             comment="Visceral fat rating",
         ),
-        sa.Column(
-            "metabolic_age", sa.Integer(), nullable=True, comment="Metabolic age"
-        ),
+        sa.Column("metabolic_age", sa.Integer(), nullable=True, comment="Metabolic age"),
         sa.Column(
             "source",
             sa.String(length=250),
@@ -403,9 +383,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_health_weight_user_id"), "health_weight", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_weight_user_id"), "health_weight", ["user_id"], unique=False)
 
     # Copy data from health_data to health_weight
     connection = op.get_bind()
@@ -414,10 +392,10 @@ def upgrade() -> None:
             """
         INSERT INTO health_weight (
             user_id, date, weight, bmi, source,
-            body_fat, body_water, bone_mass, muscle_mass, 
+            body_fat, body_water, bone_mass, muscle_mass,
             physique_rating, visceral_fat, metabolic_age
         )
-        SELECT 
+        SELECT
             user_id, date, weight, bmi, garminconnect_body_composition_id,
             NULL as body_fat, NULL as body_water, NULL as bone_mass, NULL as muscle_mass,
             NULL as physique_rating, NULL as visceral_fat, NULL as metabolic_age
@@ -432,9 +410,7 @@ def upgrade() -> None:
     # Add steps column to health_targets
     op.add_column(
         "health_targets",
-        sa.Column(
-            "steps", sa.Integer(), nullable=True, comment="Number of steps taken"
-        ),
+        sa.Column("steps", sa.Integer(), nullable=True, comment="Number of steps taken"),
     )
     op.add_column(
         "health_targets",
@@ -693,12 +669,8 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_health_sleep_date"), "health_sleep", ["date"], unique=False
-    )
-    op.create_index(
-        op.f("ix_health_sleep_user_id"), "health_sleep", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_sleep_date"), "health_sleep", ["date"], unique=False)
+    op.create_index(op.f("ix_health_sleep_user_id"), "health_sleep", ["user_id"], unique=False)
 
     # Add max_heart_rate column to users table
     op.add_column(
@@ -785,9 +757,7 @@ def downgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("health_data_pkey")),
     )
-    op.create_index(
-        op.f("ix_health_data_user_id"), "health_data", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_health_data_user_id"), "health_data", ["user_id"], unique=False)
 
     # Copy data from health_weight back to health_data
     connection = op.get_bind()
@@ -797,7 +767,7 @@ def downgrade() -> None:
         INSERT INTO health_data (
             user_id, date, weight, bmi, garminconnect_body_composition_id
         )
-        SELECT 
+        SELECT
             user_id, date, weight, bmi, source
         FROM health_weight
     """
@@ -830,9 +800,7 @@ def downgrade() -> None:
     # Drop identity_providers table
     op.drop_index(op.f("ix_identity_providers_slug"), table_name="identity_providers")
     op.drop_index(op.f("ix_identity_providers_id"), table_name="identity_providers")
-    op.drop_index(
-        op.f("ix_identity_providers_enabled"), table_name="identity_providers"
-    )
+    op.drop_index(op.f("ix_identity_providers_enabled"), table_name="identity_providers")
     op.drop_table("identity_providers")
     # Revert the refresh_token column alteration
     op.alter_column(

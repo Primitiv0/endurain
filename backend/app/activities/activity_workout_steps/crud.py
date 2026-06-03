@@ -1,17 +1,13 @@
 """Activity workout steps CRUD operations."""
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-import activities.activity.models as activity_models
 import activities.activity.crud as activity_crud
-
+import activities.activity.models as activity_models
 import activities.activity_workout_steps.models as activity_workout_steps_models
 import activities.activity_workout_steps.schema as activity_workout_steps_schema
-
-import server_settings.utils as server_settings_utils
-
 import core.decorators as core_decorators
+import server_settings.utils as server_settings_utils
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -19,13 +15,7 @@ def get_activity_workout_steps(
     activity_id: int,
     token_user_id: int,
     db: Session,
-) -> (
-    list[
-        activity_workout_steps_models
-        .ActivityWorkoutSteps
-    ]
-    | None
-):
+) -> list[activity_workout_steps_models.ActivityWorkoutSteps] | None:
     """
     Get workout steps for a single activity.
 
@@ -41,26 +31,16 @@ def get_activity_workout_steps(
     Raises:
         HTTPException: If database error occurs.
     """
-    activity = activity_crud.get_activity_by_id(
-        activity_id, db
-    )
+    activity = activity_crud.get_activity_by_id(activity_id, db)
 
     if not activity:
         return None
 
-    if (
-        token_user_id != activity.user_id
-        and activity.hide_workout_sets_steps
-    ):
+    if token_user_id != activity.user_id and activity.hide_workout_sets_steps:
         return None
 
-    stmt = select(
-        activity_workout_steps_models
-        .ActivityWorkoutSteps
-    ).where(
-        activity_workout_steps_models
-        .ActivityWorkoutSteps.activity_id
-        == activity_id,
+    stmt = select(activity_workout_steps_models.ActivityWorkoutSteps).where(
+        activity_workout_steps_models.ActivityWorkoutSteps.activity_id == activity_id,
     )
     workout_steps = db.scalars(stmt).all()
 
@@ -75,13 +55,8 @@ def get_activities_workout_steps(
     activity_ids: list[int],
     token_user_id: int,
     db: Session,
-    activities: (
-        list[activity_models.Activity] | None
-    ) = None,
-) -> list[
-    activity_workout_steps_models
-    .ActivityWorkoutSteps
-]:
+    activities: (list[activity_models.Activity] | None) = None,
+) -> list[activity_workout_steps_models.ActivityWorkoutSteps]:
     """
     Get workout steps for multiple activities.
 
@@ -102,13 +77,7 @@ def get_activities_workout_steps(
         return []
 
     if not activities:
-        stmt = select(
-            activity_models.Activity
-        ).where(
-            activity_models.Activity.id.in_(
-                activity_ids
-            )
-        )
+        stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
         activities = db.scalars(stmt).all()
 
     if not activities:
@@ -117,23 +86,14 @@ def get_activities_workout_steps(
     allowed_ids = [
         activity.id
         for activity in activities
-        if (
-            activity.user_id == token_user_id
-            or not activity.hide_workout_sets_steps
-        )
+        if (activity.user_id == token_user_id or not activity.hide_workout_sets_steps)
     ]
 
     if not allowed_ids:
         return []
 
-    stmt = select(
-        activity_workout_steps_models
-        .ActivityWorkoutSteps
-    ).where(
-        activity_workout_steps_models
-        .ActivityWorkoutSteps.activity_id.in_(
-            allowed_ids
-        )
+    stmt = select(activity_workout_steps_models.ActivityWorkoutSteps).where(
+        activity_workout_steps_models.ActivityWorkoutSteps.activity_id.in_(allowed_ids)
     )
     workout_steps = db.scalars(stmt).all()
 
@@ -147,13 +107,7 @@ def get_activities_workout_steps(
 def get_public_activity_workout_steps(
     activity_id: int,
     db: Session,
-) -> (
-    list[
-        activity_workout_steps_models
-        .ActivityWorkoutSteps
-    ]
-    | None
-):
+) -> list[activity_workout_steps_models.ActivityWorkoutSteps] | None:
     """
     Get workout steps for a public activity.
 
@@ -168,9 +122,7 @@ def get_public_activity_workout_steps(
     Raises:
         HTTPException: If database error occurs.
     """
-    activity = activity_crud.get_activity_by_id(
-        activity_id, db
-    )
+    activity = activity_crud.get_activity_by_id(activity_id, db)
 
     if not activity:
         return None
@@ -178,10 +130,7 @@ def get_public_activity_workout_steps(
     if activity.hide_workout_sets_steps:
         return None
 
-    server_settings = (
-        server_settings_utils
-        .get_server_settings_or_404(db)
-    )
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
 
     if not server_settings.public_shareable_links:
         return None
@@ -189,13 +138,8 @@ def get_public_activity_workout_steps(
     if activity.visibility != 0:
         return None
 
-    stmt = select(
-        activity_workout_steps_models
-        .ActivityWorkoutSteps
-    ).where(
-        activity_workout_steps_models
-        .ActivityWorkoutSteps.activity_id
-        == activity_id,
+    stmt = select(activity_workout_steps_models.ActivityWorkoutSteps).where(
+        activity_workout_steps_models.ActivityWorkoutSteps.activity_id == activity_id,
     )
     workout_steps = db.scalars(stmt).all()
 
@@ -207,10 +151,7 @@ def get_public_activity_workout_steps(
 
 @core_decorators.handle_db_errors
 def create_activity_workout_steps(
-    activity_workout_steps: list[
-        activity_workout_steps_schema
-        .ActivityWorkoutSteps
-    ],
+    activity_workout_steps: list[activity_workout_steps_schema.ActivityWorkoutSteps],
     activity_id: int,
     db: Session,
 ) -> None:
@@ -230,8 +171,7 @@ def create_activity_workout_steps(
         HTTPException: If database error occurs.
     """
     workout_steps = [
-        activity_workout_steps_models
-        .ActivityWorkoutSteps(
+        activity_workout_steps_models.ActivityWorkoutSteps(
             activity_id=activity_id,
             message_index=step.message_index,
             duration_type=step.duration_type,
@@ -240,19 +180,11 @@ def create_activity_workout_steps(
             target_value=step.target_value,
             intensity=step.intensity,
             notes=step.notes,
-            exercise_category=(
-                step.exercise_category
-            ),
+            exercise_category=(step.exercise_category),
             exercise_name=step.exercise_name,
-            exercise_weight=(
-                step.exercise_weight
-            ),
-            weight_display_unit=(
-                step.weight_display_unit
-            ),
-            secondary_target_value=(
-                step.secondary_target_value
-            ),
+            exercise_weight=(step.exercise_weight),
+            weight_display_unit=(step.weight_display_unit),
+            secondary_target_value=(step.secondary_target_value),
         )
         for step in activity_workout_steps
     ]

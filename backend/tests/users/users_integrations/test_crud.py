@@ -1,11 +1,10 @@
 """Tests for user_integrations.crud module."""
 
-from datetime import datetime
 from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
 from users.users_integrations import crud as user_integrations_crud
 from users.users_integrations.models import UsersIntegrations
 
@@ -91,9 +90,7 @@ class TestGetUserIntegrationsByStravaState:
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_integrations
 
         # Act
-        result = user_integrations_crud.get_user_integrations_by_strava_state(
-            "state123", mock_db
-        )
+        result = user_integrations_crud.get_user_integrations_by_strava_state("state123", mock_db)
 
         # Assert
         assert result == mock_integrations
@@ -111,9 +108,7 @@ class TestGetUserIntegrationsByStravaState:
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
-        result = user_integrations_crud.get_user_integrations_by_strava_state(
-            "nonexistent", mock_db
-        )
+        result = user_integrations_crud.get_user_integrations_by_strava_state("nonexistent", mock_db)
 
         # Assert
         assert result is None
@@ -132,9 +127,7 @@ class TestGetUserIntegrationsByStravaState:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            user_integrations_crud.get_user_integrations_by_strava_state(
-                "state", mock_db
-            )
+            user_integrations_crud.get_user_integrations_by_strava_state("state", mock_db)
 
         assert exc_info.value.status_code == 500
 
@@ -157,10 +150,7 @@ class TestCreateUserIntegrations:
         mock_integrations.id = 1
         mock_integrations.user_id = 1
 
-        with patch(
-            "users.users_integrations.crud"
-            ".user_integrations_models.UsersIntegrations"
-        ) as mock_constructor:
+        with patch("users.users_integrations.crud.user_integrations_models.UsersIntegrations") as mock_constructor:
             mock_constructor.return_value = mock_integrations
             mock_db.add = MagicMock()
             mock_db.commit = MagicMock()
@@ -238,17 +228,13 @@ class TestLinkStravaAccount:
             "expires_at": 1234567890,
         }
 
-        with patch(
-            "users.users_integrations.crud" ".core_cryptography.encrypt_token_fernet"
-        ) as mock_encrypt:
+        with patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt:
             mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
             mock_db.commit = MagicMock()
             mock_db.refresh = MagicMock()
 
             # Act
-            user_integrations_crud.link_strava_account(
-                mock_integrations, tokens, mock_db
-            )
+            user_integrations_crud.link_strava_account(mock_integrations, tokens, mock_db)
 
         # Assert
         assert mock_integrations.strava_token == "encrypted_access_token_123"
@@ -273,17 +259,13 @@ class TestLinkStravaAccount:
             "expires_at": 123,
         }
 
-        with patch(
-            "users.users_integrations.crud" ".core_cryptography.encrypt_token_fernet"
-        ):
+        with patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet"):
             mock_db.commit.side_effect = SQLAlchemyError("Database error")
             mock_db.rollback = MagicMock()
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
-                user_integrations_crud.link_strava_account(
-                    mock_integrations, tokens, mock_db
-                )
+                user_integrations_crud.link_strava_account(mock_integrations, tokens, mock_db)
 
             assert exc_info.value.status_code == 500
 
@@ -304,9 +286,7 @@ class TestUnlinkStravaAccount:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
             mock_db.refresh = MagicMock()
@@ -334,9 +314,7 @@ class TestUnlinkStravaAccount:
             - HTTPException with 404 status when not found
         """
         # Arrange
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = None
 
             # Act & Assert
@@ -361,22 +339,17 @@ class TestSetUserStravaClient:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
-            with patch(
-                "users.users_integrations.crud"
-                ".core_cryptography.encrypt_token_fernet"
-            ) as mock_encrypt:
-                mock_get.return_value = mock_integrations
-                mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
-                mock_db.commit = MagicMock()
-                mock_db.refresh = MagicMock()
+        with (
+            patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get,
+            patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt,
+        ):
+            mock_get.return_value = mock_integrations
+            mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
+            mock_db.commit = MagicMock()
+            mock_db.refresh = MagicMock()
 
-                # Act
-                user_integrations_crud.set_user_strava_client(
-                    1, "client_id", "client_secret", mock_db
-                )
+            # Act
+            user_integrations_crud.set_user_strava_client(1, "client_id", "client_secret", mock_db)
 
         # Assert
         assert mock_integrations.strava_client_id == "encrypted_client_id"
@@ -393,16 +366,12 @@ class TestSetUserStravaClient:
             - HTTPException with 404 status
         """
         # Arrange
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = None
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
-                user_integrations_crud.set_user_strava_client(
-                    1, "id", "secret", mock_db
-                )
+                user_integrations_crud.set_user_strava_client(1, "id", "secret", mock_db)
 
             assert exc_info.value.status_code == 404
 
@@ -422,9 +391,7 @@ class TestSetUserStravaState:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -446,9 +413,7 @@ class TestSetUserStravaState:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -470,9 +435,7 @@ class TestSetUserStravaState:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -498,9 +461,7 @@ class TestSetUserStravaSyncGear:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -522,9 +483,7 @@ class TestSetUserStravaSyncGear:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -552,16 +511,12 @@ class TestLinkGarminConnectAccount:
         oauth1 = {"token": "oauth1_token"}
         oauth2 = {"token": "oauth2_token"}
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
             # Act
-            user_integrations_crud.link_garminconnect_account(
-                1, oauth1, oauth2, mock_db
-            )
+            user_integrations_crud.link_garminconnect_account(1, oauth1, oauth2, mock_db)
 
         # Assert
         assert mock_integrations.garminconnect_oauth1 == oauth1
@@ -578,9 +533,7 @@ class TestLinkGarminConnectAccount:
             - HTTPException with 404 status
         """
         # Arrange
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = None
 
             # Act & Assert
@@ -605,9 +558,7 @@ class TestSetUserGarminConnectSyncGear:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -629,9 +580,7 @@ class TestSetUserGarminConnectSyncGear:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -657,9 +606,7 @@ class TestUnlinkGarminConnectAccount:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -682,9 +629,7 @@ class TestUnlinkGarminConnectAccount:
             - HTTPException with 404 status
         """
         # Arrange
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = None
 
             # Act & Assert
@@ -711,17 +656,13 @@ class TestEditUserIntegrations:
         mock_update = MagicMock()
         mock_update.model_dump.return_value = {"strava_sync_gear": True}
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
             mock_db.refresh = MagicMock()
 
             # Act
-            result = user_integrations_crud.edit_user_integrations(
-                mock_update, 1, mock_db
-            )
+            result = user_integrations_crud.edit_user_integrations(mock_update, 1, mock_db)
 
         # Assert
         assert result == mock_integrations
@@ -740,9 +681,7 @@ class TestEditUserIntegrations:
         # Arrange
         mock_update = MagicMock()
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = None
 
             # Act & Assert
@@ -765,9 +704,7 @@ class TestEditUserIntegrations:
         mock_update = MagicMock()
         mock_update.model_dump.return_value = {"strava_sync_gear": True}
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Database error")
             mock_db.rollback = MagicMock()
@@ -797,9 +734,7 @@ class TestLinkStravaAccountDBError:
         mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
         mock_db.rollback = MagicMock()
 
-        with patch(
-            "users.users_integrations.crud.core_cryptography.encrypt_token_fernet"
-        ) as mock_encrypt:
+        with patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt:
             mock_encrypt.return_value = "encrypted"
 
             # Act & Assert
@@ -834,9 +769,7 @@ class TestUnlinkStravaAccountDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()
@@ -865,23 +798,17 @@ class TestSetUserStravaClientDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()
 
-            with patch(
-                "users.users_integrations.crud.core_cryptography.encrypt_token_fernet"
-            ) as mock_encrypt:
+            with patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt:
                 mock_encrypt.return_value = "encrypted"
 
                 # Act & Assert
                 with pytest.raises(HTTPException) as exc_info:
-                    user_integrations_crud.set_user_strava_client(
-                        1, "client_id", "client_secret", mock_db
-                    )
+                    user_integrations_crud.set_user_strava_client(1, "client_id", "client_secret", mock_db)
 
                 assert exc_info.value.status_code == 500
                 mock_db.rollback.assert_called_once()
@@ -903,9 +830,7 @@ class TestSetUserStravaStateDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()
@@ -934,9 +859,7 @@ class TestSetUserStravaSyncGearDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()
@@ -965,18 +888,14 @@ class TestLinkGarminConnectAccountDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
-                user_integrations_crud.link_garminconnect_account(
-                    1, {"key": "value"}, {"key": "value"}, mock_db
-                )
+                user_integrations_crud.link_garminconnect_account(1, {"key": "value"}, {"key": "value"}, mock_db)
 
             assert exc_info.value.status_code == 500
             mock_db.rollback.assert_called_once()
@@ -998,18 +917,14 @@ class TestSetUserGarminConnectSyncGearDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
-                user_integrations_crud.set_user_garminconnect_sync_gear(
-                    1, True, mock_db
-                )
+                user_integrations_crud.set_user_garminconnect_sync_gear(1, True, mock_db)
 
             assert exc_info.value.status_code == 500
             mock_db.rollback.assert_called_once()
@@ -1031,9 +946,7 @@ class TestUnlinkGarminConnectAccountDBError:
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch(
-            "users.users_integrations.crud" ".get_user_integrations_by_user_id"
-        ) as mock_get:
+        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit.side_effect = SQLAlchemyError("Commit failed")
             mock_db.rollback = MagicMock()

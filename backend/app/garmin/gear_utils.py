@@ -1,24 +1,16 @@
+import activities.activity.crud as activities_crud
+import activities.activity.schema as activities_schema
+import core.logger as core_logger
+import garmin.utils as garmin_utils
 import garminconnect
+import gears.gear.crud as gears_crud
+import gears.gear.schema as gears_schema
+import users.users_integrations.crud as user_integrations_crud
+from core.database import SessionLocal
 from sqlalchemy.orm import Session
 
-import core.logger as core_logger
 
-import garmin.utils as garmin_utils
-
-import gears.gear.schema as gears_schema
-import gears.gear.crud as gears_crud
-
-import activities.activity.schema as activities_schema
-import activities.activity.crud as activities_crud
-
-import users.users_integrations.crud as user_integrations_crud
-
-from core.database import SessionLocal
-
-
-def fetch_and_process_gear(
-    garminconnect_client: garminconnect.Garmin, user_id: int, db: Session
-) -> int:
+def fetch_and_process_gear(garminconnect_client: garminconnect.Garmin, user_id: int, db: Session) -> int:
     # Fetch Garmin athlete
     last_used_device = garminconnect_client.get_device_last_used()
 
@@ -33,9 +25,7 @@ def fetch_and_process_gear(
 
     if processed_gears is None:
         # Log an informational event if no gear were found
-        core_logger.print_to_log(
-            f"User {user_id}: No new Garmin Connect gear found: garminconnect_gear is None"
-        )
+        core_logger.print_to_log(f"User {user_id}: No new Garmin Connect gear found: garminconnect_gear is None")
 
         # Return 0 to indicate no gear were processed
         return 0
@@ -49,9 +39,7 @@ def fetch_and_process_gear(
 
 def process_gear(gear, user_id: int, db: Session) -> gears_schema.GearCreate | None:
     # Get the gear by garminconnect uuid from user id
-    gear_db = gears_crud.get_gear_by_garminconnect_id_from_user_id(
-        gear["uuid"], user_id, db
-    )
+    gear_db = gears_crud.get_gear_by_garminconnect_id_from_user_id(gear["uuid"], user_id, db)
 
     # Skip existing gear
     if gear_db:
@@ -60,12 +48,10 @@ def process_gear(gear, user_id: int, db: Session) -> gears_schema.GearCreate | N
     new_gear = gears_schema.GearCreate(
         brand=gear["gearMakeName"] if gear["gearMakeName"] else None,
         model=gear["gearModelName"] if gear["gearModelName"] else None,
-        nickname=(
-            gear["displayName"] if gear["displayName"] else gear["customMakeModel"]
-        ),
+        nickname=(gear["displayName"] if gear["displayName"] else gear["customMakeModel"]),
         gear_type=1 if gear["gearTypeName"] == "Bike" else 2,
         user_id=user_id,
-        active=True if gear["gearStatusName"] == "active" else False,
+        active=gear["gearStatusName"] == "active",
         garminconnect_gear_id=gear["uuid"],
     )
 
@@ -88,11 +74,7 @@ def match_gear_for_activity(
 
 def set_activities_gear(user_id: int, db: Session) -> int:
     # Get user activities
-    activities = (
-        activities_crud.get_user_activities_by_user_id_and_garminconnect_gear_set(
-            user_id, db
-        )
-    )
+    activities = activities_crud.get_user_activities_by_user_id_and_garminconnect_gear_set(user_id, db)
 
     # Skip if no activities
     if activities is None:
@@ -117,9 +99,7 @@ def set_activities_gear(user_id: int, db: Session) -> int:
 
     # Persist via CRUD (single UPDATE per distinct gear_id)
     if gear_assignments:
-        activities_crud.bulk_set_activities_gear_id(
-            user_id, gear_assignments, db
-        )
+        activities_crud.bulk_set_activities_gear_id(user_id, gear_assignments, db)
 
     return len(gear_assignments)
 
@@ -128,14 +108,10 @@ def get_user_gear(user_id: int):
     # Create a new database session using context manager
     with SessionLocal() as db:
         # Log the start of the activities processing
-        core_logger.print_to_log(
-            f"User {user_id}: Started Garmin Connect gear processing"
-        )
+        core_logger.print_to_log(f"User {user_id}: Started Garmin Connect gear processing")
 
         # Get the user integrations by user ID
-        user_integrations = garmin_utils.fetch_user_integrations_and_validate_token(
-            user_id, db
-        )
+        user_integrations = garmin_utils.fetch_user_integrations_and_validate_token(user_id, db)
 
         if user_integrations is None:
             core_logger.print_to_log(f"User {user_id}: Garmin Connect not linked")
@@ -150,23 +126,15 @@ def get_user_gear(user_id: int):
         user_integrations_crud.set_user_garminconnect_sync_gear(user_id, True, db)
 
         # Fetch Garmin Connect gear
-        num_garmiconnect_gear_processed = fetch_and_process_gear(
-            garminconnect_client, user_id, db
-        )
+        num_garmiconnect_gear_processed = fetch_and_process_gear(garminconnect_client, user_id, db)
 
         # Log an informational event for tracing
-        core_logger.print_to_log(
-            f"User {user_id}: {num_garmiconnect_gear_processed} Garmin Connect gear processed"
-        )
+        core_logger.print_to_log(f"User {user_id}: {num_garmiconnect_gear_processed} Garmin Connect gear processed")
 
         # Log an informational event for tracing
-        core_logger.print_to_log(
-            f"User {user_id}: Will parse current activities and set gear if applicable"
-        )
+        core_logger.print_to_log(f"User {user_id}: Will parse current activities and set gear if applicable")
 
         num_gear_activities_set = set_activities_gear(user_id, db)
 
         # Log an informational event for tracing
-        core_logger.print_to_log(
-            f"User {user_id}: {num_gear_activities_set} activities where gear was set"
-        )
+        core_logger.print_to_log(f"User {user_id}: {num_gear_activities_set} activities where gear was set")

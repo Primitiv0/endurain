@@ -40,7 +40,7 @@ class TestUsersApiKeysModel:
     def test_users_api_keys_model_id_type(self):
         """Test id column is a String type."""
         id_column = users_api_keys_models.UsersApiKeys.id
-        assert id_column.type.python_type == str
+        assert id_column.type.python_type is str
 
     def test_users_api_keys_model_user_id_not_nullable(self):
         """Test user_id column is not nullable."""
@@ -56,7 +56,7 @@ class TestUsersApiKeysModel:
 
     def test_users_api_keys_model_name_type(self):
         """Test name column is String type."""
-        assert users_api_keys_models.UsersApiKeys.name.type.python_type == str
+        assert users_api_keys_models.UsersApiKeys.name.type.python_type is str
 
     def test_users_api_keys_model_key_prefix_not_nullable(self):
         """Test key_prefix column is not nullable."""
@@ -64,7 +64,7 @@ class TestUsersApiKeysModel:
 
     def test_users_api_keys_model_key_prefix_type(self):
         """Test key_prefix column is String type."""
-        assert users_api_keys_models.UsersApiKeys.key_prefix.type.python_type == str
+        assert users_api_keys_models.UsersApiKeys.key_prefix.type.python_type is str
 
     def test_users_api_keys_model_key_hash_not_nullable(self):
         """Test key_hash column is not nullable."""
@@ -80,7 +80,7 @@ class TestUsersApiKeysModel:
 
     def test_users_api_keys_model_key_hash_type(self):
         """Test key_hash column is String type."""
-        assert users_api_keys_models.UsersApiKeys.key_hash.type.python_type == str
+        assert users_api_keys_models.UsersApiKeys.key_hash.type.python_type is str
 
     def test_users_api_keys_model_scopes_not_nullable(self):
         """Test scopes column is not nullable."""

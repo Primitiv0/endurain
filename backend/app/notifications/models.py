@@ -1,14 +1,12 @@
 """Notification database models."""
 
 from datetime import datetime
-from typing import Any
-from typing import TYPE_CHECKING
-
-from sqlalchemy import DateTime, ForeignKey, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func
+from typing import TYPE_CHECKING, Any
 
 from core.database import Base
+from sqlalchemy import JSON, DateTime, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 if TYPE_CHECKING:
     from users.users.models import Users

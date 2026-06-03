@@ -1,28 +1,24 @@
 """Utility functions for sign-up token operations."""
 
-from datetime import datetime, timedelta, timezone
-from fastapi import (
-    HTTPException,
-    status,
-)
-from uuid import uuid4
 import hashlib
-
-from sqlalchemy.orm import Session
-
-import sign_up_tokens.email_messages as sign_up_tokens_email_messages
-import sign_up_tokens.schema as sign_up_tokens_schema
-import sign_up_tokens.crud as sign_up_tokens_crud
-
-import users.users.crud as users_crud
-import users.users.models as users_models
-import users.users.utils as users_utils
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 import core.apprise as core_apprise
 import core.i18n as core_i18n
 import core.logger as core_logger
-
+import sign_up_tokens.crud as sign_up_tokens_crud
+import sign_up_tokens.email_messages as sign_up_tokens_email_messages
+import sign_up_tokens.schema as sign_up_tokens_schema
+import users.users.crud as users_crud
+import users.users.models as users_models
+import users.users.utils as users_utils
 from core.database import SessionLocal
+from fastapi import (
+    HTTPException,
+    status,
+)
+from sqlalchemy.orm import Session
 
 
 def create_sign_up_token(user_id: int, db: Session) -> str:
@@ -45,9 +41,8 @@ def create_sign_up_token(user_id: int, db: Session) -> str:
         id=str(uuid4()),
         user_id=user_id,
         token_hash=token_hash,
-        created_at=datetime.now(timezone.utc),
-        expires_at=datetime.now(timezone.utc)
-        + timedelta(hours=24),  # 24 hour expiration
+        created_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC) + timedelta(hours=24),  # 24 hour expiration
         used=False,
     )
 
@@ -92,10 +87,8 @@ async def send_sign_up_email(
 
     # Build localized email using the user's preferred language
     locale = core_i18n.normalize_locale(user.preferred_language)
-    subject, html_content, text_content = (
-        sign_up_tokens_email_messages.get_signup_confirmation_email(
-            user.name, reset_link, email_service, locale
-        )
+    subject, html_content, text_content = sign_up_tokens_email_messages.get_signup_confirmation_email(
+        user.name, reset_link, email_service, locale
     )
 
     # Send email
@@ -139,14 +132,12 @@ async def send_sign_up_admin_approval_email(
     for admin in admins:
         # Use the admin's preferred language for each notification
         locale = core_i18n.normalize_locale(admin.preferred_language)
-        subject, html_content, text_content = (
-            sign_up_tokens_email_messages.get_admin_signup_notification_email(
-                admin.name,
-                user.name,
-                user.username,
-                email_service,
-                locale,
-            )
+        subject, html_content, text_content = sign_up_tokens_email_messages.get_admin_signup_notification_email(
+            admin.name,
+            user.name,
+            user.username,
+            email_service,
+            locale,
         )
 
         # Send email
@@ -196,10 +187,8 @@ async def send_sign_up_approval_email(
 
     # Build localized email using the approved user's preferred language
     locale = core_i18n.normalize_locale(user.preferred_language)
-    subject, html_content, text_content = (
-        sign_up_tokens_email_messages.get_user_signup_approved_email(
-            user.name, user.username, email_service, locale
-        )
+    subject, html_content, text_content = sign_up_tokens_email_messages.get_user_signup_approved_email(
+        user.name, user.username, email_service, locale
     )
 
     # Send email
@@ -275,6 +264,4 @@ def delete_invalid_tokens_from_db() -> None:
 
         # Log the number of deleted tokens
         if num_deleted > 0:
-            core_logger.print_to_log_and_console(
-                f"Deleted {num_deleted} expired sign up tokens", "info"
-            )
+            core_logger.print_to_log_and_console(f"Deleted {num_deleted} expired sign up tokens", "info")

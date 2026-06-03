@@ -1,14 +1,15 @@
 """User session schemas."""
 
+from datetime import datetime
+
 from pydantic import (
     BaseModel,
-    Field,
     ConfigDict,
-    StrictStr,
-    StrictInt,
+    Field,
     StrictBool,
+    StrictInt,
+    StrictStr,
 )
-from datetime import datetime
 
 
 class UsersSessionsBase(BaseModel):
@@ -31,16 +32,10 @@ class UsersSessionsBase(BaseModel):
     id: StrictStr = Field(..., description="Unique session identifier")
     ip_address: StrictStr = Field(..., max_length=45, description="Client IP address")
     device_type: StrictStr = Field(..., max_length=45, description="Device type")
-    operating_system: StrictStr = Field(
-        ..., max_length=45, description="Operating system"
-    )
-    operating_system_version: StrictStr = Field(
-        ..., max_length=45, description="OS version"
-    )
+    operating_system: StrictStr = Field(..., max_length=45, description="Operating system")
+    operating_system_version: StrictStr = Field(..., max_length=45, description="OS version")
     browser: StrictStr = Field(..., max_length=45, description="Browser name")
-    browser_version: StrictStr = Field(
-        ..., max_length=45, description="Browser version"
-    )
+    browser_version: StrictStr = Field(..., max_length=45, description="Browser version")
     created_at: datetime = Field(..., description="Session creation timestamp")
     last_activity_at: datetime = Field(..., description="Last activity timestamp")
     expires_at: datetime = Field(..., description="Session expiration timestamp")
@@ -83,9 +78,7 @@ class UsersSessionsInternal(UsersSessionsBase):
     """
 
     user_id: StrictInt = Field(..., ge=1, description="User ID that owns this session")
-    refresh_token: StrictStr | None = Field(
-        None, description="Hashed session refresh token"
-    )
+    refresh_token: StrictStr | None = Field(None, description="Hashed session refresh token")
     oauth_state_id: StrictStr | None = Field(
         None,
         max_length=64,
@@ -93,24 +86,22 @@ class UsersSessionsInternal(UsersSessionsBase):
     )
     tokens_exchanged: StrictBool = Field(
         default=False,
-        description="Prevents duplicate token exchange for " "mobile",
+        description="Prevents duplicate token exchange for mobile",
     )
     token_family_id: StrictStr = Field(
         ...,
-        description="UUID identifying token family for reuse " "detection",
+        description="UUID identifying token family for reuse detection",
     )
     rotation_count: StrictInt = Field(
         default=0,
         ge=0,
-        description="Number of times refresh token has been " "rotated",
+        description="Number of times refresh token has been rotated",
     )
-    last_rotation_at: datetime | None = Field(
-        None, description="Timestamp of last token rotation"
-    )
+    last_rotation_at: datetime | None = Field(None, description="Timestamp of last token rotation")
     csrf_token_hash: StrictStr | None = Field(
         None,
         max_length=255,
-        description="Hashed CSRF token for refresh " "validation",
+        description="Hashed CSRF token for refresh validation",
     )
 
     model_config = ConfigDict(

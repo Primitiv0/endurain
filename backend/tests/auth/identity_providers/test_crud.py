@@ -1,16 +1,16 @@
 """Tests for identity_providers.crud module."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException
-from sqlalchemy.exc import SQLAlchemyError
 
+import pytest
 from auth.identity_providers import crud as idp_crud
+from auth.identity_providers.models import IdentityProvider
 from auth.identity_providers.schema import (
     IdentityProviderCreate,
     IdentityProviderUpdate,
 )
-from auth.identity_providers.models import IdentityProvider
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetIdentityProvider:
@@ -235,9 +235,7 @@ class TestGetEnabledProviders:
             - Empty list is returned
         """
         # Arrange
-        (
-            mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value
-        ) = []
+        (mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value) = []
 
         # Act
         result = idp_crud.get_enabled_providers(mock_db)
@@ -396,9 +394,7 @@ class TestCreateIdentityProvider:
     @patch("auth.identity_providers.crud.idp_models.IdentityProvider")
     @patch("auth.identity_providers.crud.core_cryptography.encrypt_token_fernet")
     @patch("auth.identity_providers.crud.get_identity_provider_by_slug")
-    def test_create_identity_provider_success(
-        self, mock_get_by_slug, mock_encrypt, mock_idp_model, mock_db
-    ):
+    def test_create_identity_provider_success(self, mock_get_by_slug, mock_encrypt, mock_idp_model, mock_db):
         """Test successfully creating a new identity provider.
 
         Args:
@@ -470,9 +466,7 @@ class TestCreateIdentityProvider:
 
     @patch("auth.identity_providers.crud.core_cryptography.encrypt_token_fernet")
     @patch("auth.identity_providers.crud.get_identity_provider_by_slug")
-    def test_create_identity_provider_database_error(
-        self, mock_get_by_slug, mock_encrypt, mock_db
-    ):
+    def test_create_identity_provider_database_error(self, mock_get_by_slug, mock_encrypt, mock_db):
         """Test create_identity_provider handles database errors.
 
         Args:
@@ -510,9 +504,7 @@ class TestUpdateIdentityProvider:
     @patch("auth.identity_providers.crud.core_cryptography.encrypt_token_fernet")
     @patch("auth.identity_providers.crud.get_identity_provider_by_slug")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_update_identity_provider_success(
-        self, mock_get, mock_get_by_slug, mock_encrypt, mock_db
-    ):
+    def test_update_identity_provider_success(self, mock_get, mock_get_by_slug, mock_encrypt, mock_db):
         """Test successfully updating an identity provider.
 
         Args:
@@ -542,7 +534,7 @@ class TestUpdateIdentityProvider:
         )
 
         # Act
-        result = idp_crud.update_identity_provider(1, idp_data, mock_db)
+        idp_crud.update_identity_provider(1, idp_data, mock_db)
 
         # Assert
         mock_get.assert_called_once_with(1, mock_db)
@@ -564,9 +556,7 @@ class TestUpdateIdentityProvider:
         """
         # Arrange
         mock_get.return_value = None
-        idp_data = IdentityProviderUpdate(
-            name="Updated", slug="updated-slug", client_id="client-123"
-        )
+        idp_data = IdentityProviderUpdate(name="Updated", slug="updated-slug", client_id="client-123")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -577,9 +567,7 @@ class TestUpdateIdentityProvider:
 
     @patch("auth.identity_providers.crud.get_identity_provider_by_slug")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_update_identity_provider_slug_conflict(
-        self, mock_get, mock_get_by_slug, mock_db
-    ):
+    def test_update_identity_provider_slug_conflict(self, mock_get, mock_get_by_slug, mock_db):
         """Test updating identity provider with conflicting slug.
 
         Args:
@@ -599,9 +587,7 @@ class TestUpdateIdentityProvider:
         mock_existing.slug = "existing-slug"
         mock_get_by_slug.return_value = mock_existing
 
-        idp_data = IdentityProviderUpdate(
-            name="Test", slug="existing-slug", client_id="client-123"
-        )
+        idp_data = IdentityProviderUpdate(name="Test", slug="existing-slug", client_id="client-123")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -612,9 +598,7 @@ class TestUpdateIdentityProvider:
 
     @patch("auth.identity_providers.crud.core_cryptography.encrypt_token_fernet")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_update_identity_provider_without_slug_change(
-        self, mock_get, mock_encrypt, mock_db
-    ):
+    def test_update_identity_provider_without_slug_change(self, mock_get, mock_encrypt, mock_db):
         """Test updating identity provider without changing slug.
 
         Args:
@@ -632,12 +616,10 @@ class TestUpdateIdentityProvider:
         mock_get.return_value = mock_idp
         mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
 
-        idp_data = IdentityProviderUpdate(
-            name="Updated Name", slug="test-slug", client_id="client-123"
-        )
+        idp_data = IdentityProviderUpdate(name="Updated Name", slug="test-slug", client_id="client-123")
 
         # Act
-        result = idp_crud.update_identity_provider(1, idp_data, mock_db)
+        idp_crud.update_identity_provider(1, idp_data, mock_db)
 
         # Assert
         mock_get.assert_called_once_with(1, mock_db)
@@ -645,9 +627,7 @@ class TestUpdateIdentityProvider:
 
     @patch("auth.identity_providers.crud.core_cryptography.encrypt_token_fernet")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_update_identity_provider_database_error(
-        self, mock_get, mock_encrypt, mock_db
-    ):
+    def test_update_identity_provider_database_error(self, mock_get, mock_encrypt, mock_db):
         """Test update_identity_provider handles database errors.
 
         Args:
@@ -667,9 +647,7 @@ class TestUpdateIdentityProvider:
         mock_db.commit.side_effect = SQLAlchemyError("Database error")
 
         # Use same slug to avoid conflict check
-        idp_data = IdentityProviderUpdate(
-            name="Updated", slug="test-slug", client_id="client-123"
-        )
+        idp_data = IdentityProviderUpdate(name="Updated", slug="test-slug", client_id="client-123")
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -681,13 +659,9 @@ class TestUpdateIdentityProvider:
 class TestDeleteIdentityProvider:
     """Test suite for delete_identity_provider function."""
 
-    @patch(
-        "auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id"
-    )
+    @patch("auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_delete_identity_provider_success(
-        self, mock_get, mock_check_users, mock_db
-    ):
+    def test_delete_identity_provider_success(self, mock_get, mock_check_users, mock_db):
         """Test successfully deleting an identity provider.
 
         Args:
@@ -736,13 +710,9 @@ class TestDeleteIdentityProvider:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @patch(
-        "auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id"
-    )
+    @patch("auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_delete_identity_provider_with_linked_users(
-        self, mock_get, mock_check_users, mock_db
-    ):
+    def test_delete_identity_provider_with_linked_users(self, mock_get, mock_check_users, mock_db):
         """Test deleting identity provider with linked users.
 
         Args:
@@ -766,13 +736,9 @@ class TestDeleteIdentityProvider:
         assert exc_info.value.status_code == 409
         assert "linked users" in str(exc_info.value.detail)
 
-    @patch(
-        "auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id"
-    )
+    @patch("auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id")
     @patch("auth.identity_providers.crud.get_identity_provider")
-    def test_delete_identity_provider_database_error(
-        self, mock_get, mock_check_users, mock_db
-    ):
+    def test_delete_identity_provider_database_error(self, mock_get, mock_check_users, mock_db):
         """Test delete_identity_provider handles database errors.
 
         Args:

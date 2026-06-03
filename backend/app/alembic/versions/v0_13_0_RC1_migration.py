@@ -6,16 +6,16 @@ Create Date: 2025-06-16 21:43:35.246009
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "d9a77cb243c8"
-down_revision: Union[str, None] = "72e2079576d3"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "72e2079576d3"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -87,9 +87,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_gear_components_gear_id"), "gear_components", ["gear_id"], unique=False
-    )
+    op.create_index(op.f("ix_gear_components_gear_id"), "gear_components", ["gear_id"], unique=False)
     # Add new column to gear table
     op.add_column(
         "gear",
@@ -324,12 +322,8 @@ def upgrade() -> None:
             nullable=False,
             comment="Activity ID that the activity media belongs",
         ),
-        sa.Column(
-            "media_path", sa.String(length=250), nullable=True, comment="Media path"
-        ),
-        sa.Column(
-            "media_type", sa.Integer(), nullable=False, comment="Media type (1 - photo)"
-        ),
+        sa.Column("media_path", sa.String(length=250), nullable=True, comment="Media path"),
+        sa.Column("media_type", sa.Integer(), nullable=False, comment="Media type (1 - photo)"),
         sa.ForeignKeyConstraint(["activity_id"], ["activities.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -348,9 +342,7 @@ def downgrade() -> None:
     op.drop_constraint(None, "activity_media", type_="unique")
     op.drop_table("activity_media")
     op.drop_constraint(None, "users_default_gear", type_="foreignkey")
-    op.drop_index(
-        op.f("ix_users_default_gear_windsurf_gear_id"), table_name="users_default_gear"
-    )
+    op.drop_index(op.f("ix_users_default_gear_windsurf_gear_id"), table_name="users_default_gear")
     op.drop_column("users_default_gear", "windsurf_gear_id")
     op.drop_column("activities", "is_hidden")
     op.drop_column("activities", "private_notes")

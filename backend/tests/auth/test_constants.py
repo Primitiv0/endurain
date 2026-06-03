@@ -1,7 +1,5 @@
 """Tests for auth.constants module."""
 
-import pytest
-
 import auth.constants as auth_constants
 
 
@@ -84,15 +82,11 @@ class TestScopeConstants:
         """Test that identity providers scopes are properly defined."""
         assert auth_constants.IDENTITY_PROVIDERS_REGULAR_SCOPE is not None
         assert isinstance(auth_constants.IDENTITY_PROVIDERS_REGULAR_SCOPE, tuple)
-        assert (
-            "identity_providers:read" in auth_constants.IDENTITY_PROVIDERS_REGULAR_SCOPE
-        )
+        assert "identity_providers:read" in auth_constants.IDENTITY_PROVIDERS_REGULAR_SCOPE
 
         assert auth_constants.IDENTITY_PROVIDERS_ADMIN_SCOPE is not None
         assert isinstance(auth_constants.IDENTITY_PROVIDERS_ADMIN_SCOPE, tuple)
-        assert (
-            "identity_providers:write" in auth_constants.IDENTITY_PROVIDERS_ADMIN_SCOPE
-        )
+        assert "identity_providers:write" in auth_constants.IDENTITY_PROVIDERS_ADMIN_SCOPE
 
     def test_server_settings_scope_defined(self):
         """Test that server settings scopes are properly defined."""
@@ -176,9 +170,7 @@ class TestScopeConstants:
         regular_set = set(auth_constants.REGULAR_ACCESS_SCOPE)
         admin_set = set(auth_constants.ADMIN_ACCESS_SCOPE)
 
-        assert regular_set.issubset(
-            admin_set
-        ), "Admin scope should contain all regular scope permissions"
+        assert regular_set.issubset(admin_set), "Admin scope should contain all regular scope permissions"
 
     def test_constants_validation_with_invalid_values(self):
         """

@@ -2,17 +2,14 @@
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
-
-from sqlalchemy.orm import Session
 
 import auth.idp_link_tokens.crud as idp_link_token_crud
 import auth.idp_link_tokens.schema as idp_link_token_schema
-
 import core.database as core_database
 import core.logger as core_logger
-
+from sqlalchemy.orm import Session
 
 # Token expiry duration in seconds
 TOKEN_EXPIRY_SECONDS = 60
@@ -51,7 +48,7 @@ def generate_idp_link_token(
     token_hash = hash_idp_link_token(token)
 
     # Calculate expiration
-    created_at = datetime.now(timezone.utc)
+    created_at = datetime.now(UTC)
     expires_at = created_at + timedelta(seconds=TOKEN_EXPIRY_SECONDS)
 
     # Create token data
@@ -70,14 +67,11 @@ def generate_idp_link_token(
     db_token = idp_link_token_crud.create_idp_link_token(token_data, db)
 
     core_logger.print_to_log(
-        f"Generated IdP link token for user {user_id}, idp {idp_id} "
-        f"(expires in {TOKEN_EXPIRY_SECONDS}s)",
+        f"Generated IdP link token for user {user_id}, idp {idp_id} (expires in {TOKEN_EXPIRY_SECONDS}s)",
         "debug",
     )
 
-    return idp_link_token_schema.IdpLinkTokenResponse(
-        token=token, expires_at=db_token.expires_at
-    )
+    return idp_link_token_schema.IdpLinkTokenResponse(token=token, expires_at=db_token.expires_at)
 
 
 def delete_idp_link_expired_tokens_from_db() -> None:

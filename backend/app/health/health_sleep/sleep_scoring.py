@@ -2,9 +2,9 @@
 Sleep scoring calculations.
 """
 
-import health.health_sleep.schema as health_sleep_schema
-
 from datetime import datetime
+
+import health.health_sleep.schema as health_sleep_schema
 
 
 def _calculate_sleep_duration_hours(
@@ -74,10 +74,7 @@ def calculate_sleep_score_duration(
     if 7.0 <= hours <= 9.0:
         # Scale within optimal range (7h = 90pts, 8h = 100pts, 9h
         # = 90pts)
-        if hours <= 8.0:
-            score = int(90 + ((hours - 7.0) * 10))
-        else:
-            score = int(100 - ((hours - 8.0) * 10))
+        score = int(90 + (hours - 7.0) * 10) if hours <= 8.0 else int(100 - (hours - 8.0) * 10)
         return (score, "EXCELLENT")
 
     # Good sleep range: 6-7 or 9-10 hours
@@ -146,18 +143,10 @@ def calculate_sleep_score_quality(
     light_score = _score_sleep_stage(light_pct, 45.0, 55.0, 50.0)
 
     # Awake penalty (lower is better)
-    if awake_pct <= 5.0:
-        awake_score = 100 - (awake_pct * 4)
-    else:
-        awake_score = max(0, 80 - ((awake_pct - 5.0) * 10))
+    awake_score = 100 - awake_pct * 4 if awake_pct <= 5.0 else max(0, 80 - (awake_pct - 5.0) * 10)
 
     # Weighted average: deep 25%, REM 30%, light 25%, awake 20%
-    total_score = int(
-        (deep_score * 0.25)
-        + (rem_score * 0.30)
-        + (light_score * 0.25)
-        + (awake_score * 0.20)
-    )
+    total_score = int((deep_score * 0.25) + (rem_score * 0.30) + (light_score * 0.25) + (awake_score * 0.20))
 
     # Determine label
     if total_score >= 90:
@@ -192,25 +181,16 @@ def _score_sleep_stage(
         if actual_pct <= peak_optimal:
             # Between min and peak
             range_span = peak_optimal - min_optimal
-            if range_span > 0:
-                score = 80 + ((actual_pct - min_optimal) / range_span) * 20
-            else:
-                score = 100
+            score = 80 + (actual_pct - min_optimal) / range_span * 20 if range_span > 0 else 100
         else:
             # Between peak and max
             range_span = max_optimal - peak_optimal
-            if range_span > 0:
-                score = 100 - ((actual_pct - peak_optimal) / range_span) * 20
-            else:
-                score = 100
+            score = 100 - (actual_pct - peak_optimal) / range_span * 20 if range_span > 0 else 100
         return min(100, max(80, score))
 
     if actual_pct < min_optimal:
         # Below optimal range
-        if min_optimal > 0:
-            score = 80 * (actual_pct / min_optimal)
-        else:
-            score = 0
+        score = 80 * (actual_pct / min_optimal) if min_optimal > 0 else 0
         return max(0, score)
 
     # Above optimal range
@@ -438,9 +418,7 @@ def calculate_sleep_score_overall(
         Overall sleep score from 0-100.
     """
     # Calculate component scores
-    duration_score, _ = calculate_sleep_score_duration(
-        sleep_start_time, sleep_end_time, total_sleep_seconds
-    )
+    duration_score, _ = calculate_sleep_score_duration(sleep_start_time, sleep_end_time, total_sleep_seconds)
 
     quality_score, _ = calculate_sleep_score_quality(
         deep_sleep_seconds,
@@ -452,17 +430,10 @@ def calculate_sleep_score_overall(
 
     awake_score, _ = calculate_awake_count_score(awake_count)
 
-    stress_score, _ = calculate_sleep_stress_score(
-        avg_sleep_stress, restless_moments_count
-    )
+    stress_score, _ = calculate_sleep_stress_score(avg_sleep_stress, restless_moments_count)
 
     # Weighted combination
-    overall_score = int(
-        (duration_score * 0.30)
-        + (quality_score * 0.40)
-        + (awake_score * 0.10)
-        + (stress_score * 0.20)
-    )
+    overall_score = int((duration_score * 0.30) + (quality_score * 0.40) + (awake_score * 0.10) + (stress_score * 0.20))
 
     return max(0, min(100, overall_score))
 

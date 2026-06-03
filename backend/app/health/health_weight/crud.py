@@ -1,19 +1,15 @@
 from typing import cast
 
-from fastapi import HTTPException, status
-from sqlalchemy import func, desc, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import health.constants as health_constants
-
-import health.utils as health_utils
-
-import health.health_weight.schema as health_weight_schema
-import health.health_weight.models as health_weight_models
-import health.health_weight.utils as health_weight_utils
-
 import core.decorators as core_decorators
+import health.constants as health_constants
+import health.health_weight.models as health_weight_models
+import health.health_weight.schema as health_weight_schema
+import health.health_weight.utils as health_weight_utils
+import health.utils as health_utils
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -33,9 +29,7 @@ def get_all_health_weight(
         HTTPException: If database error occurs.
     """
     # Get the health_weight from the database
-    stmt = select(health_weight_models.HealthWeight).order_by(
-        desc(health_weight_models.HealthWeight.date)
-    )
+    stmt = select(health_weight_models.HealthWeight).order_by(desc(health_weight_models.HealthWeight.date))
     return db.execute(stmt).scalars().all()
 
 
@@ -67,17 +61,14 @@ def get_health_weight_number_by_user_id(
 
     if interval is not None:
         stmt = stmt.where(
-            health_weight_models.HealthWeight.date
-            >= health_utils.get_start_date_for_interval(interval.value)
+            health_weight_models.HealthWeight.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     return db.execute(stmt).scalar_one()
 
 
 @core_decorators.handle_db_errors
-def get_all_health_weight_by_user_id(
-    user_id: int, db: Session
-) -> list[health_weight_models.HealthWeight]:
+def get_all_health_weight_by_user_id(user_id: int, db: Session) -> list[health_weight_models.HealthWeight]:
     """
     Retrieve all health weight records for a user.
 
@@ -157,14 +148,11 @@ def get_health_weight_by_user_id(
             records sorted by date in descending order, optionally paginated.
     """
     # Get the health_weight from the database
-    stmt = select(health_weight_models.HealthWeight).where(
-        health_weight_models.HealthWeight.user_id == user_id
-    )
+    stmt = select(health_weight_models.HealthWeight).where(health_weight_models.HealthWeight.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(
-            health_weight_models.HealthWeight.date
-            >= health_utils.get_start_date_for_interval(interval.value)
+            health_weight_models.HealthWeight.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     stmt = stmt.order_by(desc(health_weight_models.HealthWeight.date))
@@ -202,9 +190,7 @@ def get_health_weight_by_date_and_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_latest_weight_by_user_id(
-    user_id: int, db: Session
-) -> health_weight_models.HealthWeight | None:
+def get_latest_weight_by_user_id(user_id: int, db: Session) -> health_weight_models.HealthWeight | None:
     """
     Get most recent weight record for dashboard display.
 
@@ -317,9 +303,7 @@ def edit_health_weight(
         )
 
     # Get the health_weight from the database
-    db_health_weight = get_health_weight_by_id_and_user_id(
-        health_weight.id, user_id, db
-    )
+    db_health_weight = get_health_weight_by_id_and_user_id(health_weight.id, user_id, db)
 
     if db_health_weight is None:
         raise HTTPException(
@@ -365,18 +349,13 @@ def delete_health_weight(user_id: int, health_weight_id: int, db: Session) -> No
         HTTPException: If record not found or database error.
     """
     # Get and delete the health_weight
-    db_health_weight = get_health_weight_by_id_and_user_id(
-        health_weight_id, user_id, db
-    )
+    db_health_weight = get_health_weight_by_id_and_user_id(health_weight_id, user_id, db)
 
     # Check if the health_weight was found
     if db_health_weight is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                f"Health weight with id {health_weight_id} "
-                f"for user {user_id} not found"
-            ),
+            detail=(f"Health weight with id {health_weight_id} for user {user_id} not found"),
         )
 
     # Delete the record

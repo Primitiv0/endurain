@@ -66,10 +66,7 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
             Response with the ``X-Request-ID`` header set.
         """
         incoming = request.headers.get(_REQUEST_ID_HEADER)
-        if incoming and _VALID_REQUEST_ID.match(incoming):
-            rid = incoming
-        else:
-            rid = str(uuid.uuid4())
+        rid = incoming if incoming and _VALID_REQUEST_ID.match(incoming) else str(uuid.uuid4())
 
         token = request_id_ctx.set(rid)
         try:

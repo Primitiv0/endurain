@@ -2,19 +2,16 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-
-import auth.security as auth_security
-import auth.password_hasher as auth_password_hasher
-
 import auth.api_keys.crud as api_keys_crud
 import auth.api_keys.schema as api_keys_schema
 import auth.api_keys.utils as api_keys_utils
+import auth.password_hasher as auth_password_hasher
+import auth.security as auth_security
+import core.database as core_database
 import users.users.crud as users_crud
 import users.users.utils as users_utils
-
-import core.database as core_database
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -43,9 +40,7 @@ async def get_user_api_keys(
         List of API key objects. Raw keys and hashes
         are never included.
     """
-    return api_keys_crud.get_api_keys_by_user_id(
-        token_user_id, db
-    )  # type: ignore[return-value]
+    return api_keys_crud.get_api_keys_by_user_id(token_user_id, db)  # type: ignore[return-value]
 
 
 @router.post(

@@ -1,26 +1,20 @@
-import requests
 import asyncio
 import json
 
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import garmin.schema as garmin_schema
+import garminconnect
+import requests
+import users.users_integrations.crud as user_integrations_crud
+import users.users_integrations.models as user_integrations_models
+import websocket.manager as websocket_manager
+import websocket.utils as websocket_utils
 from fastapi import (
     HTTPException,
     status,
 )
-import garminconnect
-
 from sqlalchemy.orm import Session
-
-import core.cryptography as core_cryptography
-
-import users.users_integrations.crud as user_integrations_crud
-import users.users_integrations.models as user_integrations_models
-
-import websocket.manager as websocket_manager
-import websocket.utils as websocket_utils
-
-import garmin.schema as garmin_schema
-
-import core.logger as core_logger
 
 
 async def get_mfa(
@@ -40,9 +34,7 @@ async def get_mfa(
     return None
 
 
-async def notify_frontend_mfa_required(
-    user_id: int, websocket_manager: websocket_manager.WebSocketManager
-):
+async def notify_frontend_mfa_required(user_id: int, websocket_manager: websocket_manager.WebSocketManager):
     try:
         json_data = {"message": "MFA_REQUIRED", "user_id": user_id}
         await websocket_utils.notify_frontend(user_id, websocket_manager, json_data)
@@ -65,9 +57,7 @@ async def link_garminconnect(
         # Bridge sync→async: schedule the async MFA prompt on the event loop
         # and block the thread until the user submits the code (timeout 65 s)
         def sync_mfa_callback():
-            future = asyncio.run_coroutine_threadsafe(
-                get_mfa(user_id, mfa_codes, websocket_manager), loop
-            )
+            future = asyncio.run_coroutine_threadsafe(get_mfa(user_id, mfa_codes, websocket_manager), loop)
             return future.result(timeout=65)
 
         # Create a new Garmin object
@@ -143,9 +133,7 @@ def login_garminconnect_using_tokens(token):
         garmin = garminconnect.Garmin()
 
         # Restore session from stored DI tokens
-        garmin.client.loads(
-            deserialize_garmin_token(token)
-        )
+        garmin.client.loads(deserialize_garmin_token(token))
         return garmin
     except (
         garminconnect.GarminConnectAuthenticationError,
@@ -164,52 +152,34 @@ def login_garminconnect_using_tokens(token):
 def serialize_garmin_token(client) -> dict:
     try:
         return {
-            "di_token": (
-                core_cryptography.encrypt_token_fernet(
-                    client.di_token
-                )
-                if client.di_token
-                else None
-            ),
+            "di_token": (core_cryptography.encrypt_token_fernet(client.di_token) if client.di_token else None),
             "di_refresh_token": (
-                core_cryptography.encrypt_token_fernet(
-                    client.di_refresh_token
-                )
-                if client.di_refresh_token
-                else None
+                core_cryptography.encrypt_token_fernet(client.di_refresh_token) if client.di_refresh_token else None
             ),
             "di_client_id": client.di_client_id,
         }
     except Exception as err:
-        core_logger.print_to_log_and_console(
-            f"Error in serialize_garmin_token: {err}", "error", err
-        )
+        core_logger.print_to_log_and_console(f"Error in serialize_garmin_token: {err}", "error", err)
         raise err
 
 
 def deserialize_garmin_token(data: dict) -> str:
     try:
-        return json.dumps({
-            "di_token": (
-                core_cryptography.decrypt_token_fernet(
-                    data["di_token"]
-                )
-                if data.get("di_token")
-                else None
-            ),
-            "di_refresh_token": (
-                core_cryptography.decrypt_token_fernet(
-                    data["di_refresh_token"]
-                )
-                if data.get("di_refresh_token")
-                else None
-            ),
-            "di_client_id": data.get("di_client_id"),
-        })
-    except Exception as err:
-        core_logger.print_to_log_and_console(
-            f"Error in deserialize_garmin_token: {err}", "error", err
+        return json.dumps(
+            {
+                "di_token": (
+                    core_cryptography.decrypt_token_fernet(data["di_token"]) if data.get("di_token") else None
+                ),
+                "di_refresh_token": (
+                    core_cryptography.decrypt_token_fernet(data["di_refresh_token"])
+                    if data.get("di_refresh_token")
+                    else None
+                ),
+                "di_client_id": data.get("di_client_id"),
+            }
         )
+    except Exception as err:
+        core_logger.print_to_log_and_console(f"Error in deserialize_garmin_token: {err}", "error", err)
         raise err
 
 
@@ -217,9 +187,7 @@ def fetch_user_integrations_and_validate_token(
     user_id: int, db: Session
 ) -> user_integrations_models.UsersIntegrations | None:
     # Get the user integrations by user ID
-    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(
-        user_id, db
-    )
+    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(user_id, db)
 
     # Check if user integrations is None
     if user_integrations is None:

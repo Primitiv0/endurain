@@ -62,10 +62,7 @@ def validate_api_key_scopes(
     allowed = {"activities:upload"}
     unsupported = set(requested_scopes) - allowed
     if unsupported or not requested_scopes:
-        raise ValueError(
-            "Unsupported API key scopes: "
-            f"{unsupported}. Valid scopes: {allowed}"
-        )
+        raise ValueError(f"Unsupported API key scopes: {unsupported}. Valid scopes: {allowed}")
 
 
 def scopes_to_json(scopes: list[str]) -> str:

@@ -1,6 +1,6 @@
+from core.database import Base
 from sqlalchemy import CheckConstraint, String
 from sqlalchemy.orm import Mapped, mapped_column
-from core.database import Base
 
 
 class ServerSettings(Base):
@@ -107,15 +107,12 @@ class ServerSettings(Base):
         comment="Auto-redirect to SSO if only one IdP (true - yes, false - no)",
     )
     tileserver_url: Mapped[str] = mapped_column(
-        default=("https://{s}.tile.openstreetmap.org/" "{z}/{x}/{y}.png"),
+        default=("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"),
         nullable=False,
         comment="URL template for the map tileserver",
     )
     tileserver_attribution: Mapped[str] = mapped_column(
-        default=(
-            '&copy; <a href="https://www.openstreetmap.org/'
-            'copyright">OpenStreetMap</a> contributors'
-        ),
+        default=('&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'),
         nullable=False,
         comment="Attribution string for the map tileserver",
     )
@@ -128,10 +125,7 @@ class ServerSettings(Base):
     tileserver_regenerate_thumbnails_on_change: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
-        comment=(
-            "Delete and regenerate all activity thumbnails when "
-            "tile server settings change"
-        ),
+        comment=("Delete and regenerate all activity thumbnails when tile server settings change"),
     )
     map_background_color: Mapped[str] = mapped_column(
         default="#dddddd",

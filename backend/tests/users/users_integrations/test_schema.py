@@ -1,9 +1,10 @@
 """Tests for user_integrations.schema module."""
 
-import pytest
-from datetime import datetime, timezone
-from pydantic import ValidationError
+from datetime import UTC, datetime
+from typing import ClassVar
 
+import pytest
+from pydantic import ValidationError
 from users.users_integrations.schema import (
     UsersIntegrationsBase,
     UsersIntegrationsCreate,
@@ -46,7 +47,7 @@ class TestUsersIntegrationsBase:
             - All fields are properly stored
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         data = {
             "strava_client_id": "client_id",
             "strava_client_secret": "client_secret",
@@ -291,16 +292,16 @@ class TestUsersIntegrationsUpdate:
 
         # Arrange
         class MockORM:
-            strava_client_id = "client_id"
-            strava_sync_gear = True
-            garminconnect_oauth1 = {"key": "value"}
-            garminconnect_oauth2 = None
-            garminconnect_sync_gear = False
-            strava_client_secret = None
-            strava_state = None
-            strava_token = None
-            strava_refresh_token = None
-            strava_token_expires_at = None
+            strava_client_id: ClassVar[str] = "client_id"
+            strava_sync_gear: ClassVar[bool] = True
+            garminconnect_oauth1: ClassVar[dict[str, str]] = {"key": "value"}
+            garminconnect_oauth2: ClassVar[None] = None
+            garminconnect_sync_gear: ClassVar[bool] = False
+            strava_client_secret: ClassVar[None] = None
+            strava_state: ClassVar[None] = None
+            strava_token: ClassVar[None] = None
+            strava_refresh_token: ClassVar[None] = None
+            strava_token_expires_at: ClassVar[None] = None
 
         # Act
         obj = UsersIntegrationsUpdate.model_validate(MockORM())

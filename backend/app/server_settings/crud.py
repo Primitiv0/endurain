@@ -1,13 +1,10 @@
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-import server_settings.schema as server_settings_schema
-import server_settings.models as server_settings_models
-import server_settings.utils as server_settings_utils
-
 import core.cryptography as core_cryptography
 import core.decorators as core_decorators
+import server_settings.models as server_settings_models
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -25,9 +22,7 @@ def get_server_settings(db: Session) -> server_settings_models.ServerSettings | 
         HTTPException: If database error occurs.
     """
     # Get the server settings from the database
-    stmt = select(server_settings_models.ServerSettings).where(
-        server_settings_models.ServerSettings.id == 1
-    )
+    stmt = select(server_settings_models.ServerSettings).where(server_settings_models.ServerSettings.id == 1)
     return db.execute(stmt).scalar_one_or_none()
 
 
@@ -53,9 +48,7 @@ def edit_server_settings(
 
     if server_settings.tileserver_api_key is not None:
         # Encrypt the tile server API key before storing
-        encrypted_api_key = core_cryptography.encrypt_token_fernet(
-            server_settings.tileserver_api_key
-        )
+        encrypted_api_key = core_cryptography.encrypt_token_fernet(server_settings.tileserver_api_key)
         server_settings.tileserver_api_key = encrypted_api_key
 
     # Dictionary of the fields to update if they are not None

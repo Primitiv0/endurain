@@ -1,13 +1,10 @@
 """Tests for users_api_keys API endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
-from fastapi import HTTPException, status
-
 import auth.api_keys.models as users_api_keys_models
-import auth.api_keys.schema as users_api_keys_schema
+from fastapi import HTTPException, status
 
 
 class TestGetUserApiKeys:
@@ -16,12 +13,10 @@ class TestGetUserApiKeys:
     """
 
     @patch("auth.api_keys.router.api_keys_crud.get_api_keys_by_user_id")
-    def test_get_user_api_keys_success(
-        self, mock_get_keys, fast_api_client, fast_api_app
-    ):
+    def test_get_user_api_keys_success(self, mock_get_keys, fast_api_client, fast_api_app):
         """Test successful retrieval of all API keys returns 200 with a list."""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_key = MagicMock(spec=users_api_keys_models.UsersApiKeys)
         mock_key.id = "some-uuid"
         mock_key.user_id = 1
@@ -47,9 +42,7 @@ class TestGetUserApiKeys:
         assert len(data) == 1
 
     @patch("auth.api_keys.router.api_keys_crud.get_api_keys_by_user_id")
-    def test_get_user_api_keys_empty(
-        self, mock_get_keys, fast_api_client, fast_api_app
-    ):
+    def test_get_user_api_keys_empty(self, mock_get_keys, fast_api_client, fast_api_app):
         """Test that an empty list is returned when the user has no API keys."""
         # Arrange
         mock_get_keys.return_value = []
@@ -85,7 +78,7 @@ class TestCreateUserApiKey:
     ):
         """Test successful API key creation returns 201 with the key in the response."""
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_user = MagicMock()
         mock_user.access_type = "regular"
         mock_get_user.return_value = mock_user
@@ -124,9 +117,7 @@ class TestCreateUserApiKey:
         assert data["key"] == "endurain_rawsecretkey"
 
     @patch("auth.api_keys.router.users_crud.get_user_by_id")
-    def test_create_user_api_key_user_not_found_returns_404(
-        self, mock_get_user, fast_api_client, fast_api_app
-    ):
+    def test_create_user_api_key_user_not_found_returns_404(self, mock_get_user, fast_api_client, fast_api_app):
         """Test that 404 is returned when the authenticated user is not found."""
         # Arrange
         mock_get_user.return_value = None
@@ -164,8 +155,7 @@ class TestCreateUserApiKey:
         mock_get_user.return_value = mock_user
         mock_verify_step_up.return_value = None
         mock_validate_scopes.side_effect = ValueError(
-            "Unsupported API key scopes: {'users:write'}. "
-            "Valid scopes: {'activities:upload'}"
+            "Unsupported API key scopes: {'users:write'}. Valid scopes: {'activities:upload'}"
         )
 
         payload = {
@@ -183,9 +173,7 @@ class TestCreateUserApiKey:
         # Assert
         assert response.status_code == 400
 
-    def test_create_user_api_key_invalid_scope_returns_422(
-        self, fast_api_client, fast_api_app
-    ):
+    def test_create_user_api_key_invalid_scope_returns_422(self, fast_api_client, fast_api_app):
         """Test that 422 is returned for an unknown scope (Pydantic validation failure)."""
         # Arrange: schema validator rejects unsupported scopes first
         payload = {
@@ -203,9 +191,7 @@ class TestCreateUserApiKey:
         # Assert
         assert response.status_code == 422
 
-    def test_create_user_api_key_empty_name_returns_422(
-        self, fast_api_client, fast_api_app
-    ):
+    def test_create_user_api_key_empty_name_returns_422(self, fast_api_client, fast_api_app):
         """Test that 422 is returned when the name is empty (min_length violation)."""
         payload = {
             "name": "",
@@ -220,9 +206,7 @@ class TestCreateUserApiKey:
 
         assert response.status_code == 422
 
-    def test_create_user_api_key_empty_scopes_returns_422(
-        self, fast_api_client, fast_api_app
-    ):
+    def test_create_user_api_key_empty_scopes_returns_422(self, fast_api_client, fast_api_app):
         """Test that 422 is returned when the scopes list is empty."""
         payload = {
             "name": "FitoTrack",
@@ -496,10 +480,7 @@ class TestApiKeyResponseSafety:
     response.
     """
 
-    @patch(
-        "auth.api_keys.router"
-        ".api_keys_crud.get_api_keys_by_user_id"
-    )
+    @patch("auth.api_keys.router.api_keys_crud.get_api_keys_by_user_id")
     def test_list_response_excludes_key_and_key_hash(
         self,
         mock_get_keys,
@@ -512,10 +493,8 @@ class TestApiKeyResponseSafety:
         Even if the ORM model carries key_hash, the
         UsersApiKeyRead schema must exclude it.
         """
-        now = datetime.now(timezone.utc)
-        mock_key = MagicMock(
-            spec=users_api_keys_models.UsersApiKeys
-        )
+        now = datetime.now(UTC)
+        mock_key = MagicMock(spec=users_api_keys_models.UsersApiKeys)
         mock_key.id = "some-uuid"
         mock_key.user_id = 1
         mock_key.name = "FitoTrack"
@@ -538,18 +517,11 @@ class TestApiKeyResponseSafety:
         assert isinstance(data, list)
         assert len(data) == 1
         item = data[0]
-        assert "key" not in item, (
-            "Raw key must not appear in list response"
-        )
-        assert "key_hash" not in item, (
-            "key_hash must not appear in list response"
-        )
+        assert "key" not in item, "Raw key must not appear in list response"
+        assert "key_hash" not in item, "key_hash must not appear in list response"
 
     @patch("auth.api_keys.router.api_keys_crud.create_api_key")
-    @patch(
-        "auth.api_keys.router"
-        ".api_keys_utils.validate_api_key_scopes"
-    )
+    @patch("auth.api_keys.router.api_keys_utils.validate_api_key_scopes")
     @patch("auth.api_keys.router.users_utils.verify_step_up_credentials")
     @patch("auth.api_keys.router.users_crud.get_user_by_id")
     def test_created_response_includes_raw_key_once(
@@ -567,16 +539,14 @@ class TestApiKeyResponseSafety:
         The key must be in the top-level response body and
         must not be duplicated under any other field name.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_user = MagicMock()
         mock_user.access_type = "regular"
         mock_get_user.return_value = mock_user
         mock_verify_step_up.return_value = None
         mock_validate_scopes.return_value = None
 
-        mock_orm_key = MagicMock(
-            spec=users_api_keys_models.UsersApiKeys
-        )
+        mock_orm_key = MagicMock(spec=users_api_keys_models.UsersApiKeys)
         mock_orm_key.id = "new-uuid"
         mock_orm_key.user_id = 1
         mock_orm_key.name = "FitoTrack"
@@ -605,23 +575,13 @@ class TestApiKeyResponseSafety:
 
         assert response.status_code == 201
         data = response.json()
-        assert data.get("key") == "endurain_rawsecretkey", (
-            "Raw key must appear in creation response"
-        )
+        assert data.get("key") == "endurain_rawsecretkey", "Raw key must appear in creation response"
         # Count occurrences across all values, not just keys
-        raw_key_occurrences = sum(
-            1 for v in data.values()
-            if v == "endurain_rawsecretkey"
-        )
-        assert raw_key_occurrences == 1, (
-            "Raw key must appear exactly once"
-        )
+        raw_key_occurrences = sum(1 for v in data.values() if v == "endurain_rawsecretkey")
+        assert raw_key_occurrences == 1, "Raw key must appear exactly once"
 
     @patch("auth.api_keys.router.api_keys_crud.create_api_key")
-    @patch(
-        "auth.api_keys.router"
-        ".api_keys_utils.validate_api_key_scopes"
-    )
+    @patch("auth.api_keys.router.api_keys_utils.validate_api_key_scopes")
     @patch("auth.api_keys.router.users_utils.verify_step_up_credentials")
     @patch("auth.api_keys.router.users_crud.get_user_by_id")
     def test_created_response_excludes_key_hash(
@@ -639,16 +599,14 @@ class TestApiKeyResponseSafety:
         The ORM model stores key_hash but the response
         schema must never include it.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_user = MagicMock()
         mock_user.access_type = "regular"
         mock_get_user.return_value = mock_user
         mock_verify_step_up.return_value = None
         mock_validate_scopes.return_value = None
 
-        mock_orm_key = MagicMock(
-            spec=users_api_keys_models.UsersApiKeys
-        )
+        mock_orm_key = MagicMock(spec=users_api_keys_models.UsersApiKeys)
         mock_orm_key.id = "new-uuid"
         mock_orm_key.user_id = 1
         mock_orm_key.name = "FitoTrack"
@@ -677,9 +635,7 @@ class TestApiKeyResponseSafety:
 
         assert response.status_code == 201
         data = response.json()
-        assert "key_hash" not in data, (
-            "key_hash must never appear in API response"
-        )
+        assert "key_hash" not in data, "key_hash must never appear in API response"
 
 
 class TestRevokeUserApiKey:
@@ -688,9 +644,7 @@ class TestRevokeUserApiKey:
     """
 
     @patch("auth.api_keys.router.api_keys_crud.revoke_api_key")
-    def test_revoke_user_api_key_success(
-        self, mock_revoke, fast_api_client, fast_api_app
-    ):
+    def test_revoke_user_api_key_success(self, mock_revoke, fast_api_client, fast_api_app):
         """Test successful key revocation returns 204 No Content."""
         # Arrange
         mock_revoke.return_value = None
@@ -705,9 +659,7 @@ class TestRevokeUserApiKey:
         assert response.status_code == 204
 
     @patch("auth.api_keys.router.api_keys_crud.revoke_api_key")
-    def test_revoke_user_api_key_not_found_returns_404(
-        self, mock_revoke, fast_api_client, fast_api_app
-    ):
+    def test_revoke_user_api_key_not_found_returns_404(self, mock_revoke, fast_api_client, fast_api_app):
         """Test that 404 is returned when the key is not found or belongs to another user."""
         # Arrange
         mock_revoke.side_effect = HTTPException(
@@ -731,9 +683,7 @@ class TestDeleteUserApiKey:
     """
 
     @patch("auth.api_keys.router.api_keys_crud.delete_api_key")
-    def test_delete_user_api_key_success(
-        self, mock_delete, fast_api_client, fast_api_app
-    ):
+    def test_delete_user_api_key_success(self, mock_delete, fast_api_client, fast_api_app):
         """Test successful key deletion returns 204 No Content."""
         # Arrange
         mock_delete.return_value = None
@@ -748,9 +698,7 @@ class TestDeleteUserApiKey:
         assert response.status_code == 204
 
     @patch("auth.api_keys.router.api_keys_crud.delete_api_key")
-    def test_delete_user_api_key_not_found_returns_404(
-        self, mock_delete, fast_api_client, fast_api_app
-    ):
+    def test_delete_user_api_key_not_found_returns_404(self, mock_delete, fast_api_client, fast_api_app):
         """Test that 404 is returned when the key does not exist."""
         # Arrange
         mock_delete.side_effect = HTTPException(

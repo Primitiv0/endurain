@@ -48,17 +48,13 @@ class TestGetSignupConfirmationEmail:
     def test_html_contains_signup_link(self):
         """HTML body contains the signup link."""
         link = "https://example.com/verify?token=xyz"
-        _, html_body, _ = email_messages.get_signup_confirmation_email(
-            "Alice", link, _make_service(), locale="us"
-        )
+        _, html_body, _ = email_messages.get_signup_confirmation_email("Alice", link, _make_service(), locale="us")
         assert link in html_body
 
     def test_text_contains_signup_link(self):
         """Plain-text body contains the signup link."""
         link = "https://example.com/verify?token=xyz"
-        _, _, text_body = email_messages.get_signup_confirmation_email(
-            "Alice", link, _make_service(), locale="us"
-        )
+        _, _, text_body = email_messages.get_signup_confirmation_email("Alice", link, _make_service(), locale="us")
         assert link in text_body
 
     def test_html_escapes_user_name(self):
@@ -101,7 +97,6 @@ class TestGetSignupConfirmationEmail:
             locale="us",
         )
         assert subject_xx == subject_us
-
 
 
 class TestGetAdminSignupNotificationEmail:
@@ -182,9 +177,7 @@ class TestGetAdminSignupNotificationEmail:
         assert "<script>" not in html_body
         assert "&lt;script&gt;" in html_body
 
-    def test_uses_admin_locale_not_new_user_locale(
-        self, monkeypatch, tmp_path
-    ):
+    def test_uses_admin_locale_not_new_user_locale(self, monkeypatch, tmp_path):
         """Different admin locales produce different subjects."""
         import json as _json
 
@@ -199,28 +192,23 @@ class TestGetAdminSignupNotificationEmail:
         monkeypatch.setattr(core_i18n, "_LOCALES_DIR", tmp_path)
         core_i18n._load_catalog.cache_clear()
         try:
-            subject_pt, _, _ = (
-                email_messages.get_admin_signup_notification_email(
-                    "Admin",
-                    "New User",
-                    "newuser",
-                    _make_service(),
-                    locale="pt",
-                )
+            subject_pt, _, _ = email_messages.get_admin_signup_notification_email(
+                "Admin",
+                "New User",
+                "newuser",
+                _make_service(),
+                locale="pt",
             )
-            subject_us, _, _ = (
-                email_messages.get_admin_signup_notification_email(
-                    "Admin",
-                    "New User",
-                    "newuser",
-                    _make_service(),
-                    locale="us",
-                )
+            subject_us, _, _ = email_messages.get_admin_signup_notification_email(
+                "Admin",
+                "New User",
+                "newuser",
+                _make_service(),
+                locale="us",
             )
         finally:
             core_i18n._load_catalog.cache_clear()
         assert subject_pt != subject_us
-
 
 
 class TestGetUserSignupApprovedEmail:
@@ -275,4 +263,3 @@ class TestGetUserSignupApprovedEmail:
             locale="es",
         )
         assert 'lang="es-ES"' in html_body
-

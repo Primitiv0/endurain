@@ -1,30 +1,26 @@
 """API routes for activity media uploads and management."""
 
 import uuid
+from collections.abc import Callable
 from pathlib import PurePosixPath
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, HTTPException, Security, UploadFile, status
-from sqlalchemy.orm import Session
+from typing import Annotated
 
 import activities.activity.dependencies as activities_dependencies
 import activities.activity_media.crud as activity_media_crud
 import activities.activity_media.dependencies as activities_media_dependencies
 import activities.activity_media.schema as activity_media_schema
-
 import auth.dependencies as auth_dependencies
-
 import core.config as core_config
 import core.database as core_database
 import core.file_uploads as core_file_uploads
+from fastapi import APIRouter, Depends, HTTPException, Security, UploadFile, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
 
 # Allow-list of safe image extensions for activity media uploads.
-_ALLOWED_MEDIA_EXTENSIONS: frozenset[str] = frozenset(
-    {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
-)
+_ALLOWED_MEDIA_EXTENSIONS: frozenset[str] = frozenset({".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"})
 
 
 def _build_safe_media_filename(activity_id: int, original_name: str | None) -> str:
@@ -66,12 +62,8 @@ def _build_safe_media_filename(activity_id: int, original_name: str | None) -> s
 )
 async def read_activities_media_user(
     activity_id: int,
-    _validate_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])
-    ],
+    _validate_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -106,9 +98,7 @@ async def read_activities_media_user(
 async def upload_media(
     file: UploadFile,
     activity_id: int,
-    _validate_id: Annotated[
-        Callable, Depends(activities_dependencies.validate_activity_id)
-    ],
+    _validate_id: Annotated[Callable, Depends(activities_dependencies.validate_activity_id)],
     _check_scopes: Annotated[
         Callable,
         Security(auth_dependencies.check_scopes, scopes=["activities:write"]),
@@ -156,9 +146,7 @@ async def upload_media(
         return activity_media_crud.create_activity_media(activity_id, file_path, db)
     except HTTPException:
         # Best-effort cleanup of the orphaned file on DB failure.
-        await core_file_uploads.delete_files_by_pattern(
-            core_config.settings.ACTIVITY_MEDIA_DIR, new_file_name
-        )
+        await core_file_uploads.delete_files_by_pattern(core_config.settings.ACTIVITY_MEDIA_DIR, new_file_name)
         raise
 
 
@@ -169,12 +157,8 @@ async def upload_media(
 )
 async def delete_activity_media(
     media_id: int,
-    _validate_id: Annotated[
-        Callable, Depends(activities_media_dependencies.validate_media_id)
-    ],
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])
-    ],
+    _validate_id: Annotated[Callable, Depends(activities_media_dependencies.validate_media_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["activities:write"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),

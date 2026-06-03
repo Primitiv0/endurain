@@ -1,10 +1,9 @@
 """Tests for auth.identity_links.utils module."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from auth.identity_links import utils as identity_links_utils
 from auth.identity_links.schema import UsersIdentityProviderResponse
 
@@ -26,8 +25,7 @@ class TestGetUserIdentityProviderRefreshToken:
         mock_link.idp_refresh_token = "encrypted-token-abc"
 
         with patch(
-            "auth.identity_links.utils.user_idp_crud"
-            ".get_user_identity_provider_by_user_id_and_idp_id",
+            "auth.identity_links.utils.user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id",
             return_value=mock_link,
         ):
             result = identity_links_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
@@ -49,8 +47,7 @@ class TestGetUserIdentityProviderRefreshToken:
             - Returns None.
         """
         with patch(
-            "auth.identity_links.utils.user_idp_crud"
-            ".get_user_identity_provider_by_user_id_and_idp_id",
+            "auth.identity_links.utils.user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id",
             return_value=None,
         ):
             result = identity_links_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
@@ -76,9 +73,7 @@ class TestEnrichUserIdentityProviders:
             - Returns empty list.
             - No db.execute called.
         """
-        result = identity_links_utils.enrich_user_identity_providers(
-            [], 1, mock_db
-        )
+        result = identity_links_utils.enrich_user_identity_providers([], 1, mock_db)
 
         assert result == []
         mock_db.execute.assert_not_called()
@@ -94,7 +89,7 @@ class TestEnrichUserIdentityProviders:
             - Returns enriched UsersIdentityProviderResponse list.
             - idp_crud called once for batch fetch.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         mock_link = MagicMock()
         mock_link.id = 1
@@ -114,13 +109,10 @@ class TestEnrichUserIdentityProviders:
         mock_idp.provider_type = "oidc"
 
         with patch(
-            "auth.identity_links.utils.idp_crud"
-            ".get_identity_providers_by_ids",
+            "auth.identity_links.utils.idp_crud.get_identity_providers_by_ids",
             return_value=[mock_idp],
         ) as mock_get_idps:
-            result = identity_links_utils.enrich_user_identity_providers(
-                [mock_link], 1, mock_db
-            )
+            result = identity_links_utils.enrich_user_identity_providers([mock_link], 1, mock_db)
 
         assert len(result) == 1
         assert isinstance(result[0], UsersIdentityProviderResponse)
@@ -140,7 +132,7 @@ class TestEnrichUserIdentityProviders:
         Asserts:
             - Returns empty list when IdP not in map.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         mock_link = MagicMock()
         mock_link.id = 1
@@ -153,13 +145,10 @@ class TestEnrichUserIdentityProviders:
         mock_link.idp_refresh_token_updated_at = None
 
         with patch(
-            "auth.identity_links.utils.idp_crud"
-            ".get_identity_providers_by_ids",
+            "auth.identity_links.utils.idp_crud.get_identity_providers_by_ids",
             return_value=[],
         ):
-            result = identity_links_utils.enrich_user_identity_providers(
-                [mock_link], 1, mock_db
-            )
+            result = identity_links_utils.enrich_user_identity_providers([mock_link], 1, mock_db)
 
         assert result == []
 
@@ -173,7 +162,7 @@ class TestEnrichUserIdentityProviders:
         Asserts:
             - get_identity_providers_by_ids called once with all IDs.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         mock_links = []
         for i in range(1, 4):
@@ -199,13 +188,10 @@ class TestEnrichUserIdentityProviders:
             mock_idps.append(idp)
 
         with patch(
-            "auth.identity_links.utils.idp_crud"
-            ".get_identity_providers_by_ids",
+            "auth.identity_links.utils.idp_crud.get_identity_providers_by_ids",
             return_value=mock_idps,
         ) as mock_get_idps:
-            result = identity_links_utils.enrich_user_identity_providers(
-                mock_links, 1, mock_db
-            )
+            result = identity_links_utils.enrich_user_identity_providers(mock_links, 1, mock_db)
 
         assert len(result) == 3
         mock_get_idps.assert_called_once_with([1, 2, 3], mock_db)
@@ -232,10 +218,7 @@ class TestIdentityServiceLinkDelegation:
             password_hasher=mock_password_hasher,
         )
 
-        with patch(
-            "auth.identity_service.auth_identity_links_crud"
-            ".create_user_identity_provider"
-        ) as mock_create:
+        with patch("auth.identity_service.auth_identity_links_crud.create_user_identity_provider") as mock_create:
             service.link_external_identity(
                 user_id=1,
                 idp_id=2,
@@ -263,8 +246,7 @@ class TestIdentityServiceLinkDelegation:
         )
 
         with patch(
-            "auth.identity_service.auth_identity_links_crud"
-            ".delete_user_identity_provider",
+            "auth.identity_service.auth_identity_links_crud.delete_user_identity_provider",
             return_value=True,
         ) as mock_delete:
             service.unlink_external_identity(
@@ -281,9 +263,8 @@ class TestIdentityServiceLinkDelegation:
         Asserts:
             - HTTPException with status 404 raised.
         """
-        from fastapi import HTTPException
-
         from auth.identity_service import DefaultIdentityService
+        from fastapi import HTTPException
 
         mock_db = MagicMock()
         service = DefaultIdentityService(
@@ -292,15 +273,16 @@ class TestIdentityServiceLinkDelegation:
             password_hasher=MagicMock(),
         )
 
-        with patch(
-            "auth.identity_service.auth_identity_links_crud"
-            ".delete_user_identity_provider",
-            return_value=False,
+        with (
+            patch(
+                "auth.identity_service.auth_identity_links_crud.delete_user_identity_provider",
+                return_value=False,
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                service.unlink_external_identity(
-                    user_id=1,
-                    idp_id=99,
-                )
+            service.unlink_external_identity(
+                user_id=1,
+                idp_id=99,
+            )
 
         assert exc_info.value.status_code == 404

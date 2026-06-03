@@ -1,8 +1,14 @@
 """Router for activity summary endpoints."""
 
-from datetime import date, datetime, timezone
-from typing import Annotated, Callable
+from collections.abc import Callable
+from datetime import UTC, date, datetime
+from typing import Annotated
 
+import activities.activity_summaries.crud as summary_crud
+import activities.activity_summaries.dependencies as summary_deps
+import activities.activity_summaries.schema as summary_schema
+import auth.dependencies as auth_dependencies
+import core.database as core_database
 from fastapi import (
     APIRouter,
     Depends,
@@ -12,13 +18,6 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
-
-import auth.dependencies as auth_dependencies
-import core.database as core_database
-
-import activities.activity_summaries.crud as summary_crud
-import activities.activity_summaries.dependencies as summary_deps
-import activities.activity_summaries.schema as summary_schema
 
 router = APIRouter()
 
@@ -46,14 +45,9 @@ def _parse_target_date(
         return date.fromisoformat(target_date_str)
     except (ValueError, TypeError):
         raise HTTPException(
-            status_code=(
-                status.HTTP_400_BAD_REQUEST
-            ),
-            detail=(
-                "Invalid date format. "
-                "Use YYYY-MM-DD."
-            ),
-        )
+            status_code=(status.HTTP_400_BAD_REQUEST),
+            detail=("Invalid date format. Use YYYY-MM-DD."),
+        ) from None
 
 
 @router.get(
@@ -69,9 +63,7 @@ async def read_activity_summary(
     view_type: str,
     _validate_view_type: Annotated[
         Callable,
-        Depends(
-            summary_deps.validate_view_type
-        ),
+        Depends(summary_deps.validate_view_type),
     ],
     _check_scopes: Annotated[
         Callable,
@@ -82,9 +74,7 @@ async def read_activity_summary(
     ],
     token_user_id: Annotated[
         int,
-        Depends(
-            auth_dependencies.get_sub_from_access_token
-        ),
+        Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[
         Session,
@@ -94,31 +84,21 @@ async def read_activity_summary(
         str | None,
         Query(
             alias="date",
-            description=(
-                "Target date (YYYY-MM-DD) for "
-                "week/month view. "
-                "Defaults to today."
-            ),
+            description=("Target date (YYYY-MM-DD) for week/month view. Defaults to today."),
         ),
     ] = None,
     target_year: Annotated[
         int | None,
         Query(
             alias="year",
-            description=(
-                "Target year for year view. "
-                "Defaults to current year."
-            ),
+            description=("Target year for year view. Defaults to current year."),
         ),
     ] = None,
     activity_type: Annotated[
         str | None,
         Query(
             alias="type",
-            description=(
-                "Filter summary by activity "
-                "type name."
-            ),
+            description=("Filter summary by activity type name."),
         ),
     ] = None,
 ) -> (
@@ -151,12 +131,10 @@ async def read_activity_summary(
     Raises:
         HTTPException: If date/year is invalid.
     """
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
 
     if view_type == "week":
-        current_date = _parse_target_date(
-            target_date_str, today
-        )
+        current_date = _parse_target_date(target_date_str, today)
         return summary_crud.get_weekly_summary(
             db=db,
             user_id=token_user_id,
@@ -165,31 +143,20 @@ async def read_activity_summary(
         )
 
     if view_type == "month":
-        current_date = _parse_target_date(
-            target_date_str, today
-        )
+        current_date = _parse_target_date(target_date_str, today)
         return summary_crud.get_monthly_summary(
             db=db,
             user_id=token_user_id,
-            target_date=current_date.replace(
-                day=1
-            ),
+            target_date=current_date.replace(day=1),
             activity_type=activity_type,
         )
 
     if view_type == "year":
-        current_year = (
-            target_year if target_year else today.year
-        )
+        current_year = target_year if target_year else today.year
         if not (1900 <= current_year <= today.year):
             raise HTTPException(
-                status_code=(
-                    status.HTTP_400_BAD_REQUEST
-                ),
-                detail=(
-                    "Invalid year. Must be between"
-                    f" 1900 and {today.year}."
-                ),
+                status_code=(status.HTTP_400_BAD_REQUEST),
+                detail=(f"Invalid year. Must be between 1900 and {today.year}."),
             )
         return summary_crud.get_yearly_summary(
             db=db,

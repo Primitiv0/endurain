@@ -45,9 +45,7 @@ def get_password_reset_email(
     # Defense in depth: percent-encode the URL, then HTML-escape it
     # before placing it into href and <p> contexts so a future change
     # that puts user-controlled data into the link cannot break out.
-    safe_reset_link = html.escape(
-        url_quote(reset_link, safe=":/?=&%#@"), quote=True
-    )
+    safe_reset_link = html.escape(url_quote(reset_link, safe=":/?=&%#@"), quote=True)
 
     body_inner = f"""
             <p>{tr("password_reset.greeting", name=safe_name)}</p>

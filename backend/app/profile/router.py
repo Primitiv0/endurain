@@ -10,70 +10,58 @@ This module provides FastAPI endpoints for:
 - Profile data export and import
 """
 
+import profile.exceptions as profile_exceptions
+import profile.export_service as profile_export_service
+import profile.import_service as profile_import_service
+import profile.mfa_store as profile_mfa_store
+import profile.schema as profile_schema
+import profile.utils as profile_utils
+from datetime import UTC, datetime
 from typing import Annotated
 
-from datetime import datetime, timezone
+import auth.dependencies as auth_dependencies
+import auth.identity_links.crud as user_idp_crud
+import auth.identity_links.schema as user_idp_schema
+import auth.identity_links.utils as user_idp_utils
+import auth.identity_providers.crud as idp_crud
+import auth.identity_service as auth_identity_service
+import auth.idp_link_tokens.schema as idp_link_token_schema
+import auth.idp_link_tokens.utils as idp_link_token_utils
+import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
+import auth.mfa_backup_codes.schema as mfa_backup_codes_schema
+import auth.security_stores as auth_security_stores
+import auth.sessions.crud as users_session_crud
+import auth.sessions.schema as users_session_schema
+import core.config as core_config
+import core.database as core_database
+import core.file_uploads as core_file_uploads
+import core.logger as core_logger
+import core.rate_limit as core_rate_limit
+import users.users.crud as users_crud
+import users.users.schema as users_schema
+import users.users.utils as users_utils
+import users.users_integrations.crud as user_integrations_crud
+import users.users_privacy_settings.crud as users_privacy_settings_crud
+import users.users_privacy_settings.schema as users_privacy_settings_schema
+import websocket.manager as websocket_manager
 from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
-    status,
-    UploadFile,
-    Response,
     Request,
+    Response,
+    UploadFile,
+    status,
 )
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-
-import users.users.schema as users_schema
-import users.users.crud as users_crud
-import users.users.utils as users_utils
-
-import auth.identity_links.crud as user_idp_crud
-import auth.identity_links.schema as user_idp_schema
-import auth.identity_links.utils as user_idp_utils
-
-import auth.identity_service as auth_identity_service
-import auth.security_stores as auth_security_stores
-
-import auth.identity_providers.crud as idp_crud
-import auth.idp_link_tokens.utils as idp_link_token_utils
-import auth.idp_link_tokens.schema as idp_link_token_schema
-
-import users.users_integrations.crud as user_integrations_crud
-
-import users.users_privacy_settings.crud as users_privacy_settings_crud
-import users.users_privacy_settings.schema as users_privacy_settings_schema
-
-import profile.utils as profile_utils
-import profile.schema as profile_schema
-import profile.export_service as profile_export_service
-import profile.import_service as profile_import_service
-import profile.exceptions as profile_exceptions
-import profile.mfa_store as profile_mfa_store
-
-import auth.dependencies as auth_dependencies
-
-import auth.mfa_backup_codes.schema as mfa_backup_codes_schema
-import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
-
-import auth.sessions.crud as users_session_crud
-import auth.sessions.schema as users_session_schema
-
-import core.database as core_database
-import core.logger as core_logger
-import core.rate_limit as core_rate_limit
-import core.config as core_config
-import core.file_uploads as core_file_uploads
-
-import websocket.manager as websocket_manager
 
 # Define the API router
 router = APIRouter()
 
 
 def _raise_mfa_secret_store_unavailable(
-    err: profile_mfa_store.MFASecretStoreUnavailable,
+    err: profile_mfa_store.MFASecretStoreUnavailableError,
 ) -> None:
     """
     Return a controlled response when MFA setup storage is down.
@@ -133,9 +121,7 @@ async def read_users_me(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(
-        user.id, db
-    )
+    user_integrations = user_integrations_crud.get_user_integrations_by_user_id(user.id, db)
 
     if user_integrations is None:
         raise HTTPException(
@@ -144,9 +130,7 @@ async def read_users_me(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_privacy_settings = (
-        users_privacy_settings_crud.get_user_privacy_settings_by_user_id(user.id, db)
-    )
+    user_privacy_settings = users_privacy_settings_crud.get_user_privacy_settings_by_user_id(user.id, db)
 
     if user_privacy_settings is None:
         raise HTTPException(
@@ -162,15 +146,9 @@ async def read_users_me(
     return user_me.model_copy(
         update={
             "is_strava_linked": (1 if user_integrations.strava_token else 0),
-            "is_garminconnect_linked": (
-                1 if user_integrations.garminconnect_token else 0
-            ),
-            "default_activity_visibility": (
-                user_privacy_settings.default_activity_visibility
-            ),
-            "hide_activity_start_time": (
-                user_privacy_settings.hide_activity_start_time
-            ),
+            "is_garminconnect_linked": (1 if user_integrations.garminconnect_token else 0),
+            "default_activity_visibility": (user_privacy_settings.default_activity_visibility),
+            "hide_activity_start_time": (user_privacy_settings.hide_activity_start_time),
             "hide_activity_location": (user_privacy_settings.hide_activity_location),
             "hide_activity_map": (user_privacy_settings.hide_activity_map),
             "hide_activity_hr": user_privacy_settings.hide_activity_hr,
@@ -180,9 +158,7 @@ async def read_users_me(
             "hide_activity_speed": (user_privacy_settings.hide_activity_speed),
             "hide_activity_pace": (user_privacy_settings.hide_activity_pace),
             "hide_activity_laps": (user_privacy_settings.hide_activity_laps),
-            "hide_activity_workout_sets_steps": (
-                user_privacy_settings.hide_activity_workout_sets_steps
-            ),
+            "hide_activity_workout_sets_steps": (user_privacy_settings.hide_activity_workout_sets_steps),
             "hide_activity_gear": (user_privacy_settings.hide_activity_gear),
             # Derived flag for the frontend: distinguishes
             # SSO-only accounts from accounts with a local
@@ -308,9 +284,7 @@ async def generate_link_token(
         )
 
     # Check if already linked
-    existing_link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(
-        token_user_id, idp_id, db
-    )
+    existing_link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(token_user_id, idp_id, db)
     if existing_link:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -424,9 +398,7 @@ async def edit_profile_privacy_settings(
         Success message.
     """
     # Edit the user privacy settings in the database
-    users_privacy_settings_crud.edit_user_privacy_settings(
-        token_user_id, user_privacy_settings, db
-    )
+    users_privacy_settings_crud.edit_user_privacy_settings(token_user_id, user_privacy_settings, db)
 
     # Return success message
     return {"message": f"User ID {token_user_id} privacy settings updated successfully"}
@@ -480,15 +452,11 @@ async def edit_profile_password(
         db,
     )
 
-    users_crud.edit_user_password(
-        token_user_id, user_attributtes.password, identity_service, db
-    )
+    users_crud.edit_user_password(token_user_id, user_attributtes.password, identity_service, db)
 
     auth_security_stores.clear_pending_mfa_for_user(token_user_id)
 
-    core_logger.print_to_log(
-        f"User {token_user_id} changed password (step-up verified)", "info"
-    )
+    core_logger.print_to_log(f"User {token_user_id} changed password (step-up verified)", "info")
 
     return {"message": f"User ID {token_user_id} password updated successfully"}
 
@@ -624,15 +592,13 @@ async def export_profile_data(
         profile_exceptions.ExportTimeoutError,
     ) as err:
         # Handle specific export errors with appropriate HTTP responses
-        http_exception = profile_exceptions.handle_import_export_exception(
-            err, "profile data export"
-        )
+        http_exception = profile_exceptions.handle_import_export_exception(err, "profile data export")
         core_logger.print_to_log(
             f"Export error for user {token_user_id}: {err}",
             "error",
             exc=err,
         )
-        raise http_exception
+        raise http_exception from err
     except Exception as err:
         # Log the exception
         core_logger.print_to_log(
@@ -676,18 +642,14 @@ async def import_profile_data(
         HTTPException: If validation or import fails.
     """
     # Comprehensive security validation via the unified pipeline.
-    await core_file_uploads.validate_upload(
-        file, kind=core_file_uploads.UploadKind.ZIP
-    )
+    await core_file_uploads.validate_upload(file, kind=core_file_uploads.UploadKind.ZIP)
 
     try:
         # Read the ZIP file data
         zip_data = await file.read()
 
         # Create import service and process the data
-        import_service = profile_import_service.ImportService(
-            token_user_id, db, websocket_manager
-        )
+        import_service = profile_import_service.ImportService(token_user_id, db, websocket_manager)
         result = await import_service.import_from_zip_data(zip_data)
 
         core_logger.print_to_log(
@@ -707,29 +669,25 @@ async def import_profile_data(
         profile_exceptions.SchemaValidationError,
     ) as err:
         # Handle import validation and format errors
-        http_exception = profile_exceptions.handle_import_export_exception(
-            err, "profile data import"
-        )
+        http_exception = profile_exceptions.handle_import_export_exception(err, "profile data import")
         core_logger.print_to_log(
             f"Import validation error for user {token_user_id}: {err}",
             "warning",
         )
-        raise http_exception
+        raise http_exception from err
     except (
         profile_exceptions.DataIntegrityError,
         profile_exceptions.ImportTimeoutError,
         profile_exceptions.DiskSpaceError,
     ) as err:
         # Handle import operation errors
-        http_exception = profile_exceptions.handle_import_export_exception(
-            err, "profile data import"
-        )
+        http_exception = profile_exceptions.handle_import_export_exception(err, "profile data import")
         core_logger.print_to_log(
             f"Import operation error for user {token_user_id}: {err}",
             "error",
             exc=err,
         )
-        raise http_exception
+        raise http_exception from err
     except ValueError as err:
         # Handle remaining validation errors for backward compatibility
         core_logger.print_to_log(
@@ -742,14 +700,12 @@ async def import_profile_data(
         ) from err
     except (profile_exceptions.MemoryAllocationError, MemoryError) as err:
         # Handle memory-related errors
-        http_exception = profile_exceptions.handle_import_export_exception(
-            err, "profile data import"
-        )
+        http_exception = profile_exceptions.handle_import_export_exception(err, "profile data import")
         core_logger.print_to_log(
             f"Memory error for user {token_user_id}: {err}",
             "error",
         )
-        raise http_exception
+        raise http_exception from err
     except (
         profile_exceptions.DatabaseConnectionError,
         profile_exceptions.FileSystemError,
@@ -758,15 +714,13 @@ async def import_profile_data(
         profile_exceptions.ExportTimeoutError,
     ) as err:
         # Handle specific import/export errors with appropriate HTTP responses
-        http_exception = profile_exceptions.handle_import_export_exception(
-            err, "profile data import"
-        )
+        http_exception = profile_exceptions.handle_import_export_exception(err, "profile data import")
         core_logger.print_to_log(
             f"Import system error for user {token_user_id}: {err}",
             "error",
             exc=err,
         )
-        raise http_exception
+        raise http_exception from err
     except Exception as err:
         # Handle unexpected errors
         core_logger.print_to_log(
@@ -888,7 +842,7 @@ async def setup_mfa(
     # Store the secret temporarily for the enable step
     try:
         mfa_secret_store.add_secret(token_user_id, response.secret)
-    except profile_mfa_store.MFASecretStoreUnavailable as err:
+    except profile_mfa_store.MFASecretStoreUnavailableError as err:
         _raise_mfa_secret_store_unavailable(err)
 
     return response
@@ -957,7 +911,7 @@ async def enable_mfa(
     # Get the secret from temporary storage
     try:
         secret = mfa_secret_store.get_secret(token_user_id)
-    except profile_mfa_store.MFASecretStoreUnavailable as err:
+    except profile_mfa_store.MFASecretStoreUnavailableError as err:
         _raise_mfa_secret_store_unavailable(err)
     if not secret:
         raise HTTPException(
@@ -966,14 +920,10 @@ async def enable_mfa(
         )
 
     try:
-        backup_codes = profile_utils.enable_user_mfa(
-            token_user_id, secret, request.mfa_code, identity_service, db
-        )
+        backup_codes = profile_utils.enable_user_mfa(token_user_id, secret, request.mfa_code, identity_service, db)
         # Clean up the temporary secret
         mfa_secret_store.delete_secret(token_user_id)
-        core_logger.print_to_log(
-            f"User {token_user_id} enabled MFA (step-up verified)", "info"
-        )
+        core_logger.print_to_log(f"User {token_user_id} enabled MFA (step-up verified)", "info")
         return {
             "message": "MFA enabled successfully",
             "backup_codes": backup_codes,
@@ -996,10 +946,7 @@ async def enable_mfa(
         # stale state behind. The status_code + detail check is
         # tightly coupled to ``profile_utils.enable_user_mfa``'s
         # wrong-code branch by design — both must change together.
-        if not (
-            exc.status_code == status.HTTP_400_BAD_REQUEST
-            and exc.detail == "Invalid MFA code"
-        ):
+        if not (exc.status_code == status.HTTP_400_BAD_REQUEST and exc.detail == "Invalid MFA code"):
             mfa_secret_store.delete_secret(token_user_id)
         raise
 
@@ -1052,9 +999,7 @@ async def disable_mfa(
         db,
     )
     profile_utils.disable_user_mfa(token_user_id, db)
-    core_logger.print_to_log(
-        f"User {token_user_id} disabled MFA (step-up verified)", "info"
-    )
+    core_logger.print_to_log(f"User {token_user_id} disabled MFA (step-up verified)", "info")
     return {"message": "MFA disabled successfully"}
 
 
@@ -1086,13 +1031,9 @@ async def verify_mfa(
     Raises:
         HTTPException: If MFA code is invalid.
     """
-    is_valid = profile_utils.verify_user_mfa(
-        token_user_id, request.mfa_code, identity_service, db
-    )
+    is_valid = profile_utils.verify_user_mfa(token_user_id, request.mfa_code, identity_service, db)
     if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
     return {"message": "MFA code verified successfully"}
 
 
@@ -1146,9 +1087,7 @@ async def generate_mfa_backup_codes(
     user = users_crud.get_user_by_id(token_user_id, db)
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     if not user.mfa_enabled:
         raise HTTPException(
@@ -1165,9 +1104,7 @@ async def generate_mfa_backup_codes(
     )
 
     # Generate codes (invalidates old codes)
-    codes = mfa_backup_codes_crud.create_backup_codes(
-        token_user_id, identity_service, db
-    )
+    codes = mfa_backup_codes_crud.create_backup_codes(token_user_id, identity_service, db)
 
     # Log event
     core_logger.print_to_log(
@@ -1177,7 +1114,7 @@ async def generate_mfa_backup_codes(
 
     return mfa_backup_codes_schema.MFABackupCodesResponse(
         codes=codes,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -1315,9 +1252,7 @@ async def delete_my_identity_provider(
         )
 
     # Check if link exists for this user
-    link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(
-        token_user_id, idp_id, db
-    )
+    link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(token_user_id, idp_id, db)
     if not link:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1329,9 +1264,7 @@ async def delete_my_identity_provider(
     user = users_crud.get_user_by_id(token_user_id, db)
 
     # Count remaining IdP links after deletion
-    all_idp_links = user_idp_crud.get_user_identity_providers_by_user_id(
-        token_user_id, db
-    )
+    all_idp_links = user_idp_crud.get_user_identity_providers_by_user_id(token_user_id, db)
     remaining_idp_count = len(all_idp_links) - 1
 
     # User must have either:
@@ -1355,9 +1288,7 @@ async def delete_my_identity_provider(
         )
 
     # Audit logging
-    core_logger.print_to_log(
-        f"User {token_user_id} unlinked IdP: idp_id={idp_id} ({idp.name})"
-    )
+    core_logger.print_to_log(f"User {token_user_id} unlinked IdP: idp_id={idp_id} ({idp.name})")
 
     # Return 204 No Content (successful deletion)
     return None

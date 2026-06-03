@@ -1,9 +1,8 @@
 """SQLAlchemy ORM model for activity exercise titles."""
 
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
-
 from core.database import Base
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class ActivityExerciseTitles(Base):
@@ -20,12 +19,8 @@ class ActivityExerciseTitles(Base):
     __tablename__ = "activity_exercise_titles"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    exercise_category: Mapped[int] = mapped_column(
-        nullable=False, comment="Exercise category"
-    )
-    exercise_name: Mapped[int] = mapped_column(
-        nullable=False, comment="Exercise name ID"
-    )
+    exercise_category: Mapped[int] = mapped_column(nullable=False, comment="Exercise category")
+    exercise_name: Mapped[int] = mapped_column(nullable=False, comment="Exercise name ID")
     wkt_step_name: Mapped[str] = mapped_column(
         String(length=250),
         nullable=False,

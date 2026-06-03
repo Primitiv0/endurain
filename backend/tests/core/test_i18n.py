@@ -2,9 +2,8 @@
 
 import json
 
-import pytest
-
 import core.i18n as core_i18n
+import pytest
 
 
 @pytest.fixture
@@ -23,9 +22,7 @@ def _write_catalog(root, locale, payload):
     """Write a catalog JSON file under ``root/locale/email.json``."""
     locale_dir = root / locale
     locale_dir.mkdir(parents=True, exist_ok=True)
-    (locale_dir / "email.json").write_text(
-        json.dumps(payload), encoding="utf-8"
-    )
+    (locale_dir / "email.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 class TestNormalizeLocale:
@@ -72,9 +69,7 @@ class TestSupportedLocalesSource:
         """Every Language enum value appears in SUPPORTED_LOCALES."""
         from users.users.schema import Language
 
-        assert core_i18n.SUPPORTED_LOCALES == frozenset(
-            language.value for language in Language
-        )
+        assert frozenset(language.value for language in Language) == core_i18n.SUPPORTED_LOCALES
 
 
 class TestHtmlLang:
@@ -139,19 +134,13 @@ class TestTranslate:
 
     def test_named_placeholder_substitution(self):
         """Named placeholders are replaced with keyword arguments."""
-        result = core_i18n.t(
-            "password_reset.greeting", "us", name="Alice"
-        )
+        result = core_i18n.t("password_reset.greeting", "us", name="Alice")
         assert "Alice" in result
 
     def test_pt_subject_differs_from_us(self, isolated_catalogs):
         """Translated catalog returns a locale-specific subject."""
-        _write_catalog(
-            isolated_catalogs, "us", {"k.subject": "English subject"}
-        )
-        _write_catalog(
-            isolated_catalogs, "pt", {"k.subject": "Portuguese subject"}
-        )
+        _write_catalog(isolated_catalogs, "us", {"k.subject": "English subject"})
+        _write_catalog(isolated_catalogs, "pt", {"k.subject": "Portuguese subject"})
         assert core_i18n.t("k.subject", "pt") == "Portuguese subject"
         assert core_i18n.t("k.subject", "us") == "English subject"
 
@@ -163,9 +152,7 @@ class TestTranslate:
 
     def test_none_locale_returns_english(self):
         """None locale produces the same result as 'us'."""
-        assert core_i18n.t("password_reset.subject", None) == (
-            core_i18n.t("password_reset.subject", "us")
-        )
+        assert core_i18n.t("password_reset.subject", None) == (core_i18n.t("password_reset.subject", "us"))
 
 
 class TestCommonLabels:
@@ -182,7 +169,7 @@ class TestCommonLabels:
             "source_code",
             "copy_link",
         ):
-            assert key in labels and labels[key]
+            assert labels.get(key)
 
     def test_falls_back_to_us_for_unknown_locale(self):
         """Unknown locale produces the English labels."""

@@ -1,14 +1,12 @@
 """Tests for auth.identity_links.crud module."""
 
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
-from sqlalchemy.exc import SQLAlchemyError
-
 from auth.identity_links import crud as identity_links_crud
 from auth.identity_links.models import UsersIdentityProvider
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestCheckUserIdentityProvidersByIdpId:
@@ -26,9 +24,7 @@ class TestCheckUserIdentityProvidersByIdpId:
         """
         mock_db.execute.return_value.scalar.return_value = True
 
-        result = identity_links_crud.check_user_identity_providers_by_idp_id(
-            1, mock_db
-        )
+        result = identity_links_crud.check_user_identity_providers_by_idp_id(1, mock_db)
 
         assert result is True
         mock_db.execute.assert_called_once()
@@ -45,9 +41,7 @@ class TestCheckUserIdentityProvidersByIdpId:
         """
         mock_db.execute.return_value.scalar.return_value = None
 
-        result = identity_links_crud.check_user_identity_providers_by_idp_id(
-            1, mock_db
-        )
+        result = identity_links_crud.check_user_identity_providers_by_idp_id(1, mock_db)
 
         assert result is False
 
@@ -64,9 +58,7 @@ class TestCheckUserIdentityProvidersByIdpId:
         mock_db.execute.side_effect = SQLAlchemyError("db error")
 
         with pytest.raises(HTTPException) as exc_info:
-            identity_links_crud.check_user_identity_providers_by_idp_id(
-                1, mock_db
-            )
+            identity_links_crud.check_user_identity_providers_by_idp_id(1, mock_db)
 
         assert exc_info.value.status_code == 500
 
@@ -93,9 +85,7 @@ class TestGetUserIdentityProvidersByUserId:
             mock_link2,
         ]
 
-        result = identity_links_crud.get_user_identity_providers_by_user_id(
-            1, mock_db
-        )
+        result = identity_links_crud.get_user_identity_providers_by_user_id(1, mock_db)
 
         assert len(result) == 2
         assert result[0].idp_id == 1
@@ -111,13 +101,9 @@ class TestGetUserIdentityProvidersByUserId:
         Asserts:
             - Returns empty list.
         """
-        mock_db.execute.return_value.scalars.return_value.all.return_value = (
-            []
-        )
+        mock_db.execute.return_value.scalars.return_value.all.return_value = []
 
-        result = identity_links_crud.get_user_identity_providers_by_user_id(
-            1, mock_db
-        )
+        result = identity_links_crud.get_user_identity_providers_by_user_id(1, mock_db)
 
         assert result == []
 
@@ -134,9 +120,7 @@ class TestGetUserIdentityProvidersByUserId:
         mock_db.execute.side_effect = SQLAlchemyError("db error")
 
         with pytest.raises(HTTPException) as exc_info:
-            identity_links_crud.get_user_identity_providers_by_user_id(
-                1, mock_db
-            )
+            identity_links_crud.get_user_identity_providers_by_user_id(1, mock_db)
 
         assert exc_info.value.status_code == 500
 
@@ -155,13 +139,9 @@ class TestGetUserIdentityProviderByUserIdAndIdpId:
             - Returns UsersIdentityProvider object.
         """
         mock_link = MagicMock(spec=UsersIdentityProvider)
-        mock_db.execute.return_value.scalar_one_or_none.return_value = (
-            mock_link
-        )
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_link
 
-        result = identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(
-            1, 2, mock_db
-        )
+        result = identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(1, 2, mock_db)
 
         assert result is mock_link
 
@@ -175,13 +155,9 @@ class TestGetUserIdentityProviderByUserIdAndIdpId:
         Asserts:
             - Returns None.
         """
-        mock_db.execute.return_value.scalar_one_or_none.return_value = (
-            None
-        )
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
-        result = identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(
-            1, 2, mock_db
-        )
+        result = identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(1, 2, mock_db)
 
         assert result is None
 
@@ -198,9 +174,7 @@ class TestGetUserIdentityProviderByUserIdAndIdpId:
         mock_db.execute.side_effect = SQLAlchemyError("db error")
 
         with pytest.raises(HTTPException) as exc_info:
-            identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(
-                1, 2, mock_db
-            )
+            identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(1, 2, mock_db)
 
         assert exc_info.value.status_code == 500
 
@@ -219,13 +193,9 @@ class TestGetUserIdentityProviderBySubjectAndIdpId:
             - Returns the matched UsersIdentityProvider.
         """
         mock_link = MagicMock(spec=UsersIdentityProvider)
-        mock_db.execute.return_value.scalar_one_or_none.return_value = (
-            mock_link
-        )
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_link
 
-        result = identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(
-            1, "user-sub-123", mock_db
-        )
+        result = identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(1, "user-sub-123", mock_db)
 
         assert result is mock_link
 
@@ -239,13 +209,9 @@ class TestGetUserIdentityProviderBySubjectAndIdpId:
         Asserts:
             - Returns None.
         """
-        mock_db.execute.return_value.scalar_one_or_none.return_value = (
-            None
-        )
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
-        result = identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(
-            1, "unknown-sub", mock_db
-        )
+        result = identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(1, "unknown-sub", mock_db)
 
         assert result is None
 
@@ -268,8 +234,7 @@ class TestCreateUserIdentityProvider:
         mock_db.refresh.side_effect = lambda obj: None
 
         with patch(
-            "auth.identity_links.crud.user_idp_models."
-            "UsersIdentityProvider",
+            "auth.identity_links.crud.user_idp_models.UsersIdentityProvider",
             return_value=mock_link,
         ):
             result = identity_links_crud.create_user_identity_provider(
@@ -296,9 +261,7 @@ class TestCreateUserIdentityProvider:
         mock_db.add.side_effect = SQLAlchemyError("db error")
 
         with pytest.raises(HTTPException) as exc_info:
-            identity_links_crud.create_user_identity_provider(
-                1, 2, "sub-abc", mock_db
-            )
+            identity_links_crud.create_user_identity_provider(1, 2, "sub-abc", mock_db)
 
         assert exc_info.value.status_code == 500
 
@@ -318,13 +281,9 @@ class TestDeleteUserIdentityProvider:
             - db.delete and db.commit called.
         """
         mock_link = MagicMock(spec=UsersIdentityProvider)
-        mock_db.execute.return_value.scalar_one_or_none.return_value = (
-            mock_link
-        )
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_link
 
-        result = identity_links_crud.delete_user_identity_provider(
-            1, 2, mock_db
-        )
+        result = identity_links_crud.delete_user_identity_provider(1, 2, mock_db)
 
         assert result is True
         mock_db.delete.assert_called_once_with(mock_link)
@@ -340,13 +299,9 @@ class TestDeleteUserIdentityProvider:
         Asserts:
             - Returns False, no db.delete called.
         """
-        mock_db.execute.return_value.scalar_one_or_none.return_value = (
-            None
-        )
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
-        result = identity_links_crud.delete_user_identity_provider(
-            1, 2, mock_db
-        )
+        result = identity_links_crud.delete_user_identity_provider(1, 2, mock_db)
 
         assert result is False
         mock_db.delete.assert_not_called()
@@ -364,8 +319,6 @@ class TestDeleteUserIdentityProvider:
         mock_db.execute.side_effect = SQLAlchemyError("db error")
 
         with pytest.raises(HTTPException) as exc_info:
-            identity_links_crud.delete_user_identity_provider(
-                1, 2, mock_db
-            )
+            identity_links_crud.delete_user_identity_provider(1, 2, mock_db)
 
         assert exc_info.value.status_code == 500

@@ -1,18 +1,18 @@
 """Tests for identity_providers.utils module."""
 
-import pytest
 from unittest.mock import patch
-from fastapi import HTTPException
 
+import pytest
+from auth.identity_providers.schema import IdentityProviderTemplate
 from auth.identity_providers.utils import (
-    validate_pkce_challenge,
-    validate_pkce_verifier,
-    validate_redirect_url,
     _secure_compare,
     get_idp_template,
     get_idp_templates,
+    validate_pkce_challenge,
+    validate_pkce_verifier,
+    validate_redirect_url,
 )
-from auth.identity_providers.schema import IdentityProviderTemplate
+from fastapi import HTTPException
 
 
 class TestValidatePkceChallenge:
@@ -107,9 +107,7 @@ class TestValidatePkceChallenge:
             - All base64url characters (A-Z, a-z, 0-9, -, _) are accepted
         """
         # Arrange
-        code_challenge = (
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr_-"  # 45 chars, valid
-        )
+        code_challenge = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqr_-"  # 45 chars, valid
         code_challenge_method = "S256"
 
         # Act & Assert (no exception should be raised)
@@ -632,12 +630,14 @@ class TestValidateRedirectUrl:
         Asserts:
             - HTTPException 400 when scheme not configured
         """
-        with patch(
-            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
-            set(),
+        with (
+            patch(
+                "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
+                set(),
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                validate_redirect_url("gadgetbridge://callback")
+            validate_redirect_url("gadgetbridge://callback")
         assert exc_info.value.status_code == 400
         assert "not allowed" in exc_info.value.detail.lower()
 
@@ -647,12 +647,14 @@ class TestValidateRedirectUrl:
         Asserts:
             - HTTPException 400 when only a different scheme is configured
         """
-        with patch(
-            "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
-            {"gadgetbridge"},
+        with (
+            patch(
+                "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
+                {"gadgetbridge"},
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                validate_redirect_url("myapp://callback")
+            validate_redirect_url("myapp://callback")
         assert exc_info.value.status_code == 400
 
     def test_path_traversal_double_dot_is_rejected(self):

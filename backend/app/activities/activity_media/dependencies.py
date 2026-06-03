@@ -18,4 +18,4 @@ def validate_media_id(media_id: int) -> None:
     Raises:
         HTTPException: If media_id is less than 0.
     """
-    core_dependencies.validate_id(id=media_id, min=0, message="Invalid media ID")
+    core_dependencies.validate_id(identifier=media_id, min_value=0, message="Invalid media ID")

@@ -6,18 +6,18 @@ movement tracking, including validation rules, Bristol Stool
 Scale types, and color enumerations.
 """
 
+from datetime import datetime
 from enum import Enum
+
+import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
-    model_validator,
+    Field,
     StrictInt,
     StrictStr,
-    Field,
+    model_validator,
 )
-from datetime import datetime
-
-import health.schema as health_schema
 
 
 class Source(Enum):
@@ -106,9 +106,7 @@ class HealthPoopBase(BaseModel):
     notes: StrictStr | None = Field(
         default=None,
         max_length=500,
-        description=(
-            "Optional notes about the bowel movement"
-        ),
+        description=("Optional notes about the bowel movement"),
     )
     source: Source | None = Field(
         default=None,
@@ -161,9 +159,7 @@ class HealthPoopRead(HealthPoopBase):
 
     id: StrictInt = Field(
         ...,
-        description=(
-            "Unique identifier for the poop record"
-        ),
+        description=("Unique identifier for the poop record"),
     )
     user_id: StrictInt = Field(
         ...,

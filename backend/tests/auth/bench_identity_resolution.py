@@ -15,17 +15,14 @@ Baseline numbers recorded on 2026-05-25:
 """
 
 import time
-from types import SimpleNamespace
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
-import pytest
-
-import auth.token_manager as auth_token_manager
 import auth.password_hasher as auth_password_hasher
+import auth.token_manager as auth_token_manager
+import pytest
 import users.users.schema as users_schema
 from auth.identity_service import DefaultIdentityService
 from auth.principal import AccessTokenCred
-
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -50,9 +47,7 @@ def token_manager() -> auth_token_manager.TokenManager:
     Returns:
         auth_token_manager.TokenManager: Token manager.
     """
-    return auth_token_manager.TokenManager(
-        secret_key="bench-secret-key-for-testing-only-min-32-chars"
-    )
+    return auth_token_manager.TokenManager(secret_key="bench-secret-key-for-testing-only-min-32-chars")
 
 
 @pytest.fixture
@@ -167,16 +162,13 @@ class TestResolveFromAccessTokenBenchmark:
 
         start = time.perf_counter()
         for _ in range(ITERATIONS):
-            principal = service_with_mocked_db.resolve_from_access_token(
-                access_token
-            )
+            principal = service_with_mocked_db.resolve_from_access_token(access_token)
         elapsed = time.perf_counter() - start
 
         assert principal.user_id == sample_user_read.id
         assert isinstance(principal.credential, AccessTokenCred)
         assert elapsed < WALL_CLOCK_LIMIT_S, (
-            f"resolve_from_access_token took {elapsed:.3f}s for "
-            f"{ITERATIONS} calls (limit: {WALL_CLOCK_LIMIT_S}s)"
+            f"resolve_from_access_token took {elapsed:.3f}s for {ITERATIONS} calls (limit: {WALL_CLOCK_LIMIT_S}s)"
         )
 
     def test_db_roundtrip_count(
@@ -191,8 +183,9 @@ class TestResolveFromAccessTokenBenchmark:
         is designed to eliminate duplicate lookups; this test
         verifies the per-call baseline before caching is applied.
         """
-        import users.users.utils as users_utils
         from unittest.mock import patch
+
+        import users.users.utils as users_utils
 
         mock_db = MagicMock()
         password_hasher = auth_password_hasher.get_password_hasher()
@@ -225,7 +218,4 @@ class TestResolveFromAccessTokenBenchmark:
 
         # 2 calls → 2 DB roundtrips (caching is at the
         # request-state level, not the service level)
-        assert mock_get_user.call_count == 2, (
-            f"Expected 2 DB calls (one per resolve), "
-            f"got {mock_get_user.call_count}"
-        )
+        assert mock_get_user.call_count == 2, f"Expected 2 DB calls (one per resolve), got {mock_get_user.call_count}"

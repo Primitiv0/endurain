@@ -1,25 +1,20 @@
 import os
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from stravalib.client import Client
 
+import activities.activity.crud as activities_crud
+import activities.activity.schema as activities_schema
 import core.config as core_config
 import core.logger as core_logger
 import core.text_imports as core_text_imports
-
-import strava.utils as strava_utils
-import strava.athlete_utils as strava_athlete_utils
-
-import gears.gear.schema as gears_schema
 import gears.gear.crud as gears_crud
+import gears.gear.schema as gears_schema
 import gears.gear.utils as gears_utils
-
-import activities.activity.schema as activities_schema
-import activities.activity.crud as activities_crud
-
+import strava.athlete_utils as strava_athlete_utils
+import strava.utils as strava_utils
 import users.users_integrations.crud as user_integrations_crud
-
 from core.database import SessionLocal
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from stravalib.client import Client
 
 
 def get_strava_gear(gear_id: str, strava_client: Client):
@@ -69,9 +64,7 @@ def fetch_and_process_gear(strava_client: Client, user_id: int, db: Session) -> 
 
     if strava_gear is None:
         # Log an informational event if no gear were found
-        core_logger.print_to_log(
-            f"User {user_id}: No new Strava gear found: strava_gear is None"
-        )
+        core_logger.print_to_log(f"User {user_id}: No new Strava gear found: strava_gear is None")
 
         # Return 0 to indicate no gear were processed
         return 0
@@ -148,9 +141,7 @@ def set_activities_gear(user_id: int, db: Session) -> int:
             gear_assignments[activity.id] = matched_gear_id
 
     # Persist via CRUD (single UPDATE per distinct gear_id)
-    activities_crud.bulk_set_activities_gear_id(
-        user_id, gear_assignments, db
-    )
+    activities_crud.bulk_set_activities_gear_id(user_id, gear_assignments, db)
 
     return len(gear_assignments)
 
@@ -159,9 +150,7 @@ def get_user_gear(user_id: int):
     # Create a new database session using context manager
     with SessionLocal() as db:
         # Get the user integrations by user ID
-        user_integrations = strava_utils.fetch_user_integrations_and_validate_token(
-            user_id, db
-        )
+        user_integrations = strava_utils.fetch_user_integrations_and_validate_token(user_id, db)
 
         # Log the start of the activities processing
         core_logger.print_to_log(f"User {user_id}: Started Strava gear processing")
@@ -176,21 +165,15 @@ def get_user_gear(user_id: int):
         num_strava_gear_processed = fetch_and_process_gear(strava_client, user_id, db)
 
         # Log an informational event for tracing
-        core_logger.print_to_log(
-            f"User {user_id}: {num_strava_gear_processed} Strava gear processed"
-        )
+        core_logger.print_to_log(f"User {user_id}: {num_strava_gear_processed} Strava gear processed")
 
         # Log an informational event for tracing
-        core_logger.print_to_log(
-            f"User {user_id}: Will parse current activities and set gear if applicable"
-        )
+        core_logger.print_to_log(f"User {user_id}: Will parse current activities and set gear if applicable")
 
         num_gear_activities_set = set_activities_gear(user_id, db)
 
         # Log an informational event for tracing
-        core_logger.print_to_log(
-            f"User {user_id}: {num_gear_activities_set} activities where gear was set"
-        )
+        core_logger.print_to_log(f"User {user_id}: {num_gear_activities_set} activities where gear was set")
 
 
 def iterate_over_bikes_csv() -> dict:
@@ -218,11 +201,7 @@ def iterate_over_bikes_csv() -> dict:
                 f"{bikes_file_name} exists in the {bulk_import_dir} directory. Starting to process file."
             )
             for row in core_text_imports.read_bounded_csv(bikes_file_path):
-                if (
-                    ("Bike Name" not in row)
-                    or ("Bike Brand" not in row)
-                    or ("Bike Model" not in row)
-                ):
+                if ("Bike Name" not in row) or ("Bike Brand" not in row) or ("Bike Model" not in row):
                     core_logger.print_to_log_and_console(
                         f"Aborting bikes import: Proper headers not found in {bikes_file_name}.  File should have 'Bike Name', 'Bike Brand', and 'Bike Model'."
                     )
@@ -235,9 +214,7 @@ def iterate_over_bikes_csv() -> dict:
                 f"Strava bike gear csv file parsed and gear dictionary created. File was {len(bikes_dict)} rows long, ignoring header row."
             )
             return bikes_dict
-        core_logger.print_to_log_and_console(
-            f"No {bikes_file_name} file located in the {bulk_import_dir} directory."
-        )
+        core_logger.print_to_log_and_console(f"No {bikes_file_name} file located in the {bulk_import_dir} directory.")
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
             detail="No Strava bikes CSV file found for import.",
@@ -245,9 +222,7 @@ def iterate_over_bikes_csv() -> dict:
     except HTTPException as http_err:
         raise http_err
     except Exception as err:
-        core_logger.print_to_log_and_console(
-            f"Error attempting to open {bikes_file_path} file:  {err}", "error"
-        )
+        core_logger.print_to_log_and_console(f"Error attempting to open {bikes_file_path} file:  {err}", "error")
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
             detail="Error parsing Strava bikes CSV file.",
@@ -273,20 +248,14 @@ def iterate_over_shoes_csv() -> list:
     shoes_file_path = os.path.join(bulk_import_dir, shoesfilename)
 
     # Get file and parse it
-    shoes_list = (
-        []
-    )  # Using a list for shoes, as there is no unique value to use as a dictionary key like with bikes
+    shoes_list = []  # Using a list for shoes, as there is no unique value to use as a dictionary key like with bikes
     try:
         if os.path.isfile(shoes_file_path):
             core_logger.print_to_log_and_console(
                 f"{shoesfilename} exists in the {bulk_import_dir} directory. Starting to process file."
             )
             for row in core_text_imports.read_bounded_csv(shoes_file_path):
-                if (
-                    ("Shoe Name" not in row)
-                    or ("Shoe Brand" not in row)
-                    or ("Shoe Model" not in row)
-                ):
+                if ("Shoe Name" not in row) or ("Shoe Brand" not in row) or ("Shoe Model" not in row):
                     core_logger.print_to_log_and_console(
                         f"Aborting shoes import: Proper headers not found in {shoesfilename}. File should have 'Shoe Name', 'Shoe Brand', and 'Shoe Model'."
                     )
@@ -299,9 +268,7 @@ def iterate_over_shoes_csv() -> list:
                 f"Strava {shoesfilename} file parsed and gear dictionary created. File was {len(shoes_list)} rows long, ignoring header row."
             )
             return shoes_list
-        core_logger.print_to_log_and_console(
-            f"No {shoesfilename} file located in the {bulk_import_dir} directory."
-        )
+        core_logger.print_to_log_and_console(f"No {shoesfilename} file located in the {bulk_import_dir} directory.")
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
             detail="No Strava shoes CSV file found for import.",
@@ -309,18 +276,14 @@ def iterate_over_shoes_csv() -> list:
     except HTTPException as http_err:
         raise http_err
     except Exception as err:
-        core_logger.print_to_log_and_console(
-            f"Error attempting to open {shoes_file_path} file:  {err}", "error"
-        )
+        core_logger.print_to_log_and_console(f"Error attempting to open {shoes_file_path} file:  {err}", "error")
         raise HTTPException(
             status_code=status.HTTP_424_FAILED_DEPENDENCY,
             detail="Error parsing Strava shoes CSV file.",
         ) from err
 
 
-def transform_csv_bike_gear_to_schema_gear(
-    bikes_dict: dict, token_user_id: int
-) -> list[gears_schema.GearCreate]:
+def transform_csv_bike_gear_to_schema_gear(bikes_dict: dict, token_user_id: int) -> list[gears_schema.GearCreate]:
     """
     Transforms a dictionary of bike data (parsed from CSV) into a list of Gear schema objects.
 
@@ -375,12 +338,8 @@ def transform_csv_shoe_gear_to_schema_gear(
             # Shoe name is blank or parses to blank; assign a new, non-duplicated name.
             proposed_name_is_already_present = True
             while proposed_name_is_already_present:
-                proposed_name = core_config.STRAVA_BULK_IMPORT_SHOES_UNNAMED_SHOE + str(
-                    newnumber
-                )
-                gear_check = gears_crud.get_gear_user_by_nickname(
-                    token_user_id, proposed_name, db
-                )
+                proposed_name = core_config.STRAVA_BULK_IMPORT_SHOES_UNNAMED_SHOE + str(newnumber)
+                gear_check = gears_crud.get_gear_user_by_nickname(token_user_id, proposed_name, db)
                 if gear_check is not None:
                     newnumber += 1
                 else:

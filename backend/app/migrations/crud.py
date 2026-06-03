@@ -1,12 +1,10 @@
 """CRUD operations for migration tracking."""
 
+import core.decorators as core_decorators
+import migrations.models as migrations_models
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
-import migrations.models as migrations_models
-
-import core.decorators as core_decorators
 
 
 @core_decorators.handle_db_errors
@@ -26,9 +24,7 @@ def get_migrations_not_executed(
     Raises:
         HTTPException: 500 error on database failure.
     """
-    stmt = select(migrations_models.Migration).where(
-        migrations_models.Migration.executed.is_(False)
-    )
+    stmt = select(migrations_models.Migration).where(migrations_models.Migration.executed.is_(False))
     results = db.execute(stmt).scalars().all()
     return results if results else None
 
@@ -52,9 +48,7 @@ def set_migration_as_executed(
         HTTPException: 404 if migration not found.
         HTTPException: 500 error on database failure.
     """
-    stmt = select(migrations_models.Migration).where(
-        migrations_models.Migration.id == migration_id
-    )
+    stmt = select(migrations_models.Migration).where(migrations_models.Migration.id == migration_id)
     db_migration = db.execute(stmt).scalar_one_or_none()
 
     if db_migration is None:

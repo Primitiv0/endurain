@@ -18,18 +18,20 @@ The unified pipeline gives every upload the same defenses:
 """
 
 import asyncio
+import contextlib
 import glob
 import io
 import os
 import shutil
 import tempfile
 import zipfile
+from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from pathlib import Path, PureWindowsPath
-from typing import Awaitable, Callable
 
 import aiofiles
 import aiofiles.os
+import core.logger as core_logger
 from fastapi import HTTPException, UploadFile, status
 from safeuploads import (
     FileSecurityConfig,
@@ -40,20 +42,17 @@ from safeuploads.audit import SecurityAuditLogger
 from safeuploads.exceptions import (
     CompressionSecurityError,
     ExtensionSecurityError,
+    FilenameSecurityError,
     FileProcessingError,
     FileSecurityError,
     FileSignatureError,
     FileSizeError,
     FileValidationError,
-    FilenameSecurityError,
     MimeTypeError,
     UnicodeSecurityError,
     WindowsReservedNameError,
     ZipBombError,
 )
-
-import core.logger as core_logger
-
 
 # ---------------------------------------------------------------------------
 # Module-level configuration and shared validator
@@ -222,8 +221,7 @@ async def validate_upload(file: UploadFile, *, kind: UploadKind) -> None:
         await validator(file)
     except FileSecurityError as err:
         core_logger.print_to_log(
-            "Upload validation failed: "
-            f"kind={kind.value} type={type(err).__name__}",
+            f"Upload validation failed: kind={kind.value} type={type(err).__name__}",
             "warning",
             exc=err,
         )
@@ -357,10 +355,8 @@ async def save_file(
         else:
             # Defensive: validators leave the cursor at 0, but a
             # caller may have read the stream. Always rewind.
-            try:
+            with contextlib.suppress(Exception):
                 await file.seek(0)
-            except Exception:  # pragma: no cover - defensive
-                pass
             content = await file.read()
         async with aiofiles.open(file_path, "wb") as save_file:
             await save_file.write(content)
@@ -398,9 +394,7 @@ async def save_file(
 _STREAM_CHUNK_BYTES = 1024 * 1024
 
 
-def _stream_to_path_sync(
-    file: UploadFile, destination: Path, max_bytes: int
-) -> None:
+def _stream_to_path_sync(file: UploadFile, destination: Path, max_bytes: int) -> None:
     """Stream an UploadFile to ``destination`` in fixed-size chunks.
 
     Writes to a sibling ``.part`` file first and atomically renames
@@ -420,10 +414,8 @@ def _stream_to_path_sync(
     bytes_written = 0
     try:
         # The validators leave file.file at offset 0; rewind defensively.
-        try:
+        with contextlib.suppress(Exception):
             file.file.seek(0)
-        except Exception:  # pragma: no cover - defensive
-            pass
         with open(part, "wb") as out:
             while True:
                 chunk = file.file.read(_STREAM_CHUNK_BYTES)
@@ -432,14 +424,9 @@ def _stream_to_path_sync(
                 bytes_written += len(chunk)
                 if bytes_written > max_bytes:
                     raise HTTPException(
-                        status_code=(
-                            status.HTTP_413_CONTENT_TOO_LARGE
-                        ),
+                        status_code=(status.HTTP_413_CONTENT_TOO_LARGE),
                         detail={
-                            "message": (
-                                "Uploaded file exceeds maximum"
-                                " allowed size"
-                            ),
+                            "message": ("Uploaded file exceeds maximum allowed size"),
                             "code": "FILE_SIZE_EXCEEDED",
                         },
                     )
@@ -454,22 +441,16 @@ def _stream_to_path_sync(
         raise
 
 
-async def _stream_to_path(
-    file: UploadFile, destination: Path, max_bytes: int
-) -> None:
+async def _stream_to_path(file: UploadFile, destination: Path, max_bytes: int) -> None:
     """Async wrapper around :func:`_stream_to_path_sync`.
 
     Runs the blocking I/O in a worker thread to avoid stalling the
     event loop on large uploads.
     """
-    await asyncio.to_thread(
-        _stream_to_path_sync, file, destination, max_bytes
-    )
+    await asyncio.to_thread(_stream_to_path_sync, file, destination, max_bytes)
 
 
-def _bytes_to_path_sync(
-    data: bytes, destination: Path, max_bytes: int
-) -> None:
+def _bytes_to_path_sync(data: bytes, destination: Path, max_bytes: int) -> None:
     """Write bytes to ``destination`` via an atomic sibling file.
 
     Args:
@@ -507,9 +488,7 @@ def _bytes_to_path_sync(
         raise
 
 
-async def _bytes_to_path(
-    data: bytes, destination: Path, max_bytes: int
-) -> None:
+async def _bytes_to_path(data: bytes, destination: Path, max_bytes: int) -> None:
     """Async wrapper around :func:`_bytes_to_path_sync`.
 
     Args:
@@ -570,9 +549,7 @@ async def save_validated_upload(
         destination = _resolve_upload_path(upload_dir, filename)
 
         if stream:
-            await _stream_to_path(
-                file, destination, _max_bytes_for(kind)
-            )
+            await _stream_to_path(file, destination, _max_bytes_for(kind))
             saved_path = str(destination)
         else:
             saved_path = await save_file(file, upload_dir, filename)
@@ -630,9 +607,7 @@ async def delete_files_by_pattern(directory: str, pattern: str) -> None:
                 if await aiofiles.os.path.exists(file_path):
                     await aiofiles.os.remove(file_path)
 
-                core_logger.print_to_log(
-                    f"File deleted successfully: {file_path}", "debug"
-                )
+                core_logger.print_to_log(f"File deleted successfully: {file_path}", "debug")
             except OSError as err:
                 core_logger.print_to_log(
                     f"Failed to delete file {file_path}: {err}",
@@ -739,9 +714,7 @@ _MAX_EXTRACTED_ENTRY_BYTES = _MAX_ACTIVITY_BYTES
 _MAX_TOTAL_EXTRACTED_BYTES = _MAX_UNCOMPRESSED_BYTES
 
 
-def _is_safe_extraction_target(
-    entry_name: str, dest_dir: Path
-) -> Path | None:
+def _is_safe_extraction_target(entry_name: str, dest_dir: Path) -> Path | None:
     """Resolve a ZIP entry against ``dest_dir`` and reject escapes.
 
     Args:
@@ -798,10 +771,7 @@ def _extract_validated_zip_sync(
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail={
-                        "message": (
-                            f"Archive contains {len(members)} entries; "
-                            f"maximum allowed is {max_entries}"
-                        ),
+                        "message": (f"Archive contains {len(members)} entries; maximum allowed is {max_entries}"),
                         "code": "ZIP_ENTRY_COUNT_EXCEEDED",
                     },
                 )
@@ -825,25 +795,17 @@ def _extract_validated_zip_sync(
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail={
-                            "message": (
-                                f"Archive contains symlink entry: "
-                                f"{member.filename!r}"
-                            ),
+                            "message": (f"Archive contains symlink entry: {member.filename!r}"),
                             "code": "ZIP_SYMLINK_REJECTED",
                         },
                     )
 
-                target = _is_safe_extraction_target(
-                    member.filename, dest_resolved
-                )
+                target = _is_safe_extraction_target(member.filename, dest_resolved)
                 if target is None:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail={
-                            "message": (
-                                f"Archive entry escapes destination: "
-                                f"{member.filename!r}"
-                            ),
+                            "message": (f"Archive entry escapes destination: {member.filename!r}"),
                             "code": "ZIP_SLIP_REJECTED",
                         },
                     )
@@ -852,10 +814,7 @@ def _extract_validated_zip_sync(
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail={
-                            "message": (
-                                "Archive contains duplicate target: "
-                                f"{member.filename!r}"
-                            ),
+                            "message": (f"Archive contains duplicate target: {member.filename!r}"),
                             "code": "ZIP_DUPLICATE_TARGET",
                         },
                     )
@@ -863,10 +822,7 @@ def _extract_validated_zip_sync(
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail={
-                            "message": (
-                                "Archive target already exists: "
-                                f"{member.filename!r}"
-                            ),
+                            "message": (f"Archive target already exists: {member.filename!r}"),
                             "code": "ZIP_TARGET_EXISTS",
                         },
                     )
@@ -877,10 +833,7 @@ def _extract_validated_zip_sync(
                     raise HTTPException(
                         status_code=request_too_large,
                         detail={
-                            "message": (
-                                "Archive entry exceeds maximum entry "
-                                "size"
-                            ),
+                            "message": ("Archive entry exceeds maximum entry size"),
                             "code": "ZIP_ENTRY_SIZE_EXCEEDED",
                         },
                     )
@@ -889,22 +842,15 @@ def _extract_validated_zip_sync(
                     raise HTTPException(
                         status_code=request_too_large,
                         detail={
-                            "message": (
-                                "Archive total uncompressed size "
-                                "exceeds maximum"
-                            ),
+                            "message": ("Archive total uncompressed size exceeds maximum"),
                             "code": "ZIP_TOTAL_SIZE_EXCEEDED",
                         },
                     )
 
-                staged_target = staging_dir / target.relative_to(
-                    dest_resolved
-                )
+                staged_target = staging_dir / target.relative_to(dest_resolved)
                 staged_target.parent.mkdir(parents=True, exist_ok=True)
                 try:
-                    with zip_ref.open(member, "r") as src, open(
-                        staged_target, "xb"
-                    ) as dst:
+                    with zip_ref.open(member, "r") as src, open(staged_target, "xb") as dst:
                         # Stream copy with a hard cap so a lying
                         # file_size in the central directory cannot
                         # fill the disk.
@@ -918,21 +864,14 @@ def _extract_validated_zip_sync(
                                 raise HTTPException(
                                     status_code=request_too_large,
                                     detail={
-                                        "message": (
-                                            "Archive entry exceeds "
-                                            "maximum entry size"
-                                        ),
-                                        "code": (
-                                            "ZIP_ENTRY_SIZE_EXCEEDED"
-                                        ),
+                                        "message": ("Archive entry exceeds maximum entry size"),
+                                        "code": ("ZIP_ENTRY_SIZE_EXCEEDED"),
                                     },
                                 )
                             dst.write(chunk)
                 except BaseException:
-                    try:
+                    with contextlib.suppress(OSError):
                         staged_target.unlink(missing_ok=True)
-                    except OSError:
-                        pass
                     raise
                 extracted.append((staged_target, target))
     except BaseException:
@@ -941,9 +880,7 @@ def _extract_validated_zip_sync(
         raise
 
     if staging_dir is None:
-        staging_dir = Path(
-            tempfile.mkdtemp(prefix=".extract-", dir=dest_resolved)
-        ).resolve()
+        staging_dir = Path(tempfile.mkdtemp(prefix=".extract-", dir=dest_resolved)).resolve()
     return staging_dir, extracted
 
 
@@ -1034,19 +971,15 @@ def _promote_extracted_files_sync(
             final_paths.append(final_resolved)
     except BaseException:
         for path in reversed(final_paths):
-            try:
+            with contextlib.suppress(OSError):
                 path.unlink(missing_ok=True)
-            except OSError:
-                pass
         # ``created_dirs`` is already deepest-first within each
         # ancestor chain (see ``missing_ancestors`` build above), so
         # iterate in natural order to ensure children are removed
         # before their parents during rollback.
         for created in created_dirs:
-            try:
+            with contextlib.suppress(OSError):
                 created.rmdir()
-            except OSError:
-                pass
         raise
 
     return final_paths
@@ -1122,13 +1055,10 @@ async def extract_validated_zip(
                         filename=final_entry.name,
                     )
                 except HTTPException:
-                    try:
+                    with contextlib.suppress(OSError):
                         staged_entry.unlink(missing_ok=True)
-                    except OSError:
-                        pass
                     core_logger.print_to_log(
-                        "extract_validated_zip dropped invalid entry: "
-                        f"{final_entry.name}",
+                        f"extract_validated_zip dropped invalid entry: {final_entry.name}",
                         "warning",
                     )
                     continue
@@ -1145,8 +1075,7 @@ async def extract_validated_zip(
             raise
         except OSError as err:
             core_logger.print_to_log(
-                f"extract_validated_zip promotion failed: "
-                f"{type(err).__name__}",
+                f"extract_validated_zip promotion failed: {type(err).__name__}",
                 "error",
                 exc=err,
             )
@@ -1159,9 +1088,7 @@ async def extract_validated_zip(
             ) from err
     finally:
         if staging_dir is not None:
-            await asyncio.to_thread(
-                shutil.rmtree, staging_dir, ignore_errors=True
-            )
+            await asyncio.to_thread(shutil.rmtree, staging_dir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1249,9 +1176,7 @@ def move_within(
             )
         source = Path(os.fspath(src)).resolve()
         if src_base_dir is not None:
-            source = _resolve_within(
-                source, Path(os.fspath(src_base_dir)).resolve()
-            )
+            source = _resolve_within(source, Path(os.fspath(src_base_dir)).resolve())
         shutil.move(source, destination)
         return destination
     except HTTPException:
@@ -1303,8 +1228,7 @@ def safe_remove_within(
         return False
     except OSError as err:
         core_logger.print_to_log(
-            f"safe_remove_within failed for {target.name}: "
-            f"{type(err).__name__}",
+            f"safe_remove_within failed for {target.name}: {type(err).__name__}",
             "warning",
             exc=err,
         )

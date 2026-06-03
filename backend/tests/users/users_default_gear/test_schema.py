@@ -5,9 +5,8 @@ This module tests Pydantic schemas for user default gear validation.
 """
 
 import pytest
-from pydantic import ValidationError
-
 import users.users_default_gear.schema as user_default_gear_schema
+from pydantic import ValidationError
 
 
 class TestUserDefaultGearBase:

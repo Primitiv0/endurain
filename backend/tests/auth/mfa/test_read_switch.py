@@ -7,16 +7,14 @@ columns.
 
 """
 
+import profile.utils as profile_utils
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-from fastapi import HTTPException, status
-
 import auth.mfa.models as auth_mfa_models
-import profile.utils as profile_utils
+import pytest
 import users.users.models as users_models
-
+from fastapi import HTTPException, status
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -78,9 +76,8 @@ class TestSetupUserMFAReadSwitch:
         # Confirm legacy column disagrees — proves the read came from auth_mfa
         assert user.mfa_enabled is False
 
-        with _patch_get_user(user):
-            with pytest.raises(HTTPException) as exc:
-                profile_utils.setup_user_mfa(1, mock_db)
+        with _patch_get_user(user), pytest.raises(HTTPException) as exc:
+            profile_utils.setup_user_mfa(1, mock_db)
 
         assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "already enabled" in exc.value.detail
@@ -127,9 +124,8 @@ class TestEnableUserMFAReadSwitch:
         user = _make_user(mfa_enabled=True, mfa_secret="enc")
         assert user.mfa_enabled is False  # legacy column is wrong on purpose
 
-        with _patch_get_user(user):
-            with pytest.raises(HTTPException) as exc:
-                profile_utils.enable_user_mfa(1, "secret", "123456", MagicMock(), mock_db)
+        with _patch_get_user(user), pytest.raises(HTTPException) as exc:
+            profile_utils.enable_user_mfa(1, "secret", "123456", MagicMock(), mock_db)
 
         assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "already enabled" in exc.value.detail
@@ -152,9 +148,8 @@ class TestDisableUserMFAReadSwitch:
         # Force legacy column to True to prove it is NOT being read
         user.mfa_enabled = True
 
-        with _patch_get_user(user):
-            with pytest.raises(HTTPException) as exc:
-                profile_utils.disable_user_mfa(1, mock_db)
+        with _patch_get_user(user), pytest.raises(HTTPException) as exc:
+            profile_utils.disable_user_mfa(1, mock_db)
 
         assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
         assert "not enabled" in exc.value.detail
@@ -167,9 +162,8 @@ class TestDisableUserMFAReadSwitch:
         user.auth_mfa = None
         user.mfa_enabled = True  # legacy column True — must be ignored
 
-        with _patch_get_user(user):
-            with pytest.raises(HTTPException) as exc:
-                profile_utils.disable_user_mfa(1, mock_db)
+        with _patch_get_user(user), pytest.raises(HTTPException) as exc:
+            profile_utils.disable_user_mfa(1, mock_db)
 
         assert exc.value.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -188,8 +182,8 @@ class TestVerifyUserMFAReadSwitch:
         even if the legacy column was True.
         """
         user = _make_user(mfa_enabled=False)
-        user.mfa_enabled = True      # legacy — must be ignored
-        user.mfa_secret = "enc"      # legacy — must be ignored
+        user.mfa_enabled = True  # legacy — must be ignored
+        user.mfa_secret = "enc"  # legacy — must be ignored
 
         with _patch_get_user(user):
             result = profile_utils.verify_user_mfa(1, "123456", MagicMock(), mock_db)
@@ -200,7 +194,7 @@ class TestVerifyUserMFAReadSwitch:
         """Returns False when auth_mfa is None."""
         user = _make_user()
         user.auth_mfa = None
-        user.mfa_enabled = True   # legacy True — must be ignored
+        user.mfa_enabled = True  # legacy True — must be ignored
 
         with _patch_get_user(user):
             result = profile_utils.verify_user_mfa(1, "123456", MagicMock(), mock_db)
@@ -215,10 +209,13 @@ class TestVerifyUserMFAReadSwitch:
         user = _make_user(mfa_enabled=True, mfa_secret="auth_enc_secret")
         user.mfa_secret = "WRONG_legacy_secret"  # must be ignored
 
-        with _patch_get_user(user), patch(
-            "profile.utils.core_cryptography.decrypt_token_fernet",
-            return_value=None,  # decrypt fails → returns False cleanly
-        ) as mock_decrypt:
+        with (
+            _patch_get_user(user),
+            patch(
+                "profile.utils.core_cryptography.decrypt_token_fernet",
+                return_value=None,  # decrypt fails → returns False cleanly
+            ) as mock_decrypt,
+        ):
             profile_utils.verify_user_mfa(1, "123456", MagicMock(), mock_db)
 
         mock_decrypt.assert_called_once_with("auth_enc_secret")
@@ -259,8 +256,8 @@ class TestIsMFAEnabledForUserReadSwitch:
         """Returns False when auth_mfa is None."""
         user = _make_user()
         user.auth_mfa = None
-        user.mfa_enabled = True   # legacy True — must be ignored
-        user.mfa_secret = "enc"   # legacy — must be ignored
+        user.mfa_enabled = True  # legacy True — must be ignored
+        user.mfa_secret = "enc"  # legacy — must be ignored
 
         with _patch_get_user(user):
             result = profile_utils.is_mfa_enabled_for_user(1, mock_db)
@@ -276,4 +273,3 @@ class TestIsMFAEnabledForUserReadSwitch:
             result = profile_utils.is_mfa_enabled_for_user(99, mock_db)
 
         assert result is False
-

@@ -1,9 +1,9 @@
-import pytest
-from datetime import datetime, date as datetime_date
-from decimal import Decimal
-from pydantic import ValidationError
+from datetime import date as datetime_date
+from datetime import datetime
 
 import health.health_sleep.schema as health_sleep_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestHealthSleepSchema:
@@ -78,9 +78,7 @@ class TestHealthSleepSchema:
         """
         # Arrange & Act & Assert
         with pytest.raises(ValidationError) as exc_info:
-            health_sleep_schema.HealthSleepBase(
-                total_sleep_seconds=28800, extra_field="not allowed"
-            )
+            health_sleep_schema.HealthSleepBase(total_sleep_seconds=28800, extra_field="not allowed")
 
         assert "extra_field" in str(exc_info.value)
 
@@ -136,9 +134,7 @@ class TestHealthSleepSchema:
             sleep_stress_score = None
 
         # Act
-        health_sleep = health_sleep_schema.HealthSleepRead.model_validate(
-            MockORMModel()
-        )
+        health_sleep = health_sleep_schema.HealthSleepRead.model_validate(MockORMModel())
 
         # Assert
         assert health_sleep.id == 1
@@ -279,9 +275,7 @@ class TestSourceEnum:
         Test Source enum can be used in HealthSleepBase schema.
         """
         # Arrange & Act
-        health_sleep = health_sleep_schema.HealthSleepBase(
-            source=health_sleep_schema.Source.GARMIN
-        )
+        health_sleep = health_sleep_schema.HealthSleepBase(source=health_sleep_schema.Source.GARMIN)
 
         # Assert
         assert health_sleep.source == "garmin"
@@ -342,9 +336,7 @@ class TestHealthSleepListResponse:
             total_sleep_seconds=32400,
         )
 
-        response = health_sleep_schema.HealthSleepListResponse(
-            total=2, records=[health_sleep1, health_sleep2]
-        )
+        response = health_sleep_schema.HealthSleepListResponse(total=2, records=[health_sleep1, health_sleep2])
 
         # Assert
         assert response.total == 2

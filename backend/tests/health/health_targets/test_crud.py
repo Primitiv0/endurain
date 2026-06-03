@@ -1,11 +1,11 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 import health.health_targets.crud as health_targets_crud
-import health.health_targets.schema as health_targets_schema
 import health.health_targets.models as health_targets_models
+import health.health_targets.schema as health_targets_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 
 class TestGetHealthTargetsByUserId:
@@ -170,9 +170,7 @@ class TestEditHealthTarget:
         """
         # Arrange
         user_id = 1
-        health_target = health_targets_schema.HealthTargetsUpdate(
-            id=999, user_id=user_id, weight=75.0, steps=10000
-        )
+        health_target = health_targets_schema.HealthTargetsUpdate(id=999, user_id=user_id, weight=75.0, steps=10000)
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
@@ -205,7 +203,7 @@ class TestEditHealthTarget:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = health_targets_crud.edit_health_target(health_target, user_id, mock_db)
+        health_targets_crud.edit_health_target(health_target, user_id, mock_db)
 
         # Assert
         mock_db.commit.assert_called_once()
@@ -216,9 +214,7 @@ class TestEditHealthTarget:
         """
         # Arrange
         user_id = 1
-        health_target = health_targets_schema.HealthTargetsUpdate(
-            id=1, user_id=user_id, weight=75.0
-        )
+        health_target = health_targets_schema.HealthTargetsUpdate(id=1, user_id=user_id, weight=75.0)
 
         mock_db_target = MagicMock(spec=health_targets_models.HealthTargets)
         mock_result = MagicMock()
@@ -226,7 +222,7 @@ class TestEditHealthTarget:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = health_targets_crud.edit_health_target(health_target, user_id, mock_db)
+        health_targets_crud.edit_health_target(health_target, user_id, mock_db)
 
         # Assert
         mock_db.commit.assert_called_once()
@@ -237,9 +233,7 @@ class TestEditHealthTarget:
         """
         # Arrange
         user_id = 1
-        health_target = health_targets_schema.HealthTargetsUpdate(
-            id=1, user_id=user_id, weight=75.0
-        )
+        health_target = health_targets_schema.HealthTargetsUpdate(id=1, user_id=user_id, weight=75.0)
 
         # Mock successful get but fail on commit
         mock_db_target = MagicMock(spec=health_targets_models.HealthTargets)
@@ -262,9 +256,7 @@ class TestEditHealthTarget:
         """
         # Arrange
         user_id = 1
-        health_target = health_targets_schema.HealthTargetsUpdate(
-            id=1, user_id=user_id, weight=None, steps=None
-        )
+        health_target = health_targets_schema.HealthTargetsUpdate(id=1, user_id=user_id, weight=None, steps=None)
 
         mock_db_target = MagicMock(spec=health_targets_models.HealthTargets)
         mock_result = MagicMock()
@@ -272,7 +264,7 @@ class TestEditHealthTarget:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = health_targets_crud.edit_health_target(health_target, user_id, mock_db)
+        health_targets_crud.edit_health_target(health_target, user_id, mock_db)
 
         # Assert
         mock_db.commit.assert_called_once()

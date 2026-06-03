@@ -11,86 +11,63 @@ Key Features:
 - Memory and timeout monitoring
 """
 
-import os
 import json
-import zipfile
-import time
-from io import BytesIO
-from typing import Any
-from fastapi import HTTPException
-from sqlalchemy.orm import Session
-
-import core.config as core_config
-import core.logger as core_logger
-import core.file_uploads as file_uploads
-
-from profile.exceptions import (
-    FileFormatError,
-    ImportTimeoutError,
-    FileSizeError,
-    ActivityLimitError,
-    JSONParseError,
-    FileSystemError,
-)
-
+import os
 import profile.utils as profile_utils
-
-import users.users.crud as users_crud
-import users.users.schema as users_schema
-
-import users.users_default_gear.crud as user_default_gear_crud
-import users.users_default_gear.schema as user_default_gear_schema
-
-import users.users_goals.crud as user_goals_crud
-import users.users_goals.schema as user_goals_schema
-
-import auth.identity_links.crud as user_identity_providers_crud
-import auth.identity_links.schema as user_identity_providers_schema
-
-import auth.identity_providers.crud as identity_providers_crud
-
-import users.users_integrations.crud as user_integrations_crud
-import users.users_integrations.schema as users_integrations_schema
-
-import users.users_privacy_settings.crud as users_privacy_settings_crud
-import users.users_privacy_settings.schema as users_privacy_settings_schema
+import time
+import zipfile
+from io import BytesIO
+from profile.exceptions import (
+    ActivityLimitError,
+    FileFormatError,
+    FileSizeError,
+    FileSystemError,
+    ImportTimeoutError,
+    JSONParseError,
+)
+from typing import Any
 
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activity_schema
-
-import activities.activity_laps.crud as activity_laps_crud
-
-import activities.activity_media.crud as activity_media_crud
-import activities.activity_media.schema as activity_media_schema
-
-import activities.activity_sets.crud as activity_sets_crud
-import activities.activity_sets.schema as activity_sets_schema
-
-import activities.activity_streams.crud as activity_streams_crud
-import activities.activity_streams.schema as activity_streams_schema
-
-import activities.activity_workout_steps.crud as activity_workout_steps_crud
-import activities.activity_workout_steps.schema as activity_workout_steps_schema
-
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
 import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
-
+import activities.activity_laps.crud as activity_laps_crud
+import activities.activity_media.crud as activity_media_crud
+import activities.activity_media.schema as activity_media_schema
+import activities.activity_sets.crud as activity_sets_crud
+import activities.activity_sets.schema as activity_sets_schema
+import activities.activity_streams.crud as activity_streams_crud
+import activities.activity_streams.schema as activity_streams_schema
+import activities.activity_workout_steps.crud as activity_workout_steps_crud
+import activities.activity_workout_steps.schema as activity_workout_steps_schema
+import auth.identity_links.crud as user_identity_providers_crud
+import auth.identity_providers.crud as identity_providers_crud
+import core.config as core_config
+import core.file_uploads as file_uploads
+import core.logger as core_logger
 import gears.gear.crud as gear_crud
 import gears.gear.schema as gear_schema
-
 import gears.gear_components.crud as gear_components_crud
 import gears.gear_components.schema as gear_components_schema
-
-import notifications.crud as notifications_crud
-import notifications.schema as notifications_schema
-
-import health.health_weight.crud as health_weight_crud
-import health.health_weight.schema as health_weight_schema
-
 import health.health_targets.crud as health_targets_crud
 import health.health_targets.schema as health_targets_schema
-
+import health.health_weight.crud as health_weight_crud
+import health.health_weight.schema as health_weight_schema
+import notifications.crud as notifications_crud
+import notifications.schema as notifications_schema
+import users.users.crud as users_crud
+import users.users.schema as users_schema
+import users.users_default_gear.crud as user_default_gear_crud
+import users.users_default_gear.schema as user_default_gear_schema
+import users.users_goals.crud as user_goals_crud
+import users.users_goals.schema as user_goals_schema
+import users.users_integrations.crud as user_integrations_crud
+import users.users_integrations.schema as users_integrations_schema
+import users.users_privacy_settings.crud as users_privacy_settings_crud
+import users.users_privacy_settings.schema as users_privacy_settings_schema
 import websocket.manager as websocket_manager
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 
 class ImportPerformanceConfig(profile_utils.BasePerformanceConfig):
@@ -188,9 +165,7 @@ class ImportService:
         self.user_id = user_id
         self.db = db
         self.websocket_manager = websocket_manager
-        self.counts = profile_utils.initialize_operation_counts(
-            include_user_count=False
-        )
+        self.counts = profile_utils.initialize_operation_counts(include_user_count=False)
         self.performance_config: ImportPerformanceConfig = (
             performance_config or ImportPerformanceConfig.get_auto_config()
         )
@@ -248,43 +223,25 @@ class ImportService:
 
                 # Import data in dependency order using streaming approach
                 # Load and import gears
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
                 gears_data = self._load_single_json(zipf, "data/gears.json")
                 gears_id_mapping = await self.collect_and_import_gears_data(gears_data)
                 del gears_data  # Explicit memory cleanup
 
                 # Load and import gear components
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
-                gear_components_data = self._load_single_json(
-                    zipf, "data/gear_components.json"
-                )
-                await self.collect_and_import_gear_components_data(
-                    gear_components_data, gears_id_mapping
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
+                gear_components_data = self._load_single_json(zipf, "data/gear_components.json")
+                await self.collect_and_import_gear_components_data(gear_components_data, gears_id_mapping)
                 del gear_components_data
 
                 # Load and import user data (includes user, default gear, integrations, goals, privacy)
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
                 user_data = self._load_single_json(zipf, "data/user.json")
-                user_default_gear_data = self._load_single_json(
-                    zipf, "data/user_default_gear.json"
-                )
+                user_default_gear_data = self._load_single_json(zipf, "data/user_default_gear.json")
                 user_goals_data = self._load_single_json(zipf, "data/user_goals.json")
-                user_identity_providers_data = self._load_single_json(
-                    zipf, "data/user_identity_providers.json"
-                )
-                user_integrations_data = self._load_single_json(
-                    zipf, "data/user_integrations.json"
-                )
-                user_privacy_settings_data = self._load_single_json(
-                    zipf, "data/user_privacy_settings.json"
-                )
+                user_identity_providers_data = self._load_single_json(zipf, "data/user_identity_providers.json")
+                user_integrations_data = self._load_single_json(zipf, "data/user_integrations.json")
+                user_privacy_settings_data = self._load_single_json(zipf, "data/user_privacy_settings.json")
 
                 await self.collect_and_import_user_data(
                     user_data,
@@ -299,70 +256,46 @@ class ImportService:
                 del user_goals_data, user_privacy_settings_data
 
                 # Load and import activities with their components
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
 
                 # Import activities and components using batched approach to avoid memory issues
-                activities_id_mapping = (
-                    await self.collect_and_import_activities_data_batched(
-                        zipf,
-                        file_list,
-                        gears_id_mapping,
-                        start_time,
-                        timeout_seconds,
-                    )
+                activities_id_mapping = await self.collect_and_import_activities_data_batched(
+                    zipf,
+                    file_list,
+                    gears_id_mapping,
+                    start_time,
+                    timeout_seconds,
                 )
 
                 # Load and import notifications
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
-                notifications_data = self._load_single_json(
-                    zipf, "data/notifications.json"
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
+                notifications_data = self._load_single_json(zipf, "data/notifications.json")
 
                 await self.collect_and_import_notifications_data(notifications_data)
                 del notifications_data
 
                 # Load and import health data
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
-                health_weight_data = self._load_single_json(
-                    zipf, "data/health_weight.json"
-                )
-                health_targets_data = self._load_single_json(
-                    zipf, "data/health_targets.json"
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
+                health_weight_data = self._load_single_json(zipf, "data/health_weight.json")
+                health_targets_data = self._load_single_json(zipf, "data/health_targets.json")
 
-                await self.collect_and_import_health_weight(
-                    health_weight_data, health_targets_data
-                )
+                await self.collect_and_import_health_weight(health_weight_data, health_targets_data)
                 del health_weight_data, health_targets_data
 
                 # Import files and media
-                profile_utils.check_timeout(
-                    timeout_seconds, start_time, ImportTimeoutError, "Import"
-                )
-                await self.add_activity_files_from_zip(
-                    zipf, file_list, activities_id_mapping
-                )
-                await self.add_activity_media_from_zip(
-                    zipf, file_list, activities_id_mapping
-                )
+                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
+                await self.add_activity_files_from_zip(zipf, file_list, activities_id_mapping)
+                await self.add_activity_media_from_zip(zipf, file_list, activities_id_mapping)
                 await self.add_user_images_from_zip(zipf, file_list)
 
         except zipfile.BadZipFile as e:
-            raise FileFormatError(f"Invalid ZIP file format: {str(e)}") from e
-        except (OSError, IOError) as e:
-            raise FileSystemError(f"File system error during import: {str(e)}") from e
+            raise FileFormatError(f"Invalid ZIP file format: {e!s}") from e
+        except OSError as e:
+            raise FileSystemError(f"File system error during import: {e!s}") from e
 
         return {"detail": "Import completed", "imported": self.counts}
 
-    def _load_single_json(
-        self, zipf: zipfile.ZipFile, filename: str, check_memory: bool = True
-    ) -> list[Any]:
+    def _load_single_json(self, zipf: zipfile.ZipFile, filename: str, check_memory: bool = True) -> list[Any]:
         """
         Load and parse JSON file from ZIP archive.
 
@@ -423,11 +356,7 @@ class ImportService:
         Raises:
             FileSizeError: If the entry exceeds the allowed size.
         """
-        limit = (
-            max_bytes
-            if max_bytes is not None
-            else self.performance_config.max_file_size_mb * 1024 * 1024
-        )
+        limit = max_bytes if max_bytes is not None else self.performance_config.max_file_size_mb * 1024 * 1024
         info = zipf.getinfo(filename)
         # ``info.file_size`` comes from the central directory and a
         # malicious archive can lie. The declared-size check below
@@ -436,8 +365,7 @@ class ImportService:
         # bytes so a zip-bomb cannot exhaust memory.
         if info.file_size > limit:
             raise FileSizeError(
-                f"ZIP entry {filename} size ({info.file_size} bytes) "
-                f"exceeds maximum allowed ({limit} bytes)"
+                f"ZIP entry {filename} size ({info.file_size} bytes) exceeds maximum allowed ({limit} bytes)"
             )
         chunks: list[bytes] = []
         bytes_read = 0
@@ -450,15 +378,12 @@ class ImportService:
                 bytes_read += len(chunk)
                 if bytes_read > limit:
                     raise FileSizeError(
-                        f"ZIP entry {filename} decompressed size "
-                        f"exceeds maximum allowed ({limit} bytes)"
+                        f"ZIP entry {filename} decompressed size exceeds maximum allowed ({limit} bytes)"
                     )
                 chunks.append(chunk)
         return b"".join(chunks)
 
-    async def collect_and_import_gears_data(
-        self, gears_data: list[Any]
-    ) -> dict[int, int]:
+    async def collect_and_import_gears_data(self, gears_data: list[Any]) -> dict[int, int]:
         """
         Import gear data and create ID mappings.
 
@@ -511,17 +436,11 @@ class ImportService:
 
             gear_component_data.pop("id", None)
 
-            gear_component = gear_components_schema.GearComponents(
-                **gear_component_data
-            )
-            gear_components_crud.create_gear_component(
-                gear_component, self.user_id, self.db
-            )
+            gear_component = gear_components_schema.GearComponents(**gear_component_data)
+            gear_components_crud.create_gear_component(gear_component, self.user_id, self.db)
             self.counts["gear_components"] += 1
 
-        core_logger.print_to_log(
-            f"Imported {self.counts['gear_components']} gear components", "info"
-        )
+        core_logger.print_to_log(f"Imported {self.counts['gear_components']} gear components", "info")
 
     async def collect_and_import_user_data(
         self,
@@ -566,23 +485,15 @@ class ImportService:
         # ``mfa_secret``, ``email_verified``, or
         # ``pending_admin_approval``, those fields are dropped here
         # before reaching the database.
-        sanitized = {
-            key: value
-            for key, value in user_profile.items()
-            if key in users_crud.PROFILE_SELF_SERVICE_FIELDS
-        }
+        sanitized = {key: value for key, value in user_profile.items() if key in users_crud.PROFILE_SELF_SERVICE_FIELDS}
         profile_payload = users_schema.ProfileUpdate.model_validate(sanitized)
         await users_crud.edit_profile_user(self.user_id, profile_payload, self.db)
         self.counts["user"] += 1
 
         # Import user-related settings
-        await self.collect_and_import_user_default_gear(
-            user_default_gear_data, gears_id_mapping
-        )
+        await self.collect_and_import_user_default_gear(user_default_gear_data, gears_id_mapping)
         await self.collect_and_import_user_goals(user_goals_data)
-        await self.collect_and_import_user_identity_providers(
-            user_identity_providers_data
-        )
+        await self.collect_and_import_user_identity_providers(user_identity_providers_data)
         await self.collect_and_import_user_integrations(user_integrations_data)
         await self.collect_and_import_user_privacy_settings(user_privacy_settings_data)
 
@@ -600,11 +511,7 @@ class ImportService:
             core_logger.print_to_log("No user default gear data to import", "info")
             return
 
-        current_user_default_gear = (
-            user_default_gear_crud.get_user_default_gear_by_user_id(
-                self.user_id, self.db
-            )
-        )
+        current_user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(self.user_id, self.db)
 
         if current_user_default_gear is None:
             core_logger.print_to_log("No existing user default gear to update", "info")
@@ -635,21 +542,14 @@ class ImportService:
 
         for field in gear_fields:
             old_gear_id = gear_data.get(field)
-            if old_gear_id in gears_id_mapping:
-                gear_data[field] = gears_id_mapping[old_gear_id]
-            else:
-                gear_data[field] = None
+            gear_data[field] = gears_id_mapping.get(old_gear_id)
 
         user_default_gear = user_default_gear_schema.UsersDefaultGearUpdate(**gear_data)
-        user_default_gear_crud.edit_user_default_gear(
-            user_default_gear, self.user_id, self.db
-        )
-        core_logger.print_to_log(f"Imported user default gear", "info")
+        user_default_gear_crud.edit_user_default_gear(user_default_gear, self.user_id, self.db)
+        core_logger.print_to_log("Imported user default gear", "info")
         self.counts["user_default_gear"] += 1
 
-    async def collect_and_import_user_integrations(
-        self, user_integrations_data: list[Any]
-    ) -> None:
+    async def collect_and_import_user_integrations(self, user_integrations_data: list[Any]) -> None:
         """
         Import user integration settings.
 
@@ -664,13 +564,9 @@ class ImportService:
         integrations_data.pop("id", None)
         integrations_data.pop("user_id", None)
 
-        user_integrations = users_integrations_schema.UsersIntegrationsUpdate(
-            **integrations_data
-        )
-        user_integrations_crud.edit_user_integrations(
-            user_integrations, self.user_id, self.db
-        )
-        core_logger.print_to_log(f"Imported user integrations", "info")
+        user_integrations = users_integrations_schema.UsersIntegrationsUpdate(**integrations_data)
+        user_integrations_crud.edit_user_integrations(user_integrations, self.user_id, self.db)
+        core_logger.print_to_log("Imported user integrations", "info")
         self.counts["user_integrations"] += 1
 
     async def collect_and_import_user_goals(self, user_goals_data: list[Any]) -> None:
@@ -692,13 +588,9 @@ class ImportService:
             user_goals_crud.create_user_goal(self.user_id, goal, self.db)
             self.counts["user_goals"] += 1
 
-        core_logger.print_to_log(
-            f"Imported {self.counts['user_goals']} user goals", "info"
-        )
+        core_logger.print_to_log(f"Imported {self.counts['user_goals']} user goals", "info")
 
-    async def collect_and_import_user_identity_providers(
-        self, user_identity_providers_data: list[Any]
-    ) -> None:
+    async def collect_and_import_user_identity_providers(self, user_identity_providers_data: list[Any]) -> None:
         """
         Import user identity provider links.
 
@@ -706,25 +598,20 @@ class ImportService:
             user_identity_providers_data: Identity provider data.
         """
         if not user_identity_providers_data:
-            core_logger.print_to_log(
-                "No user identity providers data to import", "info"
-            )
+            core_logger.print_to_log("No user identity providers data to import", "info")
             return
 
         # Check if identity provider exists
         idps = identity_providers_crud.get_all_identity_providers(self.db)
         if not idps:
             core_logger.print_to_log(
-                f"Skipping identity provider link: "
-                f"there are no identity providers configured in the system.",
+                "Skipping identity provider link: there are no identity providers configured in the system.",
                 "warning",
             )
             return
 
         for provider_data in user_identity_providers_data:
-            if not identity_providers_crud.get_identity_provider(
-                provider_data["idp_id"], self.db
-            ):
+            if not identity_providers_crud.get_identity_provider(provider_data["idp_id"], self.db):
                 core_logger.print_to_log(
                     f"Skipping identity provider link for idp_id={provider_data['idp_id']}: "
                     f"identity provider not found in the system.",
@@ -748,9 +635,7 @@ class ImportService:
             "info",
         )
 
-    async def collect_and_import_user_privacy_settings(
-        self, user_privacy_settings_data: list[Any]
-    ) -> None:
+    async def collect_and_import_user_privacy_settings(self, user_privacy_settings_data: list[Any]) -> None:
         """
         Import user privacy settings.
 
@@ -765,13 +650,9 @@ class ImportService:
         privacy_data.pop("id", None)
         privacy_data.pop("user_id", None)
 
-        user_privacy_settings = (
-            users_privacy_settings_schema.UsersPrivacySettingsUpdate(**privacy_data)
-        )
-        users_privacy_settings_crud.edit_user_privacy_settings(
-            self.user_id, user_privacy_settings, self.db
-        )
-        core_logger.print_to_log(f"Imported user privacy settings", "info")
+        user_privacy_settings = users_privacy_settings_schema.UsersPrivacySettingsUpdate(**privacy_data)
+        users_privacy_settings_crud.edit_user_privacy_settings(self.user_id, user_privacy_settings, self.db)
+        core_logger.print_to_log("Imported user privacy settings", "info")
         self.counts["user_privacy_settings"] += 1
 
     async def collect_and_import_activity_components(
@@ -801,11 +682,7 @@ class ImportService:
         # Import laps - filter for this activity
         if activity_laps_data:
             laps = []
-            laps_for_activity = [
-                lap
-                for lap in activity_laps_data
-                if lap.get("activity_id") == original_activity_id
-            ]
+            laps_for_activity = [lap for lap in activity_laps_data if lap.get("activity_id") == original_activity_id]
             for lap_data in laps_for_activity:
                 lap_data.pop("id", None)
                 lap_data["activity_id"] = new_activity_id
@@ -837,9 +714,7 @@ class ImportService:
         if activity_streams_data:
             streams = []
             streams_for_activity = [
-                stream
-                for stream in activity_streams_data
-                if stream.get("activity_id") == original_activity_id
+                stream for stream in activity_streams_data if stream.get("activity_id") == original_activity_id
             ]
             for stream_data in streams_for_activity:
                 stream_data.pop("id", None)
@@ -855,9 +730,7 @@ class ImportService:
         if activity_workout_steps_data:
             steps = []
             steps_for_activity = [
-                step
-                for step in activity_workout_steps_data
-                if step.get("activity_id") == original_activity_id
+                step for step in activity_workout_steps_data if step.get("activity_id") == original_activity_id
             ]
             for step_data in steps_for_activity:
                 step_data.pop("id", None)
@@ -866,9 +739,7 @@ class ImportService:
                 steps.append(step)
 
             if steps:
-                activity_workout_steps_crud.create_activity_workout_steps(
-                    steps, new_activity_id, self.db
-                )
+                activity_workout_steps_crud.create_activity_workout_steps(steps, new_activity_id, self.db)
                 self.counts["activity_workout_steps"] += len(steps)
 
         # Import media
@@ -886,13 +757,10 @@ class ImportService:
                 # Update media path
                 old_path = media_data.get("media_path", None)
                 if old_path:
-                    filename = os.path.basename(
-                        str(old_path).replace("\\", "/")
-                    )
+                    filename = os.path.basename(str(old_path).replace("\\", "/"))
                     if "_" not in filename:
                         core_logger.print_to_log(
-                            "Skipping activity media with invalid "
-                            f"path: {old_path}",
+                            f"Skipping activity media with invalid path: {old_path}",
                             "warning",
                         )
                         continue
@@ -907,8 +775,7 @@ class ImportService:
                         )
                     except HTTPException as err:
                         core_logger.print_to_log(
-                            "Skipping activity media with unsafe "
-                            f"path {old_path}: {err.detail}",
+                            f"Skipping activity media with unsafe path {old_path}: {err.detail}",
                             "warning",
                         )
                         continue
@@ -917,31 +784,23 @@ class ImportService:
                 media.append(media_item)
 
             if media:
-                activity_media_crud.create_activity_medias(
-                    media, new_activity_id, self.db
-                )
+                activity_media_crud.create_activity_medias(media, new_activity_id, self.db)
                 self.counts["activity_media"] += len(media)
 
         # Import exercise titles
         if activity_exercise_titles_data:
             titles = []
             exercise_titles_for_activity = [
-                title
-                for title in activity_exercise_titles_data
-                if title.get("activity_id") == original_activity_id
+                title for title in activity_exercise_titles_data if title.get("activity_id") == original_activity_id
             ]
             for title_data in exercise_titles_for_activity:
                 title_data.pop("id", None)
                 title_data["activity_id"] = new_activity_id
-                title = activity_exercise_titles_schema.ActivityExerciseTitles(
-                    **title_data
-                )
+                title = activity_exercise_titles_schema.ActivityExerciseTitles(**title_data)
                 titles.append(title)
 
             if titles:
-                activity_exercise_titles_crud.create_activity_exercise_titles(
-                    titles, self.db
-                )
+                activity_exercise_titles_crud.create_activity_exercise_titles(titles, self.db)
                 self.counts["activity_exercise_titles"] += len(titles)
 
     async def collect_and_import_activities_data_batched(
@@ -988,9 +847,7 @@ class ImportService:
         activity_workout_steps_data = self._load_single_json(
             zipf, "data/activity_workout_steps.json", check_memory=False
         )
-        activity_media_data = self._load_single_json(
-            zipf, "data/activity_media.json", check_memory=False
-        )
+        activity_media_data = self._load_single_json(zipf, "data/activity_media.json", check_memory=False)
         activity_exercise_titles_data = self._load_single_json(
             zipf, "data/activity_exercise_titles.json", check_memory=False
         )
@@ -1008,29 +865,20 @@ class ImportService:
         # Process activities in batches
         batch_size = self.performance_config.batch_size
         for batch_start in range(0, len(activities_data), batch_size):
-            profile_utils.check_timeout(
-                timeout_seconds, start_time, ImportTimeoutError, "Import"
-            )
+            profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
 
             batch_end = min(batch_start + batch_size, len(activities_data))
             activities_batch = activities_data[batch_start:batch_end]
 
             core_logger.print_to_log(
-                f"Processing activities batch {batch_start//batch_size + 1}: "
-                f"activities {batch_start}-{batch_end}",
+                f"Processing activities batch {batch_start // batch_size + 1}: activities {batch_start}-{batch_end}",
                 "info",
             )
 
             # Load components for this batch only
-            batch_laps = self._load_components_for_batch(
-                zipf, laps_files, activities_batch, "laps"
-            )
-            batch_sets = self._load_components_for_batch(
-                zipf, sets_files, activities_batch, "sets"
-            )
-            batch_streams = self._load_components_for_batch(
-                zipf, streams_files, activities_batch, "streams"
-            )
+            batch_laps = self._load_components_for_batch(zipf, laps_files, activities_batch, "laps")
+            batch_sets = self._load_components_for_batch(zipf, sets_files, activities_batch, "sets")
+            batch_streams = self._load_components_for_batch(zipf, streams_files, activities_batch, "streams")
 
             # Import activities in this batch
             for activity_data in activities_batch:
@@ -1045,9 +893,7 @@ class ImportService:
                 activity_data.pop("id", None)
 
                 activity = activity_schema.Activity(**activity_data)
-                new_activity = await activities_crud.create_activity(
-                    activity, self.websocket_manager, self.db, False
-                )
+                new_activity = await activities_crud.create_activity(activity, self.websocket_manager, self.db, False)
 
                 if original_activity_id is not None and new_activity.id is not None:
                     activities_id_mapping[original_activity_id] = new_activity.id
@@ -1069,19 +915,15 @@ class ImportService:
             # Clear batch data from memory
             del batch_laps, batch_sets, batch_streams
             profile_utils.check_memory_usage(
-                f"activities batch {batch_start//batch_size + 1}",
+                f"activities batch {batch_start // batch_size + 1}",
                 self.performance_config.max_memory_mb,
                 self.performance_config.enable_memory_monitoring,
             )
 
-        core_logger.print_to_log(
-            f"Imported {self.counts['activities']} activities", "info"
-        )
+        core_logger.print_to_log(f"Imported {self.counts['activities']} activities", "info")
         return activities_id_mapping
 
-    def _get_split_files_list(
-        self, file_list: set[str], base_filename: str
-    ) -> list[str]:
+    def _get_split_files_list(self, file_list: set[str], base_filename: str) -> list[str]:
         """
         Get list of split component files from ZIP.
 
@@ -1092,13 +934,7 @@ class ImportService:
         Returns:
             Sorted list of matching file paths.
         """
-        split_files = sorted(
-            [
-                f
-                for f in file_list
-                if f.startswith(f"{base_filename}_") and f.endswith(".json")
-            ]
-        )
+        split_files = sorted([f for f in file_list if f.startswith(f"{base_filename}_") and f.endswith(".json")])
         if split_files:
             return split_files
         # Fall back to single file if no split files found
@@ -1130,46 +966,31 @@ class ImportService:
             return []
 
         # Get activity IDs in this batch
-        batch_activity_ids = set(
-            activity.get("id")
-            for activity in activities_batch
-            if activity.get("id") is not None
-        )
+        batch_activity_ids = set(activity.get("id") for activity in activities_batch if activity.get("id") is not None)
 
         all_components = []
 
         # Load and filter components from each file
         for filename in component_files:
             try:
-                components = json.loads(
-                    self._read_zip_entry(zipf, filename)
-                )
+                components = json.loads(self._read_zip_entry(zipf, filename))
                 # Only keep components for activities in this batch
-                filtered = [
-                    comp
-                    for comp in components
-                    if comp.get("activity_id") in batch_activity_ids
-                ]
+                filtered = [comp for comp in components if comp.get("activity_id") in batch_activity_ids]
                 all_components.extend(filtered)
 
                 if filtered:
                     core_logger.print_to_log(
-                        f"Loaded {len(filtered)}/{len(components)} {component_name} "
-                        f"from {filename} for batch",
+                        f"Loaded {len(filtered)}/{len(components)} {component_name} from {filename} for batch",
                         "debug",
                     )
             except json.JSONDecodeError as err:
-                core_logger.print_to_log(
-                    f"Failed to parse {filename}: {err}", "warning"
-                )
+                core_logger.print_to_log(f"Failed to parse {filename}: {err}", "warning")
             except Exception as err:
                 core_logger.print_to_log(f"Error loading {filename}: {err}", "warning")
 
         return all_components
 
-    async def collect_and_import_notifications_data(
-        self, notifications_data: list[Any]
-    ) -> None:
+    async def collect_and_import_notifications_data(self, notifications_data: list[Any]) -> None:
         if not notifications_data:
             core_logger.print_to_log("No notifications data to import", "info")
             return
@@ -1182,9 +1003,7 @@ class ImportService:
             notifications_crud.create_notification(notification, self.db)
             self.counts["notifications"] += 1
 
-        core_logger.print_to_log(
-            f"Imported {self.counts['notifications']} notifications", "info"
-        )
+        core_logger.print_to_log(f"Imported {self.counts['notifications']} notifications", "info")
 
     async def collect_and_import_health_weight(
         self, health_weight_data: list[Any], health_targets_data: list[Any]
@@ -1231,20 +1050,14 @@ class ImportService:
                 data = health_weight_schema.HealthWeightCreate(**health_weight)
                 health_weight_crud.create_health_weight(self.user_id, data, self.db)
                 self.counts["health_weight"] += 1
-            core_logger.print_to_log(
-                f"Imported {self.counts['health_weight']} health weight records", "info"
-            )
+            core_logger.print_to_log(f"Imported {self.counts['health_weight']} health weight records", "info")
         else:
-            core_logger.print_to_log(f"No health weight data to import", "debug")
+            core_logger.print_to_log("No health weight data to import", "debug")
 
         # Import health targets
         if health_targets_data:
             for target_data in health_targets_data:
-                current_health_target = (
-                    health_targets_crud.get_health_targets_by_user_id(
-                        self.user_id, self.db
-                    )
-                )
+                current_health_target = health_targets_crud.get_health_targets_by_user_id(self.user_id, self.db)
 
                 # Convert string numeric values to floats/ints
                 if isinstance(target_data.get("weight"), str):
@@ -1270,11 +1083,9 @@ class ImportService:
                 target = health_targets_schema.HealthTargetsUpdate(**target_data)
                 health_targets_crud.edit_health_target(target, self.user_id, self.db)
                 self.counts["health_targets"] += 1
-            core_logger.print_to_log(
-                f"Imported {self.counts['health_targets']} health targets", "info"
-            )
+            core_logger.print_to_log(f"Imported {self.counts['health_targets']} health targets", "info")
         else:
-            core_logger.print_to_log(f"No health targets to import", "debug")
+            core_logger.print_to_log("No health targets to import", "debug")
 
     async def add_activity_files_from_zip(
         self,
@@ -1300,9 +1111,7 @@ class ImportService:
             path = file_path.replace("\\", "/")
 
             # Import activity files
-            if path.lower().endswith((".gpx", ".fit", ".tcx")) and path.startswith(
-                "activity_files/"
-            ):
+            if path.lower().endswith((".gpx", ".fit", ".tcx")) and path.startswith("activity_files/"):
                 file_id_str = os.path.splitext(os.path.basename(path))[0]
                 ext = os.path.splitext(path)[1]
                 try:
@@ -1317,13 +1126,8 @@ class ImportService:
                     # Read bytes from ZIP and save through the
                     # unified validated-write pipeline so the entry
                     # is re-checked as an activity file.
-                    activity_limit = (
-                        file_uploads.file_validator.config.limits
-                        .max_activity_file_size
-                    )
-                    file_bytes = self._read_zip_entry(
-                        zipf, file_path, max_bytes=activity_limit
-                    )
+                    activity_limit = file_uploads.file_validator.config.limits.max_activity_file_size
+                    file_bytes = self._read_zip_entry(zipf, file_path, max_bytes=activity_limit)
                     try:
                         await file_uploads.save_validated_bytes(
                             file_bytes,
@@ -1333,9 +1137,7 @@ class ImportService:
                         )
                     except HTTPException as err:
                         core_logger.print_to_log(
-                            "Profile import dropped invalid "
-                            f"activity file {new_file_name}: "
-                            f"{err.detail}",
+                            f"Profile import dropped invalid activity file {new_file_name}: {err.detail}",
                             "warning",
                         )
                         continue
@@ -1368,9 +1170,7 @@ class ImportService:
             path = file_path.replace("\\", "/")
 
             # Import activity media
-            if path.lower().endswith((".png", ".jpg", ".jpeg")) and path.startswith(
-                "activity_media/"
-            ):
+            if path.lower().endswith((".png", ".jpg", ".jpeg")) and path.startswith("activity_media/"):
                 file_name = os.path.basename(path)
                 base_name, ext = os.path.splitext(file_name)
 
@@ -1388,27 +1188,18 @@ class ImportService:
                         # Read bytes from ZIP and save through the
                         # unified validated-write pipeline so the
                         # entry is re-checked as an image.
-                        image_limit = (
-                            file_uploads.file_validator.config.limits
-                            .max_image_size
-                        )
-                        file_bytes = self._read_zip_entry(
-                            zipf, file_path, max_bytes=image_limit
-                        )
+                        image_limit = file_uploads.file_validator.config.limits.max_image_size
+                        file_bytes = self._read_zip_entry(zipf, file_path, max_bytes=image_limit)
                         try:
                             await file_uploads.save_validated_bytes(
                                 file_bytes,
                                 kind=file_uploads.UploadKind.IMAGE,
-                                upload_dir=(
-                                    core_config.settings.ACTIVITY_MEDIA_DIR
-                                ),
+                                upload_dir=(core_config.settings.ACTIVITY_MEDIA_DIR),
                                 filename=new_file_name,
                             )
                         except HTTPException as err:
                             core_logger.print_to_log(
-                                "Profile import dropped invalid "
-                                f"activity media {new_file_name}: "
-                                f"{err.detail}",
+                                f"Profile import dropped invalid activity media {new_file_name}: {err.detail}",
                                 "warning",
                             )
                             continue
@@ -1439,24 +1230,16 @@ class ImportService:
             path = file_path.replace("\\", "/")
 
             # Import user images
-            if path.lower().endswith((".png", ".jpg", ".jpeg")) and path.startswith(
-                "user_images/"
-            ):
-                core_logger.print_to_log(
-                    f"Processing user image file: {file_path}", "debug"
-                )
+            if path.lower().endswith((".png", ".jpg", ".jpeg")) and path.startswith("user_images/"):
+                core_logger.print_to_log(f"Processing user image file: {file_path}", "debug")
                 ext = os.path.splitext(path)[1]
                 new_file_name = f"{self.user_id}{ext}"
 
                 # Read bytes from ZIP and save through the unified
                 # validated-write pipeline so the entry is re-checked
                 # as an image.
-                image_limit = (
-                    file_uploads.file_validator.config.limits.max_image_size
-                )
-                file_bytes = self._read_zip_entry(
-                    zipf, file_path, max_bytes=image_limit
-                )
+                image_limit = file_uploads.file_validator.config.limits.max_image_size
+                file_bytes = self._read_zip_entry(zipf, file_path, max_bytes=image_limit)
                 try:
                     await file_uploads.save_validated_bytes(
                         file_bytes,
@@ -1466,8 +1249,7 @@ class ImportService:
                     )
                 except HTTPException as err:
                     core_logger.print_to_log(
-                        "Profile import dropped invalid user "
-                        f"image {new_file_name}: {err.detail}",
+                        f"Profile import dropped invalid user image {new_file_name}: {err.detail}",
                         "warning",
                     )
                     continue

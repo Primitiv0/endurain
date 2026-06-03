@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from fastapi import HTTPException, status
 
 
@@ -16,9 +15,7 @@ class TestRequestPasswordReset:
     """
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".send_password_reset_email",
+        "password_reset_tokens.router.password_reset_tokens_utils.send_password_reset_email",
         new_callable=AsyncMock,
     )
     def test_request_password_reset_success(
@@ -40,9 +37,7 @@ class TestRequestPasswordReset:
         assert "password reset link" in body["message"]
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".send_password_reset_email",
+        "password_reset_tokens.router.password_reset_tokens_utils.send_password_reset_email",
         new_callable=AsyncMock,
     )
     def test_request_password_reset_send_fails(
@@ -58,10 +53,7 @@ class TestRequestPasswordReset:
             json={"email": "user@example.com"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_request_password_reset_invalid_email_format(
         self,
@@ -73,10 +65,7 @@ class TestRequestPasswordReset:
             json={"email": "not-an-email"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_422_UNPROCESSABLE_ENTITY
-        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_request_password_reset_missing_email(
         self,
@@ -88,15 +77,10 @@ class TestRequestPasswordReset:
             json={},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_422_UNPROCESSABLE_ENTITY
-        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".send_password_reset_email",
+        "password_reset_tokens.router.password_reset_tokens_utils.send_password_reset_email",
         new_callable=AsyncMock,
     )
     def test_request_propagates_503_when_email_not_configured(
@@ -118,15 +102,10 @@ class TestRequestPasswordReset:
             json={"email": "user@example.com"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_503_SERVICE_UNAVAILABLE
-        )
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".send_password_reset_email",
+        "password_reset_tokens.router.password_reset_tokens_utils.send_password_reset_email",
         new_callable=AsyncMock,
     )
     def test_request_returns_same_200_for_unknown_email(
@@ -168,9 +147,7 @@ class TestConfirmPasswordReset:
     """
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".use_password_reset_token",
+        "password_reset_tokens.router.password_reset_tokens_utils.use_password_reset_token",
     )
     def test_confirm_password_reset_success(
         self,
@@ -189,15 +166,10 @@ class TestConfirmPasswordReset:
         )
 
         assert response.status_code == status.HTTP_200_OK
-        assert (
-            response.json()["message"]
-            == "Password reset successful"
-        )
+        assert response.json()["message"] == "Password reset successful"
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".use_password_reset_token",
+        "password_reset_tokens.router.password_reset_tokens_utils.use_password_reset_token",
     )
     def test_confirm_password_reset_invalid_token(
         self,
@@ -218,9 +190,7 @@ class TestConfirmPasswordReset:
             },
         )
 
-        assert (
-            response.status_code == status.HTTP_400_BAD_REQUEST
-        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_confirm_password_reset_password_too_short(
         self,
@@ -235,10 +205,7 @@ class TestConfirmPasswordReset:
             },
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_422_UNPROCESSABLE_ENTITY
-        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_confirm_password_reset_missing_token(
         self,
@@ -250,15 +217,10 @@ class TestConfirmPasswordReset:
             json={"new_password": "new-secure-pass"},
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_422_UNPROCESSABLE_ENTITY
-        )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     @patch(
-        "password_reset_tokens.router"
-        ".password_reset_tokens_utils"
-        ".use_password_reset_token",
+        "password_reset_tokens.router.password_reset_tokens_utils.use_password_reset_token",
     )
     def test_confirm_propagates_500_from_use_password_reset_token(
         self,
@@ -282,7 +244,4 @@ class TestConfirmPasswordReset:
             },
         )
 
-        assert (
-            response.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

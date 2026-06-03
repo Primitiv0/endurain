@@ -5,24 +5,21 @@ This module provides endpoints that aggregate health data across
 multiple health modules for efficient dashboard display.
 """
 
+from collections.abc import Callable
 from datetime import date
-from typing import Annotated, Callable
-
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
-
-import health.schema as health_schema
-
-import health.health_sleep.crud as health_sleep_crud
-import health.health_weight.crud as health_weight_crud
-import health.health_steps.crud as health_steps_crud
-import health.health_fasting.crud as health_fasting_crud
-import health.health_water.crud as health_water_crud
-import health.health_poop.crud as health_poop_crud
+from typing import Annotated
 
 import auth.dependencies as auth_dependencies
-
 import core.database as core_database
+import health.health_fasting.crud as health_fasting_crud
+import health.health_poop.crud as health_poop_crud
+import health.health_sleep.crud as health_sleep_crud
+import health.health_steps.crud as health_steps_crud
+import health.health_water.crud as health_water_crud
+import health.health_weight.crud as health_weight_crud
+import health.schema as health_schema
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -34,9 +31,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
 )
 async def read_health_daily_stats(
-    _check_scopes: Annotated[
-        Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])
-    ],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
@@ -71,36 +66,22 @@ async def read_health_daily_stats(
     today = str(date.today())
 
     # Get today's sleep
-    today_sleep = health_sleep_crud.get_health_sleep_by_date_and_user_id(
-        token_user_id, today, db
-    )
+    today_sleep = health_sleep_crud.get_health_sleep_by_date_and_user_id(token_user_id, today, db)
 
     # Get latest weight (most recent record)
     latest_weight = health_weight_crud.get_latest_weight_by_user_id(token_user_id, db)
 
     # Get today's steps
-    today_steps = health_steps_crud.get_health_steps_by_date_and_user_id(
-        token_user_id, today, db
-    )
+    today_steps = health_steps_crud.get_health_steps_by_date_and_user_id(token_user_id, today, db)
 
     # Get active fasting or most recent
-    active_fasting = health_fasting_crud.get_active_fasting_by_user_id(
-        token_user_id, db
-    )
+    active_fasting = health_fasting_crud.get_active_fasting_by_user_id(token_user_id, db)
 
     # Get today's water intake
-    today_water = (
-        health_water_crud.get_health_water_by_date_and_user_id(
-            token_user_id, today, db
-        )
-    )
+    today_water = health_water_crud.get_health_water_by_date_and_user_id(token_user_id, today, db)
 
     # Get today's poop records
-    today_poop_records = (
-        health_poop_crud.get_health_poop_by_date_and_user_id(
-            token_user_id, today, db
-        )
-    )
+    today_poop_records = health_poop_crud.get_health_poop_by_date_and_user_id(token_user_id, today, db)
 
     # Build dashboard response with only necessary fields
     sleep_data = None

@@ -1,20 +1,17 @@
 """CRUD operations for sign-up tokens."""
 
-from datetime import datetime, timezone
-
-from sqlalchemy import delete as sa_delete, select
-from sqlalchemy.orm import Session
-
-import sign_up_tokens.schema as sign_up_tokens_schema
-import sign_up_tokens.models as sign_up_tokens_models
+from datetime import UTC, datetime
 
 import core.decorators as core_decorators
+import sign_up_tokens.models as sign_up_tokens_models
+import sign_up_tokens.schema as sign_up_tokens_schema
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
-def get_sign_up_token_by_hash(
-    token_hash: str, db: Session
-) -> sign_up_tokens_models.SignUpToken | None:
+def get_sign_up_token_by_hash(token_hash: str, db: Session) -> sign_up_tokens_models.SignUpToken | None:
     """Retrieve an unused, unexpired token matching the hash.
 
     Args:
@@ -31,7 +28,7 @@ def get_sign_up_token_by_hash(
     stmt = select(sign_up_tokens_models.SignUpToken).where(
         sign_up_tokens_models.SignUpToken.token_hash == token_hash,
         sign_up_tokens_models.SignUpToken.used.is_(False),
-        sign_up_tokens_models.SignUpToken.expires_at > datetime.now(timezone.utc),
+        sign_up_tokens_models.SignUpToken.expires_at > datetime.now(UTC),
     )
     return db.execute(stmt).scalar_one_or_none()
 
@@ -68,9 +65,7 @@ def create_sign_up_token(
 
 
 @core_decorators.handle_db_errors
-def mark_sign_up_token_used(
-    token_id: str, db: Session
-) -> sign_up_tokens_models.SignUpToken | None:
+def mark_sign_up_token_used(token_id: str, db: Session) -> sign_up_tokens_models.SignUpToken | None:
     """Mark a sign-up token as used.
 
     Args:
@@ -111,7 +106,7 @@ def delete_expired_sign_up_tokens(db: Session) -> int:
         HTTPException: 500 error if database operation fails.
     """
     stmt = sa_delete(sign_up_tokens_models.SignUpToken).where(
-        sign_up_tokens_models.SignUpToken.expires_at < datetime.now(timezone.utc)
+        sign_up_tokens_models.SignUpToken.expires_at < datetime.now(UTC)
     )
     result = db.execute(stmt)
     db.commit()

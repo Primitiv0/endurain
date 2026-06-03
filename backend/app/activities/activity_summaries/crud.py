@@ -2,9 +2,6 @@
 
 from datetime import date, timedelta
 
-from sqlalchemy import case, extract, func, select
-from sqlalchemy.orm import Session
-
 from activities.activity.models import Activity
 from activities.activity.utils import (
     ACTIVITY_NAME_TO_ID,
@@ -13,15 +10,17 @@ from activities.activity.utils import (
 from activities.activity_summaries.schema import (
     DaySummary,
     LifetimeSummaryResponse,
-    MonthSummary,
     MonthlySummaryResponse,
+    MonthSummary,
     SummaryMetrics,
     TypeBreakdownItem,
-    WeekSummary,
     WeeklySummaryResponse,
+    WeekSummary,
     YearlyPeriodSummary,
     YearlySummaryResponse,
 )
+from sqlalchemy import case, extract, func, select
+from sqlalchemy.orm import Session
 
 
 def _apply_activity_type_filter(
@@ -41,17 +40,13 @@ def _apply_activity_type_filter(
     """
     if not activity_type:
         return stmt, None
-    type_id = ACTIVITY_NAME_TO_ID.get(
-        activity_type.lower()
-    )
+    type_id = ACTIVITY_NAME_TO_ID.get(activity_type.lower())
     if type_id is not None:
         return (
-            stmt.where(
-                Activity.activity_type == type_id
-            ),
+            stmt.where(Activity.activity_type == type_id),
             type_id,
         )
-    # Unknown type – force empty result set
+    # Unknown type - force empty result set
     return stmt.where(Activity.id == -1), None
 
 
@@ -76,31 +71,18 @@ def _get_type_breakdown(
         List of per-type breakdown items.
     """
     stmt = select(
-        Activity.activity_type.label(
-            "activity_type"
-        ),
-        func.coalesce(
-            func.sum(Activity.distance), 0
-        ).label("total_distance"),
+        Activity.activity_type.label("activity_type"),
+        func.coalesce(func.sum(Activity.distance), 0).label("total_distance"),
         func.coalesce(
             func.sum(Activity.total_timer_time),
             0.0,
         ).label("total_duration"),
-        func.coalesce(
-            func.sum(Activity.elevation_gain), 0
-        ).label("total_elevation_gain"),
-        func.coalesce(
-            func.sum(Activity.calories), 0
-        ).label("total_calories"),
-        func.count(Activity.id).label(
-            "activity_count"
-        ),
+        func.coalesce(func.sum(Activity.elevation_gain), 0).label("total_elevation_gain"),
+        func.coalesce(func.sum(Activity.calories), 0).label("total_calories"),
+        func.count(Activity.id).label("activity_count"),
     ).where(Activity.user_id == user_id)
 
-    is_unbounded = (
-        start_date == date.min
-        and end_date == date.max
-    )
+    is_unbounded = start_date == date.min and end_date == date.max
     if not is_unbounded:
         stmt = stmt.where(
             Activity.start_time >= start_date,
@@ -108,19 +90,13 @@ def _get_type_breakdown(
         )
 
     if activity_type:
-        type_id = ACTIVITY_NAME_TO_ID.get(
-            activity_type.lower()
-        )
+        type_id = ACTIVITY_NAME_TO_ID.get(activity_type.lower())
         if type_id is not None:
-            stmt = stmt.where(
-                Activity.activity_type == type_id
-            )
+            stmt = stmt.where(Activity.activity_type == type_id)
         else:
             return []
 
-    stmt = stmt.group_by(
-        Activity.activity_type
-    ).order_by(
+    stmt = stmt.group_by(Activity.activity_type).order_by(
         func.count(Activity.id).desc(),
         Activity.activity_type.asc(),
     )
@@ -128,32 +104,16 @@ def _get_type_breakdown(
     rows = db.execute(stmt).all()
     breakdown: list[TypeBreakdownItem] = []
     for row in rows:
-        name = (
-            set_activity_name_based_on_activity_type(
-                row.activity_type
-            )
-        )
+        name = set_activity_name_based_on_activity_type(row.activity_type)
         breakdown.append(
             TypeBreakdownItem(
-                activity_type_id=int(
-                    row.activity_type
-                ),
+                activity_type_id=int(row.activity_type),
                 activity_type=name,
-                total_distance=float(
-                    row.total_distance
-                ),
-                total_duration=float(
-                    row.total_duration
-                ),
-                total_elevation_gain=float(
-                    row.total_elevation_gain
-                ),
-                total_calories=float(
-                    row.total_calories
-                ),
-                activity_count=int(
-                    row.activity_count
-                ),
+                total_distance=float(row.total_distance),
+                total_duration=float(row.total_duration),
+                total_elevation_gain=float(row.total_elevation_gain),
+                total_calories=float(row.total_calories),
+                activity_count=int(row.activity_count),
             )
         )
     return breakdown
@@ -179,126 +139,74 @@ def get_weekly_summary(
     Returns:
         Weekly summary with daily breakdowns.
     """
-    start_of_week = target_date - timedelta(
-        days=target_date.weekday()
-    )
+    start_of_week = target_date - timedelta(days=target_date.weekday())
     end_of_week = start_of_week + timedelta(days=7)
 
     # Database-agnostic ISO day of week
     # PostgreSQL: extract('isodow') -> 1-7 Mon-Sun
     # MySQL: DAYOFWEEK (1=Sun, 7=Sat) -> ISO
-    engine_name = (
-        db.get_bind().dialect.name
-    )
+    engine_name = db.get_bind().dialect.name
     if engine_name == "postgresql":
-        iso_dow = extract(
-            "isodow", Activity.start_time
-        )
+        iso_dow = extract("isodow", Activity.start_time)
     else:
         iso_dow = case(
             (
-                func.dayofweek(
-                    Activity.start_time
-                )
-                == 1,
+                func.dayofweek(Activity.start_time) == 1,
                 7,
             ),
-            else_=(
-                func.dayofweek(
-                    Activity.start_time
-                )
-                - 1
-            ),
+            else_=(func.dayofweek(Activity.start_time) - 1),
         )
 
     stmt = select(
         iso_dow.label("day_of_week"),
-        func.coalesce(
-            func.sum(Activity.distance), 0
-        ).label("total_distance"),
+        func.coalesce(func.sum(Activity.distance), 0).label("total_distance"),
         func.coalesce(
             func.sum(Activity.total_timer_time),
             0.0,
         ).label("total_duration"),
-        func.coalesce(
-            func.sum(Activity.elevation_gain), 0
-        ).label("total_elevation_gain"),
-        func.coalesce(
-            func.sum(Activity.calories), 0
-        ).label("total_calories"),
-        func.count(Activity.id).label(
-            "activity_count"
-        ),
+        func.coalesce(func.sum(Activity.elevation_gain), 0).label("total_elevation_gain"),
+        func.coalesce(func.sum(Activity.calories), 0).label("total_calories"),
+        func.count(Activity.id).label("activity_count"),
     ).where(
         Activity.user_id == user_id,
         Activity.start_time >= start_of_week,
         Activity.start_time < end_of_week,
     )
 
-    stmt, _ = _apply_activity_type_filter(
-        stmt, activity_type
-    )
+    stmt, _ = _apply_activity_type_filter(stmt, activity_type)
 
-    stmt = stmt.group_by(iso_dow).order_by(
-        iso_dow
-    )
+    stmt = stmt.group_by(iso_dow).order_by(iso_dow)
 
     daily_results = db.execute(stmt).all()
     breakdown: list[DaySummary] = []
     overall = SummaryMetrics()
 
-    day_map = {
-        d.day_of_week: d for d in daily_results
-    }
+    day_map = {d.day_of_week: d for d in daily_results}
 
     for i in range(1, 8):
         day_data = day_map.get(i)
         if day_data:
             ds = DaySummary(
                 day_of_week=i - 1,
-                total_distance=float(
-                    day_data.total_distance
-                ),
-                total_duration=float(
-                    day_data.total_duration
-                ),
-                total_elevation_gain=float(
-                    day_data.total_elevation_gain
-                ),
-                total_calories=float(
-                    day_data.total_calories
-                ),
-                activity_count=int(
-                    day_data.activity_count
-                ),
+                total_distance=float(day_data.total_distance),
+                total_duration=float(day_data.total_duration),
+                total_elevation_gain=float(day_data.total_elevation_gain),
+                total_calories=float(day_data.total_calories),
+                activity_count=int(day_data.activity_count),
             )
             breakdown.append(ds)
-            overall.total_distance += (
-                ds.total_distance
-            )
-            overall.total_duration += (
-                ds.total_duration
-            )
-            overall.total_elevation_gain += (
-                ds.total_elevation_gain
-            )
-            overall.total_calories += (
-                ds.total_calories
-            )
-            overall.activity_count += (
-                ds.activity_count
-            )
+            overall.total_distance += ds.total_distance
+            overall.total_duration += ds.total_duration
+            overall.total_elevation_gain += ds.total_elevation_gain
+            overall.total_calories += ds.total_calories
+            overall.activity_count += ds.activity_count
         else:
-            breakdown.append(
-                DaySummary(day_of_week=i - 1)
-            )
+            breakdown.append(DaySummary(day_of_week=i - 1))
 
     return WeeklySummaryResponse(
         total_distance=overall.total_distance,
         total_duration=overall.total_duration,
-        total_elevation_gain=(
-            overall.total_elevation_gain
-        ),
+        total_elevation_gain=(overall.total_elevation_gain),
         total_calories=overall.total_calories,
         activity_count=overall.activity_count,
         breakdown=breakdown,
@@ -333,45 +241,29 @@ def get_monthly_summary(
         Monthly summary with weekly breakdowns.
     """
     start_of_month = target_date.replace(day=1)
-    end_of_month = (
-        start_of_month + timedelta(days=32)
-    ).replace(day=1)
+    end_of_month = (start_of_month + timedelta(days=32)).replace(day=1)
 
-    week_expr = extract(
-        "week", Activity.start_time
-    )
+    week_expr = extract("week", Activity.start_time)
 
     stmt = select(
         week_expr.label("week_number"),
-        func.coalesce(
-            func.sum(Activity.distance), 0
-        ).label("total_distance"),
+        func.coalesce(func.sum(Activity.distance), 0).label("total_distance"),
         func.coalesce(
             func.sum(Activity.total_timer_time),
             0.0,
         ).label("total_duration"),
-        func.coalesce(
-            func.sum(Activity.elevation_gain), 0
-        ).label("total_elevation_gain"),
-        func.coalesce(
-            func.sum(Activity.calories), 0
-        ).label("total_calories"),
-        func.count(Activity.id).label(
-            "activity_count"
-        ),
+        func.coalesce(func.sum(Activity.elevation_gain), 0).label("total_elevation_gain"),
+        func.coalesce(func.sum(Activity.calories), 0).label("total_calories"),
+        func.count(Activity.id).label("activity_count"),
     ).where(
         Activity.user_id == user_id,
         Activity.start_time >= start_of_month,
         Activity.start_time < end_of_month,
     )
 
-    stmt, _ = _apply_activity_type_filter(
-        stmt, activity_type
-    )
+    stmt, _ = _apply_activity_type_filter(stmt, activity_type)
 
-    stmt = stmt.group_by(week_expr).order_by(
-        week_expr
-    )
+    stmt = stmt.group_by(week_expr).order_by(week_expr)
 
     weekly_results = db.execute(stmt).all()
     breakdown: list[WeekSummary] = []
@@ -379,44 +271,24 @@ def get_monthly_summary(
 
     for week_data in weekly_results:
         ws = WeekSummary(
-            week_number=int(
-                week_data.week_number
-            ),
-            total_distance=float(
-                week_data.total_distance
-            ),
-            total_duration=float(
-                week_data.total_duration
-            ),
-            total_elevation_gain=float(
-                week_data.total_elevation_gain
-            ),
-            total_calories=float(
-                week_data.total_calories
-            ),
-            activity_count=int(
-                week_data.activity_count
-            ),
+            week_number=int(week_data.week_number),
+            total_distance=float(week_data.total_distance),
+            total_duration=float(week_data.total_duration),
+            total_elevation_gain=float(week_data.total_elevation_gain),
+            total_calories=float(week_data.total_calories),
+            activity_count=int(week_data.activity_count),
         )
         breakdown.append(ws)
-        overall.total_distance += (
-            ws.total_distance
-        )
-        overall.total_duration += (
-            ws.total_duration
-        )
-        overall.total_elevation_gain += (
-            ws.total_elevation_gain
-        )
+        overall.total_distance += ws.total_distance
+        overall.total_duration += ws.total_duration
+        overall.total_elevation_gain += ws.total_elevation_gain
         overall.total_calories += ws.total_calories
         overall.activity_count += ws.activity_count
 
     return MonthlySummaryResponse(
         total_distance=overall.total_distance,
         total_duration=overall.total_duration,
-        total_elevation_gain=(
-            overall.total_elevation_gain
-        ),
+        total_elevation_gain=(overall.total_elevation_gain),
         total_calories=overall.total_calories,
         activity_count=overall.activity_count,
         breakdown=breakdown,
@@ -452,98 +324,58 @@ def get_yearly_summary(
     start_of_year = date(year, 1, 1)
     end_of_year = date(year + 1, 1, 1)
 
-    month_expr = extract(
-        "month", Activity.start_time
-    )
+    month_expr = extract("month", Activity.start_time)
 
     stmt = select(
         month_expr.label("month_number"),
-        func.coalesce(
-            func.sum(Activity.distance), 0
-        ).label("total_distance"),
+        func.coalesce(func.sum(Activity.distance), 0).label("total_distance"),
         func.coalesce(
             func.sum(Activity.total_timer_time),
             0.0,
         ).label("total_duration"),
-        func.coalesce(
-            func.sum(Activity.elevation_gain), 0
-        ).label("total_elevation_gain"),
-        func.coalesce(
-            func.sum(Activity.calories), 0
-        ).label("total_calories"),
-        func.count(Activity.id).label(
-            "activity_count"
-        ),
+        func.coalesce(func.sum(Activity.elevation_gain), 0).label("total_elevation_gain"),
+        func.coalesce(func.sum(Activity.calories), 0).label("total_calories"),
+        func.count(Activity.id).label("activity_count"),
     ).where(
         Activity.user_id == user_id,
         Activity.start_time >= start_of_year,
         Activity.start_time < end_of_year,
     )
 
-    stmt, _ = _apply_activity_type_filter(
-        stmt, activity_type
-    )
+    stmt, _ = _apply_activity_type_filter(stmt, activity_type)
 
-    stmt = stmt.group_by(month_expr).order_by(
-        month_expr
-    )
+    stmt = stmt.group_by(month_expr).order_by(month_expr)
 
     monthly_results = db.execute(stmt).all()
     breakdown: list[MonthSummary] = []
     overall = SummaryMetrics()
 
-    month_map = {
-        m.month_number: m for m in monthly_results
-    }
+    month_map = {m.month_number: m for m in monthly_results}
 
     for i in range(1, 13):
         month_data = month_map.get(i)
         if month_data:
             ms = MonthSummary(
                 month_number=i,
-                total_distance=float(
-                    month_data.total_distance
-                ),
-                total_duration=float(
-                    month_data.total_duration
-                ),
-                total_elevation_gain=float(
-                    month_data.total_elevation_gain
-                ),
-                total_calories=float(
-                    month_data.total_calories
-                ),
-                activity_count=int(
-                    month_data.activity_count
-                ),
+                total_distance=float(month_data.total_distance),
+                total_duration=float(month_data.total_duration),
+                total_elevation_gain=float(month_data.total_elevation_gain),
+                total_calories=float(month_data.total_calories),
+                activity_count=int(month_data.activity_count),
             )
             breakdown.append(ms)
-            overall.total_distance += (
-                ms.total_distance
-            )
-            overall.total_duration += (
-                ms.total_duration
-            )
-            overall.total_elevation_gain += (
-                ms.total_elevation_gain
-            )
-            overall.total_calories += (
-                ms.total_calories
-            )
-            overall.activity_count += (
-                ms.activity_count
-            )
+            overall.total_distance += ms.total_distance
+            overall.total_duration += ms.total_duration
+            overall.total_elevation_gain += ms.total_elevation_gain
+            overall.total_calories += ms.total_calories
+            overall.activity_count += ms.activity_count
         else:
-            breakdown.append(
-                MonthSummary(month_number=i)
-            )
+            breakdown.append(MonthSummary(month_number=i))
 
     return YearlySummaryResponse(
         total_distance=overall.total_distance,
         total_duration=overall.total_duration,
-        total_elevation_gain=(
-            overall.total_elevation_gain
-        ),
+        total_elevation_gain=(overall.total_elevation_gain),
         total_calories=overall.total_calories,
         activity_count=overall.activity_count,
         breakdown=breakdown,
@@ -576,9 +408,7 @@ def get_lifetime_summary(
     """
     # Overall metrics
     metrics_stmt = select(
-        func.coalesce(
-            func.sum(Activity.distance), 0.0
-        ).label("total_distance"),
+        func.coalesce(func.sum(Activity.distance), 0.0).label("total_distance"),
         func.coalesce(
             func.sum(Activity.total_timer_time),
             0.0,
@@ -587,33 +417,19 @@ def get_lifetime_summary(
             func.sum(Activity.elevation_gain),
             0.0,
         ).label("total_elevation_gain"),
-        func.coalesce(
-            func.sum(Activity.calories), 0.0
-        ).label("total_calories"),
-        func.count(Activity.id).label(
-            "activity_count"
-        ),
+        func.coalesce(func.sum(Activity.calories), 0.0).label("total_calories"),
+        func.count(Activity.id).label("activity_count"),
     ).where(Activity.user_id == user_id)
 
-    metrics_stmt, type_id = (
-        _apply_activity_type_filter(
-            metrics_stmt, activity_type
-        )
-    )
+    metrics_stmt, _ = _apply_activity_type_filter(metrics_stmt, activity_type)
 
-    totals = db.execute(
-        metrics_stmt
-    ).one_or_none()
+    totals = db.execute(metrics_stmt).one_or_none()
 
     # Yearly breakdown
-    year_expr = extract(
-        "year", Activity.start_time
-    )
+    year_expr = extract("year", Activity.start_time)
     yearly_stmt = select(
         year_expr.label("year_number"),
-        func.coalesce(
-            func.sum(Activity.distance), 0.0
-        ).label("total_distance"),
+        func.coalesce(func.sum(Activity.distance), 0.0).label("total_distance"),
         func.coalesce(
             func.sum(Activity.total_timer_time),
             0.0,
@@ -622,21 +438,13 @@ def get_lifetime_summary(
             func.sum(Activity.elevation_gain),
             0.0,
         ).label("total_elevation_gain"),
-        func.coalesce(
-            func.sum(Activity.calories), 0.0
-        ).label("total_calories"),
-        func.count(Activity.id).label(
-            "activity_count"
-        ),
+        func.coalesce(func.sum(Activity.calories), 0.0).label("total_calories"),
+        func.count(Activity.id).label("activity_count"),
     ).where(Activity.user_id == user_id)
 
-    yearly_stmt, _ = _apply_activity_type_filter(
-        yearly_stmt, activity_type
-    )
+    yearly_stmt, _ = _apply_activity_type_filter(yearly_stmt, activity_type)
 
-    yearly_stmt = yearly_stmt.group_by(
-        year_expr
-    ).order_by(year_expr.desc())
+    yearly_stmt = yearly_stmt.group_by(year_expr).order_by(year_expr.desc())
 
     yearly_rows = db.execute(yearly_stmt).all()
     breakdown: list[YearlyPeriodSummary] = []
@@ -644,41 +452,21 @@ def get_lifetime_summary(
         breakdown.append(
             YearlyPeriodSummary(
                 year_number=int(row.year_number),
-                total_distance=float(
-                    row.total_distance
-                ),
-                total_duration=float(
-                    row.total_duration
-                ),
-                total_elevation_gain=float(
-                    row.total_elevation_gain
-                ),
-                total_calories=float(
-                    row.total_calories
-                ),
-                activity_count=int(
-                    row.activity_count
-                ),
+                total_distance=float(row.total_distance),
+                total_duration=float(row.total_duration),
+                total_elevation_gain=float(row.total_elevation_gain),
+                total_calories=float(row.total_calories),
+                activity_count=int(row.activity_count),
             )
         )
 
     if totals:
         return LifetimeSummaryResponse(
-            total_distance=float(
-                totals.total_distance
-            ),
-            total_duration=float(
-                totals.total_duration
-            ),
-            total_elevation_gain=float(
-                totals.total_elevation_gain
-            ),
-            total_calories=float(
-                totals.total_calories
-            ),
-            activity_count=int(
-                totals.activity_count
-            ),
+            total_distance=float(totals.total_distance),
+            total_duration=float(totals.total_duration),
+            total_elevation_gain=float(totals.total_elevation_gain),
+            total_calories=float(totals.total_calories),
+            activity_count=int(totals.activity_count),
             breakdown=breakdown,
             type_breakdown=(
                 _get_type_breakdown(

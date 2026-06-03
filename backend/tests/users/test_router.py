@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 import users.users.router as users_router
 import users.users.schema as users_schema
 
@@ -28,9 +27,7 @@ class TestEditUserPassword:
         user_id = 42
         new_password = "new-secure-password"
         identity_service = MagicMock()
-        user_attributes = users_schema.UsersAdminEditPassword(
-            password=new_password
-        )
+        user_attributes = users_schema.UsersAdminEditPassword(password=new_password)
 
         result = await users_router.edit_user_password(
             user_id=user_id,
@@ -48,6 +45,4 @@ class TestEditUserPassword:
             mock_db,
         )
         mock_delete_sessions.assert_called_once_with(user_id, mock_db)
-        assert result == {
-            "message": f"User ID {user_id} password updated successfully"
-        }
+        assert result == {"message": f"User ID {user_id} password updated successfully"}

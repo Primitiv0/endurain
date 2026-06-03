@@ -1,10 +1,9 @@
 """Fernet token encryption helpers."""
 
+import core.config as core_config
+import core.logger as core_logger
 from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
-
-import core.logger as core_logger
-import core.config as core_config
 
 
 def create_fernet_cipher() -> Fernet:
@@ -20,14 +19,11 @@ def create_fernet_cipher() -> Fernet:
     try:
         key = core_config.read_secret("FERNET_KEY")
         if key is None:
-            raise ValueError(
-                "FERNET_KEY not found in environment or secrets file"
-            )
+            raise ValueError("FERNET_KEY not found in environment or secrets file")
         return Fernet(key.encode())
     except Exception as err:
         core_logger.print_to_log(
-            "Error in create_fernet_cipher: "
-            f"{type(err).__name__}",
+            f"Error in create_fernet_cipher: {type(err).__name__}",
             "error",
             exc=err,
         )
@@ -63,8 +59,7 @@ def encrypt_token_fernet(token: object | None) -> str | None:
         return cipher.encrypt(token.encode()).decode()
     except Exception as err:
         core_logger.print_to_log(
-            "Error in encrypt_token_fernet: "
-            f"{type(err).__name__}",
+            f"Error in encrypt_token_fernet: {type(err).__name__}",
             "error",
             exc=err,
         )
@@ -97,8 +92,7 @@ def decrypt_token_fernet(encrypted_token: str | None) -> str | None:
         return cipher.decrypt(encrypted_token.encode()).decode()
     except Exception as err:
         core_logger.print_to_log(
-            "Error in decrypt_token_fernet: "
-            f"{type(err).__name__}",
+            f"Error in decrypt_token_fernet: {type(err).__name__}",
             "error",
             exc=err,
         )

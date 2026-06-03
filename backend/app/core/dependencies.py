@@ -5,13 +5,13 @@ from typing import Annotated
 from fastapi import HTTPException, Query, status
 
 
-def validate_id(id: int, min: int, message: str) -> None:
+def validate_id(identifier: int, min_value: int, message: str) -> None:
     """
     Validate that an integer identifier is above a minimum.
 
     Args:
-        id: Identifier value to validate.
-        min: Minimum exclusive value.
+        identifier: Identifier value to validate.
+        min_value: Minimum exclusive value.
         message: Error detail for invalid values.
 
     Returns:
@@ -20,21 +20,21 @@ def validate_id(id: int, min: int, message: str) -> None:
     Raises:
         HTTPException: If the value is not above the minimum.
     """
-    if not (int(id) > min):
+    if not (int(identifier) > min_value):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=message,
         )
 
 
-def validate_type(type: int, min: int, max: int, message: str) -> None:
+def validate_type(type_value: int, min_value: int, max_value: int, message: str) -> None:
     """
     Validate that an integer type is inside an inclusive range.
 
     Args:
-        type: Type value to validate.
-        min: Minimum inclusive value.
-        max: Maximum inclusive value.
+        type_value: Type value to validate.
+        min_value: Minimum inclusive value.
+        max_value: Maximum inclusive value.
         message: Error detail for invalid values.
 
     Returns:
@@ -43,7 +43,7 @@ def validate_type(type: int, min: int, max: int, message: str) -> None:
     Raises:
         HTTPException: If the value is outside the range.
     """
-    if not (min <= int(type) <= max):
+    if not (min_value <= int(type_value) <= max_value):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=message,

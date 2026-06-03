@@ -1,4 +1,3 @@
-import pytest
 from datetime import date as datetime_date
 
 import health.health_steps.models as health_steps_models
@@ -70,11 +69,11 @@ class TestHealthStepsModel:
         Test HealthSteps model column types.
         """
         # Assert
-        assert health_steps_models.HealthSteps.id.type.python_type == int
-        assert health_steps_models.HealthSteps.user_id.type.python_type == int
-        assert health_steps_models.HealthSteps.date.type.python_type == datetime_date
-        assert health_steps_models.HealthSteps.steps.type.python_type == int
-        assert health_steps_models.HealthSteps.source.type.python_type == str
+        assert health_steps_models.HealthSteps.id.type.python_type is int
+        assert health_steps_models.HealthSteps.user_id.type.python_type is int
+        assert health_steps_models.HealthSteps.date.type.python_type is datetime_date
+        assert health_steps_models.HealthSteps.steps.type.python_type is int
+        assert health_steps_models.HealthSteps.source.type.python_type is str
 
     def test_health_steps_model_relationship(self):
         """

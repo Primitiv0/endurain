@@ -1,14 +1,14 @@
 """Tests for OAuth state CRUD operations."""
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.models as oauth_state_models
 import auth.sessions.models as users_session_models
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetOAuthStateById:
@@ -20,7 +20,7 @@ class TestGetOAuthStateById:
         state_id = "test_state_12345678"
         mock_oauth_state = MagicMock(spec=oauth_state_models.OAuthState)
         mock_oauth_state.id = state_id
-        mock_oauth_state.expires_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+        mock_oauth_state.expires_at = datetime.now(UTC) + timedelta(minutes=5)
         mock_oauth_state.used = False
 
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_oauth_state
@@ -255,7 +255,7 @@ class TestCreateOAuthState:
             # Assert
             call_kwargs = mock_model.call_args[1]
             expires_at = call_kwargs["expires_at"]
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             expected_expiry = now + timedelta(minutes=10)
 
             # Allow 5 second tolerance for test execution time

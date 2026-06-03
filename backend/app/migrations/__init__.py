@@ -21,13 +21,13 @@ from .schema import StreamType
 from .utils import check_migrations_not_executed
 
 __all__ = [
-    # CRUD operations
-    "get_migrations_not_executed",
-    "set_migration_as_executed",
     # Database model
     "MigrationModel",
     # Enums
     "StreamType",
     # Utility functions
     "check_migrations_not_executed",
+    # CRUD operations
+    "get_migrations_not_executed",
+    "set_migration_as_executed",
 ]

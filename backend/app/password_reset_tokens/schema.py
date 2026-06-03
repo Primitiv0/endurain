@@ -2,8 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from pydantic import StrictBool, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StrictBool, StrictInt, StrictStr
 
 
 class PasswordResetToken(BaseModel):

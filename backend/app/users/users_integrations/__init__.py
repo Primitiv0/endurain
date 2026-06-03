@@ -17,18 +17,18 @@ Exports:
 """
 
 from .crud import (
-    get_user_integrations_by_user_id,
-    get_user_integrations_by_strava_state,
     create_user_integrations,
     edit_user_integrations,
+    get_user_integrations_by_strava_state,
+    get_user_integrations_by_user_id,
+    link_garminconnect_account,
     link_strava_account,
-    unlink_strava_account,
+    set_user_garminconnect_sync_gear,
     set_user_strava_client,
     set_user_strava_state,
     set_user_strava_sync_gear,
-    link_garminconnect_account,
     unlink_garminconnect_account,
-    set_user_garminconnect_sync_gear,
+    unlink_strava_account,
 )
 from .models import UsersIntegrations as UsersIntegrationsModel
 from .schema import (
@@ -39,24 +39,24 @@ from .schema import (
 )
 
 __all__ = [
-    # CRUD operations
-    "get_user_integrations_by_user_id",
-    "get_user_integrations_by_strava_state",
-    "create_user_integrations",
-    "edit_user_integrations",
-    "link_strava_account",
-    "unlink_strava_account",
-    "set_user_strava_client",
-    "set_user_strava_state",
-    "set_user_strava_sync_gear",
-    "link_garminconnect_account",
-    "unlink_garminconnect_account",
-    "set_user_garminconnect_sync_gear",
-    # Database model
-    "UsersIntegrationsModel",
     # Pydantic schemas
     "UsersIntegrationsBase",
     "UsersIntegrationsCreate",
+    # Database model
+    "UsersIntegrationsModel",
     "UsersIntegrationsRead",
     "UsersIntegrationsUpdate",
+    "create_user_integrations",
+    "edit_user_integrations",
+    "get_user_integrations_by_strava_state",
+    # CRUD operations
+    "get_user_integrations_by_user_id",
+    "link_garminconnect_account",
+    "link_strava_account",
+    "set_user_garminconnect_sync_gear",
+    "set_user_strava_client",
+    "set_user_strava_state",
+    "set_user_strava_sync_gear",
+    "unlink_garminconnect_account",
+    "unlink_strava_account",
 ]

@@ -1,14 +1,13 @@
 """Tests for IdP link tokens CRUD operations."""
 
-from datetime import datetime, timedelta, timezone
-
-import pytest
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import auth.idp_link_tokens.crud as idp_link_token_crud
 import auth.idp_link_tokens.schema as idp_link_token_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetIdpLinkTokenByHash:
@@ -23,9 +22,7 @@ class TestGetIdpLinkTokenByHash:
         mock_result.scalar_one_or_none.return_value = mock_token
 
         # Act
-        result = idp_link_token_crud.get_idp_link_token_by_hash(
-            token_hash, mock_db
-        )
+        result = idp_link_token_crud.get_idp_link_token_by_hash(token_hash, mock_db)
 
         # Assert
         assert result == mock_token
@@ -39,9 +36,7 @@ class TestGetIdpLinkTokenByHash:
         mock_result.scalar_one_or_none.return_value = None
 
         # Act
-        result = idp_link_token_crud.get_idp_link_token_by_hash(
-            token_hash, mock_db
-        )
+        result = idp_link_token_crud.get_idp_link_token_by_hash(token_hash, mock_db)
 
         # Assert
         assert result is None
@@ -55,10 +50,7 @@ class TestGetIdpLinkTokenByHash:
         with pytest.raises(HTTPException) as exc_info:
             idp_link_token_crud.get_idp_link_token_by_hash("c" * 64, mock_db)
 
-        assert (
-            exc_info.value.status_code
-            == status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert exc_info.value.detail == "Database error occurred"
 
 
@@ -68,7 +60,7 @@ class TestCreateIdpLinkToken:
     def test_create_token_success(self, mock_db):
         """Test successful IdP link token creation."""
         # Arrange
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
         token_data = idp_link_token_schema.IdpLinkTokenCreate(
             id="11111111-1111-4111-8111-111111111111",
             token_hash="d" * 64,
@@ -80,16 +72,12 @@ class TestCreateIdpLinkToken:
             ip_address="192.168.1.1",
         )
 
-        with patch(
-            "auth.idp_link_tokens.crud.idp_link_token_models.IdpLinkToken"
-        ) as mock_model:
+        with patch("auth.idp_link_tokens.crud.idp_link_token_models.IdpLinkToken") as mock_model:
             mock_token = MagicMock()
             mock_model.return_value = mock_token
 
             # Act
-            result = idp_link_token_crud.create_idp_link_token(
-                token_data, mock_db
-            )
+            result = idp_link_token_crud.create_idp_link_token(token_data, mock_db)
 
             # Assert
             mock_model.assert_called_once_with(**token_data.model_dump())

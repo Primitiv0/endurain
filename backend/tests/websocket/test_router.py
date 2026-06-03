@@ -3,9 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import WebSocketDisconnect
-
 import websocket.router as websocket_router
+from fastapi import WebSocketDisconnect
 
 
 class TestWebSocketEndpoint:
@@ -27,9 +26,7 @@ class TestWebSocketEndpoint:
         return manager
 
     @patch("websocket.router.core_logger.print_to_log")
-    async def test_websocket_endpoint_normal_operation(
-        self, mock_log, mock_websocket, mock_manager
-    ):
+    async def test_websocket_endpoint_normal_operation(self, mock_log, mock_websocket, mock_manager):
         """Test WebSocket endpoint normal operation until disconnect."""
         user_id = 1
 
@@ -55,9 +52,7 @@ class TestWebSocketEndpoint:
         mock_log.assert_not_called()
 
     @patch("websocket.router.core_logger.print_to_log")
-    async def test_websocket_endpoint_malformed_json(
-        self, mock_log, mock_websocket, mock_manager
-    ):
+    async def test_websocket_endpoint_malformed_json(self, mock_log, mock_websocket, mock_manager):
         """Test WebSocket endpoint handling malformed JSON."""
         user_id = 1
 
@@ -74,17 +69,13 @@ class TestWebSocketEndpoint:
         mock_manager.connect.assert_awaited_once_with(user_id, mock_websocket)
 
         # Verify warning was logged for malformed JSON
-        mock_log.assert_called_once_with(
-            f"Received malformed JSON from user {user_id}", "warning"
-        )
+        mock_log.assert_called_once_with(f"Received malformed JSON from user {user_id}", "warning")
 
         # Verify disconnect was called
         mock_manager.disconnect.assert_called_once_with(user_id)
 
     @patch("websocket.router.core_logger.print_to_log")
-    async def test_websocket_endpoint_multiple_malformed_json(
-        self, mock_log, mock_websocket, mock_manager
-    ):
+    async def test_websocket_endpoint_multiple_malformed_json(self, mock_log, mock_websocket, mock_manager):
         """Test WebSocket endpoint handling multiple malformed JSON messages."""
         user_id = 1
 
@@ -101,14 +92,10 @@ class TestWebSocketEndpoint:
 
         # Verify warning was logged for each malformed JSON
         assert mock_log.call_count == 3
-        mock_log.assert_called_with(
-            f"Received malformed JSON from user {user_id}", "warning"
-        )
+        mock_log.assert_called_with(f"Received malformed JSON from user {user_id}", "warning")
 
     @patch("websocket.router.core_logger.print_to_log")
-    async def test_websocket_endpoint_immediate_disconnect(
-        self, mock_log, mock_websocket, mock_manager
-    ):
+    async def test_websocket_endpoint_immediate_disconnect(self, mock_log, mock_websocket, mock_manager):
         """Test WebSocket endpoint with immediate disconnect."""
         user_id = 1
 
@@ -153,9 +140,7 @@ class TestWebSocketEndpoint:
         reason="Complex test requiring WebSocket protocol understanding - "
         "endpoint behavior verified through integration tests"
     )
-    async def test_websocket_endpoint_send_receive_cycle(
-        self, mock_websocket, mock_manager
-    ):
+    async def test_websocket_endpoint_send_receive_cycle(self, mock_websocket, mock_manager):
         """
         Test bidirectional communication (complex WebSocket protocol).
 

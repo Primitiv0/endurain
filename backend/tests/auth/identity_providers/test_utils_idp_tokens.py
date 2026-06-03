@@ -5,11 +5,11 @@ This module tests the utility functions for managing IdP tokens,
 including refresh_idp_tokens_if_needed and clear_all_idp_tokens.
 """
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from sqlalchemy.orm import Session
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import auth.identity_providers.utils as idp_utils
+import pytest
+from sqlalchemy.orm import Session
 
 
 class TestRefreshIdpTokensIfNeeded:
@@ -42,12 +42,15 @@ class TestRefreshIdpTokensIfNeeded:
         mock_link.idp_id = 1
         mock_link.user_id = user_id
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
-        ) as mock_should_refresh:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
+            ) as mock_should_refresh,
+        ):
             from auth.identity_providers.service import TokenAction
 
             mock_should_refresh.return_value = TokenAction.SKIP
@@ -69,15 +72,19 @@ class TestRefreshIdpTokensIfNeeded:
         mock_link.idp_id = 1
         mock_link.user_id = user_id
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
-        ) as mock_should_refresh, patch(
-            "auth.identity_providers.utils.idp_service.idp_service.refresh_idp_session",
-            new_callable=AsyncMock,
-        ) as mock_refresh:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
+            ) as mock_should_refresh,
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service.refresh_idp_session",
+                new_callable=AsyncMock,
+            ) as mock_refresh,
+        ):
             from auth.identity_providers.service import TokenAction
 
             mock_should_refresh.return_value = TokenAction.REFRESH
@@ -100,15 +107,19 @@ class TestRefreshIdpTokensIfNeeded:
         mock_link.idp_id = 1
         mock_link.user_id = user_id
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
-        ) as mock_should_refresh, patch(
-            "auth.identity_providers.utils.idp_service.idp_service.refresh_idp_session",
-            new_callable=AsyncMock,
-        ) as mock_refresh:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
+            ) as mock_should_refresh,
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service.refresh_idp_session",
+                new_callable=AsyncMock,
+            ) as mock_refresh,
+        ):
             from auth.identity_providers.service import TokenAction
 
             mock_should_refresh.return_value = TokenAction.REFRESH
@@ -131,14 +142,18 @@ class TestRefreshIdpTokensIfNeeded:
         mock_link.idp_id = 1
         mock_link.user_id = user_id
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
-        ) as mock_should_refresh, patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
+            ) as mock_should_refresh,
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             from auth.identity_providers.service import TokenAction
 
             mock_should_refresh.return_value = TokenAction.CLEAR
@@ -160,14 +175,18 @@ class TestRefreshIdpTokensIfNeeded:
         mock_link = MagicMock()
         mock_link.idp_id = 1
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
-        ) as mock_should_refresh, patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
+            ) as mock_should_refresh,
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             from auth.identity_providers.service import TokenAction
 
             mock_should_refresh.return_value = TokenAction.CLEAR
@@ -192,12 +211,15 @@ class TestRefreshIdpTokensIfNeeded:
         mock_link2 = MagicMock()
         mock_link2.idp_id = 2
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link1, mock_link2],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
-        ) as mock_should_refresh:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link1, mock_link2],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service._should_refresh_idp_token"
+            ) as mock_should_refresh,
+        ):
             from auth.identity_providers.service import TokenAction
 
             # First IdP raises error, second succeeds
@@ -258,12 +280,15 @@ class TestClearAllIdpTokens:
         mock_link = MagicMock()
         mock_link.idp_id = 1
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             mock_clear.return_value = True
 
             # Act
@@ -282,15 +307,19 @@ class TestClearAllIdpTokens:
         mock_link = MagicMock()
         mock_link.idp_id = 1
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service.revoke_idp_token",
-            new_callable=AsyncMock,
-        ) as mock_revoke, patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service.revoke_idp_token",
+                new_callable=AsyncMock,
+            ) as mock_revoke,
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             mock_revoke.return_value = True
             mock_clear.return_value = True
 
@@ -311,15 +340,19 @@ class TestClearAllIdpTokens:
         mock_link = MagicMock()
         mock_link.idp_id = 1
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service.revoke_idp_token",
-            new_callable=AsyncMock,
-        ) as mock_revoke, patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service.revoke_idp_token",
+                new_callable=AsyncMock,
+            ) as mock_revoke,
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             mock_revoke.return_value = False  # Revocation failed
             mock_clear.return_value = True
 
@@ -339,15 +372,19 @@ class TestClearAllIdpTokens:
         mock_link = MagicMock()
         mock_link.idp_id = 1
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.idp_service.idp_service.revoke_idp_token",
-            new_callable=AsyncMock,
-        ) as mock_revoke, patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.idp_service.idp_service.revoke_idp_token",
+                new_callable=AsyncMock,
+            ) as mock_revoke,
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             mock_revoke.side_effect = Exception("Revocation error")
             mock_clear.return_value = True
 
@@ -367,12 +404,15 @@ class TestClearAllIdpTokens:
         mock_link = MagicMock()
         mock_link.idp_id = 1
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link],
-        ), patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link],
+            ),
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             mock_clear.return_value = False  # No token to clear
 
             # Act - should not raise exception
@@ -394,12 +434,15 @@ class TestClearAllIdpTokens:
         mock_link2 = MagicMock()
         mock_link2.idp_id = 2
 
-        with patch(
-            "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
-            return_value=[mock_link1, mock_link2],
-        ), patch(
-            "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
-        ) as mock_clear:
+        with (
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.get_user_identity_providers_by_user_id",
+                return_value=[mock_link1, mock_link2],
+            ),
+            patch(
+                "auth.identity_providers.utils.user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id"
+            ) as mock_clear,
+        ):
             # First IdP raises error, second succeeds
             mock_clear.side_effect = [Exception("Error clearing IdP 1"), True]
 

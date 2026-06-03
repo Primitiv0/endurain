@@ -1,13 +1,12 @@
-import pytest
-from datetime import datetime, date as datetime_date
-from decimal import Decimal
+from datetime import date as datetime_date
 from unittest.mock import MagicMock, patch
-from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 import health.health_sleep.crud as health_sleep_crud
-import health.health_sleep.schema as health_sleep_schema
 import health.health_sleep.models as health_sleep_models
+import health.health_sleep.schema as health_sleep_schema
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 
 class TestGetHealthSleepNumber:
@@ -82,9 +81,7 @@ class TestGetHealthSleepWithPagination:
         ]
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_user_id(
-            user_id, mock_db, page_number, num_records
-        )
+        result = health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db, page_number, num_records)
 
         # Assert
         assert result == [mock_sleep1, mock_sleep2]
@@ -99,7 +96,7 @@ class TestGetHealthSleepWithPagination:
         mock_db.execute.return_value.scalars.return_value.all.return_value = []
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db)
+        health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db)
 
         # Assert
         mock_db.execute.assert_called_once()
@@ -135,9 +132,7 @@ class TestGetHealthSleepByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_sleep
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(
-            user_id, test_date, mock_db
-        )
+        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
         assert result == mock_sleep
@@ -153,9 +148,7 @@ class TestGetHealthSleepByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(
-            user_id, test_date, mock_db
-        )
+        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
         assert result is None
@@ -171,9 +164,7 @@ class TestGetHealthSleepByDate:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            health_sleep_crud.get_health_sleep_by_date_and_user_id(
-                user_id, test_date, mock_db
-            )
+            health_sleep_crud.get_health_sleep_by_date_and_user_id(user_id, test_date, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -208,9 +199,7 @@ class TestCreateHealthSleep:
             return_value=mock_db_sleep,
         ):
             # Act
-            result = health_sleep_crud.create_health_sleep(
-                user_id, health_sleep, mock_db
-            )
+            result = health_sleep_crud.create_health_sleep(user_id, health_sleep, mock_db)
 
             # Assert
             assert result.id == 1
@@ -241,9 +230,7 @@ class TestCreateHealthSleep:
             return_value=mock_db_sleep,
         ):
             # Act
-            result = health_sleep_crud.create_health_sleep(
-                user_id, health_sleep, mock_db
-            )
+            result = health_sleep_crud.create_health_sleep(user_id, health_sleep, mock_db)
 
             # Assert
             assert result.id == 1
@@ -256,9 +243,7 @@ class TestCreateHealthSleep:
         """
         # Arrange
         user_id = 1
-        health_sleep = health_sleep_schema.HealthSleepCreate(
-            date=datetime_date(2024, 1, 15), total_sleep_seconds=28800
-        )
+        health_sleep = health_sleep_schema.HealthSleepCreate(date=datetime_date(2024, 1, 15), total_sleep_seconds=28800)
 
         mock_db_sleep = MagicMock()
         mock_db.add.return_value = None
@@ -283,9 +268,7 @@ class TestCreateHealthSleep:
         """
         # Arrange
         user_id = 1
-        health_sleep = health_sleep_schema.HealthSleepCreate(
-            date=datetime_date(2024, 1, 15), total_sleep_seconds=28800
-        )
+        health_sleep = health_sleep_schema.HealthSleepCreate(date=datetime_date(2024, 1, 15), total_sleep_seconds=28800)
 
         mock_db.add.side_effect = SQLAlchemyError("Database error")
 
@@ -355,9 +338,7 @@ class TestEditHealthSleep:
         """
         # Arrange
         user_id = 1
-        health_sleep = health_sleep_schema.HealthSleepUpdate(
-            id=1, user_id=1, total_sleep_seconds=32400
-        )
+        health_sleep = health_sleep_schema.HealthSleepUpdate(id=1, user_id=1, total_sleep_seconds=32400)
 
         # Mock get_health_sleep_by_id_and_user_id to return a record
         mock_db_sleep = MagicMock(spec=health_sleep_models.HealthSleep)

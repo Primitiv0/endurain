@@ -16,7 +16,7 @@ def validate_user_id(user_id: int) -> None:
     Raises:
         HTTPException: 400 if user ID is invalid (≤ 0).
     """
-    core_dependencies.validate_id(id=user_id, min=0, message="Invalid user ID")
+    core_dependencies.validate_id(identifier=user_id, min_value=0, message="Invalid user ID")
 
 
 def validate_target_user_id(target_user_id: int) -> None:
@@ -32,6 +32,4 @@ def validate_target_user_id(target_user_id: int) -> None:
     Raises:
         HTTPException: 400 if target user ID is invalid (≤ 0).
     """
-    core_dependencies.validate_id(
-        id=target_user_id, min=0, message="Invalid target user ID"
-    )
+    core_dependencies.validate_id(identifier=target_user_id, min_value=0, message="Invalid target user ID")

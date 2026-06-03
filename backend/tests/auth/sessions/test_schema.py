@@ -1,8 +1,8 @@
-import pytest
-from datetime import datetime, timezone
-from pydantic import ValidationError
+from datetime import UTC, datetime
 
 import auth.sessions.schema as users_session_schema
+import pytest
+from pydantic import ValidationError
 
 
 class TestUsersSessionsBaseSchema:
@@ -15,7 +15,7 @@ class TestUsersSessionsBaseSchema:
         Test UsersSessionsBase schema with valid data.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         session = users_session_schema.UsersSessionsBase(
@@ -48,7 +48,7 @@ class TestUsersSessionsBaseSchema:
         Test UsersSessionsBase schema requires id field.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -71,7 +71,7 @@ class TestUsersSessionsBaseSchema:
         Test UsersSessionsBase schema ip_address max length validation.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         long_ip = "a" * 50  # Exceeds 45 character limit
 
         # Act & Assert
@@ -96,7 +96,7 @@ class TestUsersSessionsBaseSchema:
         Test UsersSessionsBase schema device_type max length validation.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         long_device = "a" * 50  # Exceeds 45 character limit
 
         # Act & Assert
@@ -121,7 +121,7 @@ class TestUsersSessionsBaseSchema:
         Test UsersSessionsBase schema enforces strict string types.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -145,10 +145,7 @@ class TestUsersSessionsBaseSchema:
         Test UsersSessionsBase schema has from_attributes config.
         """
         # Assert
-        assert (
-            users_session_schema.UsersSessionsBase.model_config.get("from_attributes")
-            is True
-        )
+        assert users_session_schema.UsersSessionsBase.model_config.get("from_attributes") is True
 
 
 class TestUsersSessionsReadSchema:
@@ -161,7 +158,7 @@ class TestUsersSessionsReadSchema:
         Test UsersSessionsRead schema includes user_id field.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         session = users_session_schema.UsersSessionsRead(
@@ -186,7 +183,7 @@ class TestUsersSessionsReadSchema:
         Test UsersSessionsRead schema requires user_id field.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -210,7 +207,7 @@ class TestUsersSessionsReadSchema:
         Test UsersSessionsRead schema user_id must be >= 1.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -251,7 +248,7 @@ class TestUsersSessionsInternalSchema:
         Test UsersSessionsInternal schema includes all fields.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         session = users_session_schema.UsersSessionsInternal(
@@ -289,7 +286,7 @@ class TestUsersSessionsInternalSchema:
         Test UsersSessionsInternal schema allows refresh_token to be optional.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         session = users_session_schema.UsersSessionsInternal(
@@ -317,7 +314,7 @@ class TestUsersSessionsInternalSchema:
         Test UsersSessionsInternal schema tokens_exchanged default.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         session = users_session_schema.UsersSessionsInternal(
@@ -345,7 +342,7 @@ class TestUsersSessionsInternalSchema:
         Test UsersSessionsInternal schema rotation_count must be >= 0.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act & Assert
         with pytest.raises(ValidationError) as exc_info:
@@ -373,7 +370,7 @@ class TestUsersSessionsInternalSchema:
         Test UsersSessionsInternal schema oauth_state_id max length.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         long_oauth_state = "a" * 70  # Exceeds 64 character limit
 
         # Act & Assert
@@ -413,7 +410,7 @@ class TestUsersSessionsInternalSchema:
         Test UsersSessionsInternal schema with all optional fields set.
         """
         # Arrange
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Act
         session = users_session_schema.UsersSessionsInternal(

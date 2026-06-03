@@ -6,7 +6,7 @@ Create Date: 2025-02-12 12:06:28.789923
 
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 from alembic import op
 import sqlalchemy as sa
@@ -14,9 +14,9 @@ from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision: str = "7217cc0eee8c"
-down_revision: Union[str, None] = "0158771b9f18"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0158771b9f18"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def get_db_dialect():
@@ -49,7 +49,7 @@ def upgrade() -> None:
             nullable=False,
             comment="Allow show user info on public shareable links (true - yes, false - no)",
         ),
-        #sa.CheckConstraint("id = 1", name="single_row_check"),
+        # sa.CheckConstraint("id = 1", name="single_row_check"),
         sa.PrimaryKeyConstraint("id"),
     )
     # Add the new entry to the server_settings table
@@ -60,11 +60,11 @@ def upgrade() -> None:
     """
     )
     # Check the database dialect and add the CHECK constraint if it's PostgreSQL
-    if get_db_dialect() == 'postgresql':
+    if get_db_dialect() == "postgresql":
         op.create_check_constraint(
-            'single_row_check',  # Constraint name
-            'server_settings',   # Table name
-            'id = 1'             # Check condition
+            "single_row_check",  # Constraint name
+            "server_settings",  # Table name
+            "id = 1",  # Check condition
         )
     # Create table for users_default_gear
     op.create_table(
@@ -136,24 +136,16 @@ def upgrade() -> None:
             nullable=True,
             comment="Gear ID that the default hike activity type belongs",
         ),
-        sa.ForeignKeyConstraint(
-            ["gravel_ride_gear_id"], ["gear.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["gravel_ride_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["hike_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["mtb_ride_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["ows_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["ride_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["run_gear_id"], ["gear.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(
-            ["trail_run_gear_id"], ["gear.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["trail_run_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["virtual_ride_gear_id"], ["gear.id"], ondelete="SET NULL"
-        ),
-        sa.ForeignKeyConstraint(
-            ["virtual_run_gear_id"], ["gear.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["virtual_ride_gear_id"], ["gear.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(["virtual_run_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["walk_gear_id"], ["gear.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -234,9 +226,7 @@ def downgrade() -> None:
     # drop table for server_settings
     op.drop_table("server_settings")
     # drop table for users_default_gear
-    op.drop_index(
-        op.f("ix_users_default_gear_walk_gear_id"), table_name="users_default_gear"
-    )
+    op.drop_index(op.f("ix_users_default_gear_walk_gear_id"), table_name="users_default_gear")
     op.drop_index(
         op.f("ix_users_default_gear_virtual_run_gear_id"),
         table_name="users_default_gear",
@@ -245,27 +235,13 @@ def downgrade() -> None:
         op.f("ix_users_default_gear_virtual_ride_gear_id"),
         table_name="users_default_gear",
     )
-    op.drop_index(
-        op.f("ix_users_default_gear_user_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_trail_run_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_run_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_ride_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_ows_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_mtb_ride_gear_id"), table_name="users_default_gear"
-    )
-    op.drop_index(
-        op.f("ix_users_default_gear_hike_gear_id"), table_name="users_default_gear"
-    )
+    op.drop_index(op.f("ix_users_default_gear_user_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_trail_run_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_run_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_ride_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_ows_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_mtb_ride_gear_id"), table_name="users_default_gear")
+    op.drop_index(op.f("ix_users_default_gear_hike_gear_id"), table_name="users_default_gear")
     op.drop_index(
         op.f("ix_users_default_gear_gravel_ride_gear_id"),
         table_name="users_default_gear",

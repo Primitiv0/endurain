@@ -1,24 +1,18 @@
 """CRUD operations for follower relationships."""
 
+import core.decorators as core_decorators
+import core.logger as core_logger
+import followers.models as followers_models
+import notifications.utils as notifications_utils
+import websocket.manager as websocket_manager
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-import followers.models as followers_models
-
-import core.decorators as core_decorators
-import core.logger as core_logger
-
-import notifications.utils as notifications_utils
-
-import websocket.manager as websocket_manager
-
 
 @core_decorators.handle_db_errors
-def get_all_followers_by_user_id(
-    user_id: int, db: Session
-) -> list[followers_models.Follower]:
+def get_all_followers_by_user_id(user_id: int, db: Session) -> list[followers_models.Follower]:
     """
     Retrieve all follower records where the user is being followed.
 
@@ -32,16 +26,12 @@ def get_all_followers_by_user_id(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(followers_models.Follower).where(
-        followers_models.Follower.following_id == user_id
-    )
+    stmt = select(followers_models.Follower).where(followers_models.Follower.following_id == user_id)
     return list(db.scalars(stmt).all())
 
 
 @core_decorators.handle_db_errors
-def get_accepted_followers_by_user_id(
-    user_id: int, db: Session
-) -> list[followers_models.Follower]:
+def get_accepted_followers_by_user_id(user_id: int, db: Session) -> list[followers_models.Follower]:
     """
     Retrieve accepted follower records where the user is being followed.
 
@@ -63,9 +53,7 @@ def get_accepted_followers_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_all_following_by_user_id(
-    user_id: int, db: Session
-) -> list[followers_models.Follower]:
+def get_all_following_by_user_id(user_id: int, db: Session) -> list[followers_models.Follower]:
     """
     Retrieve all follow records where the user is the follower.
 
@@ -79,16 +67,12 @@ def get_all_following_by_user_id(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(followers_models.Follower).where(
-        followers_models.Follower.follower_id == user_id
-    )
+    stmt = select(followers_models.Follower).where(followers_models.Follower.follower_id == user_id)
     return list(db.scalars(stmt).all())
 
 
 @core_decorators.handle_db_errors
-def get_accepted_following_by_user_id(
-    user_id: int, db: Session
-) -> list[followers_models.Follower]:
+def get_accepted_following_by_user_id(user_id: int, db: Session) -> list[followers_models.Follower]:
     """
     Retrieve accepted follow records where the user is the follower.
 
@@ -110,9 +94,7 @@ def get_accepted_following_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def count_followers_by_user_id(
-    user_id: int, db: Session, *, accepted_only: bool = False
-) -> int:
+def count_followers_by_user_id(user_id: int, db: Session, *, accepted_only: bool = False) -> int:
     """
     Count followers for a user without loading the full rowset.
 
@@ -127,8 +109,10 @@ def count_followers_by_user_id(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(func.count()).select_from(followers_models.Follower).where(
-        followers_models.Follower.following_id == user_id
+    stmt = (
+        select(func.count())
+        .select_from(followers_models.Follower)
+        .where(followers_models.Follower.following_id == user_id)
     )
     if accepted_only:
         stmt = stmt.where(followers_models.Follower.is_accepted.is_(True))
@@ -136,9 +120,7 @@ def count_followers_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def count_following_by_user_id(
-    user_id: int, db: Session, *, accepted_only: bool = False
-) -> int:
+def count_following_by_user_id(user_id: int, db: Session, *, accepted_only: bool = False) -> int:
     """
     Count users a given user is following without loading the rowset.
 
@@ -153,8 +135,10 @@ def count_following_by_user_id(
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(func.count()).select_from(followers_models.Follower).where(
-        followers_models.Follower.follower_id == user_id
+    stmt = (
+        select(func.count())
+        .select_from(followers_models.Follower)
+        .where(followers_models.Follower.follower_id == user_id)
     )
     if accepted_only:
         stmt = stmt.where(followers_models.Follower.is_accepted.is_(True))
@@ -218,9 +202,7 @@ async def create_follower(
 
     # Pre-check to return a clean 409 instead of a 500 from a unique
     # constraint violation.
-    existing = get_follower_for_user_id_and_target_user_id(
-        user_id, target_user_id, db
-    )
+    existing = get_follower_for_user_id_and_target_user_id(user_id, target_user_id, db)
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -260,9 +242,7 @@ async def create_follower(
             detail="Database error occurred",
         ) from err
 
-    await notifications_utils.create_new_follower_request_notification(
-        user_id, target_user_id, websocket_manager, db
-    )
+    await notifications_utils.create_new_follower_request_notification(user_id, target_user_id, websocket_manager, db)
 
     return new_follow
 

@@ -12,7 +12,6 @@ from functools import lru_cache
 from urllib.parse import urlencode
 
 import apprise
-
 import core.config as core_config
 import core.logger as core_logger
 
@@ -48,9 +47,7 @@ class AppriseService:
         # Password is intentionally not stored on the
         # Settings object; it is loaded from env or a
         # Docker secret file via ``read_secret``.
-        self.smtp_password: str | None = core_config.read_secret(
-            "SMTP_PASSWORD"
-        )
+        self.smtp_password: str | None = core_config.read_secret("SMTP_PASSWORD")
         # Public attribute consumed by email-body templates
         # (e.g. ``{email_service.frontend_host}/login``).
         self.frontend_host: str = s.ENDURAIN_HOST
@@ -121,9 +118,7 @@ class AppriseService:
             )
             return False
         if not self.is_smtp_configured():
-            core_logger.print_to_log(
-                "send_email skipped: SMTP not configured", "warning"
-            )
+            core_logger.print_to_log("send_email skipped: SMTP not configured", "warning")
             return False
 
         content = html_content if html_content else text_content
@@ -147,30 +142,23 @@ class AppriseService:
                 recipient_qs = urlencode([("to", email)])
                 temp_apprise.add(f"{smtp_url}&{recipient_qs}")
 
-            success = await temp_apprise.async_notify(
-                title=subject, body=content, body_format=body_format
-            )
+            success = await temp_apprise.async_notify(title=subject, body=content, body_format=body_format)
         except _APPRISE_NETWORK_ERRORS as err:
             # Log the exception type only; ``err`` may
             # contain the recipient or partial credentials
             # in its message on some libc/transport
             # combinations.
             core_logger.print_to_log(
-                f"send_email transport failure for subject "
-                f"'{subject}': {type(err).__name__}",
+                f"send_email transport failure for subject '{subject}': {type(err).__name__}",
                 "error",
                 exc=err,
             )
             return False
 
         if success:
-            core_logger.print_to_log(
-                f"Email sent: {subject} (recipients={len(to_emails)})", "info"
-            )
+            core_logger.print_to_log(f"Email sent: {subject} (recipients={len(to_emails)})", "info")
         else:
-            core_logger.print_to_log_and_console(
-                f"Email send returned failure: {subject}", "warning"
-            )
+            core_logger.print_to_log_and_console(f"Email send returned failure: {subject}", "warning")
         return bool(success)
 
     # Configuration introspection
@@ -189,9 +177,7 @@ class AppriseService:
         """
         if not self.smtp_host:
             return False
-        if self.smtp_username and not self.smtp_password:
-            return False
-        return True
+        return not (self.smtp_username and not self.smtp_password)
 
 
 # Module-level accessors

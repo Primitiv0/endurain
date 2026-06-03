@@ -4,10 +4,9 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from core.database import Base
 from sqlalchemy import DECIMAL, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity.models import Activity
@@ -195,6 +194,4 @@ class ActivityLaps(Base):
     )
 
     # Define a relationship to the Activity model
-    activity: Mapped["Activity"] = relationship(
-        back_populates="activity_laps"
-    )
+    activity: Mapped["Activity"] = relationship(back_populates="activity_laps")

@@ -2,14 +2,19 @@
 
 from datetime import date as date_type
 from typing import TYPE_CHECKING
+
+from core.database import Base
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from core.database import Base
 
 if TYPE_CHECKING:
     from activities.activity.models import Activity
+    from auth.api_keys.models import UsersApiKeys
+    from auth.identity_links.models import UsersIdentityProvider
+    from auth.mfa.models import AuthUserMFA
     from auth.mfa_backup_codes.models import MFABackupCode
     from auth.oauth_state.models import OAuthState
+    from auth.sessions.models import UsersSessions
     from followers.models import Follower
     from gears.gear.models import Gear
     from gears.gear_components.models import GearComponents
@@ -23,14 +28,10 @@ if TYPE_CHECKING:
     from notifications.models import Notification
     from password_reset_tokens.models import PasswordResetToken
     from sign_up_tokens.models import SignUpToken
-    from auth.api_keys.models import UsersApiKeys
     from users.users_default_gear.models import UsersDefaultGear
     from users.users_goals.models import UsersGoal
-    from auth.identity_links.models import UsersIdentityProvider
     from users.users_integrations.models import UsersIntegrations
     from users.users_privacy_settings.models import UsersPrivacySettings
-    from auth.mfa.models import AuthUserMFA
-    from auth.sessions.models import UsersSessions
 
 
 class Users(Base):
@@ -185,18 +186,12 @@ class Users(Base):
     email_verified: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
-        comment=(
-            "Whether the user's email address has been verified "
-            "(true - yes, false - no)"
-        ),
+        comment=("Whether the user's email address has been verified (true - yes, false - no)"),
     )
     pending_admin_approval: Mapped[bool] = mapped_column(
         default=False,
         nullable=False,
-        comment=(
-            "Whether the user is pending admin approval for "
-            "activation (true - yes, false - no)"
-        ),
+        comment=("Whether the user is pending admin approval for activation (true - yes, false - no)"),
     )
 
     # Relationships
@@ -312,7 +307,4 @@ class Users(Base):
         Used by Pydantic schemas (``from_attributes=True``) and
         any caller that checks MFA status on the profile row.
         """
-        return bool(
-            self.auth_mfa and self.auth_mfa.mfa_enabled
-        )
-
+        return bool(self.auth_mfa and self.auth_mfa.mfa_enabled)

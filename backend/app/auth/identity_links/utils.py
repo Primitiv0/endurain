@@ -1,12 +1,11 @@
 """Utility functions for user identity provider links."""
 
-from sqlalchemy.orm import Session
-
-import core.logger as core_logger
 import auth.identity_links.crud as user_idp_crud
-import auth.identity_links.schema as user_idp_schema
 import auth.identity_links.models as user_idp_models
+import auth.identity_links.schema as user_idp_schema
 import auth.identity_providers.crud as idp_crud
+import core.logger as core_logger
+from sqlalchemy.orm import Session
 
 
 def get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
@@ -68,16 +67,13 @@ def enrich_user_identity_providers(
     idps = idp_crud.get_identity_providers_by_ids(idp_ids, db)
     idp_map = {idp.id: idp for idp in idps}
 
-    enriched_links: list[
-        user_idp_schema.UsersIdentityProviderResponse
-    ] = []
+    enriched_links: list[user_idp_schema.UsersIdentityProviderResponse] = []
 
     for link in idp_links:
         idp = idp_map.get(link.idp_id)
         if idp is None:
             core_logger.print_to_log(
-                f"IDP with id {link.idp_id} not found for user "
-                f"{user_id}, skipping enrichment",
+                f"IDP with id {link.idp_id} not found for user {user_id}, skipping enrichment",
                 "warning",
             )
             continue
@@ -89,12 +85,8 @@ def enrich_user_identity_providers(
             idp_subject=link.idp_subject,
             linked_at=link.linked_at,
             last_login=link.last_login,
-            idp_access_token_expires_at=(
-                link.idp_access_token_expires_at
-            ),
-            idp_refresh_token_updated_at=(
-                link.idp_refresh_token_updated_at
-            ),
+            idp_access_token_expires_at=(link.idp_access_token_expires_at),
+            idp_refresh_token_updated_at=(link.idp_refresh_token_updated_at),
             idp_name=idp.name,
             idp_slug=idp.slug,
             idp_icon=idp.icon,

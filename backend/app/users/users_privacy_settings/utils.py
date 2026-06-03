@@ -17,11 +17,7 @@ def visibility_to_int(
     """
     if visibility is None:
         return 0
-    value = (
-        visibility.value
-        if isinstance(visibility, users_privacy_settings_schema.ActivityVisibility)
-        else visibility
-    )
+    value = visibility.value if isinstance(visibility, users_privacy_settings_schema.ActivityVisibility) else visibility
     mapping = {
         "public": 0,
         "followers": 1,

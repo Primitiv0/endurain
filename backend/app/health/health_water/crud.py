@@ -5,18 +5,15 @@ This module provides database operations for creating, reading,
 updating, and deleting water intake records.
 """
 
-from fastapi import HTTPException, status
-from sqlalchemy import func, desc, select
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-
-import health.constants as health_constants
-import health.utils as health_utils
-
-import health.health_water.schema as health_water_schema
-import health.health_water.models as health_water_models
-
 import core.decorators as core_decorators
+import health.constants as health_constants
+import health.health_water.models as health_water_models
+import health.health_water.schema as health_water_schema
+import health.utils as health_utils
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -45,17 +42,12 @@ def get_health_water_number_by_user_id(
     stmt = (
         select(func.count())
         .select_from(health_water_models.HealthWater)
-        .where(
-            health_water_models.HealthWater.user_id == user_id
-        )
+        .where(health_water_models.HealthWater.user_id == user_id)
     )
 
     if interval is not None:
         stmt = stmt.where(
-            health_water_models.HealthWater.date
-            >= health_utils.get_start_date_for_interval(
-                interval.value
-            )
+            health_water_models.HealthWater.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
     return db.execute(stmt).scalar_one()
@@ -108,26 +100,17 @@ def get_health_water_by_user_id(
     Returns:
         List of HealthWater records sorted by date descending.
     """
-    stmt = select(health_water_models.HealthWater).where(
-        health_water_models.HealthWater.user_id == user_id
-    )
+    stmt = select(health_water_models.HealthWater).where(health_water_models.HealthWater.user_id == user_id)
 
     if interval is not None:
         stmt = stmt.where(
-            health_water_models.HealthWater.date
-            >= health_utils.get_start_date_for_interval(
-                interval.value
-            )
+            health_water_models.HealthWater.date >= health_utils.get_start_date_for_interval(interval.value)
         )
 
-    stmt = stmt.order_by(
-        desc(health_water_models.HealthWater.date)
-    )
+    stmt = stmt.order_by(desc(health_water_models.HealthWater.date))
 
     if page_number is not None and num_records is not None:
-        stmt = stmt.offset(
-            (page_number - 1) * num_records
-        ).limit(num_records)
+        stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
     return db.execute(stmt).scalars().all()
 
@@ -151,8 +134,7 @@ def get_health_water_by_date_and_user_id(
         HTTPException: If database error occurs.
     """
     stmt = select(health_water_models.HealthWater).where(
-        health_water_models.HealthWater.date
-        == func.date(date),
+        health_water_models.HealthWater.date == func.date(date),
         health_water_models.HealthWater.user_id == user_id,
     )
     return db.execute(stmt).scalar_one_or_none()
@@ -194,11 +176,7 @@ def create_health_water(
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Duplicate entry error. Check if there is"
-                " already an entry created for"
-                f" {health_water.date}"
-            ),
+            detail=(f"Duplicate entry error. Check if there is already an entry created for {health_water.date}"),
         ) from integrity_error
 
 
@@ -226,15 +204,10 @@ def edit_health_water(
     if health_water.user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "Cannot edit health water intake"
-                " for another user."
-            ),
+            detail=("Cannot edit health water intake for another user."),
         )
 
-    db_health_water = get_health_water_by_id_and_user_id(
-        health_water.id, user_id, db
-    )
+    db_health_water = get_health_water_by_id_and_user_id(health_water.id, user_id, db)
 
     if db_health_water is None:
         raise HTTPException(
@@ -242,9 +215,7 @@ def edit_health_water(
             detail="Health water intake not found",
         ) from None
 
-    health_water_data = health_water.model_dump(
-        exclude_unset=True
-    )
+    health_water_data = health_water.model_dump(exclude_unset=True)
     for key, value in health_water_data.items():
         setattr(db_health_water, key, value)
 
@@ -255,9 +226,7 @@ def edit_health_water(
 
 
 @core_decorators.handle_db_errors
-def delete_health_water(
-    user_id: int, health_water_id: int, db: Session
-) -> None:
+def delete_health_water(user_id: int, health_water_id: int, db: Session) -> None:
     """
     Delete a water intake record for a user.
 
@@ -272,9 +241,7 @@ def delete_health_water(
     Raises:
         HTTPException: If record not found or database error.
     """
-    db_health_water = get_health_water_by_id_and_user_id(
-        health_water_id, user_id, db
-    )
+    db_health_water = get_health_water_by_id_and_user_id(health_water_id, user_id, db)
 
     if db_health_water is None:
         raise HTTPException(

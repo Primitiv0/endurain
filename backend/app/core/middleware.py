@@ -2,14 +2,13 @@
 
 from collections.abc import Awaitable, Callable
 
+import core.config as core_config
+import server_settings.schema as server_settings_schema
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
-
-import core.config as core_config
-import server_settings.schema as server_settings_schema
 
 _DEPLOYED_ENVIRONMENTS = {"production", "demo"}
 _CSRF_METHODS = {"POST", "PUT", "DELETE", "PATCH"}
@@ -56,14 +55,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         # Disable unnecessary browser features
-        response.headers["Permissions-Policy"] = (
-            "geolocation=(), microphone=(), camera=()"
-        )
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
 
         if core_config.settings.ENVIRONMENT in _DEPLOYED_ENVIRONMENTS:
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         # Only HTML receives CSP to avoid surprising JSON API clients.
         content_type = response.headers.get("content-type", "")

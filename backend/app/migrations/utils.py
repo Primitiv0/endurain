@@ -3,8 +3,7 @@
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-from sqlalchemy.orm import Session
-
+import core.logger as core_logger
 import migrations.crud as migrations_crud
 import migrations.migration_1 as migrations_migration_1
 import migrations.migration_2 as migrations_migration_2
@@ -12,8 +11,7 @@ import migrations.migration_3 as migrations_migration_3
 import migrations.migration_4 as migrations_migration_4
 import migrations.migration_5 as migrations_migration_5
 import migrations.migration_6 as migrations_migration_6
-
-import core.logger as core_logger
+from sqlalchemy.orm import Session
 
 # Synchronous migration handlers keyed by migration ID.
 _SYNC_MIGRATIONS: dict[int, Callable[[Session], None]] = {
@@ -51,9 +49,7 @@ async def check_migrations_not_executed(
         return
 
     for migration in migrations_not_executed:
-        core_logger.print_to_log(
-            f"Migration not executed: {migration.name}" " - Migration will be executed"
-        )
+        core_logger.print_to_log(f"Migration not executed: {migration.name} - Migration will be executed")
 
         if migration.id in _SYNC_MIGRATIONS:
             _SYNC_MIGRATIONS[migration.id](db)

@@ -1,11 +1,9 @@
-import pytest
 from datetime import date as datetime_date
-from unittest.mock import MagicMock, patch, ANY
-from fastapi import HTTPException, status
-from fastapi.testclient import TestClient
+from unittest.mock import ANY, MagicMock, patch
 
-import health.health_weight.schema as health_weight_schema
 import health.health_weight.models as health_weight_models
+import health.health_weight.schema as health_weight_schema
+from fastapi import HTTPException, status
 
 
 class TestReadHealthWeightAll:
@@ -13,15 +11,9 @@ class TestReadHealthWeightAll:
     Test suite for read_health_weight_all endpoint.
     """
 
-    @patch(
-        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
-    )
-    @patch(
-        "health.health_weight.router.health_weight_crud." "get_health_weight_by_user_id"
-    )
-    def test_read_health_weight_all_success(
-        self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
-    ):
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id")
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_user_id")
+    def test_read_health_weight_all_success(self, mock_get_all, mock_get_number, fast_api_client, fast_api_app):
         """
         Test successful retrieval of all health weight records with total count.
         """
@@ -71,16 +63,9 @@ class TestReadHealthWeightAll:
         assert data["total"] == 2
         assert len(data["records"]) == 2
 
-    @patch(
-        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
-    )
-    @patch(
-        "health.health_weight.router.health_weight_crud."
-        "get_all_health_weight_by_user_id"
-    )
-    def test_read_health_weight_all_empty(
-        self, mock_get_all, mock_get_number, fast_api_client, fast_api_app
-    ):
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id")
+    @patch("health.health_weight.router.health_weight_crud.get_all_health_weight_by_user_id")
+    def test_read_health_weight_all_empty(self, mock_get_all, mock_get_number, fast_api_client, fast_api_app):
         """
         Test retrieval when user has no health weight records.
         """
@@ -106,12 +91,8 @@ class TestReadHealthWeightAllPagination:
     Test suite for read_health_weight_all_pagination endpoint.
     """
 
-    @patch(
-        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
-    )
-    @patch(
-        "health.health_weight.router.health_weight_crud." "get_health_weight_by_user_id"
-    )
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id")
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_user_id")
     def test_read_health_weight_all_pagination_success(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -151,12 +132,8 @@ class TestReadHealthWeightAllPagination:
         assert data["page_number"] == 1
         assert len(data["records"]) == 1
 
-    @patch(
-        "health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id"
-    )
-    @patch(
-        "health.health_weight.router.health_weight_crud." "get_health_weight_by_user_id"
-    )
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_number_by_user_id")
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_user_id")
     def test_read_health_weight_all_pagination_different_page(
         self, mock_get_paginated, mock_get_number, fast_api_client, fast_api_app
     ):
@@ -189,9 +166,7 @@ class TestCreateHealthWeight:
     """
 
     @patch("health.health_weight.router.health_weight_crud.create_health_weight")
-    @patch(
-        "health.health_weight.router.health_weight_crud.get_health_weight_by_date_and_user_id"
-    )
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_date_and_user_id")
     def test_create_health_weight_success(
         self,
         mock_get_by_date,
@@ -229,12 +204,8 @@ class TestCreateHealthWeight:
         assert data["weight"] == 75.5
 
     @patch("health.health_weight.router.health_weight_crud.edit_health_weight")
-    @patch(
-        "health.health_weight.router.health_weight_crud.get_health_weight_by_date_and_user_id"
-    )
-    def test_create_health_weight_updates_existing(
-        self, mock_get_by_date, mock_edit, fast_api_client, fast_api_app
-    ):
+    @patch("health.health_weight.router.health_weight_crud.get_health_weight_by_date_and_user_id")
+    def test_create_health_weight_updates_existing(self, mock_get_by_date, mock_edit, fast_api_client, fast_api_app):
         """
         Test creating health weight when entry exists updates it.
         """
@@ -305,9 +276,7 @@ class TestEditHealthWeight:
         assert data["weight"] == 76.0
 
     @patch("health.health_weight.router.health_weight_crud.edit_health_weight")
-    def test_edit_health_weight_not_found(
-        self, mock_edit, fast_api_client, fast_api_app
-    ):
+    def test_edit_health_weight_not_found(self, mock_edit, fast_api_client, fast_api_app):
         """
         Test edit when health weight not found.
         """
@@ -339,9 +308,7 @@ class TestDeleteHealthWeight:
     """
 
     @patch("health.health_weight.router.health_weight_crud.delete_health_weight")
-    def test_delete_health_weight_success(
-        self, mock_delete, fast_api_client, fast_api_app
-    ):
+    def test_delete_health_weight_success(self, mock_delete, fast_api_client, fast_api_app):
         """
         Test successful deletion of health weight entry.
         """
@@ -359,9 +326,7 @@ class TestDeleteHealthWeight:
         mock_delete.assert_called_once_with(1, 1, ANY)
 
     @patch("health.health_weight.router.health_weight_crud.delete_health_weight")
-    def test_delete_health_weight_not_found(
-        self, mock_delete, fast_api_client, fast_api_app
-    ):
+    def test_delete_health_weight_not_found(self, mock_delete, fast_api_client, fast_api_app):
         """
         Test deletion when health weight not found.
         """
