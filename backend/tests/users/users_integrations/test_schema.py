@@ -36,8 +36,7 @@ class TestUsersIntegrationsBase:
         assert obj.strava_refresh_token is None
         assert obj.strava_token_expires_at is None
         assert obj.strava_sync_gear is False
-        assert obj.garminconnect_oauth1 is None
-        assert obj.garminconnect_oauth2 is None
+        assert obj.garminconnect_token is None
         assert obj.garminconnect_sync_gear is False
 
     def test_users_integrations_base_valid_all_fields(self):
@@ -56,8 +55,7 @@ class TestUsersIntegrationsBase:
             "strava_refresh_token": "refresh",
             "strava_token_expires_at": now,
             "strava_sync_gear": True,
-            "garminconnect_oauth1": {"key": "value"},
-            "garminconnect_oauth2": {"key": "value"},
+            "garminconnect_token": {"key": "value"},
             "garminconnect_sync_gear": True,
         }
 
@@ -72,8 +70,7 @@ class TestUsersIntegrationsBase:
         assert obj.strava_refresh_token == "refresh"
         assert obj.strava_token_expires_at == now
         assert obj.strava_sync_gear is True
-        assert obj.garminconnect_oauth1 == {"key": "value"}
-        assert obj.garminconnect_oauth2 == {"key": "value"}
+        assert obj.garminconnect_token == {"key": "value"}
         assert obj.garminconnect_sync_gear is True
 
     def test_users_integrations_base_extra_fields_forbidden(self):
@@ -294,8 +291,7 @@ class TestUsersIntegrationsUpdate:
         class MockORM:
             strava_client_id: ClassVar[str] = "client_id"
             strava_sync_gear: ClassVar[bool] = True
-            garminconnect_oauth1: ClassVar[dict[str, str]] = {"key": "value"}
-            garminconnect_oauth2: ClassVar[None] = None
+            garminconnect_token: ClassVar[dict[str, str]] = {"key": "value"}
             garminconnect_sync_gear: ClassVar[bool] = False
             strava_client_secret: ClassVar[None] = None
             strava_state: ClassVar[None] = None

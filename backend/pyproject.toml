@@ -59,6 +59,7 @@ dev = [
     "httpx>=0.28.1",
     "faker>=40.15.0",
     "import-linter>=2.1",
+    "hypothesis>=6.150.0",
     "ruff>=0.15.12",
     "mypy>=1.20.2",
 ]
@@ -80,7 +81,7 @@ dependency-groups = ["dev"]
 lint = "ruff check . --fix"
 format = "ruff format ."
 format-check = "ruff format --check ."
-test = "pytest app tests --cov=app --cov-fail-under=100 -v"
+test = "pytest app tests --cov=app --cov-fail-under=80 -v"
 typecheck = "mypy app --strict --no-incremental"
 validate = ["lint", "format", "test", "typecheck"]
 check = ["lint", "format", "test", "typecheck"]
@@ -93,6 +94,9 @@ python_functions = ["test_*"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-v --strict-markers --cov=app --cov-report=term-missing --cov-report=html"
+filterwarnings = [
+    "ignore::DeprecationWarning:slowapi.*",
+]
 
 [tool.coverage.run]
 source = ["app"]

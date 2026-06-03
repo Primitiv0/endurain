@@ -281,7 +281,7 @@ class TestSignupEndpoint:
             json={},
         )
 
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     @patch("sign_up_tokens.router.users_crud.create_signup_user")
     @patch("sign_up_tokens.router.server_settings_utils.get_server_settings_or_404")
@@ -528,7 +528,7 @@ class TestVerifyEmailEndpoint:
             json={},
         )
 
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     @patch(
         "sign_up_tokens.router.notifications_utils.create_admin_new_sign_up_approval_request_notification",

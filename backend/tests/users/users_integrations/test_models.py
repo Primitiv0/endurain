@@ -58,8 +58,7 @@ class TestUsersIntegrationsModel:
             "strava_refresh_token",
             "strava_token_expires_at",
             "strava_sync_gear",
-            "garminconnect_oauth1",
-            "garminconnect_oauth2",
+            "garminconnect_token",
             "garminconnect_sync_gear",
         ]
 
@@ -96,8 +95,7 @@ class TestUsersIntegrationsModel:
         """
         # Arrange
         garmin_columns = [
-            "garminconnect_oauth1",
-            "garminconnect_oauth2",
+            "garminconnect_token",
         ]
 
         # Assert
@@ -171,16 +169,14 @@ class TestUsersIntegrationsModelStructure:
         column = UsersIntegrations.__table__.columns["strava_token_expires_at"]
         assert isinstance(column.type, DateTime)
 
-    def test_users_integrations_garminconnect_oauth_json_type(self):
-        """Test that garminconnect_oauth columns are JSON type.
+    def test_users_integrations_garminconnect_token_json_type(self):
+        """Test that garminconnect_token column is JSON type.
 
         Asserts:
-            - Columns are JSON type for dict storage
+            - Column is JSON type for dict storage
         """
         # Assert
         from sqlalchemy import JSON
 
-        oauth1_col = UsersIntegrations.__table__.columns["garminconnect_oauth1"]
-        oauth2_col = UsersIntegrations.__table__.columns["garminconnect_oauth2"]
-        assert isinstance(oauth1_col.type, JSON)
-        assert isinstance(oauth2_col.type, JSON)
+        token_col = UsersIntegrations.__table__.columns["garminconnect_token"]
+        assert isinstance(token_col.type, JSON)

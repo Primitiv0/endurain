@@ -65,7 +65,7 @@ class TestRequestPasswordReset:
             json={"email": "not-an-email"},
         )
 
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_request_password_reset_missing_email(
         self,
@@ -77,7 +77,7 @@ class TestRequestPasswordReset:
             json={},
         )
 
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     @patch(
         "password_reset_tokens.router.password_reset_tokens_utils.send_password_reset_email",
@@ -205,7 +205,7 @@ class TestConfirmPasswordReset:
             },
         )
 
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     def test_confirm_password_reset_missing_token(
         self,
@@ -217,7 +217,7 @@ class TestConfirmPasswordReset:
             json={"new_password": "new-secure-pass"},
         )
 
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
     @patch(
         "password_reset_tokens.router.password_reset_tokens_utils.use_password_reset_token",

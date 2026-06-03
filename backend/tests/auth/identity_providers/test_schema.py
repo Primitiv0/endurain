@@ -1,6 +1,6 @@
 """Tests for identity_providers.schema module."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from auth.identity_providers.schema import (
@@ -388,7 +388,7 @@ class TestIdentityProvider:
             - All fields including id and timestamps are set
         """
         # Arrange
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Act
         idp = IdentityProvider(
@@ -424,8 +424,8 @@ class TestIdentityProvider:
                 name="Test",
                 slug="test",
                 client_id="client-123",
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
         assert "id" in str(exc_info.value)
@@ -450,7 +450,7 @@ class TestIdentityProvider:
             - Encrypted client_id (starting with 'gAAAAAB') triggers decryption
         """
         # Arrange
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         encrypted_id = "gAAAAABtest_encrypted_token"
 
         # Act
@@ -473,7 +473,7 @@ class TestIdentityProvider:
             - Non-encrypted client_id is returned as-is
         """
         # Arrange
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         plain_id = "plain-client-id"
 
         # Act
@@ -496,7 +496,7 @@ class TestIdentityProvider:
             - None client_id returns None
         """
         # Arrange
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Act
         idp = IdentityProvider(
@@ -798,7 +798,7 @@ class TestTokenExchangeResponse:
         # Arrange
         from unittest.mock import patch
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         idp_data = {
             "id": 1,

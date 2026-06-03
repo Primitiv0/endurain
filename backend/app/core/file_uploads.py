@@ -290,6 +290,12 @@ def _resolve_upload_path(upload_dir: str, filename: str) -> Path:
             detail="Invalid filename",
         )
 
+    if "\x00" in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
     upload_root = Path(upload_dir).resolve()
     file_path = (upload_root / filename).resolve()
     try:

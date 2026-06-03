@@ -21,6 +21,9 @@ class TestReadHealthTargetsAll:
         mock_targets.weight = 75.5
         mock_targets.steps = 10000
         mock_targets.sleep = 28800
+        mock_targets.fasting = None
+        mock_targets.water_ml = None
+        mock_targets.poop_count = None
 
         mock_get_targets.return_value = mock_targets
 
@@ -67,6 +70,9 @@ class TestReadHealthTargetsAll:
         mock_targets.weight = 75.5
         mock_targets.steps = None
         mock_targets.sleep = None
+        mock_targets.fasting = None
+        mock_targets.water_ml = None
+        mock_targets.poop_count = None
 
         mock_get_targets.return_value = mock_targets
 
@@ -101,6 +107,9 @@ class TestUpdateHealthTargets:
         mock_updated_targets.weight = 80.0
         mock_updated_targets.steps = 12000
         mock_updated_targets.sleep = 32400
+        mock_updated_targets.fasting = None
+        mock_updated_targets.water_ml = None
+        mock_updated_targets.poop_count = None
 
         mock_edit.return_value = mock_updated_targets
 
@@ -136,6 +145,9 @@ class TestUpdateHealthTargets:
         mock_updated_targets.weight = 75.0
         mock_updated_targets.steps = 10000
         mock_updated_targets.sleep = 28800
+        mock_updated_targets.fasting = None
+        mock_updated_targets.water_ml = None
+        mock_updated_targets.poop_count = None
 
         mock_edit.return_value = mock_updated_targets
 
@@ -167,6 +179,9 @@ class TestUpdateHealthTargets:
         mock_updated_targets.weight = None
         mock_updated_targets.steps = None
         mock_updated_targets.sleep = None
+        mock_updated_targets.fasting = None
+        mock_updated_targets.water_ml = None
+        mock_updated_targets.poop_count = None
 
         mock_edit.return_value = mock_updated_targets
 
@@ -227,6 +242,9 @@ class TestUpdateHealthTargets:
         mock_updated_targets.weight = 85.5
         mock_updated_targets.steps = 15000
         mock_updated_targets.sleep = 36000
+        mock_updated_targets.fasting = None
+        mock_updated_targets.water_ml = None
+        mock_updated_targets.poop_count = None
 
         mock_edit.return_value = mock_updated_targets
 

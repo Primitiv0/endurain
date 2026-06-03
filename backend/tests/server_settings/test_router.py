@@ -7,7 +7,6 @@ including read, update, and file upload operations.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
 from fastapi import HTTPException, status
@@ -41,6 +40,7 @@ class TestReadServerSettings:
         mock_settings.password_length_regular_users = 8
         mock_settings.password_length_admin_users = 12
         mock_settings.tileserver_api_key = None
+        mock_settings.tileserver_regenerate_thumbnails_on_change = False
 
         mock_get_settings.return_value = mock_settings
 
@@ -147,6 +147,7 @@ class TestEditServerSettings:
         mock_updated_settings.password_length_regular_users = 10
         mock_updated_settings.password_length_admin_users = 15
         mock_updated_settings.tileserver_api_key = None
+        mock_updated_settings.tileserver_regenerate_thumbnails_on_change = False
 
         mock_edit_settings.return_value = mock_updated_settings
 
@@ -178,7 +179,7 @@ class TestEditServerSettings:
         )
 
         # Assert
-        assert response.status_code == 201
+        assert response.status_code == 200
         data = response.json()
         assert data["units"] == "imperial"
         assert data["num_records_per_page"] == 50
@@ -221,21 +222,6 @@ class TestEditServerSettings:
 
         # Assert
         assert response.status_code == 404
-
-
-class TestUploadLoginPhoto:
-    """Test suite for upload_login_photo endpoint."""
-
-    @pytest.mark.skip(reason="Complex async file upload mocking - tested via integration tests")
-    def test_upload_login_photo_success(
-        self,
-        fast_api_client,
-        fast_api_app,
-    ):
-        """Test successful upload of login photo."""
-        # This endpoint requires complex async file I/O mocking
-        # File upload functionality is better tested via integration tests
-        pass
 
 
 class TestDeleteLoginPhoto:

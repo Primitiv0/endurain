@@ -103,4 +103,4 @@ class TestUserIdentityProviderModel:
         # Assert
         # Model should have indexes (at minimum on user_id, idp_id)
         # Indexes are configured at the database schema level
-        assert mapper.mapped_table is not None
+        assert mapper.persist_selectable is not None

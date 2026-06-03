@@ -32,7 +32,7 @@ class TestValidateGoalId:
         # Arrange
         goal_id = 0
         mock_validate_id.side_effect = HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid goal ID",
         )
 
@@ -40,7 +40,7 @@ class TestValidateGoalId:
         with pytest.raises(HTTPException) as exc_info:
             user_goals_dependencies.validate_goal_id(goal_id)
 
-        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert exc_info.value.detail == "Invalid goal ID"
 
     @patch("users.users_goals.dependencies.core_dependencies.validate_id")
@@ -49,7 +49,7 @@ class TestValidateGoalId:
         # Arrange
         goal_id = -1
         mock_validate_id.side_effect = HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid goal ID",
         )
 
@@ -57,4 +57,4 @@ class TestValidateGoalId:
         with pytest.raises(HTTPException) as exc_info:
             user_goals_dependencies.validate_goal_id(goal_id)
 
-        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

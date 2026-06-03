@@ -135,16 +135,3 @@ class TestWebSocketEndpoint:
         assert mock_manager.disconnect.call_count == 2
         mock_manager.disconnect.assert_any_call(1)
         mock_manager.disconnect.assert_any_call(2)
-
-    @pytest.mark.skip(
-        reason="Complex test requiring WebSocket protocol understanding - "
-        "endpoint behavior verified through integration tests"
-    )
-    async def test_websocket_endpoint_send_receive_cycle(self, mock_websocket, mock_manager):
-        """
-        Test bidirectional communication (complex WebSocket protocol).
-
-        This test is skipped as it requires deep WebSocket protocol mocking.
-        The endpoint is primarily receive-only in current implementation.
-        """
-        pass

@@ -305,7 +305,7 @@ class TestCSRFMiddlewareSameSiteCookie:
         response = client.post(
             "/api/v1/test/post",
             headers={"X-Client-Type": "web", "X-CSRF-Token": "header-only-token"},
-            cookies={},  # Explicitly no cookies
+            # No cookies needed per-request
         )
         assert response.status_code == 200
         assert response.json() == {"message": "POST success"}
@@ -319,18 +319,20 @@ class TestCSRFMiddlewareSameSiteCookie:
             - Cookie-based CSRF (old model) is not checked
         """
         # Request with CSRF cookie but no header - should fail
+        client.cookies.set("csrf_token", "cookie-csrf-token")
         response = client.post(
             "/api/v1/test/post",
             headers={"X-Client-Type": "web"},
-            cookies={"csrf_token": "cookie-csrf-token"},
         )
         assert response.status_code == 403
         assert response.json() == {"detail": "CSRF token required"}
 
         # Request with both cookie and header - header wins
+        client.cookies.clear()
+        client.cookies.set("csrf_token", "different-cookie-csrf-token")
         response = client.post(
             "/api/v1/test/post",
             headers={"X-Client-Type": "web", "X-CSRF-Token": "header-csrf-token"},
-            cookies={"csrf_token": "different-cookie-csrf-token"},
+            # Cookie already set on client instance above
         )
         assert response.status_code == 200

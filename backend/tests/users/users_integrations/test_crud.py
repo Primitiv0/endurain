@@ -508,19 +508,17 @@ class TestLinkGarminConnectAccount:
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
-        oauth1 = {"token": "oauth1_token"}
-        oauth2 = {"token": "oauth2_token"}
+        token = {"token": "garmin_token"}
 
         with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
             # Act
-            user_integrations_crud.link_garminconnect_account(1, oauth1, oauth2, mock_db)
+            user_integrations_crud.link_garminconnect_account(1, token, mock_db)
 
         # Assert
-        assert mock_integrations.garminconnect_oauth1 == oauth1
-        assert mock_integrations.garminconnect_oauth2 == oauth2
+        assert mock_integrations.garminconnect_token == token
         mock_db.commit.assert_called_once()
 
     def test_link_garminconnect_account_not_found(self, mock_db):
@@ -538,7 +536,7 @@ class TestLinkGarminConnectAccount:
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
-                user_integrations_crud.link_garminconnect_account(1, {}, {}, mock_db)
+                user_integrations_crud.link_garminconnect_account(1, {}, mock_db)
 
             assert exc_info.value.status_code == 404
 
@@ -614,8 +612,7 @@ class TestUnlinkGarminConnectAccount:
             user_integrations_crud.unlink_garminconnect_account(1, mock_db)
 
         # Assert
-        assert mock_integrations.garminconnect_oauth1 is None
-        assert mock_integrations.garminconnect_oauth2 is None
+        assert mock_integrations.garminconnect_token is None
         assert mock_integrations.garminconnect_sync_gear is False
         mock_db.commit.assert_called_once()
 
@@ -895,7 +892,7 @@ class TestLinkGarminConnectAccountDBError:
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
-                user_integrations_crud.link_garminconnect_account(1, {"key": "value"}, {"key": "value"}, mock_db)
+                user_integrations_crud.link_garminconnect_account(1, {"key": "value"}, mock_db)
 
             assert exc_info.value.status_code == 500
             mock_db.rollback.assert_called_once()

@@ -37,6 +37,7 @@ class TestReadPublicServerSettings:
         mock_settings.password_type = "strict"
         mock_settings.password_length_regular_users = 8
         mock_settings.password_length_admin_users = 12
+        mock_settings.tileserver_regenerate_thumbnails_on_change = False
 
         mock_get_settings.return_value = mock_settings
 
