@@ -18,6 +18,7 @@ import os
 import stat
 import threading
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Annotated, Self
 
 import core.logger as core_logger
@@ -466,13 +467,15 @@ def _is_safe_path(file_path: Path) -> bool:
         allowed_prefixes = [
             "/run/secrets/",  # Standard Docker secrets mount point
             "/var/run/secrets/",  # Alternative Docker secrets location
-            "/tmp/",  # For testing/development  # noqa: S108  # TODO(https://codeberg.org/endurain-project/endurain/issues/642)
             "/secrets/",  # Custom secrets directory
         ]
 
         # For development, also allow paths in the working directory.
         if settings.ENVIRONMENT == "development":
-            cwd = Path.cwd()
+            tmp_dir = Path(gettempdir()).resolve()
+            allowed_prefixes.append(f"{tmp_dir}/")
+
+            cwd = Path.cwd().resolve()
             try:
                 file_path.relative_to(cwd)
                 return True
