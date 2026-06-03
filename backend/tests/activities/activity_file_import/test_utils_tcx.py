@@ -1,24 +1,7 @@
 """Tests for TCX activity file import utilities."""
 
-# ruff: noqa: E402  # TODO: https://codeberg.org/endurain-project/endurain/issues/641
-
-import sys
 from datetime import UTC, datetime
-from types import ModuleType, SimpleNamespace
-from unittest.mock import MagicMock
-
-safeuploads_stub = ModuleType("safeuploads")
-safeuploads_exceptions_stub = ModuleType("safeuploads.exceptions")
-
-
-class _FileValidationError(Exception):
-    """Test stub for safeuploads file validation errors."""
-
-
-safeuploads_stub.FileValidator = MagicMock
-safeuploads_exceptions_stub.FileValidationError = _FileValidationError
-sys.modules.setdefault("safeuploads", safeuploads_stub)
-sys.modules.setdefault("safeuploads.exceptions", safeuploads_exceptions_stub)
+from types import SimpleNamespace
 
 import activities.activity_file_import.utils_tcx as utils_tcx
 

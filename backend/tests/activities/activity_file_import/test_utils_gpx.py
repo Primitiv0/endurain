@@ -1,31 +1,14 @@
 """Tests for GPX activity file import utilities."""
 
-# ruff: noqa: E402  # TODO: https://codeberg.org/endurain-project/endurain/issues/641
-
-import sys
 from datetime import datetime, timedelta
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 from unittest.mock import MagicMock
-
-import gpxpy
-import pytest
-from geopy.distance import geodesic
-
-safeuploads_stub = ModuleType("safeuploads")
-safeuploads_exceptions_stub = ModuleType("safeuploads.exceptions")
-
-
-class _FileValidationError(Exception):
-    """Test stub for safeuploads file validation errors."""
-
-
-safeuploads_stub.FileValidator = MagicMock
-safeuploads_exceptions_stub.FileValidationError = _FileValidationError
-sys.modules.setdefault("safeuploads", safeuploads_stub)
-sys.modules.setdefault("safeuploads.exceptions", safeuploads_exceptions_stub)
 
 import activities.activity.utils as activities_utils
 import activities.activity_file_import.utils_gpx as utils_gpx
+import gpxpy
+import pytest
+from geopy.distance import geodesic
 
 
 def _privacy_settings() -> SimpleNamespace:

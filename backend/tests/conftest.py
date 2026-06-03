@@ -1,31 +1,17 @@
-# ruff: noqa: E402  # TODO: https://codeberg.org/endurain-project/endurain/issues/641
-
 import contextlib
-import os
-import sys
 from importlib import import_module
-from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
-from dotenv import load_dotenv
-from fastapi import FastAPI, Request
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-
-# Load test environment variables from .env.test before importing app modules
-env_test_path = Path(__file__).parent.parent / ".env.test"
-load_dotenv(dotenv_path=env_test_path)
-
-# Add the app directory to the Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
 import auth.dependencies as auth_dependencies
 import auth.password_hasher as auth_password_hasher
 import auth.security as auth_security
 import auth.sessions.router as users_session_router
 import auth.token_manager as auth_token_manager
+import pytest
 import users.users.schema as user_schema
+from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 # Variables and constants
 DEFAULT_ROUTER_MODULES = [
