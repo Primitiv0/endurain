@@ -53,12 +53,12 @@ Committing should use clear messages following [Conventional Commits](https://ww
 
 **Format:** `<type>(<scope>)!: <description>` — `(<scope>)` and the breaking-change `!` are optional.
 
-The following rules are enforced automatically on every PR (against the PR title and every commit subject) by `.forgejo/workflows/conventional-commits.yml`. Generated commit messages must comply:
+The following rules are enforced automatically on every PR (against the PR title and every commit subject) by `.forgejo/workflows/conventional-commits.yml`. Validation follows the [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) spec, with a single project-policy addition (the allowed-type whitelist). Generated commit messages must comply:
 
-- **Allowed types:** `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`.
-- **Description** must start with a lowercase letter and must not end with a period.
-- **Header length** (first line) must be 72 characters or fewer.
-- **Scope** (optional) must be lowercase and may contain letters, digits, `-`, `_`, `.`, `/`, `,` or spaces.
+- **Header format:** `<type>(<scope>)!: <description>` — the `(<scope>)` and breaking-change `!` are optional, and a space is required after the colon.
+- **Allowed types (project policy):** `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Types are matched case-insensitively per the spec.
+- **Scope** (optional) is any non-empty string (no parentheses), per the spec.
+- **Description** is free-form text, per the spec (no lowercase requirement, no trailing-period restriction, no length limit).
 - **Breaking changes** are marked with `!` after the type/scope (e.g. `feat(api)!: ...`) or a `BREAKING CHANGE:` footer in the commit body.
 
 Examples:
