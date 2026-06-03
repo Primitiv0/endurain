@@ -75,7 +75,7 @@
 
 <script setup lang="ts">
 // Vue composition API
-import { ref, computed, onMounted, onUnmounted, type PropType } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 // Composables
 import { useBootstrapModal } from '@/composables/useBootstrapModal'
 // Types

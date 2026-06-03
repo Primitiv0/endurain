@@ -15,11 +15,7 @@
 
 <script setup>
 import { computed, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-
 import { notifications } from '@/services/notificationsService'
-
-const { t } = useI18n()
 const emit = defineEmits(['notificationRead'])
 const props = defineProps({
   notification: {

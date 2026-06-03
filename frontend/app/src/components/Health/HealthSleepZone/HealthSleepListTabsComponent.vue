@@ -314,7 +314,7 @@
 import { formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 import { getHrvStatusI18nKey, getScoreStatusI18nKey } from '@/utils/healthUtils'
 
-const props = defineProps({
+defineProps({
   userHealthSleep: {
     type: Object,
     required: true

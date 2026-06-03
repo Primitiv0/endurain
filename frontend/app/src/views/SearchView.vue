@@ -165,7 +165,7 @@
               <span v-else-if="searchSelectValue == 2">{{
                 formatDateMed(result.start_time_tz_applied)
               }}</span>
-              <span v-else="searchSelectValue == 3">{{
+              <span v-else-if="searchSelectValue == 3">{{
                 formatDateMed(result.created_at_tz_applied)
               }}</span>
             </div>
@@ -193,7 +193,6 @@ import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 // import lodash
 import { debounce } from 'lodash'
-import { useAuthStore } from '@/stores/authStore'
 import { users } from '@/services/usersService'
 import { gears } from '@/services/gearsService'
 import { activities } from '@/services/activitiesService'
@@ -207,7 +206,6 @@ import NoItemsFoundComponents from '@/components/GeneralComponents/NoItemsFoundC
 const emit = defineEmits(['collapseNavbar', 'toggleShowSearch'])
 
 // Setup composables
-const authStore = useAuthStore()
 const { t } = useI18n()
 
 // Reactive variables

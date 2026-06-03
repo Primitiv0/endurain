@@ -100,7 +100,7 @@ import ListPlaceholderComponent from '../PlaceholderComponents/ListPlaceholderCo
 import { health_sleep } from '@/services/health_sleepService'
 import { useServerSettingsStore } from '@/stores/serverSettingsStore'
 
-const props = defineProps({
+defineProps({
   isLoadingParent: {
     type: Boolean,
     required: true

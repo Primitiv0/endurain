@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-const props = defineProps({
+defineProps({
   activeSection: {
     type: String,
     required: true

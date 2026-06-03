@@ -393,7 +393,7 @@ function handleSubmit() {
       (props.gear && newEditGearInitialKms.value !== props.gear.initial_kms) ||
       props.action === 'add'
     ) {
-      newEditGearInitialMiles.value = kmToMiles(newEditGearInitialKms.initial_kms)
+      newEditGearInitialMiles.value = kmToMiles(newEditGearInitialKms.value.initial_kms)
     }
   } else {
     if (props.action === 'add') {

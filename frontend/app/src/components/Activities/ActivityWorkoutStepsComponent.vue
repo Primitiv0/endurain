@@ -335,17 +335,12 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-// Importing the components
-import LoadingComponent from '@/components/GeneralComponents/LoadingComponent.vue'
+import { computed } from 'vue'
 import { formatSecondsToHoursMinutesSeconds } from '@/utils/dateTimeUtils'
 import { formatPaceMetric } from '@/utils/activityUtils'
 import { metersToKm } from '@/utils/unitsUtils'
 
 export default {
-  components: {
-    LoadingComponent
-  },
   props: {
     activity: {
       type: Object,

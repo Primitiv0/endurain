@@ -60,7 +60,9 @@
               :required="requireStringField"
               v-if="requireStringField"
             />
-            <small v-if="stringHint && requireStringField" class="form-text text-muted">{{ stringHint }}</small>
+            <small v-if="stringHint && requireStringField" class="form-text text-muted">{{
+              stringHint
+            }}</small>
 
             <p class="mt-2">* {{ requiredFieldText }}</p>
           </div>
@@ -82,7 +84,9 @@
                 'btn-warning': actionButtonType === 'warning',
                 'btn-primary': actionButtonType === 'primary'
               }"
-              :disabled="(requirePassword && !password) || (requireStringField && !stringValue) || isLoading"
+              :disabled="
+                (requirePassword && !password) || (requireStringField && !stringValue) || isLoading
+              "
               :aria-label="actionButtonText"
             >
               <span

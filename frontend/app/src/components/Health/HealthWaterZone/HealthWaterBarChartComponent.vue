@@ -74,8 +74,6 @@ const chartData = computed(() => {
     labels.push(`${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`)
   }
 
-  const unit = isImperial ? t('generalItems.unitsFlOz') : t('generalItems.unitsMl')
-
   const datasets = [
     {
       label: t('healthWaterZoneComponent.labelWaterMl'),

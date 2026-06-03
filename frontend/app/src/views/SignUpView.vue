@@ -301,7 +301,7 @@
  * preferences, and physical attributes. Supports both metric and imperial unit systems.
  */
 
-import { ref, computed, onMounted, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, type Router } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'

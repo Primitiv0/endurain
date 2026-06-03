@@ -89,7 +89,7 @@
 // ============================================================================
 // Section 1: Imports
 // ============================================================================
-import { ref, onMounted, onUnmounted, watch, type Ref } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 

@@ -52,7 +52,7 @@ import {
   formatCalories
 } from '@/utils/activityUtils'
 
-const props = defineProps({
+defineProps({
   typeBreakdownData: {
     type: Array,
     required: true

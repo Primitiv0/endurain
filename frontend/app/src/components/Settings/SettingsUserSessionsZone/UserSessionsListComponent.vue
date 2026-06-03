@@ -72,7 +72,6 @@
 </template>
 
 <script>
-import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/authStore'
 import { formatDateMed, formatTime } from '@/utils/dateTimeUtils'

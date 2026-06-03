@@ -1,10 +1,4 @@
-import {
-  fetchGetRequest,
-  fetchPostRequest,
-  fetchPutRequest,
-  fetchDeleteRequest,
-  fetchPostFileRequest
-} from '@/utils/serviceUtils'
+import { fetchGetRequest, fetchPutRequest } from '@/utils/serviceUtils'
 
 export const userDefaultGear = {
   getUserDefaultGear() {

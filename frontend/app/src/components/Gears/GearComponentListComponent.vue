@@ -53,8 +53,12 @@
         <span> @ {{ formatDateMed(gearComponent.purchase_date) }}</span>
         <span v-if="gearComponent.purchase_value">
           - {{ gearComponent.purchase_value }}
-          <span v-if="authStore.user.currency === 'euro'">{{ $t('generalItems.currencyEuroSymbol') }}</span>
-          <span v-else-if="authStore.user.currency === 'dollar'">{{ $t('generalItems.currencyDollarSymbol') }}</span>
+          <span v-if="authStore.user.currency === 'euro'">{{
+            $t('generalItems.currencyEuroSymbol')
+          }}</span>
+          <span v-else-if="authStore.user.currency === 'dollar'">{{
+            $t('generalItems.currencyDollarSymbol')
+          }}</span>
           <span v-else>{{ $t('generalItems.currencyPoundSymbol') }}</span>
         </span>
         <br />
@@ -68,7 +72,9 @@
           }}{{ t('gearComponentListComponent.gearComponentOf')
           }}{{ formatSecondsToHours(gearComponent.expected_kms) }}</span
         >
-        <span v-if="gearComponent.retired_date"> @ {{ formatDateMed(gearComponent.retired_date) }}</span>
+        <span v-if="gearComponent.retired_date">
+          @ {{ formatDateMed(gearComponent.retired_date) }}</span
+        >
         <div
           v-if="gearComponent.expected_kms && gear.gear_type !== 4"
           class="progress"

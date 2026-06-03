@@ -125,7 +125,12 @@
               v-if="graphSelection === 'temp' && tempPresent"
             />
             <BarChartComponent
-              v-if="hrZones && Object.keys(hrZones).length > 0 && graphSelection === 'hrZones' && hrPresent"
+              v-if="
+                hrZones &&
+                Object.keys(hrZones).length > 0 &&
+                graphSelection === 'hrZones' &&
+                hrPresent
+              "
               :labels="hrChartData.labels"
               :values="hrChartData.values"
               :barColors="hrChartData.barColors"

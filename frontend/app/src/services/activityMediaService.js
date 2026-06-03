@@ -1,10 +1,4 @@
-import {
-  fetchGetRequest,
-  fetchPostFileRequest,
-  fetchDeleteRequest,
-  fetchPutRequest,
-  fetchPostRequest
-} from '@/utils/serviceUtils'
+import { fetchGetRequest, fetchPostFileRequest, fetchDeleteRequest } from '@/utils/serviceUtils'
 
 export const activityMedia = {
   // Activity media authenticated

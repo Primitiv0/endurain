@@ -137,19 +137,20 @@
             </li>
           </ul>
           <!-- list zone -->
-          <ul
-            class="list-group list-group-flush"
-            v-for="goal in goalsArray"
-            :key="goal.id"
-            :goal="goal"
-            v-if="goalsArray && goalsArray.length"
-          >
-            <GoalsListComponent
+          <template v-if="goalsArray && goalsArray.length">
+            <ul
+              class="list-group list-group-flush"
+              v-for="goal in goalsArray"
+              :key="goal.id"
               :goal="goal"
-              @goalDeleted="updateGoalList"
-              @editedGoal="editGoalList"
-            />
-          </ul>
+            >
+              <GoalsListComponent
+                :goal="goal"
+                @goalDeleted="updateGoalList"
+                @editedGoal="editGoalList"
+              />
+            </ul>
+          </template>
           <NoItemsFoundComponents
             :show-shadow="false"
             v-if="goalsArray.length === 0 && hasActiveFilters"
@@ -226,7 +227,9 @@ async function fetchGoals(): Promise<void> {
     if (selectedGoalType.value) filters.goal_type = selectedGoalType.value
     if (selectedInterval.value) filters.interval = selectedInterval.value
 
-    goalsArray.value = await (userGoalService as any).getUserGoals(filters)
+    goalsArray.value = await (userGoalService.getUserGoals as (filters: object) => Promise<Goal[]>)(
+      filters
+    )
   } catch (error) {
     push.error(`${t('settingsUserGoalsZone.errorFetchingGoals')} - ${error}`)
   } finally {

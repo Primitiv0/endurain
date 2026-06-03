@@ -72,7 +72,7 @@ import { useBootstrapModal } from '@/composables/useBootstrapModal'
 // Types
 import type { ActionButtonType } from '@/types'
 
-const props = defineProps({
+defineProps({
   modalId: {
     type: String,
     required: true

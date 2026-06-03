@@ -42,7 +42,13 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const serverSettingsStore = useServerSettingsStore()
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
-const units = ref('metric')
+const units = computed(() => {
+  if (authStore.isAuthenticated && authStore.user) {
+    return authStore.user.units ?? 'metric'
+  }
+  return serverSettingsStore.serverSettings.units ?? 'metric'
+})
+
 let myChart: Chart | null = null
 
 /**
@@ -148,12 +154,6 @@ const computedChartData = computed(() => {
   let label = ''
   const cadData: number[] = []
   const labels: string[] = []
-
-  if (authStore.isAuthenticated && authStore.user) {
-    units.value = authStore.user.units ?? 'metric'
-  } else {
-    units.value = serverSettingsStore.serverSettings.units ?? 'metric'
-  }
 
   for (const stream of props.activityStreams) {
     // Save Cadence (Stroke Rate) data for swimming rest detection
@@ -280,8 +280,11 @@ const computedChartData = computed(() => {
       }
     } else if (stream.stream_type === 8 && props.graphSelection === 'temp') {
       for (const streamPoint of stream.stream_waypoints) {
-        let rawTemp = (streamPoint.temp !== undefined && streamPoint.temp !== null) ? Number(streamPoint.temp) : null
-        
+        const rawTemp =
+          streamPoint.temp !== undefined && streamPoint.temp !== null
+            ? Number(streamPoint.temp)
+            : null
+
         if (rawTemp !== null) {
           if (units.value === 'metric') {
             data.push(rawTemp)

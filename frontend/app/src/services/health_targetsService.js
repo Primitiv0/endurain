@@ -1,9 +1,4 @@
-import {
-  fetchGetRequest,
-  fetchPostRequest,
-  fetchPutRequest,
-  fetchDeleteRequest
-} from '@/utils/serviceUtils'
+import { fetchGetRequest, fetchPutRequest } from '@/utils/serviceUtils'
 
 export const health_targets = {
   getUserHealthTargets() {

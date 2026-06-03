@@ -277,7 +277,7 @@ const initMap = () => {
     attribution: serverSettingsStore.serverSettings.tileserver_attribution
   }).addTo(leafletMap.value)
 
-  const polyline = L.polyline(latlngs, {
+  L.polyline(latlngs, {
     color: '#2563eb',
     weight: 4,
     opacity: 0.8,
@@ -311,7 +311,7 @@ const initMap = () => {
 
 watch(
   () => props.activityActivityMedia,
-  async (newVal, oldVal) => {
+  async () => {
     await nextTick() // wait for DOM to update with the new v-if block
     if (activityStreamLatLng.value) {
       initMap()

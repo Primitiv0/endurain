@@ -87,7 +87,7 @@ interface DateRange {
   endDate: string
 }
 
-const props = defineProps({
+defineProps({
   modalId: {
     type: String,
     required: true

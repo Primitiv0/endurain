@@ -264,14 +264,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   userDeleted: [userId: number]
-  editedUser: [editedUser: any]
+  editedUser: [editedUser: { id: number; [key: string]: unknown }]
   approvedUser: [userId: number]
+  decrementedExternalAuthCount: [userId: number]
 }>()
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const userDetails = ref(false)
-const userSessions: Ref<any[]> = ref([])
+const userSessions: Ref<{ id: string; [key: string]: unknown }[]> = ref([])
 const userIdps: Ref<UserIdentityProviderEnriched[]> = ref([])
 const isLoadingSessions = ref(true)
 const isLoadingIdps = ref(false)
@@ -286,7 +287,7 @@ async function submitDeleteUser() {
   }
 }
 
-function editUserList(editedUser: any) {
+function editUserList(editedUser: { id: number; [key: string]: unknown }) {
   emit('editedUser', editedUser)
 }
 
@@ -324,9 +325,7 @@ async function updateIdpListDeleted(idpId: number) {
     userIdps.value = userIdps.value.filter((idp) => idp.idp_id !== idpId)
 
     // Update the external_auth_count badge
-    if (props.user.external_auth_count && props.user.external_auth_count > 0) {
-      props.user.external_auth_count--
-    }
+    emit('decrementedExternalAuthCount', props.user.id)
 
     push.success(t('usersListComponent.userIdpDeleteSuccessMessage'))
   } catch (error) {

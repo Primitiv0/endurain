@@ -23,7 +23,9 @@
             class="btn position-absolute top-50 end-0 translate-middle-y"
             @click="toggleCurrentPasswordVisibility"
           >
-            <font-awesome-icon :icon="showCurrentPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']" />
+            <font-awesome-icon
+              :icon="showCurrentPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']"
+            />
           </button>
         </div>
 
@@ -130,7 +132,15 @@
         <button
           type="submit"
           class="btn btn-success"
-          :disabled="!currentPassword || !newPassword || !newPasswordRepeat || !isNewPasswordValid || !isNewPasswordRepeatValid || !isPasswordMatch || (mfaEnabled && !mfaCode)"
+          :disabled="
+            !currentPassword ||
+            !newPassword ||
+            !newPasswordRepeat ||
+            !isNewPasswordValid ||
+            !isNewPasswordRepeatValid ||
+            !isPasswordMatch ||
+            (mfaEnabled && !mfaCode)
+          "
           name="editUserPassword"
         >
           {{ $t('settingsSecurityZone.subtitleChangePassword') }}
@@ -366,7 +376,11 @@
         ref="idpUnlinkModalRef"
         modalId="idpUnlinkStepUpModal"
         :title="t('settingsSecurityZone.unlinkModalTitle')"
-        :description="t('settingsSecurityZone.unlinkModalConfirmation', { providerName: pendingUnlinkProviderName })"
+        :description="
+          t('settingsSecurityZone.unlinkModalConfirmation', {
+            providerName: pendingUnlinkProviderName
+          })
+        "
         :passwordLabel="t('settingsSecurityZone.changeUserPasswordCurrentPasswordLabel')"
         passwordAutocomplete="current-password"
         :stringLabel="t('settingsSecurityZone.mfaVerificationCodeLabel')"
@@ -816,7 +830,10 @@ async function completeUnlinkAccount({ password, stringValue }) {
       push.error(t('settingsSecurityZone.unlinkAccountRateLimitError'))
     } else if (errorMessage.includes('401')) {
       push.error(t('settingsSecurityZone.unlinkAccountCredentialsError'))
-    } else if (errorMessage.includes('last authentication method') || errorMessage.includes('400')) {
+    } else if (
+      errorMessage.includes('last authentication method') ||
+      errorMessage.includes('400')
+    ) {
       push.error(t('settingsSecurityZone.unlinkAccountLastMethodError'))
     } else {
       push.error(`${t('settingsSecurityZone.unlinkAccountError')} - ${errorMessage}`)

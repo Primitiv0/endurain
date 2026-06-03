@@ -29,11 +29,20 @@ export function useBootstrapModal() {
    * Handles both component refs (`modalRef.value.$el`) and template refs (`modalRef.value`).
    * Sets up automatic cleanup on modal hide event.
    */
-  const initializeModal = async (modalRef: Ref<any>): Promise<void> => {
+  const initializeModal = async (modalRef: Ref<unknown>): Promise<void> => {
     await nextTick()
 
-    // Handle both component refs (modalRef.value.$el) and template refs (modalRef.value)
-    const element = modalRef.value?.$el || modalRef.value
+    const refValue = modalRef.value
+
+    if (!refValue) {
+      console.error('Modal element not found in ref')
+      return
+    }
+
+    // Handle both component refs (refValue.$el) and template refs (refValue is the element)
+    const maybeEl =
+      refValue instanceof Element ? refValue : (refValue as Record<string, unknown>)['$el']
+    const element = maybeEl instanceof Element ? maybeEl : null
 
     if (!element) {
       console.error('Modal element not found in ref')

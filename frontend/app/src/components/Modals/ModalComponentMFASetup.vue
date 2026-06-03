@@ -90,7 +90,9 @@
                     'btn-warning': actionButtonType === 'warning',
                     'btn-primary': actionButtonType === 'primary'
                   }"
-                  :disabled="!verificationCode || (requirePassword && !currentPassword) || isLoading"
+                  :disabled="
+                    !verificationCode || (requirePassword && !currentPassword) || isLoading
+                  "
                   :aria-label="actionButtonText"
                 >
                   <span
@@ -186,7 +188,7 @@ const emit = defineEmits<{
   submitAction: [{ mfa_code: string; current_password: string | null }]
 }>()
 
-const { modalInstance, initializeModal, showModal, hideModal, disposeModal } = useBootstrapModal()
+const { initializeModal, showModal, hideModal, disposeModal } = useBootstrapModal()
 
 const modalRef = ref<HTMLDivElement | null>(null)
 const verificationCode = ref('')

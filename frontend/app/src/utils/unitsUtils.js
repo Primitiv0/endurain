@@ -69,4 +69,3 @@ export function flOzToMl(flOz) {
 export function celsiusToFahrenheit(celsius) {
   return Number(((celsius * 9) / 5 + 32).toFixed(1))
 }
-

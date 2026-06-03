@@ -621,7 +621,7 @@ const updateProvider = async (): Promise<void> => {
     } else {
       icon = formData.value.icon
     }
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       name: formData.value.name,
       slug: formData.value.slug.toLowerCase(),
       provider_type: formData.value.provider_type,

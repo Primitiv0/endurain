@@ -454,9 +454,7 @@ onMounted(async () => {
     }
     await updateGearActivities()
     // Use backend-computed stats (total_distance in meters, total_time in seconds)
-    gearDistance.value = Math.floor(
-      (gear.value.total_distance || 0) / 1000
-    )
+    gearDistance.value = Math.floor((gear.value.total_distance || 0) / 1000)
     gearTime.value = gear.value.total_time || 0
     gearTotalValue.value = gear.value.total_components_cost || 0
     if (gear.value.purchase_value) {

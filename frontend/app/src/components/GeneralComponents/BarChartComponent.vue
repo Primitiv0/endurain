@@ -68,7 +68,7 @@ function renderChart() {
         },
         tooltip: { enabled: false },
         datalabels: {
-          backgroundColor: function (context) {
+          backgroundColor: function () {
             return 'black'
           },
           borderRadius: 4,

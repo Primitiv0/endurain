@@ -74,7 +74,7 @@ import {
 } from '@/utils/activityUtils'
 
 // Define props
-const props = defineProps({
+defineProps({
   activity: {
     type: Object,
     required: true

@@ -76,6 +76,7 @@
                 @userDeleted="updateUserList"
                 @editedUser="editUserList"
                 @approvedUser="approvedUserList"
+                @decrementedExternalAuthCount="decrementExternalAuthCount"
               />
             </ul>
 
@@ -192,6 +193,13 @@ function addUserList(createdUser) {
 function editUserList(editedUser) {
   const index = usersArray.value.findIndex((user) => user.id === editedUser.id)
   usersArray.value[index] = editedUser
+}
+
+function decrementExternalAuthCount(userId) {
+  const user = usersArray.value.find((u) => u.id === userId)
+  if (user && user.external_auth_count && user.external_auth_count > 0) {
+    user.external_auth_count--
+  }
 }
 
 function approvedUserList(userID) {

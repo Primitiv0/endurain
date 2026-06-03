@@ -605,9 +605,6 @@ const editSleepId = ref('')
 onMounted(() => {
   if (props.userHealthSleep) {
     const totalSleep = returnHoursMinutesFromSeconds(props.userHealthSleep.total_sleep_seconds ?? 0)
-    const unmeasurableSleep = returnHoursMinutesFromSeconds(
-      props.userHealthSleep.unmeasurable_sleep_seconds ?? 0
-    )
     const deepSleep = returnHoursMinutesFromSeconds(props.userHealthSleep.deep_sleep_seconds ?? 0)
     const lightSleep = returnHoursMinutesFromSeconds(props.userHealthSleep.light_sleep_seconds ?? 0)
     const remSleep = returnHoursMinutesFromSeconds(props.userHealthSleep.rem_sleep_seconds ?? 0)

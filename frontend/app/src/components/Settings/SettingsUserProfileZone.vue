@@ -883,7 +883,7 @@ async function updateDefaultGear() {
     await userDefaultGear.editUserDefaultGear(data)
 
     push.success(t('settingsUserProfileZone.successUpdateDefaultGear'))
-  } catch (error) {
+  } catch {
     push.error(t('settingsUserProfileZone.errorUpdateDefaultGear'))
   }
 }

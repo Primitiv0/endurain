@@ -166,7 +166,7 @@ export function getWeekEndDate(jsDate, firstDayOfWeek = 'monday') {
   return DateTime.fromJSDate(weekStart, { zone: 'utc' }).plus({ days: 7 }).toJSDate()
 }
 
-export function navigateWeek(currentDate, direction, firstDayOfWeek = 'monday') {
+export function navigateWeek(currentDate, direction) {
   return DateTime.fromJSDate(currentDate, { zone: 'utc' })
     .plus({ days: 7 * direction })
     .toJSDate()

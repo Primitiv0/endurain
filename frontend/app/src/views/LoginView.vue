@@ -454,7 +454,7 @@ const fetchSSOProviders = async (): Promise<void> => {
 
   try {
     ssoProviders.value = await identityProviders.getEnabledProviders()
-  } catch (error) {
+  } catch {
     ssoProviders.value = []
   } finally {
     loadingSSOProviders.value = false

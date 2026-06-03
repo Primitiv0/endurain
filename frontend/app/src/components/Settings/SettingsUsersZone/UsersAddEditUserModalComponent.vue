@@ -793,14 +793,7 @@ async function submitEditUserForm() {
       // Self-service profile endpoint enforces a strict allow-list and silently
       // drops administrative fields. Send only the fields the backend accepts so
       // the UI never implies these values were saved.
-      const {
-        id,
-        access_type,
-        active,
-        email_verified,
-        pending_admin_approval,
-        ...profileData
-      } = data
+      const { ...profileData } = data
       await profile.editProfile(profileData)
       updatedUser = await profile.getProfileInfo()
     } else {
@@ -824,7 +817,11 @@ async function submitEditUserForm() {
       emit('editedUser', data)
     }
     if (data.id === authStore.user.id || props.action === 'profile') {
-      authStore.setUser(props.action === 'profile' ? updatedUser : data, authStore.session_id, locale)
+      authStore.setUser(
+        props.action === 'profile' ? updatedUser : data,
+        authStore.session_id,
+        locale
+      )
     }
     push.success(t('usersAddEditUserModalComponent.addEditUserModalSuccessEditUser'))
   } catch (error) {

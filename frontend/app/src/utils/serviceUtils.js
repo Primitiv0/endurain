@@ -146,55 +146,6 @@ export async function attemptFetch(url, options, responseType = 'json') {
   return responseType === 'blob' ? response.blob() : response.json()
 }
 
-async function refreshAccessToken() {
-  if (refreshTokenPromise) {
-    return refreshTokenPromise
-  }
-
-  const url = 'refresh'
-  const authStore = useAuthStore()
-  const csrfToken = authStore.getCsrfToken()
-
-  const options = {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Client-Type': 'web'
-    }
-  }
-
-  // Add CSRF token if available (optional on initial load, required for subsequent refreshes)
-  if (csrfToken) {
-    options.headers['X-CSRF-Token'] = csrfToken
-  }
-
-  refreshTokenPromise = (async () => {
-    try {
-      const response = await attemptFetch(url, options)
-
-      // Update tokens in auth store
-      if (response.access_token) {
-        authStore.setAccessToken(response.access_token)
-      }
-      if (response.csrf_token) {
-        authStore.setCsrfToken(response.csrf_token)
-      }
-      if (response.session_id) {
-        authStore.setUserSessionId(response.session_id)
-      }
-
-      return response
-    } catch (error) {
-      throw error
-    } finally {
-      refreshTokenPromise = null
-    }
-  })()
-
-  return refreshTokenPromise
-}
-
 export async function fetchGetRequest(url, options = {}) {
   const requestOptions = {
     method: 'GET',

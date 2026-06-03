@@ -551,7 +551,7 @@ async function updateServerSettings() {
     serverSettingsStore.setServerSettings(data)
 
     push.success(t('settingsServerSettingsZoneComponent.successUpdateServerSettings'))
-  } catch (error) {
+  } catch {
     push.error(t('settingsServerSettingsZoneComponent.errorUpdateServerSettings'))
   }
 }

@@ -240,7 +240,7 @@ const submitConnectGarminConnect = async (): Promise<void> => {
     await garminConnect.linkGarminConnect(data)
 
     // Update user object with linked status
-    const user = { ...authStore.user } as any
+    const user = { ...authStore.user } as Record<string, unknown>
     user.is_garminconnect_linked = 1
     authStore.setUser(user, authStore.session_id, locale)
 

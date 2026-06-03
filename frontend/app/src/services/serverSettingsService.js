@@ -1,6 +1,5 @@
 import {
   fetchGetRequest,
-  fetchPostRequest,
   fetchPutRequest,
   fetchDeleteRequest,
   fetchPostFileRequest

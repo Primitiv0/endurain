@@ -94,9 +94,7 @@
                   @click="togglePasswordVisibility"
                   :aria-label="showPassword ? 'Hide password' : 'Show password'"
                 >
-                  <font-awesome-icon
-                    :icon="showPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']"
-                  />
+                  <font-awesome-icon :icon="showPassword ? ['fas', 'eye-slash'] : ['fas', 'eye']" />
                 </button>
               </div>
             </div>
@@ -213,13 +211,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits<{
-  submitAction: [{
-    name: string
-    scopes: string[]
-    expires_at: string | null
-    current_password: string | null
-    mfa_code: string | null
-  }]
+  submitAction: [
+    {
+      name: string
+      scopes: string[]
+      expires_at: string | null
+      current_password: string | null
+      mfa_code: string | null
+    }
+  ]
 }>()
 
 const { initializeModal, showModal, hideModal, disposeModal } = useBootstrapModal()

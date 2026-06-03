@@ -477,7 +477,7 @@ async function triggerDataFetch() {
     pageNumber.value = 1
     await fetchSummaryData()
     await updateActivities()
-  } catch (error) {
+  } catch {
     clearData({
       clearSummary: true,
       clearTypeBreakdown: true,
@@ -518,7 +518,7 @@ const summaryPeriodText = computed(() => {
     return t('summaryView.headerYear', { year: selectedYear.value })
   }
 
-  let date = new Date(selectedDate.value)
+  const date = new Date(selectedDate.value)
   // Handle month view type
   if (selectedViewType.value === 'month') {
     return date.toLocaleDateString(undefined, {
@@ -557,7 +557,7 @@ function navigatePeriod(direction) {
     if (selectedViewType.value === 'year') {
       selectedYear.value = selectedYear.value + direction
     } else {
-      let date = new Date(selectedDate.value)
+      const date = new Date(selectedDate.value)
       if (selectedViewType.value === 'week') {
         date.setUTCDate(date.getUTCDate() + 7 * direction)
       } else {

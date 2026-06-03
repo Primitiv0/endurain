@@ -16,14 +16,11 @@
 
 <script setup>
 import { computed, watch } from 'vue'
-// Importing the i18n
-import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/authStore'
 
 import { notifications } from '@/services/notificationsService'
 
 const authStore = useAuthStore()
-const { t } = useI18n()
 const emit = defineEmits(['notificationRead'])
 const props = defineProps({
   notification: {

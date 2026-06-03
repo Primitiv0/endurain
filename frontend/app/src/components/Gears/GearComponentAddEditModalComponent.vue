@@ -52,11 +52,7 @@
               v-model="newEditGearComponentType"
               required
             >
-              <option
-                v-for="type in componentTypes"
-                :key="type"
-                :value="type"
-              >
+              <option v-for="type in componentTypes" :key="type" :value="type">
                 {{ getComponentTypeLabel(type) }}
               </option>
             </select>

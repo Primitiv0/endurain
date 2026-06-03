@@ -20,18 +20,14 @@
 </template>
 
 <script setup>
-import { useI18n } from 'vue-i18n'
-// Import constants
 import { INTEGRATION_LOGOS } from '@/constants/integrationLogoConstants'
 
 import { formatDateShort } from '@/utils/dateTimeUtils'
 
-const props = defineProps({
+defineProps({
   userHealthSleep: {
     type: Object,
     required: true
   }
 })
-
-const { t } = useI18n()
 </script>

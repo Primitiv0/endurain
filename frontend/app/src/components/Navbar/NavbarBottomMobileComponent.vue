@@ -40,7 +40,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { push } from 'notivue'
 
@@ -106,7 +106,6 @@ async function fetchNotificationById(notificationId) {
 
 onMounted(async () => {
   if (authStore.user_websocket) {
-    authStore.user_websocket.on
     // Set up websocket message handler
     authStore.user_websocket.onmessage = async (event) => {
       try {
