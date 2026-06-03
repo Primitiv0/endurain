@@ -29,6 +29,8 @@ markdown_extensions:
       base_path: ["docs"]
 extra_css:
   - stylesheets/extra.css
+extra_javascript:
+  - assets/javascripts/secret-tools.js
 plugins:
   - blog
   - search
@@ -62,6 +64,7 @@ nav:
     - Supported types: developer-guide/supported-types.md
     - Import development notes: developer-guide/import-dev-notes.md
   - Gallery: gallery.md
+  - Tools: tools.md
   - Backend reference:
     - Activities:
       - Activity streams: reference/activities/activity_streams.md

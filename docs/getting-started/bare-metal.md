@@ -52,7 +52,7 @@ Copy the provided example.
 cp /path/to/endurain/.env.example /path/to/endurain/.env
 ```
 
-Generate your `SECRET_KEY` and `FERNET_KEY`. These keys are required for Endurain to work, so be sure to paste them into your `.env` file.
+Generate your `SECRET_KEY` and `FERNET_KEY`. These keys are required for Endurain to work, so be sure to paste them into your `.env` file. You can run the commands below or use the [Secret Generators](../tools.md#secret-generators) tool.
 
 ```bash
 openssl rand -hex 32 # SECRET_KEY

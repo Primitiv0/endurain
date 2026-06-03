@@ -30,8 +30,8 @@ services:
             - DB_HOST=postgres
             - DB_PORT=5432
             - DB_PASSWORD=changeme
-            - SECRET_KEY=changeme # openssl rand -hex 32
-            - FERNET_KEY=changeme # https://fernetkeygen.com or python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+            - SECRET_KEY=changeme # openssl rand -hex 32 or use the Tools page Secret Generators
+            - FERNET_KEY=changeme # openssl rand -base64 32 or use the Tools page Secret Generators
             - ENDURAIN_HOST=http://localhost:8080 # change if needed
             - BEHIND_PROXY=false
             - ENVIRONMENT=development
@@ -71,6 +71,8 @@ services:
             - 8081:8080
         restart: unless-stopped
 ```
+
+> Need values for `SECRET_KEY` and `FERNET_KEY`? Generate and copy them from the [Tools](../tools.md#secret-generators) page.
 
 - In the same folder, create a `.env` file that sets the data storage location:
 

@@ -36,8 +36,8 @@ Table below shows supported environment variables. Variables marked with optiona
 | DB_PASSWORD | No default set | `No` | Database password. Alternatively, use `DB_PASSWORD_FILE` for Docker secrets |
 | DB_DATABASE | endurain | Yes | N/A |
 | DB_SSLMODE | *(empty)* | Yes | Optional TLS mode for the PostgreSQL connection. Leave empty to disable (default — keeps local Postgres without SSL working). Accepted values match libpq: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full`. Recommended for any deployed environment: `require`. Most secure (validates CA + hostname): `verify-full` |
-| SECRET_KEY | No default set | `No` | Run `openssl rand -hex 32` on a terminal to get a secret. Alternatively, use `SECRET_KEY_FILE` for Docker secrets |
-| FERNET_KEY | No default set | `No` | Run `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on a terminal to get a secret or go to [https://fernetkeygen.com](https://fernetkeygen.com). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=`. Alternatively, use `FERNET_KEY_FILE` for Docker secrets |
+| SECRET_KEY | No default set | `No` | Run `openssl rand -hex 32` on a terminal or use the [Secret Generators](../tools.md#secret-generators) tool. Example output is `69b85208190c96821050d4ba980a8a95d928ab7e0ebf1a40b8ef6d09fd8367d3`. Alternatively, use `SECRET_KEY_FILE` for Docker secrets |
+| FERNET_KEY | No default set | `No` | Run `openssl rand -base64 32` on a terminal or use the base64 tool in the [Secret Generators](../tools.md#secret-generators). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=`. Alternatively, use `FERNET_KEY_FILE` for Docker secrets |
 | ALGORITHM | HS256 | Yes | Currently only HS256 is supported |
 | ACCESS_TOKEN_EXPIRE_MINUTES | 15 | Yes | Time in minutes |
 | REFRESH_TOKEN_EXPIRE_DAYS | 7 | Yes | Time in days |

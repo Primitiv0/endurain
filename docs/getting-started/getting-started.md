@@ -88,10 +88,10 @@ Here is an explanation of what you can set in the `.env`:
 Environment variable  | How to set it |
 | --- | --- |
 | LOCAL_PATH | Root directory for Docker volume mounts (activity files, images, logs, database data). Defaults to `/var/opt/endurain`. Set to any absolute path. |
-| DB_PASSWORD | Run `openssl rand -hex 32` on a terminal to get a secret |
+| DB_PASSWORD | Run `openssl rand -hex 32` on a terminal to get a secret, or use the [Secret Generators](../tools.md#secret-generators) tool |
 | POSTGRES_PASSWORD | Set the same value as DB_PASSWORD.|
-| SECRET_KEY | Run `openssl rand -hex 32` on a terminal to get a secret |
-| FERNET_KEY |Run `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` on a terminal to get a secret or go to [https://fernetkeygen.com](https://fernetkeygen.com). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=` |
+| SECRET_KEY | Run `openssl rand -hex 32` on a terminal to get a secret, or use the [Secret Generators](../tools.md#secret-generators) tool. Example output is `69b85208190c96821050d4ba980a8a95d928ab7e0ebf1a40b8ef6d09fd8367d3`. |
+| FERNET_KEY | Run `openssl rand -base64 32` on a terminal to get a secret, or use the base64 tool in the [Secret Generators](../tools.md#secret-generators). Example output is `7NfMMRSCWcoNDSjqBX8WoYH9nTFk1VdQOdZY13po53Y=`. |
 | TZ | Timezone definition. Insert your timezone. List of available time zones [here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). Format `Europe/Lisbon` expected |
 | ENDURAIN_HOST | https://endurain.yourdomain.com |
 | BEHIND_PROXY | Change to true if behind reverse proxy |

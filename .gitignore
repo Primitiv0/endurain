@@ -12,6 +12,9 @@ docker_forgejo_runner/data
 # Python
 __pycache__/
 
+# Docs
+site/
+
 # Tests, logs, coverage and distribution
 dev-dist/
 dist/
