@@ -1,0 +1,45 @@
+name: Backend tests
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - backend/**
+      - .forgejo/workflows/backend-tests.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ forgejo.workflow }}-${{ forgejo.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  backend-tests:
+    name: Backend (pytest)
+    runs-on: codeberg-small
+    steps:
+      - name: Checkout code
+        uses: https://data.forgejo.org/actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: https://data.forgejo.org/actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$FORGEJO_PATH"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Run backend tests
+        working-directory: backend
+        run: uv run pytest app tests --cov=app --cov-fail-under=45 -v
