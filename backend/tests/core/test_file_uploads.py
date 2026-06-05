@@ -19,7 +19,9 @@ from core.file_uploads import (
     _to_http_exception,
     extract_validated_zip,
     move_within,
+    resolve_storage_path,
     safe_remove_within,
+    save_file,
     save_validated_bytes,
     save_validated_upload,
     validate_bytes,
@@ -31,6 +33,7 @@ from safeuploads.exceptions import (
     ExtensionSecurityError,
     FilenameSecurityError,
     FileProcessingError,
+    FileSecurityError,
     FileSignatureError,
     FileSizeError,
     FileValidationError,
@@ -687,3 +690,453 @@ def test_safe_remove_within_missing_file_returns_false(tmp_path: Path):
     """A missing-but-contained path returns False without raising."""
     missing = tmp_path / "ghost.bin"
     assert safe_remove_within(missing, base_dir=tmp_path) is False
+
+
+# ---------------------------------------------------------------------------
+# _validator_for / _max_bytes_for: dispatch edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_validator_for_unknown_kind():
+    """An unrecognized UploadKind raises ValueError."""
+    with pytest.raises(ValueError, match="Unsupported UploadKind"):
+        core_file_uploads._validator_for("unknown")
+
+
+def test_max_bytes_for_image():
+    """IMAGE kind returns the expected byte cap."""
+    assert core_file_uploads._max_bytes_for(UploadKind.IMAGE) == 20 * 1024 * 1024
+
+
+def test_max_bytes_for_gzip():
+    """GZIP kind returns the expected byte cap."""
+    assert core_file_uploads._max_bytes_for(UploadKind.GZIP) == 200 * 1024 * 1024
+
+
+def test_max_bytes_for_unknown_kind():
+    """Unrecognized UploadKind raises ValueError."""
+    with pytest.raises(ValueError, match="Unsupported UploadKind"):
+        core_file_uploads._max_bytes_for("unknown")
+
+
+# ---------------------------------------------------------------------------
+# _to_http_exception: fallback branch
+# ---------------------------------------------------------------------------
+
+
+def test_to_http_exception_fallback():
+    """A plain FileSecurityError maps to 500."""
+    err = FileSecurityError("generic security error")
+    http_err = _to_http_exception(err)
+    assert http_err.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# _resolve_upload_path / resolve_storage_path: extra edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_upload_path_rejects_dotdot(tmp_path: Path):
+    """A bare '..' filename escapes via relative_to failure."""
+    with pytest.raises(HTTPException) as exc:
+        _resolve_upload_path(str(tmp_path), "..")
+    assert exc.value.status_code == 400
+
+
+def test_resolve_upload_path_rejects_nul_byte(tmp_path: Path):
+    """Filename containing NUL byte is rejected."""
+    with pytest.raises(HTTPException) as exc:
+        _resolve_upload_path(str(tmp_path), "bad\x00file")
+    assert exc.value.status_code == 400
+
+
+def test_resolve_storage_path(tmp_path: Path):
+    """Wrapper returns the same result as the internal function."""
+    resolved = resolve_storage_path(str(tmp_path), "ok.png")
+    assert resolved == _resolve_upload_path(str(tmp_path), "ok.png")
+
+
+# ---------------------------------------------------------------------------
+# save_file: bytes input + error handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_save_file_with_bytes(tmp_path: Path):
+    """save_file accepts raw bytes as input."""
+    path = await save_file(b"raw bytes content", str(tmp_path), "raw.bin")
+    assert Path(path).exists()
+    assert Path(path).read_bytes() == b"raw bytes content"
+
+
+@pytest.mark.asyncio
+async def test_save_file_generic_error(tmp_path: Path, monkeypatch):
+    """Non-HTTPException in save_file raises 500."""
+
+    async def fail_makedirs(*args: object, **kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(core_file_uploads.aiofiles.os, "makedirs", fail_makedirs)
+
+    with pytest.raises(HTTPException) as exc:
+        await save_file(b"data", str(tmp_path), "fail.bin")
+    assert exc.value.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# _bytes_to_path_sync: oversize + cleanup OSError
+# ---------------------------------------------------------------------------
+
+
+def test_bytes_to_path_sync_oversize(tmp_path: Path):
+    """Data exceeding max_bytes raises 413."""
+    destination = tmp_path / "test.bin"
+    with pytest.raises(HTTPException) as exc:
+        core_file_uploads._bytes_to_path_sync(b"x" * 100, destination, max_bytes=10)
+    assert exc.value.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_bytes_to_path_cleans_part_on_oserror(tmp_path: Path, monkeypatch):
+    """Part file cleanup handles OSError silently."""
+    gpx_bytes = _make_gpx_bytes()
+
+    def fail_replace(_src: object, _dst: object) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(core_file_uploads.os, "replace", fail_replace)
+
+    original_unlink = Path.unlink
+
+    def fail_unlink(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name.endswith(".part"):
+            raise OSError("permission denied")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+
+    with pytest.raises(HTTPException) as exc:
+        await save_validated_bytes(
+            gpx_bytes,
+            kind=UploadKind.ACTIVITY,
+            upload_dir=str(tmp_path),
+            filename="activity.gpx",
+        )
+    assert exc.value.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# _stream_to_path_sync: cleanup OSError
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_stream_to_path_handles_cleanup_oserror(tmp_path: Path, monkeypatch):
+    """OSError from part.unlink during stream cleanup is caught."""
+    payload = b"x" * 1024
+    upload = _upload("blob.bin", payload)
+    destination = tmp_path / "blob.bin"
+
+    def fail_replace(_src: object, _dst: object) -> None:
+        raise OSError("rename failed")
+
+    monkeypatch.setattr(core_file_uploads.os, "replace", fail_replace)
+
+    original_unlink = Path.unlink
+
+    def fail_unlink(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name.endswith(".part"):
+            raise OSError("permission denied")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+
+    with pytest.raises(OSError):
+        try:
+            await _stream_to_path(upload, destination, max_bytes=10 * 1024 * 1024)
+        finally:
+            await upload.close()
+
+
+# ---------------------------------------------------------------------------
+# save_validated_upload: generic error handler
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_save_validated_upload_generic_error(tmp_path: Path, monkeypatch):
+    """Non-HTTPException in save_validated_upload is wrapped in 500."""
+
+    async def fail_makedirs(*args: object, **kwargs: object) -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(core_file_uploads.aiofiles.os, "makedirs", fail_makedirs)
+
+    upload = _upload("ride.gpx", _make_gpx_bytes())
+    with pytest.raises(HTTPException) as exc:
+        try:
+            await save_validated_upload(
+                upload,
+                kind=UploadKind.ACTIVITY,
+                upload_dir=str(tmp_path),
+                filename="ride.gpx",
+            )
+        finally:
+            await upload.close()
+    assert exc.value.status_code == 500
+    assert "FILE_SAVE_FAILED" in str(exc.value.detail)
+
+
+# ---------------------------------------------------------------------------
+# delete_files_by_pattern: per-file and generic errors
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_files_by_pattern_no_files(tmp_path: Path):
+    """Pattern matching no files is a no-op."""
+    await core_file_uploads.delete_files_by_pattern(str(tmp_path), "*.nonexistent")
+
+
+@pytest.mark.asyncio
+async def test_delete_files_by_pattern_logs_per_file_oserror(tmp_path: Path, monkeypatch):
+    """OSError during individual file delete is caught and logged."""
+    target = tmp_path / "test.txt"
+    target.write_text("hello")
+
+    async def fail_remove(path: object, *args: object, **kwargs: object) -> None:
+        if "test.txt" in str(path):
+            raise OSError("permission denied")
+
+    monkeypatch.setattr(core_file_uploads.aiofiles.os, "remove", fail_remove)
+
+    await core_file_uploads.delete_files_by_pattern(str(tmp_path), "*.txt")
+
+
+@pytest.mark.asyncio
+async def test_delete_files_by_pattern_generic_error(tmp_path: Path, monkeypatch):
+    """Non-OSError exception during glob lookup is caught and logged."""
+
+    def fail_glob(_pattern: str) -> list[str]:
+        raise Exception("glob engine failed")
+
+    monkeypatch.setattr(core_file_uploads.glob, "glob", fail_glob)
+
+    await core_file_uploads.delete_files_by_pattern(str(tmp_path), "*.txt")
+
+
+# ---------------------------------------------------------------------------
+# _is_safe_extraction_target: NUL / self-target
+# ---------------------------------------------------------------------------
+
+
+def test_is_safe_extraction_target_nul_byte(tmp_path: Path):
+    """Entry name containing NUL byte is rejected."""
+    result = core_file_uploads._is_safe_extraction_target("bad\x00file", tmp_path)
+    assert result is None
+
+
+def test_is_safe_extraction_target_equals_dest(tmp_path: Path):
+    """Entry resolving to dest_dir itself is rejected."""
+    dest = tmp_path / "out"
+    dest.mkdir()
+    result = core_file_uploads._is_safe_extraction_target(".", dest)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# extract_validated_zip: directory entries / symlink / size caps / bad file
+# ---------------------------------------------------------------------------
+
+
+def _make_zip_with_dir_entry() -> bytes:
+    """ZIP containing a directory and a file entry."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("mydir/", b"")
+        zf.writestr("mydir/file.txt", b"content")
+    return buf.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_extract_validated_zip_skips_dir_entries(tmp_path: Path):
+    """Directory entries in ZIP are skipped."""
+    zip_path = tmp_path / "withdir.zip"
+    zip_path.write_bytes(_make_zip_with_dir_entry())
+    dest = tmp_path / "out"
+
+    extracted = await extract_validated_zip(zip_path, dest_dir=dest)
+    assert len(extracted) == 1
+    assert extracted[0].name == "file.txt"
+
+
+@pytest.mark.asyncio
+async def test_extract_validated_zip_rejects_symlink(tmp_path: Path):
+    """Symlink entries in ZIP are rejected."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        info = zipfile.ZipInfo("link.txt")
+        info.external_attr = 0o120777 << 16
+        zf.writestr(info, b"target")
+    zip_path = tmp_path / "symlink.zip"
+    zip_path.write_bytes(buf.getvalue())
+    dest = tmp_path / "out"
+
+    with pytest.raises(HTTPException) as exc:
+        await extract_validated_zip(zip_path, dest_dir=dest)
+    assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_extract_validated_zip_entry_size_exceeded(tmp_path: Path, monkeypatch):
+    """Entry exceeding max size is rejected with 413."""
+    monkeypatch.setattr(core_file_uploads, "_MAX_EXTRACTED_ENTRY_BYTES", 10)
+    payload = _build_zip_with_entries([("large.bin", b"x" * 100)])
+    zip_path = tmp_path / "large.zip"
+    zip_path.write_bytes(payload)
+    dest = tmp_path / "out"
+
+    with pytest.raises(HTTPException) as exc:
+        await extract_validated_zip(zip_path, dest_dir=dest)
+    assert exc.value.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_extract_validated_zip_total_size_exceeded(tmp_path: Path, monkeypatch):
+    """Total uncompressed size exceeding max is rejected with 413."""
+    monkeypatch.setattr(core_file_uploads, "_MAX_EXTRACTED_ENTRY_BYTES", 20)
+    monkeypatch.setattr(core_file_uploads, "_MAX_TOTAL_EXTRACTED_BYTES", 15)
+    payload = _build_zip_with_entries(
+        [
+            ("a.bin", b"x" * 10),
+            ("b.bin", b"x" * 10),
+        ]
+    )
+    zip_path = tmp_path / "total.zip"
+    zip_path.write_bytes(payload)
+    dest = tmp_path / "out"
+
+    with pytest.raises(HTTPException) as exc:
+        await extract_validated_zip(zip_path, dest_dir=dest)
+    assert exc.value.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_extract_validated_zip_bad_file(tmp_path: Path):
+    """Invalid ZIP file raises 400."""
+    zip_path = tmp_path / "bad.zip"
+    zip_path.write_bytes(b"not a zip file")
+    dest = tmp_path / "out"
+
+    with pytest.raises(HTTPException) as exc:
+        await extract_validated_zip(zip_path, dest_dir=dest)
+    assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_extract_validated_zip_promotion_failure(tmp_path: Path, monkeypatch):
+    """OSError during promotion raises 500."""
+    payload = _build_zip_with_entries([("a.gpx", _make_gpx_bytes())])
+    zip_path = tmp_path / "ok.zip"
+    zip_path.write_bytes(payload)
+    dest = tmp_path / "out"
+
+    def fail_promote(
+        extracted: object,
+        dest_path: object,
+    ) -> object:
+        raise OSError("promotion failed")
+
+    monkeypatch.setattr(
+        core_file_uploads,
+        "_promote_extracted_files_sync",
+        fail_promote,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await extract_validated_zip(zip_path, dest_dir=dest)
+    assert exc.value.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# move_within: existing destination + OS error
+# ---------------------------------------------------------------------------
+
+
+def test_move_within_existing_destination(tmp_path: Path):
+    """move_within rejects overwriting an existing destination."""
+    src = tmp_path / "src.bin"
+    src.write_bytes(b"payload")
+    dest_dir = tmp_path / "out"
+    dest_dir.mkdir()
+    existing = dest_dir / "moved.bin"
+    existing.write_bytes(b"existing")
+
+    with pytest.raises(HTTPException) as exc:
+        move_within(src, dest_dir, filename="moved.bin")
+    assert exc.value.status_code == 400
+    assert src.exists()
+    assert existing.read_bytes() == b"existing"
+
+
+def test_move_within_oserror(tmp_path: Path, monkeypatch):
+    """OSError from shutil.move raises 500."""
+    src = tmp_path / "src.bin"
+    src.write_bytes(b"payload")
+    dest_dir = tmp_path / "out"
+
+    def fail_move(_src: object, _dst: object) -> None:
+        raise OSError("move failed")
+
+    monkeypatch.setattr(core_file_uploads.shutil, "move", fail_move)
+
+    with pytest.raises(HTTPException) as exc:
+        move_within(src, dest_dir, filename="moved.bin")
+    assert exc.value.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# safe_remove_within: FileNotFoundError + OSError
+# ---------------------------------------------------------------------------
+
+
+def test_safe_remove_within_file_disappears(tmp_path: Path, monkeypatch):
+    """FileNotFoundError from unlink is caught and returns False."""
+    target = tmp_path / "ghost.bin"
+
+    original_is_file = Path.is_file
+
+    def mock_is_file(self: Path) -> bool:
+        return True if self.name == "ghost.bin" else original_is_file(self)
+
+    monkeypatch.setattr(Path, "is_file", mock_is_file)
+
+    original_unlink = Path.unlink
+
+    def mock_unlink(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name == "ghost.bin":
+            raise FileNotFoundError("file disappeared")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", mock_unlink)
+
+    result = safe_remove_within(target, base_dir=tmp_path)
+    assert result is False
+
+
+def test_safe_remove_within_oserror_handling(tmp_path: Path, monkeypatch):
+    """OSError from unlink is caught and returns False."""
+    target = tmp_path / "locked.bin"
+    target.write_bytes(b"x")
+
+    original_unlink = Path.unlink
+
+    def mock_unlink(self: Path, *args: object, **kwargs: object) -> None:
+        if self.name == "locked.bin":
+            raise OSError("permission denied")
+        return original_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", mock_unlink)
+
+    result = safe_remove_within(target, base_dir=tmp_path)
+    assert result is False

@@ -82,6 +82,6 @@ def validate_gear_component_type(
                 7: "windsurf",
             }
             raise HTTPException(
-                status_code=(status.HTTP_422_UNPROCESSABLE_ENTITY),
+                status_code=(status.HTTP_422_UNPROCESSABLE_CONTENT),
                 detail=(f"Invalid gear component type for {gear_type_names[gear.gear_type]}"),
             )

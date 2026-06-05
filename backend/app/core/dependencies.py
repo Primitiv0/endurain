@@ -22,7 +22,7 @@ def validate_id(identifier: int, min_value: int, message: str) -> None:
     """
     if not (int(identifier) > min_value):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=message,
         )
 
@@ -45,7 +45,7 @@ def validate_type(type_value: int, min_value: int, max_value: int, message: str)
     """
     if not (min_value <= int(type_value) <= max_value):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=message,
         )
 
@@ -69,13 +69,13 @@ def validate_pagination_values(
     """
     if not (int(page_number) > 0):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid page number, must be higher than 0",
         )
 
     if not (int(num_records) > 0):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid number of records, must be higher than 0",
         )
 
@@ -108,12 +108,12 @@ def validate_pagination_values_on_query(
 
     if not (int(page_number) > 0):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid page number, must be higher than 0",
         )
 
     if not (int(num_records) > 0):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid number of records, must be higher than 0",
         )

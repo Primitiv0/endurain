@@ -185,13 +185,13 @@ def handle_import_export_exception(error: Exception, operation: str) -> HTTPExce
 
     elif isinstance(error, ZipCreationError):
         return HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Failed to create export archive during {operation}.",
         )
 
     elif isinstance(error, DataCollectionError):
         return HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Data collection failed during {operation}. Some data may be corrupted.",
         )
 
@@ -216,7 +216,7 @@ def handle_import_export_exception(error: Exception, operation: str) -> HTTPExce
 
     elif isinstance(error, DataIntegrityError):
         return HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Data integrity error during {operation}. {error!s}",
         )
 

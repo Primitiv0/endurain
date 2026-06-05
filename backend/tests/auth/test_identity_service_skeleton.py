@@ -751,3 +751,137 @@ class TestGetIdentityServiceDependency:
         )
         assert isinstance(svc, DefaultIdentityService)
         assert isinstance(svc, IdentityService)
+
+
+# ---------------------------------------------------------------------------
+# validate_and_hash_password
+# ---------------------------------------------------------------------------
+
+
+class TestValidateAndHashPassword:
+    """Tests for DefaultIdentityService.validate_and_hash_password."""
+
+    def test_happy_path_validates_and_hashes(self, service, mock_password_hasher):
+        mock_password_hasher.validate_password.return_value = None
+        mock_password_hasher.hash_password.return_value = "$argon2id$hash"
+        result = service.validate_and_hash_password("validPass1!", 8, "standard")
+        mock_password_hasher.validate_password.assert_called_once_with("validPass1!", 8, "standard")
+        mock_password_hasher.hash_password.assert_called_once_with("validPass1!")
+        assert result == "$argon2id$hash"
+
+    def test_password_policy_error_raises_400(self, service, mock_password_hasher):
+        from auth.password_hasher import PasswordPolicyError
+
+        mock_password_hasher.validate_password.side_effect = PasswordPolicyError("Too short")
+        with pytest.raises(HTTPException) as exc_info:
+            service.validate_and_hash_password("short", 12, "standard")
+        assert exc_info.value.status_code == 400
+        assert "Too short" in str(exc_info.value.detail)
+
+
+# ---------------------------------------------------------------------------
+# hash_password
+# ---------------------------------------------------------------------------
+
+
+class TestHashPassword:
+    """Tests for DefaultIdentityService.hash_password."""
+
+    def test_delegates_to_password_hasher(self, service, mock_password_hasher):
+        mock_password_hasher.hash_password.return_value = "$argon2id$abc"
+        result = service.hash_password("secret123")
+        mock_password_hasher.hash_password.assert_called_once_with("secret123")
+        assert result == "$argon2id$abc"
+
+
+# ---------------------------------------------------------------------------
+# verify_password
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyPassword:
+    """Tests for DefaultIdentityService.verify_password."""
+
+    def test_delegates_to_password_hasher(self, service, mock_password_hasher):
+        mock_password_hasher.verify.return_value = True
+        result = service.verify_password("pass", "$argon2id$hash")
+        mock_password_hasher.verify.assert_called_once_with("pass", "$argon2id$hash")
+        assert result is True
+
+
+# ---------------------------------------------------------------------------
+# create_mfa_backup_codes
+# ---------------------------------------------------------------------------
+
+
+class TestCreateMfaBackupCodes:
+    """Tests for DefaultIdentityService.create_mfa_backup_codes."""
+
+    def test_delegates_to_backup_codes_crud(self, service):
+        with patch(
+            "auth.mfa_backup_codes.crud.create_backup_codes",
+            return_value=["code1", "code2"],
+        ) as mock_create:
+            result = service.create_mfa_backup_codes(1, count=5)
+        mock_create.assert_called_once_with(1, service._password_hasher, service._db, 5)
+        assert result == ["code1", "code2"]
+
+
+# ---------------------------------------------------------------------------
+# verify_and_consume_mfa_backup_code
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyAndConsumeMfaBackupCode:
+    """Tests for DefaultIdentityService.verify_and_consume_mfa_backup_code."""
+
+    def test_delegates_to_backup_codes_utils(self, service):
+        with patch(
+            "auth.mfa_backup_codes.utils.verify_and_consume_backup_code",
+            return_value=True,
+        ) as mock_verify:
+            result = service.verify_and_consume_mfa_backup_code(1, "ABCD-1234")
+        mock_verify.assert_called_once_with(1, "ABCD-1234", service._password_hasher, service._db)
+        assert result is True
+
+
+# ---------------------------------------------------------------------------
+# link_external_identity
+# ---------------------------------------------------------------------------
+
+
+class TestLinkExternalIdentity:
+    """Tests for DefaultIdentityService.link_external_identity."""
+
+    def test_delegates_to_identity_links_crud(self, service):
+        with patch(
+            "auth.identity_service.auth_identity_links_crud.create_user_identity_provider",
+        ) as mock_link:
+            service.link_external_identity(1, 2, "ext-subject")
+        mock_link.assert_called_once_with(1, 2, "ext-subject", service._db)
+
+
+# ---------------------------------------------------------------------------
+# unlink_external_identity
+# ---------------------------------------------------------------------------
+
+
+class TestUnlinkExternalIdentity:
+    """Tests for DefaultIdentityService.unlink_external_identity."""
+
+    def test_happy_path_delegates_and_succeeds(self, service):
+        with patch(
+            "auth.identity_service.auth_identity_links_crud.delete_user_identity_provider",
+            return_value=True,
+        ) as mock_unlink:
+            service.unlink_external_identity(1, 2)
+        mock_unlink.assert_called_once_with(1, 2, service._db)
+
+    def test_not_found_raises_404(self, service):
+        with patch(
+            "auth.identity_service.auth_identity_links_crud.delete_user_identity_provider",
+            return_value=False,
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                service.unlink_external_identity(99, 99)
+            assert exc_info.value.status_code == 404

@@ -414,6 +414,88 @@ class TestLoginEndpoint:
         assert response.status_code == 503
         assert "unavailable" in response.json()["detail"].lower()
 
+    @patch("auth.router.auth_utils.complete_login")
+    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.auth_utils.authenticate_user")
+    def test_login_store_unavailable_on_reset_attempts_returns_503(
+        self,
+        mock_auth,
+        mock_check_active,
+        mock_mfa_check,
+        mock_complete_login,
+        auth_client,
+        auth_app,
+        fake_failed_login_store,
+    ):
+        """503 when reset_attempts raises after successful login with no MFA."""
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_auth.return_value = mock_user
+        mock_check_active.return_value = None
+        mock_mfa_check.return_value = False
+        fake_failed_login_store.reset_attempts = MagicMock(
+            side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
+        )
+        response = auth_client.post(
+            "/auth/login",
+            data={"username": "testuser", "password": "Password1!"},
+        )
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    @patch("auth.router.auth_utils.complete_login")
+    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.auth_utils.authenticate_user")
+    def test_login_store_unavailable_on_add_pending_returns_503(
+        self,
+        mock_auth,
+        mock_check_active,
+        mock_mfa_check,
+        mock_complete_login,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_auth.return_value = mock_user
+        mock_check_active.return_value = None
+        mock_mfa_check.return_value = True
+        fake_pending_mfa_store.add_pending_login = MagicMock(
+            side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
+        )
+        response = auth_client.post(
+            "/auth/login",
+            data={"username": "mfauser", "password": "Password1!"},
+        )
+        assert response.status_code == 503
+
+    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.auth_utils.authenticate_user")
+    def test_login_mfa_required_mobile_returns_dict(
+        self,
+        mock_auth,
+        mock_check_active,
+        mock_mfa_check,
+        auth_client,
+        auth_app,
+    ):
+        auth_app.state._client_type = "mobile"
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_auth.return_value = mock_user
+        mock_check_active.return_value = None
+        mock_mfa_check.return_value = True
+        response = auth_client.post(
+            "/auth/login",
+            data={"username": "mfauser", "password": "Password1!"},
+        )
+        assert response.status_code == 200
+        assert response.json()["mfa_required"] is True
+
 
 # ------------------------------------------------------------------
 # POST /auth/mfa/verify
@@ -559,6 +641,150 @@ class TestMFAVerifyEndpoint:
 
         assert response.status_code == 503
         assert "unavailable" in response.json()["detail"].lower()
+
+    def test_mfa_verify_store_unavailable_on_is_locked_out_returns_503(
+        self,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        """503 when is_locked_out raises AuthSecurityStoreUnavailableError."""
+        fake_pending_mfa_store.is_locked_out = MagicMock(
+            side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
+        )
+        response = auth_client.post(
+            "/auth/mfa/verify",
+            json={"username": "testuser", "mfa_code": "123456"},
+        )
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    @patch("auth.router.profile_utils.verify_user_mfa")
+    def test_mfa_verify_store_unavailable_on_record_failed_returns_503(
+        self,
+        mock_verify_mfa,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        """503 when record_failed_attempt raises after invalid MFA code."""
+        fake_pending_mfa_store.add_pending_login("testuser", 1)
+        mock_verify_mfa.return_value = False
+        fake_pending_mfa_store.record_failed_attempt = MagicMock(
+            side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
+        )
+        response = auth_client.post(
+            "/auth/mfa/verify",
+            json={"username": "testuser", "mfa_code": "000000"},
+        )
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    @patch("auth.router.profile_utils.verify_user_mfa")
+    def test_mfa_verify_store_unavailable_on_claim_pending_returns_503(
+        self,
+        mock_verify_mfa,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        """503 when claim_pending_login raises after valid MFA code."""
+        fake_pending_mfa_store.add_pending_login("testuser", 1)
+        mock_verify_mfa.return_value = True
+        fake_pending_mfa_store.claim_pending_login = MagicMock(
+            side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
+        )
+        response = auth_client.post(
+            "/auth/mfa/verify",
+            json={"username": "testuser", "mfa_code": "123456"},
+        )
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    @patch("auth.router.users_crud.get_user_by_id")
+    @patch("auth.router.profile_utils.verify_user_mfa")
+    def test_mfa_verify_user_not_found_returns_401(
+        self,
+        mock_verify_mfa,
+        mock_get_user,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        """401 when user is not found after MFA verification."""
+        fake_pending_mfa_store.add_pending_login("testuser", 1)
+        mock_verify_mfa.return_value = True
+        mock_get_user.return_value = None
+        response = auth_client.post(
+            "/auth/mfa/verify",
+            json={"username": "testuser", "mfa_code": "123456"},
+        )
+        assert response.status_code == 401
+        assert "Unable to authenticate" in response.json()["detail"]
+
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.users_crud.get_user_by_id")
+    @patch("auth.router.profile_utils.verify_user_mfa")
+    def test_mfa_verify_store_unavailable_on_reset_returns_503(
+        self,
+        mock_verify_mfa,
+        mock_get_user,
+        mock_check_active,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        """503 when reset_failed_attempts raises after successful MFA."""
+        fake_pending_mfa_store.add_pending_login("testuser", 1)
+        mock_verify_mfa.return_value = True
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_get_user.return_value = mock_user
+        mock_check_active.return_value = None
+        fake_pending_mfa_store.reset_failed_attempts = MagicMock(
+            side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
+        )
+        response = auth_client.post(
+            "/auth/mfa/verify",
+            json={"username": "testuser", "mfa_code": "123456"},
+        )
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
+    @patch("auth.router.auth_utils.create_mobile_pkce_session_response")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.users_crud.get_user_by_id")
+    @patch("auth.router.profile_utils.verify_user_mfa")
+    def test_mfa_verify_mobile_pkce_returns_session_response(
+        self,
+        mock_verify_mfa,
+        mock_get_user,
+        mock_check_active,
+        mock_pkce,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+    ):
+        """Mobile PKCE flow after MFA returns session response."""
+        auth_app.state._client_type = "mobile"
+        fake_pending_mfa_store.add_pending_login("testuser", 1)
+        mock_verify_mfa.return_value = True
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_get_user.return_value = mock_user
+        mock_check_active.return_value = None
+        mock_pkce.return_value = {
+            "session_id": "pkce-sid-mfa",
+            "mfa_required": False,
+            "message": "Complete authentication...",
+        }
+        challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        response = auth_client.post(
+            f"/auth/mfa/verify?code_challenge={challenge}&code_challenge_method=S256",
+            json={"username": "testuser", "mfa_code": "123456"},
+        )
+        assert response.status_code == 200
+        assert response.json()["session_id"] == "pkce-sid-mfa"
 
 
 # ------------------------------------------------------------------
@@ -1557,3 +1783,28 @@ class TestLogoutEndpoint:
 
         assert response.status_code == 403
         assert "client type" in response.json()["detail"].lower()
+
+    @patch("auth.router.auth_utils.clear_refresh_token_cookies")
+    @patch("auth.router.users_session_crud.delete_session")
+    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    def test_logout_missing_session_is_idempotent_success_mobile(
+        self,
+        mock_get_session,
+        mock_delete_session,
+        mock_clear_cookies,
+        auth_client,
+        auth_app,
+    ):
+        auth_app.state._client_type = "mobile"
+        mock_get_session.return_value = None
+
+        app = auth_app
+        app.dependency_overrides[auth_security.validate_refresh_token] = lambda: None
+        app.dependency_overrides[auth_security.get_sub_from_refresh_token] = lambda: 1
+        app.dependency_overrides[auth_security.get_sid_from_refresh_token] = lambda: "nonexistent"
+        app.dependency_overrides[auth_security.get_and_return_refresh_token] = lambda: "rt"
+
+        response = auth_client.post("/auth/logout")
+        assert response.status_code == 200
+        mock_delete_session.assert_not_called()
+        mock_clear_cookies.assert_not_called()

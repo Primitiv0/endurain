@@ -101,7 +101,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["app"]
-omit = ["*/tests/*", "*/__pycache__/*", "*/alembic/*"]
+omit = ["*/tests/*", "*/__pycache__/*", "*/alembic/*", "*/migrations/*"]
 
 [tool.coverage.report]
 exclude_lines = [

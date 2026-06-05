@@ -404,7 +404,7 @@ class ImportService:
             original_id = gear_data.get("id")
             gear_data.pop("id", None)
 
-            gear = gear_schema.Gear(**gear_data)
+            gear = gear_schema.GearCreate(**gear_data)
             new_gear = gear_crud.create_gear(gear, self.user_id, self.db)
             gears_id_mapping[original_id] = new_gear.id
             self.counts["gears"] += 1
@@ -427,7 +427,6 @@ class ImportService:
             return
 
         for gear_component_data in gear_components_data:
-            gear_component_data["user_id"] = self.user_id
             gear_component_data["gear_id"] = (
                 gears_id_mapping.get(gear_component_data["gear_id"])
                 if gear_component_data.get("gear_id") in gears_id_mapping
@@ -436,7 +435,7 @@ class ImportService:
 
             gear_component_data.pop("id", None)
 
-            gear_component = gear_components_schema.GearComponents(**gear_component_data)
+            gear_component = gear_components_schema.GearComponentCreate(**gear_component_data)
             gear_components_crud.create_gear_component(gear_component, self.user_id, self.db)
             self.counts["gear_components"] += 1
 
@@ -999,7 +998,7 @@ class ImportService:
             notification_data["user_id"] = self.user_id
             notification_data.pop("id", None)
 
-            notification = notifications_schema.Notification(**notification_data)
+            notification = notifications_schema.NotificationCreate(**notification_data)
             notifications_crud.create_notification(notification, self.db)
             self.counts["notifications"] += 1
 

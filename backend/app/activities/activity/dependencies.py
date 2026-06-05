@@ -63,7 +63,7 @@ def validate_activity_type(activity_type: int | None = Query(None)):
     """
     if activity_type not in ACTIVITY_ID_TO_NAME and activity_type is not None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid activity type",
         )
 
@@ -112,7 +112,7 @@ def validate_sort_by(sort_by: str | None = Query(None)):
         and sort_by is not None
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid sort by field",
         )
 
@@ -131,6 +131,6 @@ def validate_sort_order(sort_order: str | None = Query(None)):
     # sort_order can be "asc", "desc" or None
     if sort_order not in ["asc", "desc"] and sort_order is not None:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Invalid sort order",
         )

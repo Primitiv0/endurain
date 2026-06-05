@@ -1,7 +1,9 @@
 """Tests for temporary MFA setup secret storage."""
 
 import profile.mfa_store as profile_mfa_store
+import time
 from fnmatch import fnmatch
+from unittest.mock import patch
 
 import core.redis as core_redis
 import pytest
@@ -206,21 +208,67 @@ class FailingRedis(FakeRedis):
 
 
 class TestMFASecretStore:
-    """Tests for the process-local MFA secret store."""
+    """Tests for the in-memory MFA secret store."""
 
     def test_memory_store_lifecycle(self) -> None:
-        """Test memory store add, get, has, and delete."""
+        """Test basic store, retrieve, and delete lifecycle."""
         store = profile_mfa_store.MFASecretStore()
 
         store.add_secret(123, "secret-value")
-
-        assert store.has_secret(123) is True
         assert store.get_secret(123) == "secret-value"
+        assert store.has_secret(123) is True
 
         store.delete_secret(123)
-
-        assert store.has_secret(123) is False
         assert store.get_secret(123) is None
+        assert store.has_secret(123) is False
+
+    def test_add_secret_encryption_failure(self) -> None:
+        """Test ValueError raised when encryption returns None."""
+        with (
+            patch("profile.mfa_store.core_cryptography.encrypt_token_fernet", return_value=None),
+            pytest.raises(ValueError, match="Failed to encrypt MFA secret"),
+        ):
+            profile_mfa_store.MFASecretStore().add_secret(123, "secret-value")
+
+    def test_has_secret_expired_after_add(self) -> None:
+        """Test has_secret returns False for expired secret."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+        store._store[123]["expires_at"] = time.time() - 1
+        assert store.has_secret(123) is False
+
+    def test_clear_all_happy_path(self) -> None:
+        """Test clear_all removes all secrets."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+        store.add_secret(456, "other-secret")
+        store.clear_all()
+        assert store.get_secret(123) is None
+        assert store.get_secret(456) is None
+        assert store.has_secret(123) is False
+
+    def test_get_stats_with_secrets(self) -> None:
+        """Test get_stats returns correct counts."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+        stats = store.get_stats()
+        assert stats["total_secrets"] >= 1
+        assert stats["active_secrets"] >= 1
+        assert stats["ttl_seconds"] >= 0
+
+    def test_encrypt_secret_error(self) -> None:
+        """Test _encrypt_secret raises ValueError when encryption returns None."""
+        with (
+            patch("profile.mfa_store.core_cryptography.encrypt_token_fernet", return_value=None),
+            pytest.raises(ValueError, match="Failed to encrypt MFA secret"),
+        ):
+            profile_mfa_store._encrypt_secret("test-secret")
+
+    def test_decrypt_secret_returns_none_on_error(self) -> None:
+        """Test _decrypt_secret returns None when decryption fails."""
+        with patch("profile.mfa_store.core_cryptography.decrypt_token_fernet", side_effect=Exception("bad decrypt")):
+            result = profile_mfa_store._decrypt_secret("bad-encrypted-data", 123)
+            assert result is None
 
     def test_memory_store_expired_secret_is_evicted(self) -> None:
         """Test memory store evicts expired secrets on read."""
@@ -368,4 +416,181 @@ class TestMFASecretStoreFactory:
             "redis://localhost:6379/0",
         )
 
+        assert profile_mfa_store.get_mfa_secret_storage_uri() == "memory://"
+
+
+class TestMFASecretStoreCleanup:
+    """Tests for the MFA secret store cleanup thread."""
+
+    def test_cleanup_expired_secrets_removes_expired(self, monkeypatch) -> None:
+        """Expired secrets are removed by the cleanup loop body."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+        store._store[123]["expires_at"] = time.time() - 1
+
+        sleeps: list[float] = []
+
+        def mock_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            raise StopIteration("break")
+
+        monkeypatch.setattr(time, "sleep", mock_sleep)
+
+        with pytest.raises(StopIteration):
+            store._cleanup_expired_secrets()
+
+        assert 123 not in store._store
+
+    def test_cleanup_expired_secrets_no_expired(self, monkeypatch) -> None:
+        """Non-expired secrets are preserved by the cleanup loop body."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+
+        sleeps: list[float] = []
+
+        def mock_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            raise StopIteration("break")
+
+        monkeypatch.setattr(time, "sleep", mock_sleep)
+
+        with pytest.raises(StopIteration):
+            store._cleanup_expired_secrets()
+
+        assert 123 in store._store
+
+    def test_cleanup_expired_secrets_error_handling(self, monkeypatch) -> None:
+        """Exceptions in the cleanup loop are caught and logged."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+
+        class FailingDict(dict):  # type: ignore[type-arg]
+            def items(self) -> list:  # type: ignore[override]
+                raise Exception("cleanup failed")
+
+        store._store = FailingDict(store._store)
+
+        sleeps: list[float] = []
+
+        def mock_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            raise StopIteration("break")
+
+        monkeypatch.setattr(time, "sleep", mock_sleep)
+
+        with pytest.raises(StopIteration):
+            store._cleanup_expired_secrets()
+
+        assert sleeps == [60]
+
+
+class TestMFASecretStoreErrorHandling:
+    """Tests for error handling in memory store methods."""
+
+    def test_get_secret_logs_error_on_exception(self) -> None:
+        """get_secret returns None and logs when decryption fails."""
+        store = profile_mfa_store.MFASecretStore()
+        store.add_secret(123, "secret-value")
+        with patch("profile.mfa_store._decrypt_secret", side_effect=Exception("decrypt failed")):
+            result = store.get_secret(123)
+            assert result is None
+
+    def test_delete_secret_logs_error_on_exception(self) -> None:
+        """delete_secret catches and logs exception from store access."""
+
+        class FailingDict(dict):  # type: ignore[type-arg]
+            def __contains__(self, key: object) -> bool:
+                raise Exception("test error")
+
+        store = profile_mfa_store.MFASecretStore()
+        store._store = FailingDict(store._store)
+        store.delete_secret(123)
+
+    def test_has_secret_logs_error_on_exception(self) -> None:
+        """has_secret returns False when store access raises."""
+
+        class FailingDict(dict):  # type: ignore[type-arg]
+            def __contains__(self, key: object) -> bool:
+                raise Exception("test error")
+
+        store = profile_mfa_store.MFASecretStore()
+        store._store = FailingDict(store._store)
+        result = store.has_secret(123)
+        assert result is False
+
+    def test_clear_all_logs_error_on_exception(self) -> None:
+        """clear_all catches and logs exception from store clear."""
+
+        class FailingDict(dict):  # type: ignore[type-arg]
+            def clear(self) -> None:
+                raise Exception("test error")
+
+        store = profile_mfa_store.MFASecretStore()
+        store._store = FailingDict(store._store)
+        store.clear_all()
+
+    def test_get_stats_logs_error_on_exception(self) -> None:
+        """get_stats returns error dict when store access raises."""
+
+        class FailingDict(dict):  # type: ignore[type-arg]
+            def values(self) -> object:  # type: ignore[override]
+                raise Exception("test error")
+
+        store = profile_mfa_store.MFASecretStore()
+        store._store = FailingDict(store._store)
+        stats = store.get_stats()
+        assert "error" in stats
+
+
+class TestRedisMFASecretStoreEdgeCases:
+    """Edge-case tests for Redis-backed MFA secret storage."""
+
+    def test_redis_delete_failure_logged(self) -> None:
+        """Redis delete errors are logged (not re-raised)."""
+        store = profile_mfa_store.RedisMFASecretStore(FailingRedis("delete"))
+        store.delete_secret(123)
+
+    def test_redis_has_secret_failure_is_sanitized(self) -> None:
+        """Redis has_secret errors become MFA-store outage errors."""
+        store = profile_mfa_store.RedisMFASecretStore(FailingRedis("get"))
+        with pytest.raises(profile_mfa_store.MFASecretStoreUnavailableError):
+            store.has_secret(123)
+
+    def test_redis_clear_all_failure_is_sanitized(self) -> None:
+        """Redis clear_all errors become MFA-store outage errors."""
+        store = profile_mfa_store.RedisMFASecretStore(FailingRedis("scan_iter"))
+        with pytest.raises(profile_mfa_store.MFASecretStoreUnavailableError):
+            store.clear_all()
+
+    def test_redis_get_stats(self) -> None:
+        """Redis get_stats returns correct counts."""
+        redis_client = FakeRedis()
+        store = profile_mfa_store.RedisMFASecretStore(redis_client, ttl_seconds=300)
+        store.add_secret(123, "secret-one")
+        store.add_secret(456, "secret-two")
+        stats = store.get_stats()
+        assert stats["total_secrets"] == 2
+        assert stats["active_secrets"] == 2
+        assert stats["expired_secrets"] == 0
+        assert stats["ttl_seconds"] == 300
+
+    def test_redis_get_stats_failure(self) -> None:
+        """Redis get_stats returns error dict on scan failure."""
+        store = profile_mfa_store.RedisMFASecretStore(FailingRedis("scan_iter"))
+        stats = store.get_stats()
+        assert stats["error"] == "MFASecretStoreUnavailableError"
+
+
+class TestMFASecretStoreModuleLevel:
+    """Tests for module-level helpers."""
+
+    def test_get_mfa_secret_store(self) -> None:
+        """get_mfa_secret_store returns the module-level instance."""
+        store = profile_mfa_store.get_mfa_secret_store()
+        assert isinstance(store, (profile_mfa_store.MFASecretStore, profile_mfa_store.RedisMFASecretStore))
+
+    def test_get_mfa_secret_storage_uri_fallback_memory(self, monkeypatch) -> None:
+        """When both storage URIs are unset, memory:// is returned."""
+        monkeypatch.setattr(profile_mfa_store.core_config.settings, "AUTH_SECURITY_STORAGE_URI", None)
+        monkeypatch.setattr(profile_mfa_store.core_config.settings, "RATE_LIMIT_STORAGE_URI", None)
         assert profile_mfa_store.get_mfa_secret_storage_uri() == "memory://"

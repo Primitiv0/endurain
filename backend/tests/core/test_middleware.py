@@ -9,6 +9,8 @@ Verifies:
 5. Only POST/PUT/DELETE/PATCH methods are checked
 """
 
+from unittest.mock import patch
+
 import pytest
 from core.middleware import CSRFMiddleware
 from fastapi import FastAPI
@@ -336,3 +338,173 @@ class TestCSRFMiddlewareSameSiteCookie:
             # Cookie already set on client instance above
         )
         assert response.status_code == 200
+
+
+class TestSecurityHeadersMiddleware:
+    """Tests for SecurityHeadersMiddleware in core.middleware."""
+
+    def test_all_security_headers_present_in_development(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        client = TestClient(app)
+
+        with patch("core.middleware.core_config.settings.ENVIRONMENT", "development"):
+            response = client.get("/test")
+
+        assert response.status_code == 200
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert response.headers["X-XSS-Protection"] == "0"
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        assert response.headers["Permissions-Policy"] == "geolocation=(), microphone=(), camera=()"
+        assert "Strict-Transport-Security" not in response.headers
+        assert "Server" not in response.headers
+
+    def test_hsts_header_present_in_production(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        client = TestClient(app)
+
+        with patch("core.middleware.core_config.settings.ENVIRONMENT", "production"):
+            response = client.get("/test")
+
+        assert response.status_code == 200
+        assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+
+    def test_hsts_header_present_in_demo(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "ok"}
+
+        client = TestClient(app)
+
+        with patch("core.middleware.core_config.settings.ENVIRONMENT", "demo"):
+            response = client.get("/test")
+
+        assert response.status_code == 200
+        assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
+
+    def test_csp_header_present_for_html_response(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.responses import HTMLResponse
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/html")
+        async def html_endpoint():
+            return HTMLResponse("<html><body>Hello</body></html>")
+
+        client = TestClient(app)
+        response = client.get("/html")
+
+        assert response.status_code == 200
+        csp = response.headers.get("Content-Security-Policy")
+        assert csp is not None
+        assert "default-src 'self'" in csp
+
+    def test_csp_header_absent_for_non_html_response(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/json")
+        async def json_endpoint():
+            return {"message": "ok"}
+
+        client = TestClient(app)
+        response = client.get("/json")
+
+        assert response.status_code == 200
+        assert "Content-Security-Policy" not in response.headers
+
+    def test_server_header_removed_when_present(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.responses import Response
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/with-server")
+        async def with_server():
+            return Response("ok", headers={"Server": "EvilServer/1.0"})
+
+        client = TestClient(app)
+        response = client.get("/with-server")
+
+        assert "Server" not in response.headers
+
+    def test_allowed_tile_domains_uses_default_when_not_set(self):
+        import server_settings.schema as server_settings_schema
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.responses import HTMLResponse
+        from fastapi.testclient import TestClient
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/html")
+        async def html_endpoint():
+            return HTMLResponse("<html><body>Hello</body></html>")
+
+        client = TestClient(app)
+        response = client.get("/html")
+
+        csp = response.headers["Content-Security-Policy"]
+        for domain in server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS:
+            assert domain in csp
+
+    def test_allowed_tile_domains_uses_custom_when_set(self):
+        from core.middleware import SecurityHeadersMiddleware
+        from fastapi import FastAPI
+        from fastapi.responses import HTMLResponse
+        from fastapi.testclient import TestClient
+
+        custom_domains = ["https://*.custom-tiles.example.com"]
+
+        app = FastAPI()
+        app.state.allowed_tile_domains = custom_domains
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/html")
+        async def html_endpoint():
+            return HTMLResponse("<html><body>Hello</body></html>")
+
+        client = TestClient(app)
+        response = client.get("/html")
+
+        csp = response.headers["Content-Security-Policy"]
+        assert "https://*.custom-tiles.example.com" in csp

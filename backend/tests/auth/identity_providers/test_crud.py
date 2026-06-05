@@ -481,7 +481,7 @@ class TestCreateIdentityProvider:
         # Arrange
         mock_get_by_slug.return_value = None
         mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
-        mock_db.commit.side_effect = Exception("Database error")
+        mock_db.commit.side_effect = SQLAlchemyError("Database error")
 
         idp_data = IdentityProviderCreate(
             name="Test",

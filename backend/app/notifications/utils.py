@@ -340,3 +340,7 @@ async def create_garmin_token_expired_notification(
                 "error",
                 exc=err,
             )
+            raise HTTPException(
+                status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
+                detail="Internal Server Error",
+            ) from err

@@ -483,6 +483,12 @@ def edit_gear(
     )
     db_gear = db.execute(stmt).scalar_one_or_none()
 
+    if db_gear is None:
+        raise HTTPException(
+            status_code=(status.HTTP_404_NOT_FOUND),
+            detail="Gear not found",
+        )
+
     if gear.brand is not None:
         db_gear.brand = unquote(gear.brand).replace("+", " ")
     if gear.model is not None:

@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+import auth.schema as auth_schema
 import auth.utils as auth_utils
 import pytest
 from fastapi import HTTPException, Response
@@ -90,6 +91,16 @@ class TestAuthenticateUser:
             assert result == mock_user
             # Password should be updated since we're using different hasher
             mock_edit.assert_called_once()
+
+    def test_authenticate_user_sso_account_no_password_raises_401(self, password_hasher, mock_db):
+        """SSO-only account (no local password) raises 401."""
+        mock_user = MagicMock()
+        mock_user.password = None
+        with patch("auth.utils.users_crud.get_user_by_username", return_value=mock_user):
+            with pytest.raises(HTTPException) as exc_info:
+                auth_utils.authenticate_user("ssouser", "anypass", password_hasher, mock_db)
+            assert exc_info.value.status_code == 401
+            assert "Unable to authenticate" in exc_info.value.detail
 
 
 class TestCreateTokens:
@@ -425,3 +436,85 @@ class TestCompleteLogin:
         assert result1["session_id"] != result2["session_id"]
         assert result1["access_token"] != result2["access_token"]
         assert result1["csrf_token"] != result2["csrf_token"]
+
+
+class TestIsSecureCookieEnvironment:
+    """Tests for _is_secure_cookie_environment."""
+
+    def test_returns_true_when_production(self):
+        with patch.object(auth_utils.core_config.settings, "ENVIRONMENT", "production"):
+            assert auth_utils._is_secure_cookie_environment() is True
+
+    def test_returns_true_when_demo(self):
+        with patch.object(auth_utils.core_config.settings, "ENVIRONMENT", "demo"):
+            assert auth_utils._is_secure_cookie_environment() is True
+
+    def test_returns_false_when_development(self):
+        with patch.object(auth_utils.core_config.settings, "ENVIRONMENT", "development"):
+            assert auth_utils._is_secure_cookie_environment() is False
+
+
+class TestClearRefreshTokenCookies:
+    """Tests for clear_refresh_token_cookies."""
+
+    def test_clears_cookies_on_all_paths(self):
+        response = Response()
+        auth_utils.clear_refresh_token_cookies(response)
+        expected_paths = auth_utils.REFRESH_TOKEN_COOKIE_CLEAR_PATHS
+        set_cookie_headers = [v.decode().lower() for k, v in response.raw_headers if k == b"set-cookie"]
+        for path in expected_paths:
+            assert any(
+                "endurain_refresh_token" in h and "max-age=0" in h and f"path={path}" in h for h in set_cookie_headers
+            ), f"Missing clear for path {path}"
+
+    def test_uses_secure_httponly_samesite_attributes(self):
+        response = Response()
+        auth_utils.clear_refresh_token_cookies(response)
+        set_cookie_headers = [v.decode() for k, v in response.raw_headers if k == b"set-cookie"]
+        for header in set_cookie_headers:
+            lower = header.lower()
+            assert "httponly" in lower
+            assert "samesite=strict" in lower
+
+
+class TestCreateMobilePkceSessionResponse:
+    """Tests for create_mobile_pkce_session_response."""
+
+    def test_invalid_code_challenge_method_raises_400(self, password_hasher, mock_db):
+        with pytest.raises(HTTPException) as exc_info:
+            auth_utils.create_mobile_pkce_session_response(
+                response=Response(),
+                request=MagicMock(),
+                user=MagicMock(),
+                code_challenge="abc",
+                code_challenge_method="plain",
+                password_hasher=password_hasher,
+                db=mock_db,
+            )
+        assert exc_info.value.status_code == 400
+
+    def test_valid_code_challenge_creates_session(self, password_hasher, mock_db):
+        response = Response()
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_user = MagicMock()
+        mock_user.id = 1
+
+        with (
+            patch("auth.utils.idp_utils.validate_pkce_challenge"),
+            patch("auth.utils.oauth_state_crud.create_oauth_state"),
+            patch("auth.utils.users_session_utils.create_session"),
+        ):
+            result = auth_utils.create_mobile_pkce_session_response(
+                response=response,
+                request=mock_request,
+                user=mock_user,
+                code_challenge="E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+                code_challenge_method="S256",
+                password_hasher=password_hasher,
+                db=mock_db,
+            )
+
+        assert isinstance(result, auth_schema.MobileSessionResponse)
+        assert result.session_id is not None
+        assert result.mfa_required is False
