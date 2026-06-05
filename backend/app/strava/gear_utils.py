@@ -299,9 +299,9 @@ def transform_csv_bike_gear_to_schema_gear(bikes_dict: dict, token_user_id: int)
     for bike in bikes_dict:
         new_gear = gears_schema.GearCreate(
             user_id=token_user_id,
-            brand=bikes_dict[bike]["Bike Brand"],
-            model=bikes_dict[bike]["Bike Model"],
-            nickname=bike,
+            brand=bikes_dict[bike]["Bike Brand"].strip() if bikes_dict[bike]["Bike Brand"] else None,
+            model=bikes_dict[bike]["Bike Model"].strip() if bikes_dict[bike]["Bike Model"] else None,
+            nickname=bike.strip(),
             gear_type=gears_utils.GEAR_NAME_TO_ID["bike"],
             active=True,
             strava_gear_id=None,
@@ -351,13 +351,13 @@ def transform_csv_shoe_gear_to_schema_gear(
                     newnumber += 1  # Iterate the number so the next unnamed shoe does not duplicate this one.
         else:
             # CSV data has a name for the shoe, use CSV's data as the name.
-            shoe_name = shoerow["Shoe Name"]
+            shoe_name = shoerow["Shoe Name"].strip()
 
         # 2 - Add (possibly renamed) gear item to the list of gear to be added.
         new_gear = gears_schema.GearCreate(
             user_id=token_user_id,
-            brand=shoerow["Shoe Brand"],
-            model=shoerow["Shoe Model"],
+            brand=shoerow["Shoe Brand"].strip() if shoerow["Shoe Brand"] else None,
+            model=shoerow["Shoe Model"].strip() if shoerow["Shoe Model"] else None,
             nickname=shoe_name,
             gear_type=gears_utils.GEAR_NAME_TO_ID["shoes"],
             active=True,

@@ -122,7 +122,15 @@ def create_gear_dictionary_for_bulk_import(
             for item in user_gear_list:
                 users_existing_gear_nickname_to_id[item.nickname] = [item.id]
                 # Strava apparently exports shoe names as a smoosh of "{brand} {model} {name}", so adding that as a second key for each gear item
-                strava_name_smoosh = item.brand + " " + item.model + " " + item.nickname
+                strava_name_smoosh = " ".join(
+                    part
+                    for part in [
+                        (item.brand or "").strip(),
+                        (item.model or "").strip(),
+                        (item.nickname or "").strip(),
+                    ]
+                    if part
+                )
                 if strava_name_smoosh not in users_existing_gear_nickname_to_id:
                     users_existing_gear_nickname_to_id[strava_name_smoosh] = [item.id]
         return users_existing_gear_nickname_to_id
