@@ -20,6 +20,7 @@ import core.logger as core_logger
 import core.middleware as core_middleware
 import core.middleware_request_id as core_middleware_request_id
 import core.migrations as core_migrations
+import core.network as core_network
 import core.rate_limit as core_rate_limit
 import core.scheduler as core_scheduler
 import core.tracing as core_tracing
@@ -157,6 +158,23 @@ def _init_allowed_tile_domains(fastapi_app: FastAPI) -> None:
             fastapi_app.state.allowed_tile_domains = server_settings_schema.DEFAULT_ALLOWED_TILE_DOMAINS.copy()
 
 
+async def _resolve_trusted_proxy_hostnames() -> dict[str, list[str]]:
+    """Refresh TRUSTED_PROXIES hostnames at startup.
+
+    Called during Phase 2 of startup (best-effort). The same
+    helper is reused by request-time trust checks to avoid stale
+    Docker container IPs after proxy-only restarts.
+
+    Returns:
+        Dictionary mapping hostnames to their resolved IP lists.
+        Empty dict if no hostnames are configured or all fail.
+    """
+    return core_network.refresh_trusted_proxy_hostnames(
+        force=True,
+        log_success=True,
+    )
+
+
 async def startup_event(fastapi_app: FastAPI) -> None:
     """Run startup tasks in well-defined phases.
 
@@ -201,7 +219,15 @@ async def startup_event(fastapi_app: FastAPI) -> None:
     core_logger.print_to_log_and_console("Initializing allowed tile domains for Content Security Policy")
     _init_allowed_tile_domains(fastapi_app)
 
+    core_logger.print_to_log_and_console("Resolving TRUSTED_PROXIES hostnames")
+    await _safe_run_async("resolve_trusted_proxy_hostnames", _resolve_trusted_proxy_hostnames)
+
     core_logger.print_to_log_and_console(f"Allowed trusted proxies: {core_config.settings.TRUSTED_PROXIES}")
+    if core_config.settings._resolved_trusted_proxy_ips:
+        core_logger.print_to_log_and_console(
+            f"Resolved trusted proxy IPs: {sorted(core_config.settings._resolved_trusted_proxy_ips)}",
+            "info",
+        )
 
 
 def shutdown_event() -> None:

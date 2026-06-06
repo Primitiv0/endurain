@@ -47,7 +47,7 @@ class TestStartScheduler:
             from core.scheduler import start_scheduler
 
             start_scheduler()
-            assert mock_add_job.call_count == 11
+            assert mock_add_job.call_count == 12
 
 
 class TestAddSchedulerJob:

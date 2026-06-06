@@ -13,22 +13,22 @@ class TestLookLikeIp:
     """_looks_like_ip: best-effort IP literal detection."""
 
     def test_valid_ipv4(self):
-        from core.config import _looks_like_ip
+        from core.network import _looks_like_ip
 
         assert _looks_like_ip("192.168.1.1") is True
 
     def test_valid_ipv6(self):
-        from core.config import _looks_like_ip
+        from core.network import _looks_like_ip
 
         assert _looks_like_ip("::1") is True
 
     def test_hostname(self):
-        from core.config import _looks_like_ip
+        from core.network import _looks_like_ip
 
         assert _looks_like_ip("example.com") is False
 
     def test_hostname_with_digits(self):
-        from core.config import _looks_like_ip
+        from core.network import _looks_like_ip
 
         assert _looks_like_ip("host123") is False
 
@@ -160,6 +160,58 @@ class TestSettings:
 
         s = Settings(_env_file=None, ENVIRONMENT="development")
         assert s.TRUSTED_PROXIES == ["*"]
+
+    def test_trusted_proxies_with_hostname(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, TRUSTED_PROXIES="proxy.internal,192.168.1.1")
+        assert s.TRUSTED_PROXIES == ["proxy.internal", "192.168.1.1"]
+
+    def test_trusted_proxies_with_cidr(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, TRUSTED_PROXIES="10.0.0.0/8,proxy.internal")
+        assert s.TRUSTED_PROXIES == ["10.0.0.0/8", "proxy.internal"]
+
+    def test_trusted_proxies_with_wildcard(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, TRUSTED_PROXIES="*")
+        assert s.TRUSTED_PROXIES == ["*"]
+
+    def test_trusted_proxies_mixed_formats(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, TRUSTED_PROXIES="192.168.1.1,10.0.0.0/8,proxy.local,*")
+        assert len(s.TRUSTED_PROXIES) == 4
+        assert "192.168.1.1" in s.TRUSTED_PROXIES
+        assert "10.0.0.0/8" in s.TRUSTED_PROXIES
+        assert "proxy.local" in s.TRUSTED_PROXIES
+        assert "*" in s.TRUSTED_PROXIES
+
+    def test_trusted_proxies_invalid_cidr_rejected(self):
+        from core.config import Settings
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, TRUSTED_PROXIES="999.999.999.999/32")
+
+    def test_trusted_proxies_invalid_hostname_rejected(self):
+        from core.config import Settings
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, TRUSTED_PROXIES="caddy:8080")
+
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, TRUSTED_PROXIES="http://caddy")
+
+    def test_trusted_proxies_resolved_ips_cache_initialized(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, TRUSTED_PROXIES="proxy.internal")
+        # Cache should be initialized as empty set
+        assert s._resolved_trusted_proxy_ips == set()
 
     def test_reverse_geo_rate_limit_float(self):
         from core.config import Settings

@@ -14,6 +14,7 @@ mocks (``mock.patch("...core_config.ATTR")``) keep
 working unchanged.
 """
 
+import ipaddress
 import os
 import stat
 import threading
@@ -22,6 +23,7 @@ from tempfile import gettempdir
 from typing import Annotated, Self
 
 import core.logger as core_logger
+import core.network as core_network
 import core.redis as core_redis
 from cryptography.fernet import Fernet
 from pydantic import field_validator, model_validator
@@ -48,23 +50,6 @@ SUPPORTED_FILE_FORMATS = [
     ".tcx",
     ".gz",
 ]  # used to screen bulk import files
-
-
-def _looks_like_ip(value: str) -> bool:
-    """Best-effort check that ``value`` is an IP literal.
-
-    Used by the ``SSRF_ALLOWED_HOSTS`` validator to decide
-    whether to parse an entry as an IP/CIDR or as a
-    hostname. Returns ``False`` for hostnames that may
-    happen to contain digits.
-    """
-    import ipaddress
-
-    try:
-        ipaddress.ip_address(value)
-        return True
-    except ValueError:
-        return False
 
 
 # Settings — every value driven by an environment variable.
@@ -105,6 +90,11 @@ class Settings(BaseSettings):
     # are rejected at startup to prevent accidental
     # neutering of the SSRF guard.
     SSRF_ALLOWED_HOSTS: Annotated[list[str], NoDecode] = []
+
+    # --- Internal caches (populated at startup) ---
+    # Hostnames from TRUSTED_PROXIES, resolved to IPs at startup and cached.
+    # Used by _is_trusted_peer() to check resolved hostname IPs.
+    _resolved_trusted_proxy_ips: set[str] = set()
 
     # --- Filesystem layout ---
     FRONTEND_DIR: str = "/app/frontend/dist"
@@ -194,6 +184,48 @@ class Settings(BaseSettings):
             return [ip.strip() for ip in v.split(",") if ip.strip()]
         return v
 
+    @field_validator("TRUSTED_PROXIES", mode="after")
+    @classmethod
+    def _validate_trusted_proxies(cls, v):
+        """Validate TRUSTED_PROXIES entries are valid IPs, CIDRs, hostnames, or '*'.
+
+        Entries may be:
+        - Exact IPs (IPv4 or IPv6)
+        - CIDR ranges (e.g., 10.0.0.0/8)
+        - Hostnames (e.g., proxy.internal, caddy)
+        - Wildcard '*' (trusts all peers)
+
+        Invalid entries are rejected with a ValidationError.
+        Hostnames are not resolved at config validation time;
+        resolution happens at startup in Phase 2.
+        """
+
+        for entry in v:
+            entry = entry.strip()
+            if not entry:
+                continue
+
+            # Wildcard is allowed
+            if entry == "*":
+                continue
+
+            # Try to parse as IP or CIDR
+            if core_network._looks_like_ip(entry) or "/" in entry:
+                try:
+                    ipaddress.ip_network(entry, strict=False)
+                    continue
+                except ValueError as err:
+                    raise ValueError(
+                        f"Invalid TRUSTED_PROXIES entry '{entry}': not a valid IP address or CIDR range."
+                    ) from err
+
+            # Hostname: validate RFC 1123 syntax before accepting.
+            else:
+                if not core_network._is_valid_hostname(entry):
+                    raise ValueError(f"Invalid TRUSTED_PROXIES entry '{entry}': not a valid hostname.")
+
+        return v
+
     @field_validator("SSRF_ALLOWED_HOSTS", mode="before")
     @classmethod
     def _parse_ssrf_allowed_hosts(cls, v):
@@ -221,7 +253,6 @@ class Settings(BaseSettings):
         one valid entry must remain for the field to
         take effect.
         """
-        import ipaddress
 
         if v is None or v == "":
             return []
@@ -238,7 +269,7 @@ class Settings(BaseSettings):
                 continue
 
             # CIDR / IP entry
-            if "/" in entry or _looks_like_ip(entry):
+            if "/" in entry or core_network._looks_like_ip(entry):
                 try:
                     network = ipaddress.ip_network(entry, strict=False)
                 except ValueError:
@@ -461,29 +492,41 @@ def _is_safe_path(file_path: Path) -> bool:
         True if path is safe, False otherwise.
     """
     try:
-        path_str = str(file_path)
+        resolved_path = Path(file_path).resolve()
 
         # Allow common Docker secrets locations
-        allowed_prefixes = [
-            "/run/secrets/",  # Standard Docker secrets mount point
-            "/var/run/secrets/",  # Alternative Docker secrets location
-            "/secrets/",  # Custom secrets directory
+        allowed_directories = [
+            Path("/run/secrets"),  # Standard Docker secrets mount point
+            Path("/var/run/secrets"),  # Alternative Docker secrets location
+            Path("/secrets"),  # Custom secrets directory
         ]
 
         # For development, also allow paths in the working directory.
         if settings.ENVIRONMENT == "development":
             tmp_dir = Path(gettempdir()).resolve()
-            allowed_prefixes.append(f"{tmp_dir}/")
+            allowed_directories.append(tmp_dir)
 
-            cwd = Path.cwd().resolve()
             try:
-                file_path.relative_to(cwd)
+                resolved_path.relative_to(tmp_dir)
                 return True
             except ValueError:
                 pass
 
-        # Check if path starts with any allowed prefix
-        return any(path_str.startswith(prefix) for prefix in allowed_prefixes)
+            cwd = Path.cwd().resolve()
+            try:
+                resolved_path.relative_to(cwd)
+                return True
+            except ValueError:
+                pass
+
+        for allowed_dir in allowed_directories:
+            try:
+                resolved_path.relative_to(allowed_dir.resolve())
+                return True
+            except ValueError:
+                continue
+
+        return False
 
     except (OSError, ValueError, TypeError):
         return False

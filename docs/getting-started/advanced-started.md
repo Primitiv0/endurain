@@ -59,11 +59,59 @@ Table below shows supported environment variables. Variables marked with optiona
 | LOG_LEVEL | info | Yes | Supported levels: critical, error, warning, info, debug, trace |
 | FRONTEND_PROTOCOL | http | Yes | Protocol used for cookie security. Set to `https` when running behind HTTPS to enable the `Secure` flag on authentication cookies |
 | ALLOWED_REDIRECT_SCHEMES | *(empty)* | Yes | Comma-separated list of custom URI schemes allowed as SSO redirect targets for mobile apps using the system browser (e.g., `gadgetbridge,myapp`). Defaults to empty — only relative paths (e.g., `/dashboard`) are accepted. External `http`/`https` URLs are always rejected regardless of this setting. See [Mobile SSO with PKCE](../developer-guide/authentication.md#mobile-sso-with-pkce) |
-| TRUSTED_PROXIES | "*" | Yes | Comma-separated list of trusted proxy IPs or CIDR ranges for correct client IP detection when `BEHIND_PROXY` is `true`. Defaults to `["*"]` (all proxies trusted) in development and `[]` in production and demo |
+| TRUSTED_PROXIES | "*" | Yes | Comma-separated list of trusted proxy IPs, CIDR ranges, or hostnames for correct client IP detection when `BEHIND_PROXY` is `true`. Defaults to `["*"]` (all proxies trusted) in development and `[]` in production and demo. **Hostname support:** You can use hostnames (e.g., `proxy.internal` or Docker container names like `caddy`) which are resolved to IPs at application startup and refreshed periodically in memory. This is useful in Docker deployments where container IPs may change on restart. If a hostname cannot be resolved, a warning is logged and the entry is skipped (graceful degradation). |
 | SSRF_ALLOWED_HOSTS | No default set | Yes | Comma-separated allowlist of exact hostnames (case-insensitive) and/or explicit IP CIDR ranges that may resolve to private/internal addresses for admin-configured outbound calls (currently OIDC discovery and JWKS fetch only). Enables self-hosted identity providers (Authentik, Pocket ID, Keycloak, ...) reachable only over a private network. Example: `auth.internal.example.com,10.10.0.0/24,fd00::/64`. Wildcards (`*`) are rejected; CIDRs must be at least `/8` for IPv4 and `/32` for IPv6. Every allowlisted outbound call is audit-logged at INFO. Does not affect other outbound calls (geocoding, etc.) |
 | RATE_LIMIT_ENABLED | true | Yes | Enable or disable API rate limiting. Set to `false` to disable for development or testing. Accepted values are `true` and `false` |
 | RATE_LIMIT_STORAGE_URI | memory:// | Yes | Storage backend URI for rate limit counters. Use `memory://` for single-worker deployments or `redis://redis:6379/0` for multi-worker setups so all workers share counters. |
 | AUTH_SECURITY_STORAGE_URI | No default set | Yes | Storage backend URI for auth security state, including login lockout, pending MFA login state, and temporary MFA setup secrets. Defaults to `RATE_LIMIT_STORAGE_URI` when unset. Use `memory://` for single-worker deployments or Redis for shared multi-worker protection. |
+
+### TRUSTED_PROXIES Examples
+
+When running Endurain behind a reverse proxy (e.g., Caddy, Nginx) with `BEHIND_PROXY=true`, configure `TRUSTED_PROXIES` to ensure correct client IP detection:
+
+**Docker Compose with Hostname (Recommended for Docker):**
+```yaml
+services:
+  endurain:
+    environment:
+      BEHIND_PROXY: "true"
+      TRUSTED_PROXIES: "caddy"  # Use the service name of your reverse proxy
+```
+The hostname `caddy` will be resolved to its IP address at startup and refreshed periodically. This is useful because Docker container IPs can change on restart.
+
+**With Static IPs:**
+```yaml
+environment:
+  BEHIND_PROXY: "true"
+  TRUSTED_PROXIES: "10.0.0.5"
+```
+
+**With CIDR Ranges:**
+```yaml
+environment:
+  BEHIND_PROXY: "true"
+  TRUSTED_PROXIES: "192.168.0.0/16"
+```
+
+**Mixed Format:**
+```yaml
+environment:
+  BEHIND_PROXY: "true"
+  TRUSTED_PROXIES: "caddy,192.168.1.0/24,reverse-proxy.local"
+```
+
+**Debug Output:**
+When the application starts, it logs resolved hostnames at startup:
+```
+INFO: Resolved TRUSTED_PROXIES hostname 'caddy' to ['10.0.0.5']
+INFO: Allowed trusted proxies: ['caddy', '192.168.1.0/24']
+INFO: Resolved trusted proxy IPs: ['10.0.0.5']
+```
+
+If a hostname cannot be resolved, a warning is logged but the application continues:
+```
+WARNING: Failed to resolve TRUSTED_PROXIES hostname 'nonexistent': [Errno -3] Temporary failure in name resolution
+```
 
 Table below shows the obligatory environment variables for postgres container. You should set them based on what was also set for the Endurain container.
 

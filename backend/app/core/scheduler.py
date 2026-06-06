@@ -7,6 +7,7 @@ import auth.oauth_state.utils as oauth_state_utils
 import auth.security_stores as auth_security_stores
 import auth.sessions.utils as users_session_utils
 import core.logger as core_logger
+import core.network as core_network
 import garmin.activity_utils as garmin_activity_utils
 import garmin.health_utils as garmin_health_utils
 import password_reset_tokens.utils as password_reset_tokens_utils
@@ -123,6 +124,14 @@ def start_scheduler() -> None:
         60,
         [],
         "generate thumbnails for activities missing one",
+    )
+
+    add_scheduler_job(
+        core_network.refresh_trusted_proxy_hostnames,
+        "interval",
+        1,
+        [],
+        "refresh trusted proxy hostname resolutions",
     )
 
 
