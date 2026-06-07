@@ -1080,7 +1080,7 @@ def get_activity_by_garminconnect_id_from_user_id(
             activities_models.Activity.user_id == user_id,
             activities_models.Activity.garminconnect_activity_id == activity_garminconnect_id,
         )
-        activity = db.execute(stmt).scalar_one_or_none()
+        activity = db.execute(stmt).scalars().first()
         if not activity:
             return None
         return activities_utils.serialize_activity(activity)

@@ -19,6 +19,7 @@ def setup_mock_execute(
         scalars_mock.all.return_value = return_all
     if return_scalar is not None:
         scalars_mock.scalar.return_value = return_scalar
+    scalars_mock.first.return_value = return_one_or_none
     if return_one_or_none is not None:
         scalars_mock.one_or_none.return_value = return_one_or_none
         execute_mock.scalar_one_or_none.return_value = return_one_or_none
