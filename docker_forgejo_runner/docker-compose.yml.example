@@ -1,6 +1,6 @@
 services:
   docker-in-docker:
-    image: docker:dind
+    image: docker:dind@sha256:7d85d0eda291f1a7ab6df4a9d1802b5ad4cf9145a088bd11188c78dcb5c7392b
     container_name: 'docker_dind'
     privileged: 'true'
     command:
@@ -19,7 +19,7 @@ services:
     restart: 'unless-stopped'
 
   runner-job-image:
-    image: docker:cli
+    image: docker:cli@sha256:873de13208aab9c1de73fe984fd45883e01464fcfcc85efa20aa56a9ccfe7aa6
     depends_on:
       docker-in-docker:
         condition: service_healthy
@@ -36,7 +36,7 @@ services:
       - '/job-image'
 
   runner:
-    image: 'data.forgejo.org/forgejo/runner:12'
+    image: 'data.forgejo.org/forgejo/runner:12@sha256:379b324d6942824b7487706c0a06be4d63e546c17b62bece4ae18c74364a8fae'
     links:
       - docker-in-docker
     depends_on:

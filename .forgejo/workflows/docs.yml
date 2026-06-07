@@ -27,12 +27,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: https://data.forgejo.org/actions/checkout@v6
+        uses: https://data.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: https://data.forgejo.org/actions/setup-python@v6
+        uses: https://data.forgejo.org/actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.13'
           cache: pip
@@ -44,7 +44,7 @@ jobs:
         run: mkdocs build --site-dir site
 
       - name: Deploy documentation to Codeberg Pages
-        uses: https://codeberg.org/git-pages/action@v2
+        uses: https://data.forgejo.org/actions/git-pages@5978530ffb9bbe196ad9fdc0c48fdaf1483de4cf # v2.1.0
         with:
           site: https://docs.endurain.com/
           server: codeberg.page

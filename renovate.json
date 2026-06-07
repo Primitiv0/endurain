@@ -2,6 +2,15 @@
   "extends": [
     "config:recommended"
   ],
+  "minimumReleaseAge": "30 days",
+  "dependencyDashboard": true,
+  "pinDigests": true,
+  "hostRules": [
+    {
+      "matchHost": "data.forgejo.org",
+      "hostType": "github"
+    }
+  ],
   "timezone": "Etc/UTC",
   "labels": [
     "dependencies"
@@ -13,6 +22,26 @@
     "enabled": true,
     "schedule": [
       "before 4am on monday"
+    ]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track data.forgejo.org/actions/git-pages with full semver tag to avoid forgejo-tags major-version reduction bug",
+      "managerFilePatterns": ["/^\\.forgejo/workflows/docs\\.yml$/"],
+      "matchStrings": [
+        "uses:\\s+https://data\\.forgejo\\.org/actions/git-pages@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "git-pages/action",
+      "datasourceTemplate": "forgejo-tags",
+      "versioningTemplate": "semver",
+      "registryUrlTemplate": "https://codeberg.org"
+    }
+  ],
+  "docker-compose": {
+    "enabled": true,
+    "managerFilePatterns": [
+      "/(^|/)(?:compose|docker-compose)[^/]*\\.ya?ml(?:[^/]*\\.example)?$/"
     ]
   },
   "packageRules": [
@@ -31,6 +60,23 @@
         "dependencies",
         "major-update"
       ]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["git-pages/action"],
+      "enabled": false
+    },
+    {
+      "matchCategories": [
+        "security"
+      ],
+      "labels": [
+        "dependencies",
+        "security"
+      ],
+      "prPriority": 10,
+      "groupName": "security updates",
+      "dependencyDashboardApproval": false
     }
   ]
 }

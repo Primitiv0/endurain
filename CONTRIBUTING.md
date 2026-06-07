@@ -29,7 +29,8 @@ PRs that are too large to review efficiently will be asked to be split before th
 ## Prerequisites
 
 - **Python 3.13+**
-- **Hatch** — install it: `pip install hatch` or `uv tool install hatch`
+- **uv** (installed globally) — see [docs.astral.sh/uv](https://docs.astral.sh/uv/)
+- **Hatch** is included as a dev dependency — run `cd backend && uv sync` once to install it
 
 ## How to Contribute
  
@@ -94,10 +95,10 @@ PRs that are too large to review efficiently will be asked to be split before th
    - `refactor(activities)!: rename Activity.distance to total_distance`
 
 5. **Validate changes before pushing:**
-   - **Backend:** `cd backend && hatch run validate` (or any individual script from `[tool.hatch.envs.default.scripts]` in `pyproject.toml`)
+   - **Backend:** `cd backend && uv run hatch run validate` (or any individual script from `[tool.hatch.envs.default.scripts]` in `pyproject.toml`)
    - **Frontend:** `cd frontend/app && npm run format:check && npm run lint:check && npm run type-check`
 
-   Hatch manages the virtual environment and dependencies automatically on first run. It also supports composite scripts — for example, `hatch run validate` runs lint, format, test, and typecheck sequentially in one command, which `uv run` does not yet offer. See `pyproject.toml` for the full list of available scripts.
+   `uv run hatch run validate` runs lint, format, test, and typecheck sequentially in one command, which `uv run` alone does not yet offer. See `pyproject.toml` for the full list of available scripts.
 
    CI will enforce these checks on all PRs.
 

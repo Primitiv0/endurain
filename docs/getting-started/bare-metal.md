@@ -99,15 +99,7 @@ EOF
 ```bash
 cd /path/to/endurain/backend
 
-uv tool install poetry
-uv tool update-shell
-export PATH="/root/.local/bin:$PATH"
-
-poetry self add poetry-plugin-export
-poetry export -f requirements.txt --output requirements.txt --without-hashes
-
-uv venv
-uv pip install -r requirements.txt
+uv sync --no-dev
 ```
 
 ## 7. Setup Postgres Database
@@ -180,7 +172,6 @@ cd /path/to/endurain
 TAG=$(curl -s https://codeberg.org/api/v1/repos/endurain-project/endurain/releases | grep -oP '"tag_name": "\K([^"]+)' | head -n 1)
 curl -L "https://codeberg.org/endurain-project/endurain/archive/$TAG.tar.gz" \
   | tar xz
-  | tar xz
 EXTRACTED=$(ls -d endurain-*)
 shopt -s dotglob
 mv "$EXTRACTED"/* .
@@ -200,10 +191,7 @@ Set Up the Backend.
 
 ```bash
 cd /path/to/endurain/backend
-poetry export -f requirements.txt --output requirements.txt --without-hashes
-
-uv venv
-uv pip install -r requirements.txt
+uv sync --no-dev
 ```
 
 start the service.

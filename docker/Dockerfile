@@ -1,12 +1,15 @@
+# Stage 0: Pin uv version
+FROM ghcr.io/astral-sh/uv:0.11.18@sha256:78bc42400d77b0678ba95765305c826652ed5431f399257271dda681d0318f03 AS uv-dist
+
 # Stage 1: Build Vue.js app
-FROM node:24-slim AS frontend-build
+FROM node:24-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS frontend-build
 
 # Set the working directory to /tmp/frontend
 WORKDIR /tmp/frontend
 
 # Copy and install dependencies
 COPY frontend/app/package*.json ./
-RUN npm ci --prefer-offline
+RUN npm ci --prefer-offline --ignore-scripts
 
 # Copy the frontend directory
 COPY frontend/app ./
@@ -15,22 +18,22 @@ COPY frontend/app ./
 RUN npm run build
 
 # Stage 2: Install requirements
-FROM python:3.13-alpine AS requirements-stage
+FROM python:3.13-alpine@sha256:420cd0bf0f3998275875e02ecd5808168cf0843cbb4d3c536432f729247b2acc AS requirements-stage
 
 # Set the working directory
 WORKDIR /tmp/backend
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+COPY --from=uv-dist /uv /uvx /usr/local/bin/
 
 # Copy pyproject.toml and uv.lock files
 COPY backend/pyproject.toml backend/uv.lock ./
 
 # Export production dependencies to requirements.txt
-RUN uv export --no-emit-project --no-dev --no-hashes -o requirements.txt
+RUN uv export --no-emit-project --no-dev -o requirements.txt
 
 # Stage 3: Build FastAPI app
-FROM python:3.13-alpine
+FROM python:3.13-alpine@sha256:420cd0bf0f3998275875e02ecd5808168cf0843cbb4d3c536432f729247b2acc
 
 ARG UID=1000
 ARG GID=1000
@@ -76,7 +79,7 @@ WORKDIR /app/backend
 COPY --from=requirements-stage --chown=${UID}:${GID} /tmp/backend/requirements.txt ./
 
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir --upgrade -r ./requirements.txt
+ && pip install --no-cache-dir --require-hashes -r ./requirements.txt
 
 COPY --chown=${UID}:${GID} backend/app ./
 

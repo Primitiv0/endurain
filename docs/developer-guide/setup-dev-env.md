@@ -46,7 +46,7 @@ services:
         restart: unless-stopped
 
     postgres:
-        image: postgres:latest
+        image: postgres:18
         container_name: postgres
         environment:
             - POSTGRES_PASSWORD=changeme
@@ -66,11 +66,13 @@ services:
 
     adminer:
         container_name: adminer
-        image: adminer
+        image: adminer:5.3.0
         ports:
             - 8081:8080
         restart: unless-stopped
 ```
+
+> While this example uses specific versions for simplicity, always pin Docker images to exact tags and digests (`tag@sha256:...`) in production to guarantee immutable, verifiable builds. The project's compose files use this pattern.
 
 > Need values for `SECRET_KEY` and `FERNET_KEY`? Generate and copy them from the [Tools](../tools.md#secret-generators) page.
 
@@ -100,7 +102,7 @@ docker compose down
 docker image remove unified-image
 ```
 
-- Backend uses [Poetry](https://python-poetry.org/) for dependency management. You may need to install Python and Poetry if dependency management is necessary.
+- Backend uses **uv** (Python package/project manager) and **hatch** (test runner / script orchestrator, installed as a dev dependency via `uv sync`). You may need to install Python and uv globally if dependency management is necessary.
 
 ## Frontend
 Make sure you have an up-to-date version of [Node.js](https://nodejs.org/) installed.

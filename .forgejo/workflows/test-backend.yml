@@ -1,4 +1,4 @@
-name: Lint Backend
+name: Test Backend
 
 on:
   push:
@@ -7,11 +7,13 @@ on:
       - main
     paths:
       - backend/**
-      - .forgejo/workflows/lint-backend.yml
+      - .forgejo/workflows/test-backend.yml
   pull_request:
+    branches:
+      - master
     paths:
       - backend/**
-      - .forgejo/workflows/lint-backend.yml
+      - .forgejo/workflows/test-backend.yml
 
 permissions:
   contents: read
@@ -22,14 +24,19 @@ concurrency:
 
 jobs:
 
-  lint-backend:
-    name: Backend (ruff)
+  test-backend:
+    name: Backend (pytest)
     runs-on: codeberg-small
     steps:
       - name: Checkout code
         uses: https://data.forgejo.org/actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
+
+      - name: Set up Python
+        uses: https://data.forgejo.org/actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version-file: backend/pyproject.toml
 
       - name: Install uv
         uses: https://data.forgejo.org/astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
@@ -38,12 +45,8 @@ jobs:
 
       - name: Sync dependencies
         working-directory: backend
-        run: uv sync --frozen --only-group lint
+        run: uv sync --frozen --no-dev --group test --no-install-project
 
-      - name: Lint check
+      - name: Run tests
         working-directory: backend
-        run: uv run --no-sync ruff check .
-
-      - name: Format check
-        working-directory: backend
-        run: uv run --no-sync ruff format --check .
+        run: uv run --no-sync pytest
