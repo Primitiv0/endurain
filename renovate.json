@@ -77,6 +77,10 @@
       "prPriority": 10,
       "groupName": "security updates",
       "dependencyDashboardApproval": false
+    },
+    {
+      "matchPackageNames": ["codeberg.org/endurain-project/endurain"],
+      "pinDigests": false
     }
   ]
 }
