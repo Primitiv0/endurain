@@ -28,7 +28,7 @@
     {
       "customType": "regex",
       "description": "Track data.forgejo.org/actions/git-pages with full semver tag to avoid forgejo-tags major-version reduction bug",
-      "managerFilePatterns": ["/^\\.forgejo/workflows/docs\\.yml$/"],
+      "managerFilePatterns": ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
       "matchStrings": [
         "uses:\\s+https://data\\.forgejo\\.org/actions/git-pages@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
       ],
@@ -36,6 +36,28 @@
       "datasourceTemplate": "forgejo-tags",
       "versioningTemplate": "semver",
       "registryUrlTemplate": "https://codeberg.org"
+    },
+    {
+      "customType": "regex",
+      "description": "Track astral-sh/setup-uv via git-refs to work around forgejo-tags API limitation on mirrored actions",
+      "managerFilePatterns": ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "uses:\\s+https://data\\.forgejo\\.org/astral-sh/setup-uv@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "https://github.com/astral-sh/setup-uv.git",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Track actions/checkout via git-refs to work around forgejo-tags API limitation on mirrored actions",
+      "managerFilePatterns": ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
+      "matchStrings": [
+        "uses:\\s+https://data\\.forgejo\\.org/actions/checkout@(?<currentDigest>[a-f0-9]{40})\\s+#\\s+(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "https://github.com/actions/checkout.git",
+      "datasourceTemplate": "git-refs",
+      "versioningTemplate": "semver"
     }
   ],
   "docker-compose": {
@@ -63,7 +85,12 @@
     },
     {
       "matchManagers": ["github-actions"],
-      "matchPackageNames": ["git-pages/action"],
+      "matchPackageNames": ["git-pages/action", "astral-sh/setup-uv", "actions/checkout"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchDepNames": ["python"],
       "enabled": false
     },
     {
