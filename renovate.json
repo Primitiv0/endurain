@@ -106,6 +106,8 @@
       "dependencyDashboardApproval": false
     },
     {
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "minimumReleaseAge": "30 days",
       "matchPackageNames": ["codeberg.org/endurain-project/endurain"],
       "pinDigests": false
     }
