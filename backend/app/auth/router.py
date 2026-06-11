@@ -1,4 +1,3 @@
-import profile.utils as profile_utils
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Annotated
@@ -16,13 +15,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 import auth.identity_providers.utils as idp_utils
+import auth.identity_service as auth_identity_service
+import auth.internal_dependencies as auth_internal_dependencies
+import auth.mfa.service as mfa_service
 import auth.password_hasher as auth_password_hasher
 import auth.schema as auth_schema
-import auth.security as auth_security
 import auth.security_stores as auth_security_stores
-import auth.sessions.crud as users_session_crud
-import auth.sessions.rotated_refresh_tokens.utils as users_session_rotated_tokens_utils
-import auth.sessions.utils as users_session_utils
+import auth.sessions.crud as auth_sessions_crud
+import auth.sessions.rotated_refresh_tokens.utils as auth_sessions_rotated_tokens_utils
+import auth.sessions.utils as auth_sessions_utils
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
 import core.database as core_database
@@ -107,7 +108,7 @@ async def login_for_access_token(
     response: Response,
     request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
+    client_type: Annotated[str, Depends(auth_internal_dependencies.header_client_type_scheme)],
     failed_attempts: Annotated[
         auth_security_stores.FailedLoginStore,
         Depends(auth_security_stores.get_failed_login_attempts),
@@ -209,7 +210,7 @@ async def login_for_access_token(
     users_utils.check_user_is_active(user)
 
     # Check if MFA is enabled for this user
-    if profile_utils.is_mfa_enabled_for_user(user.id, db):
+    if mfa_service.is_mfa_enabled_for_user(user.id, db):
         # Store the user for pending MFA verification
         try:
             pending_mfa_store.add_pending_login(form_data.username, user.id)
@@ -268,7 +269,7 @@ async def verify_mfa_and_login(
     response: Response,
     request: Request,
     mfa_request: auth_schema.MFALoginRequest,
-    client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
+    client_type: Annotated[str, Depends(auth_internal_dependencies.header_client_type_scheme)],
     failed_attempts: Annotated[
         auth_security_stores.FailedLoginStore,
         Depends(auth_security_stores.get_failed_login_attempts),
@@ -276,6 +277,10 @@ async def verify_mfa_and_login(
     pending_mfa_store: Annotated[
         auth_security_stores.PendingMFAStore,
         Depends(auth_security_stores.get_pending_mfa_store),
+    ],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -311,6 +316,7 @@ async def verify_mfa_and_login(
         mfa_request: MFA login request containing username and MFA code
         client_type: The type of client making the request ("web" or "mobile")
         pending_mfa_store: Store for pending MFA logins
+        identity_service: Identity service used to verify backup codes.
         password_hasher: The password hasher instance used for verifying passwords
         token_manager: The token manager instance used for token operations
         db: Database session
@@ -366,7 +372,7 @@ async def verify_mfa_and_login(
         )
 
     # Verify the MFA code (TOTP or backup code)
-    if not profile_utils.verify_user_mfa(user_id, mfa_request.mfa_code, password_hasher, db):
+    if not mfa_service.verify_user_mfa(user_id, mfa_request.mfa_code, identity_service, db):
         # Record failed attempt and apply lockout if threshold exceeded
         try:
             failed_count = pending_mfa_store.record_failed_attempt(mfa_request.username)
@@ -410,7 +416,7 @@ async def verify_mfa_and_login(
 
     # MFA verification successful - reset both MFA and login failed attempts counters
     try:
-        pending_mfa_store.reset_failed_attempts(mfa_request.username)
+        pending_mfa_store.reset_attempts(mfa_request.username)
         failed_attempts.reset_attempts(mfa_request.username)
     except auth_security_stores.AuthSecurityStoreUnavailableError as err:
         _raise_auth_security_store_unavailable(err)
@@ -441,18 +447,18 @@ async def verify_mfa_and_login(
 async def refresh_token(
     response: Response,
     request: Request,
-    _validate_refresh_token: Annotated[Callable, Depends(auth_security.validate_refresh_token)],
+    _validate_refresh_token: Annotated[Callable, Depends(auth_internal_dependencies.validate_refresh_token)],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_refresh_token),
+        Depends(auth_internal_dependencies.get_sub_from_refresh_token),
     ],
     token_session_id: Annotated[
         str,
-        Depends(auth_security.get_sid_from_refresh_token),
+        Depends(auth_internal_dependencies.get_sid_from_refresh_token),
     ],
     refresh_token_value: Annotated[
         str,
-        Depends(auth_security.get_and_return_refresh_token),
+        Depends(auth_internal_dependencies.get_and_return_refresh_token),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -466,8 +472,8 @@ async def refresh_token(
         Session,
         Depends(core_database.get_db),
     ],
-    client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
-    x_csrf_token: Annotated[str | None, Depends(auth_security.header_csrf_token_scheme)] = None,
+    client_type: Annotated[str, Depends(auth_internal_dependencies.header_client_type_scheme)],
+    x_csrf_token: Annotated[str | None, Depends(auth_internal_dependencies.header_csrf_token_scheme)] = None,
 ):
     """
     Handles the refresh token process for user sessions.
@@ -503,7 +509,7 @@ async def refresh_token(
                        user is inactive, or CSRF token is invalid (when provided).
     """
     # Get the session from the database
-    session = users_session_crud.get_session_by_id_not_expired(token_session_id, db)
+    session = auth_sessions_crud.get_session_by_id_not_expired(token_session_id, db)
 
     # Check if the session was found
     if session is None:
@@ -513,8 +519,26 @@ async def refresh_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Defense-in-depth: ensure the session belongs to the user named in
+    # the refresh token's `sub` claim. The refresh-token hash stored on
+    # the session is already bound to this user, so a mismatched token
+    # would fail hash verification below — but asserting ownership here
+    # makes the invariant explicit and fails fast (rather than relying on
+    # the implicit binding) if a token's `sub`/`sid` claims are ever
+    # decoupled from the persisted session.
+    if session.user_id != token_user_id:
+        core_logger.print_to_log(
+            f"Refresh token session owner mismatch: token sub={token_user_id}, session user_id={session.user_id}",
+            "warning",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Validate session hasn't exceeded idle or absolute timeout
-    users_session_utils.validate_session_timeout(session)
+    auth_sessions_utils.validate_session_timeout(session)
 
     # Verify CSRF token for web clients only
     # Mobile clients don't use CSRF tokens
@@ -534,7 +558,7 @@ async def refresh_token(
         client_type == "web"
         and x_csrf_token
         and session.csrf_token_hash is not None
-        and not users_session_utils.verify_csrf_token(x_csrf_token, session.csrf_token_hash)
+        and not auth_sessions_utils.verify_csrf_token(x_csrf_token, session.csrf_token_hash)
     ):
         # CSRF token was provided: validate it
         raise HTTPException(
@@ -553,18 +577,18 @@ async def refresh_token(
 
     # Check for token reuse BEFORE validating token
     # Uses HMAC-SHA256 internally for deterministic, secure lookup
-    is_reused, in_grace = users_session_rotated_tokens_utils.check_token_reuse(refresh_token_value, db)
+    is_reused, in_grace = auth_sessions_rotated_tokens_utils.check_token_reuse(refresh_token_value, db)
 
     if is_reused and not in_grace:
         # Token theft detected - invalidate entire family
-        users_session_rotated_tokens_utils.invalidate_token_family(session.token_family_id, db)
+        auth_sessions_rotated_tokens_utils.invalidate_token_family(session.token_family_id, db)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token reuse detected. All sessions invalidated.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    is_valid = password_hasher.verify(refresh_token_value, session.refresh_token)
+    is_valid = password_hasher.verify_password(refresh_token_value, session.refresh_token)
 
     if not is_valid:
         raise HTTPException(
@@ -591,7 +615,7 @@ async def refresh_token(
     # This enables detection if the old token is reused later
     # Note: We store the raw token value; store_rotated_token
     # hashes it with HMAC-SHA256 for secure, deterministic lookup
-    users_session_rotated_tokens_utils.store_rotated_token(
+    auth_sessions_rotated_tokens_utils.store_rotated_token(
         refresh_token_value,
         session.token_family_id,
         session.rotation_count,
@@ -611,7 +635,7 @@ async def refresh_token(
     # Edit session and store in database
     # Note: edit_session automatically increments rotation_count
     # and updates last_rotation_at
-    users_session_utils.edit_session(
+    auth_sessions_utils.edit_session(
         session,
         request,
         new_refresh_token,
@@ -623,38 +647,19 @@ async def refresh_token(
     # Opportunistically refresh IdP tokens for all linked identity providers
     await idp_utils.refresh_idp_tokens_if_needed(user.id, db)
 
-    # Token delivery based on client type
-    if client_type == "web":
-        # Web: Refresh token as httpOnly cookie. Cookie attributes are
-        # centralised in auth_utils.set_refresh_token_cookie so login,
-        # /refresh, and SSO token exchange share one Secure-flag rule.
-        auth_utils.set_refresh_token_cookie(response, new_refresh_token)
-
-        # Return access token and CSRF token in body
-        # expires_in / refresh_token_expires_in are seconds-until-expiry
-        # per RFC 6749 §5.1
-        now = datetime.now(UTC)
-        return {
-            "session_id": session_id,
-            "access_token": new_access_token,
-            "csrf_token": new_csrf_token,
-            "token_type": "bearer",
-            "expires_in": int((new_access_token_exp - now).total_seconds()),
-            "refresh_token_expires_in": int((new_refresh_token_exp - now).total_seconds()),
-        }
-    else:
-        # Mobile: All tokens in JSON response body
-        # expires_in / refresh_token_expires_in are seconds-until-expiry
-        # per RFC 6749 §5.1
-        now = datetime.now(UTC)
-        return {
-            "session_id": session_id,
-            "access_token": new_access_token,
-            "refresh_token": new_refresh_token,
-            "token_type": "bearer",
-            "expires_in": int((new_access_token_exp - now).total_seconds()),
-            "refresh_token_expires_in": int((new_refresh_token_exp - now).total_seconds()),
-        }
+    # Token delivery based on client type (web cookie vs mobile body) is
+    # centralised in auth_utils.build_token_response so login, /refresh, and
+    # SSO token exchange share one delivery contract.
+    return auth_utils.build_token_response(
+        response,
+        client_type,
+        session_id,
+        new_access_token,
+        new_access_token_exp,
+        new_refresh_token,
+        new_refresh_token_exp,
+        new_csrf_token,
+    )
 
 
 @router.post("/logout", response_model=auth_schema.LogoutResponse)
@@ -662,19 +667,19 @@ async def refresh_token(
 async def logout(
     response: Response,
     request: Request,
-    _validate_refresh_token: Annotated[Callable, Depends(auth_security.validate_refresh_token)],
+    _validate_refresh_token: Annotated[Callable, Depends(auth_internal_dependencies.validate_refresh_token)],
     token_session_id: Annotated[
         str,
-        Depends(auth_security.get_sid_from_refresh_token),
+        Depends(auth_internal_dependencies.get_sid_from_refresh_token),
     ],
     refresh_token_value: Annotated[
         str,
-        Depends(auth_security.get_and_return_refresh_token),
+        Depends(auth_internal_dependencies.get_and_return_refresh_token),
     ],
-    client_type: Annotated[str, Depends(auth_security.header_client_type_scheme)],
+    client_type: Annotated[str, Depends(auth_internal_dependencies.header_client_type_scheme)],
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_refresh_token),
+        Depends(auth_internal_dependencies.get_sub_from_refresh_token),
     ],
     password_hasher: Annotated[
         auth_password_hasher.PasswordHasher,
@@ -707,7 +712,7 @@ async def logout(
         HTTPException: If client type is invalid (403 Forbidden).
     """
     # Get the session from the database
-    session = users_session_crud.get_session_by_id_not_expired(token_session_id, db)
+    session = auth_sessions_crud.get_session_by_id_not_expired(token_session_id, db)
 
     # Check if the session was found
     if session is not None:
@@ -720,7 +725,7 @@ async def logout(
             )
 
         # Verify the refresh token
-        is_valid = password_hasher.verify(refresh_token_value, session.refresh_token)
+        is_valid = password_hasher.verify_password(refresh_token_value, session.refresh_token)
 
         # If the refresh token is not valid, raise an exception
         if not is_valid:
@@ -731,7 +736,7 @@ async def logout(
             )
 
         # Delete the session from the database
-        users_session_crud.delete_session(session.id, token_user_id, db)
+        auth_sessions_crud.delete_session(session.id, token_user_id, db)
 
         # Clear all IdP refresh tokens for security
         await idp_utils.clear_all_idp_tokens(token_user_id, db)

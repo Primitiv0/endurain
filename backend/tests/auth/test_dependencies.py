@@ -51,7 +51,7 @@ class TestValidateAccessToken:
 class TestGetSubFromAccessToken:
     """Tests for get_sub_from_access_token."""
 
-    @patch("auth.dependencies._resolve_and_cache_principal")
+    @patch("auth.internal_dependencies._resolve_and_cache_principal")
     def test_returns_user_id(self, mock_resolve):
         principal = Principal(
             user_id=5,
@@ -158,12 +158,33 @@ class TestValidateAccessTokenOrApiKey:
             identity_service,
             access_token=None,
             api_key_header="sk-123",
-            api_key_query=None,
         )
         assert result.user_id == 8
         assert result.auth_type == "api_key"
 
-    async def test_api_key_query_provided_resolves_via_service(self):
+    async def test_api_key_query_string_ignored_when_disabled(self):
+        """Query-string API key is silently ignored when ALLOW_API_KEY_QUERY_PARAM is False."""
+        request = MagicMock()
+        request.state = SimpleNamespace()
+        identity_service = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.ALLOW_API_KEY_QUERY_PARAM = False
+        with (
+            patch("auth.internal_dependencies.core_config.settings", mock_settings),
+            pytest.raises(HTTPException) as exc_info,
+        ):
+            await validate_access_token_or_api_key(
+                request,
+                identity_service,
+                access_token=None,
+                api_key_header=None,
+                api_key_query="qk-456",
+            )
+        assert exc_info.value.status_code == 401
+        identity_service.resolve_from_api_key.assert_not_called()
+
+    async def test_api_key_query_string_accepted_when_enabled(self):
+        """Query-string API key resolves when ALLOW_API_KEY_QUERY_PARAM is True."""
         request = MagicMock()
         request.state = SimpleNamespace()
         identity_service = MagicMock()
@@ -176,20 +197,29 @@ class TestValidateAccessTokenOrApiKey:
             scopes=frozenset({"read"}),
             credential=ApiKeyCred(api_key_id=3, key_prefix="qk"),
         )
-        result = await validate_access_token_or_api_key(
-            request,
-            identity_service,
-            access_token=None,
-            api_key_header=None,
-            api_key_query="qk-456",
-        )
+        mock_settings = MagicMock()
+        mock_settings.ALLOW_API_KEY_QUERY_PARAM = True
+        with patch("auth.internal_dependencies.core_config.settings", mock_settings):
+            result = await validate_access_token_or_api_key(
+                request,
+                identity_service,
+                access_token=None,
+                api_key_header=None,
+                api_key_query="qk-456",
+            )
         assert result.user_id == 9
         assert result.auth_type == "api_key"
+        identity_service.resolve_from_api_key.assert_called_once_with("qk-456", request)
 
     async def test_no_credentials_raises_401(self):
         request = MagicMock()
         request.state = SimpleNamespace()
-        with pytest.raises(HTTPException) as exc_info:
+        mock_settings = MagicMock()
+        mock_settings.ALLOW_API_KEY_QUERY_PARAM = False
+        with (
+            patch("auth.internal_dependencies.core_config.settings", mock_settings),
+            pytest.raises(HTTPException) as exc_info,
+        ):
             await validate_access_token_or_api_key(
                 request,
                 MagicMock(),
@@ -282,3 +312,12 @@ class TestResolveAndCachePrincipal:
 
         result = auth_dependencies._resolve_and_cache_principal("token", request, MagicMock())
         assert result == principal
+
+
+class TestAuthContextIdentity:
+    """Assert that dependencies.AuthContext is the same type as internal_dependencies.AuthContext."""
+
+    def test_auth_context_is_same_type_as_security(self):
+        import auth.internal_dependencies as auth_security
+
+        assert auth_dependencies.AuthContext is auth_security.AuthContext

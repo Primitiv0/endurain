@@ -162,6 +162,11 @@ Save the generated **Client ID** and **Client Secret**.
 
 - **Solution**: Update your existing Endurain account email to match your SSO provider email, or link the identity provider to your existing account
 
+**Problem**: "Cannot link this identity provider to an existing account because the provider did not verify the email address" (HTTP 403)
+
+- **Cause**: For security (account-takeover prevention), Endurain auto-links an SSO identity to an **existing** local account by email only when the identity provider asserts the email is verified via the standard OIDC `email_verified` claim. Providers that omit this claim, or report the email as unverified, are refused.
+- **Solution**: Configure the identity provider to verify email addresses and include `email_verified: true` in the userinfo/ID token (request the `email` scope), or link the provider from **Settings → Security** while signed in to the existing account.
+
 **Problem**: SSO button doesn't appear on login page
 
 - **Solution**: 

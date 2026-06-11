@@ -11,6 +11,8 @@ from pydantic import (
     field_validator,
 )
 
+import auth.api_keys.utils as api_keys_utils
+
 
 class UsersApiKeyCreate(BaseModel):
     """
@@ -23,8 +25,9 @@ class UsersApiKeyCreate(BaseModel):
 
     For SSO-only accounts (no local password set), the password
     field may be omitted and the password check is skipped — see
-    :func:`users.users.utils.verify_step_up_credentials` for the
-    rationale and the known coverage gap.
+    :func:`auth.services.step_up_service.verify_step_up_credentials`
+    and ``docs/developer-guide/auth-boundary.md`` for the rationale
+    and the tracked SSO-only step-up gap.
 
     Attributes:
         name: User-friendly label for the key.
@@ -81,10 +84,11 @@ class UsersApiKeyCreate(BaseModel):
         Raises:
             ValueError: If any scope is not supported.
         """
-        allowed = {"activities:upload"}
-        unsupported = set(v) - allowed
+        unsupported = set(v) - api_keys_utils.SUPPORTED_API_KEY_SCOPES
         if unsupported:
-            raise ValueError(f"Unsupported API key scopes: {unsupported}. Valid scopes: {allowed}")
+            raise ValueError(
+                f"Unsupported API key scopes: {unsupported}. Valid scopes: {api_keys_utils.SUPPORTED_API_KEY_SCOPES}"
+            )
         return v
 
     model_config = ConfigDict(from_attributes=True)

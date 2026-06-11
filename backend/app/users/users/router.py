@@ -7,14 +7,11 @@ from fastapi import APIRouter, Depends, Query, Security, UploadFile, status
 from sqlalchemy.orm import Session
 
 import auth.dependencies as auth_dependencies
-import auth.identity_links.crud as user_idp_crud
 import auth.identity_service as auth_identity_service
-import auth.security_stores as auth_security_stores
-import auth.sessions.crud as users_sessions_crud
+import auth.sign_up_tokens.utils as sign_up_tokens_utils
 import core.apprise as core_apprise
 import core.database as core_database
 import core.dependencies as core_dependencies
-import sign_up_tokens.utils as sign_up_tokens_utils
 import users.users.crud as users_crud
 import users.users.dependencies as users_dependencies
 import users.users.schema as users_schema
@@ -37,6 +34,10 @@ async def read_users_all_pagination(
     db: Annotated[
         Session,
         Depends(core_database.get_db),
+    ],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
     ],
     page_number: Annotated[
         int | None,
@@ -95,10 +96,14 @@ async def read_users_all_pagination(
         show_pending_approval,
     )
 
+    # Batch fetch IdP link counts for all users in a single grouped query
+    user_ids = [user.id for user in users]
+    idp_counts = identity_service.get_identity_link_counts_for_users(user_ids)
+
     # Enrich with IDP count before serializing
     enriched_users = []
     for user in users:
-        idp_count = len(user_idp_crud.get_user_identity_providers_by_user_id(user.id, db))
+        idp_count = idp_counts.get(user.id, 0)
         user_read = users_schema.UsersRead.model_validate(user)
         user_read.external_auth_count = idp_count
 
@@ -256,7 +261,7 @@ async def create_user(
     created_user = users_crud.create_user(user, identity_service, db)
 
     # Create default data for the user
-    users_utils.create_user_default_data(created_user.id, db)
+    users_utils.create_user_default_data(created_user.id, identity_service, db)
 
     # Return the created user
     return created_user
@@ -305,6 +310,10 @@ async def edit_user(
         Session,
         Depends(core_database.get_db),
     ],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
+    ],
 ) -> users_schema.UsersRead:
     """
     Update user information.
@@ -322,7 +331,8 @@ async def edit_user(
     db_user = await users_crud.edit_user(user_id, user_attributtes, db)
 
     # Enrich with IDP count before serializing
-    idp_count = len(user_idp_crud.get_user_identity_providers_by_user_id(db_user.id, db))
+    idp_counts = identity_service.get_identity_link_counts_for_users([db_user.id])
+    idp_count = idp_counts.get(db_user.id, 0)
     user_read = users_schema.UsersRead.model_validate(db_user)
     user_read.external_auth_count = idp_count
 
@@ -375,10 +385,6 @@ async def edit_user_password(
         auth_identity_service.IdentityService,
         Depends(auth_identity_service.get_identity_service),
     ],
-    db: Annotated[
-        Session,
-        Depends(core_database.get_db),
-    ],
 ) -> dict[str, str]:
     """
     Update user password.
@@ -389,14 +395,14 @@ async def edit_user_password(
         user_attributes: New password data.
         _check_scope: Authorization check.
         identity_service: Identity service dependency.
-        db: Database session dependency.
 
     Returns:
         Success message.
     """
-    users_crud.edit_user_password(user_id, user_attributes.password, identity_service, db)
-    users_sessions_crud.delete_sessions_by_user(user_id, db)
-    auth_security_stores.clear_pending_mfa_for_user(user_id)
+    identity_service.change_managed_user_password(
+        user_id,
+        user_attributes.password,
+    )
 
     # Return success message
     return {"message": f"User ID {user_id} password updated successfully"}

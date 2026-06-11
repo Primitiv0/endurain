@@ -10,7 +10,7 @@ from sqlalchemy.sql import func
 from core.database import Base
 
 if TYPE_CHECKING:
-    from auth.identity_links.models import UsersIdentityProvider
+    from auth.identity_providers.links.models import IdentityLink
     from auth.oauth_state.models import OAuthState
 
 
@@ -40,7 +40,7 @@ class IdentityProvider(Base):
             fields.
         created_at (datetime): Timestamp when the provider was created.
         updated_at (datetime): Timestamp when the provider was last updated.
-        user_identity_providers (list[UsersIdentityProvider]): Relationship to
+        user_identity_providers (list[IdentityLink]): Relationship to
             user identity providers (many-to-many through junction table).
         oauth_states (list[OAuthState]): Relationship to OAuth states.
     """
@@ -154,7 +154,7 @@ class IdentityProvider(Base):
     )
 
     # Relationship to user identity providers (many-to-many through junction table)
-    user_identity_providers: Mapped[list["UsersIdentityProvider"]] = relationship(
+    user_identity_providers: Mapped[list["IdentityLink"]] = relationship(
         back_populates="identity_providers",
         cascade="all, delete-orphan",
     )

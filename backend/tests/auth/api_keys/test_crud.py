@@ -9,7 +9,7 @@ import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 
-import auth.api_keys.crud as api_keys_crud
+import auth.api_keys.crud as auth_api_keys_crud
 import auth.api_keys.models as api_keys_models
 import auth.api_keys.schema as api_keys_schema
 
@@ -26,7 +26,7 @@ class TestGetApiKeysByUserId:
         mock_result.scalars.return_value.all.return_value = [mock_key1, mock_key2]
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_keys_by_user_id(user_id, mock_db)
+        result = auth_api_keys_crud.get_api_keys_by_user_id(user_id, mock_db)
 
         assert result == [mock_key1, mock_key2]
         mock_db.execute.assert_called_once()
@@ -37,7 +37,7 @@ class TestGetApiKeysByUserId:
         mock_result.scalars.return_value.all.return_value = []
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_keys_by_user_id(1, mock_db)
+        result = auth_api_keys_crud.get_api_keys_by_user_id(1, mock_db)
 
         assert result == []
 
@@ -46,7 +46,7 @@ class TestGetApiKeysByUserId:
         mock_db.execute.side_effect = SQLAlchemyError("DB error")
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.get_api_keys_by_user_id(1, mock_db)
+            auth_api_keys_crud.get_api_keys_by_user_id(1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -61,7 +61,7 @@ class TestGetApiKeyById:
         mock_result.scalar_one_or_none.return_value = mock_key
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
 
         assert result is mock_key
 
@@ -71,7 +71,7 @@ class TestGetApiKeyById:
         mock_result.scalar_one_or_none.return_value = None
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_key_by_id("nonexistent-uuid", 1, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_id("nonexistent-uuid", 1, mock_db)
 
         assert result is None
 
@@ -81,7 +81,7 @@ class TestGetApiKeyById:
         mock_result.scalar_one_or_none.return_value = None
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_key_by_id("some-uuid", 999, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_id("some-uuid", 999, mock_db)
 
         assert result is None
 
@@ -90,7 +90,7 @@ class TestGetApiKeyById:
         mock_db.execute.side_effect = SQLAlchemyError("DB error")
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
+            auth_api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -105,7 +105,7 @@ class TestGetApiKeyByHash:
         mock_result.scalar_one_or_none.return_value = mock_key
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_key_by_hash("a" * 64, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_hash("a" * 64, mock_db)
 
         assert result is mock_key
 
@@ -115,7 +115,7 @@ class TestGetApiKeyByHash:
         mock_result.scalar_one_or_none.return_value = None
         mock_db.execute.return_value = mock_result
 
-        result = api_keys_crud.get_api_key_by_hash("b" * 64, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_hash("b" * 64, mock_db)
 
         assert result is None
 
@@ -124,7 +124,7 @@ class TestGetApiKeyByHash:
         mock_db.execute.side_effect = SQLAlchemyError("DB error")
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.get_api_key_by_hash("c" * 64, mock_db)
+            auth_api_keys_crud.get_api_key_by_hash("c" * 64, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -144,7 +144,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             return_value=mock_orm_key,
         ):
-            result = api_keys_crud.create_api_key(1, data, mock_db)
+            result = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         assert isinstance(result, tuple)
         assert len(result) == 2
@@ -160,7 +160,7 @@ class TestCreateApiKey:
             scopes=["activities:upload"],
         )
 
-        api_keys_crud.create_api_key(1, data, mock_db)
+        auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()
@@ -177,7 +177,7 @@ class TestCreateApiKey:
             scopes=["activities:upload"],
         )
 
-        _, raw_key = api_keys_crud.create_api_key(1, data, mock_db)
+        _, raw_key = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         assert raw_key.startswith("endurain_")
 
@@ -198,7 +198,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             side_effect=fake_constructor,
         ):
-            _, raw_key = api_keys_crud.create_api_key(1, data, mock_db)
+            _, raw_key = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         assert captured_kwargs["key_prefix"] == raw_key[9:17]
 
@@ -219,7 +219,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             side_effect=fake_constructor,
         ):
-            api_keys_crud.create_api_key(1, data, mock_db)
+            auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         assert captured_kwargs["is_active"] is True
 
@@ -242,7 +242,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             side_effect=fake_constructor,
         ):
-            _, raw_key = api_keys_crud.create_api_key(1, data, mock_db)
+            _, raw_key = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         expected_hash = hashlib.sha256(raw_key.encode()).hexdigest()
         assert captured_kwargs["key_hash"] == expected_hash
@@ -256,7 +256,7 @@ class TestCreateApiKey:
         mock_db.add.side_effect = SQLAlchemyError("DB error")
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.create_api_key(1, data, mock_db)
+            auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -271,7 +271,7 @@ class TestUpdateLastUsed:
         mock_result.scalar_one_or_none.return_value = mock_key
         mock_db.execute.return_value = mock_result
 
-        api_keys_crud.update_last_used("some-uuid", mock_db)
+        auth_api_keys_crud.update_last_used("some-uuid", mock_db)
 
         assert mock_key.last_used_at is not None
         mock_db.commit.assert_called_once()
@@ -283,7 +283,7 @@ class TestUpdateLastUsed:
         mock_db.execute.return_value = mock_result
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.update_last_used("nonexistent-uuid", mock_db)
+            auth_api_keys_crud.update_last_used("nonexistent-uuid", mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -292,7 +292,7 @@ class TestUpdateLastUsed:
         mock_db.execute.side_effect = SQLAlchemyError("DB error")
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.update_last_used("some-uuid", mock_db)
+            auth_api_keys_crud.update_last_used("some-uuid", mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -307,7 +307,7 @@ class TestRevokeApiKey:
         mock_key.is_active = True
         mock_get_by_id.return_value = mock_key
 
-        api_keys_crud.revoke_api_key("some-uuid", 1, mock_db)
+        auth_api_keys_crud.revoke_api_key("some-uuid", 1, mock_db)
 
         assert mock_key.is_active is False
         mock_db.commit.assert_called_once()
@@ -318,7 +318,7 @@ class TestRevokeApiKey:
         mock_get_by_id.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.revoke_api_key("nonexistent-uuid", 1, mock_db)
+            auth_api_keys_crud.revoke_api_key("nonexistent-uuid", 1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -332,7 +332,7 @@ class TestDeleteApiKey:
         mock_key = MagicMock(spec=api_keys_models.UsersApiKeys)
         mock_get_by_id.return_value = mock_key
 
-        api_keys_crud.delete_api_key("some-uuid", 1, mock_db)
+        auth_api_keys_crud.delete_api_key("some-uuid", 1, mock_db)
 
         mock_db.delete.assert_called_once_with(mock_key)
         mock_db.commit.assert_called_once()
@@ -343,23 +343,6 @@ class TestDeleteApiKey:
         mock_get_by_id.return_value = None
 
         with pytest.raises(HTTPException) as exc_info:
-            api_keys_crud.delete_api_key("nonexistent-uuid", 1, mock_db)
+            auth_api_keys_crud.delete_api_key("nonexistent-uuid", 1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-
-
-class TestIdentityServiceApiKeyDelegation:
-    """Test suite for IdentityService.revoke_api_key delegation."""
-
-    @patch("auth.api_keys.crud.revoke_api_key")
-    def test_revoke_api_key_delegates_to_crud(self, mock_revoke):
-        """DefaultIdentityService.revoke_api_key delegates to crud.revoke_api_key."""
-        from auth.identity_service import DefaultIdentityService
-
-        mock_db = MagicMock()
-        mock_token_manager = MagicMock()
-        mock_password_hasher = MagicMock()
-        service = DefaultIdentityService(mock_db, mock_token_manager, mock_password_hasher)
-        service.revoke_api_key("test-uuid", 42)
-
-        mock_revoke.assert_called_once_with("test-uuid", 42, mock_db)

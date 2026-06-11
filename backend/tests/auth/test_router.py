@@ -8,9 +8,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+import auth.identity_service as auth_identity_service
+import auth.internal_dependencies as auth_security
 import auth.password_hasher as auth_password_hasher
 import auth.router as auth_router
-import auth.security as auth_security
 import auth.security_stores as auth_security_stores
 import auth.token_manager as auth_token_manager
 import core.database as core_database
@@ -78,7 +79,7 @@ class FakePendingMFAStore:
         """Record failed MFA attempt."""
         return 1
 
-    def reset_failed_attempts(self, username: str) -> None:
+    def reset_attempts(self, username: str) -> None:
         """Reset MFA failed attempts."""
         pass
 
@@ -102,8 +103,16 @@ def fake_pending_mfa_store():
 
 
 @pytest.fixture
+def mock_identity_service():
+    """Return an IdentityService test double."""
+    service = MagicMock()
+    return service
+
+
+@pytest.fixture
 def auth_app(
     mock_db,
+    mock_identity_service,
     password_hasher,
     token_manager,
     fake_failed_login_store,
@@ -119,6 +128,7 @@ def auth_app(
         return app.state._client_type
 
     app.dependency_overrides[core_database.get_db] = lambda: mock_db
+    app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: mock_identity_service
     app.dependency_overrides[auth_password_hasher.get_password_hasher] = lambda: password_hasher
     app.dependency_overrides[auth_token_manager.get_token_manager] = lambda: token_manager
     app.dependency_overrides[auth_security.header_client_type_scheme] = _client_type
@@ -143,7 +153,7 @@ class TestLoginEndpoint:
     """Tests for POST /auth/login endpoint."""
 
     @patch("auth.router.auth_utils.complete_login")
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_web_success(
@@ -182,7 +192,7 @@ class TestLoginEndpoint:
         assert data["token_type"] == "bearer"
 
     @patch("auth.router.auth_utils.complete_login")
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_mobile_success(
@@ -272,7 +282,7 @@ class TestLoginEndpoint:
         assert response.status_code == 429
         assert "locked" in response.json()["detail"].lower()
 
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_mfa_required_returns_202(
@@ -313,7 +323,7 @@ class TestLoginEndpoint:
         assert "together" in response.json()["detail"]
 
     @patch("auth.router.auth_utils.create_mobile_pkce_session_response")
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_mobile_pkce_returns_session_response(
@@ -416,7 +426,7 @@ class TestLoginEndpoint:
         assert "unavailable" in response.json()["detail"].lower()
 
     @patch("auth.router.auth_utils.complete_login")
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_store_unavailable_on_reset_attempts_returns_503(
@@ -446,7 +456,7 @@ class TestLoginEndpoint:
         assert "unavailable" in response.json()["detail"].lower()
 
     @patch("auth.router.auth_utils.complete_login")
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_store_unavailable_on_add_pending_returns_503(
@@ -473,7 +483,7 @@ class TestLoginEndpoint:
         )
         assert response.status_code == 503
 
-    @patch("auth.router.profile_utils.is_mfa_enabled_for_user")
+    @patch("auth.router.mfa_service.is_mfa_enabled_for_user")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.auth_utils.authenticate_user")
     def test_login_mfa_required_mobile_returns_dict(
@@ -509,7 +519,7 @@ class TestMFAVerifyEndpoint:
     @patch("auth.router.auth_utils.complete_login")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_success(
         self,
         mock_verify_mfa,
@@ -547,7 +557,7 @@ class TestMFAVerifyEndpoint:
         assert response.status_code == 200
         assert response.json()["access_token"] == "at-mfa"
 
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_invalid_code_returns_400(
         self,
         mock_verify_mfa,
@@ -569,6 +579,59 @@ class TestMFAVerifyEndpoint:
 
         assert response.status_code == 400
         assert "Invalid MFA code" in response.json()["detail"]
+
+    @patch("auth.router.auth_utils.complete_login")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.users_crud.get_user_by_id")
+    def test_mfa_verify_backup_code_calls_utils_directly(
+        self,
+        mock_get_user,
+        mock_check_active,
+        mock_complete_login,
+        auth_client,
+        auth_app,
+        fake_pending_mfa_store,
+        mock_identity_service,
+    ):
+        """Backup-code MFA login calls mfa_backup_codes.utils directly (not via IdentityService)."""
+        fake_pending_mfa_store.add_pending_login("testuser", 1)
+        mock_mfa = MagicMock()
+        mock_mfa.mfa_enabled = True
+        mock_mfa.mfa_secret = "encrypted-secret"
+        mock_user = MagicMock()
+        mock_user.id = 1
+        mock_user.auth_mfa = mock_mfa
+        mock_get_user.return_value = mock_user
+        mock_check_active.return_value = None
+        mock_complete_login.return_value = {
+            "session_id": "sid-backup",
+            "access_token": "at-backup",
+            "csrf_token": "csrf-backup",
+            "token_type": "bearer",
+            "expires_in": 900,
+            "refresh_token_expires_in": 604800,
+        }
+
+        with patch(
+            "auth.mfa.service.mfa_backup_codes_utils.verify_and_consume_backup_code",
+            return_value=True,
+        ) as mock_backup_verify:
+            response = auth_client.post(
+                "/auth/mfa/verify",
+                json={
+                    "username": "testuser",
+                    "mfa_code": "A3K9-7BDF",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.json()["access_token"] == "at-backup"
+        mock_backup_verify.assert_called_once_with(
+            1,
+            "A3K9-7BDF",
+            mock_identity_service,
+            mock_backup_verify.call_args[0][3],
+        )
 
     def test_mfa_verify_no_pending_login_returns_400(
         self,
@@ -660,7 +723,7 @@ class TestMFAVerifyEndpoint:
         assert response.status_code == 503
         assert "unavailable" in response.json()["detail"].lower()
 
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_store_unavailable_on_record_failed_returns_503(
         self,
         mock_verify_mfa,
@@ -681,7 +744,7 @@ class TestMFAVerifyEndpoint:
         assert response.status_code == 503
         assert "unavailable" in response.json()["detail"].lower()
 
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_store_unavailable_on_claim_pending_returns_503(
         self,
         mock_verify_mfa,
@@ -703,7 +766,7 @@ class TestMFAVerifyEndpoint:
         assert "unavailable" in response.json()["detail"].lower()
 
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_user_not_found_returns_401(
         self,
         mock_verify_mfa,
@@ -725,7 +788,7 @@ class TestMFAVerifyEndpoint:
 
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_store_unavailable_on_reset_returns_503(
         self,
         mock_verify_mfa,
@@ -735,14 +798,14 @@ class TestMFAVerifyEndpoint:
         auth_app,
         fake_pending_mfa_store,
     ):
-        """503 when reset_failed_attempts raises after successful MFA."""
+        """503 when reset_attempts raises after successful MFA."""
         fake_pending_mfa_store.add_pending_login("testuser", 1)
         mock_verify_mfa.return_value = True
         mock_user = MagicMock()
         mock_user.id = 1
         mock_get_user.return_value = mock_user
         mock_check_active.return_value = None
-        fake_pending_mfa_store.reset_failed_attempts = MagicMock(
+        fake_pending_mfa_store.reset_attempts = MagicMock(
             side_effect=auth_security_stores.AuthSecurityStoreUnavailableError("Redis down"),
         )
         response = auth_client.post(
@@ -755,7 +818,7 @@ class TestMFAVerifyEndpoint:
     @patch("auth.router.auth_utils.create_mobile_pkce_session_response")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.profile_utils.verify_user_mfa")
+    @patch("auth.router.mfa_service.verify_user_mfa")
     def test_mfa_verify_mobile_pkce_returns_session_response(
         self,
         mock_verify_mfa,
@@ -797,15 +860,15 @@ class TestRefreshEndpoint:
     """Tests for POST /auth/refresh endpoint."""
 
     @patch("auth.router.idp_utils.refresh_idp_tokens_if_needed")
-    @patch("auth.router.users_session_utils.edit_session")
+    @patch("auth.router.auth_sessions_utils.edit_session")
     @patch("auth.router.auth_utils.create_tokens")
     @patch("auth.router.auth_utils.set_refresh_token_cookie")
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_web_success(
         self,
         mock_get_session,
@@ -828,6 +891,7 @@ class TestRefreshEndpoint:
         now = datetime.now(UTC)
         mock_session = MagicMock()
         mock_session.id = "sid-1"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("mock_refresh_token")
         mock_session.csrf_token_hash = None
         mock_session.token_family_id = "fam-1"
@@ -868,7 +932,7 @@ class TestRefreshEndpoint:
         assert data["csrf_token"] == "new-csrf"
         assert data["token_type"] == "bearer"
 
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_session_not_found_returns_404(self, mock_get_session, auth_client, auth_app):
         """Missing session returns 404."""
         mock_get_session.return_value = None
@@ -885,10 +949,40 @@ class TestRefreshEndpoint:
         assert response.status_code == 404
         assert "Session not found" in response.json()["detail"]
 
-    @patch("auth.router.users_session_rotated_tokens_utils.invalidate_token_family")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
+    def test_refresh_session_owner_mismatch_returns_401(
+        self,
+        mock_get_session,
+        mock_validate_timeout,
+        auth_client,
+        auth_app,
+    ):
+        """Session owned by a different user than the token sub returns 401."""
+        mock_session = MagicMock()
+        mock_session.id = "sid-1"
+        # Session belongs to user 999, but the refresh token's sub is 1.
+        mock_session.user_id = 999
+        mock_get_session.return_value = mock_session
+
+        app = auth_app
+        app.dependency_overrides[auth_security.validate_refresh_token] = lambda: None
+        app.dependency_overrides[auth_security.get_sub_from_refresh_token] = lambda: 1
+        app.dependency_overrides[auth_security.get_sid_from_refresh_token] = lambda: "sid-1"
+        app.dependency_overrides[auth_security.get_and_return_refresh_token] = lambda: "rt"
+        app.dependency_overrides[auth_security.header_csrf_token_scheme] = lambda: None
+
+        response = auth_client.post("/auth/refresh")
+
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid refresh token"
+        # The owner check must short-circuit before session-timeout validation.
+        mock_validate_timeout.assert_not_called()
+
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.invalidate_token_family")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_token_reuse_returns_401(
         self,
         mock_get_session,
@@ -901,6 +995,7 @@ class TestRefreshEndpoint:
         """Token reuse detected invalidates family and returns 401."""
         mock_session = MagicMock()
         mock_session.id = "sid-1"
+        mock_session.user_id = 1
         mock_session.refresh_token = "hashed-rt"
         mock_session.csrf_token_hash = None
         mock_session.token_family_id = "fam-1"
@@ -922,16 +1017,16 @@ class TestRefreshEndpoint:
         mock_invalidate.assert_called_once()
 
     @patch("auth.router.idp_utils.refresh_idp_tokens_if_needed")
-    @patch("auth.router.users_session_utils.edit_session")
+    @patch("auth.router.auth_sessions_utils.edit_session")
     @patch("auth.router.auth_utils.create_tokens")
     @patch("auth.router.auth_utils.set_refresh_token_cookie")
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_utils.verify_csrf_token")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_utils.verify_csrf_token")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_web_valid_csrf_token_succeeds(
         self,
         mock_get_session,
@@ -979,6 +1074,7 @@ class TestRefreshEndpoint:
         now = datetime.now(UTC)
         mock_session = MagicMock()
         mock_session.id = "sid-csrf-1"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("mock_rt")
         mock_session.csrf_token_hash = "stored-hmac"
         mock_session.token_family_id = "fam-1"
@@ -1012,11 +1108,11 @@ class TestRefreshEndpoint:
         assert response.status_code == 200
         mock_verify_csrf.assert_called_once_with("valid-csrf", "stored-hmac")
 
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_utils.edit_session")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_utils.verify_csrf_token")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_utils.edit_session")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_utils.verify_csrf_token")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_web_invalid_csrf_returns_403_no_side_effects(
         self,
         mock_get_session,
@@ -1047,6 +1143,7 @@ class TestRefreshEndpoint:
         """
         mock_session = MagicMock()
         mock_session.id = "sid-bad-csrf"
+        mock_session.user_id = 1
         mock_session.refresh_token = "some-hashed-token"
         mock_session.csrf_token_hash = "stored-hmac"
         mock_get_session.return_value = mock_session
@@ -1068,15 +1165,15 @@ class TestRefreshEndpoint:
         mock_edit_session.assert_not_called()
 
     @patch("auth.router.idp_utils.refresh_idp_tokens_if_needed")
-    @patch("auth.router.users_session_utils.edit_session")
+    @patch("auth.router.auth_sessions_utils.edit_session")
     @patch("auth.router.auth_utils.create_tokens")
     @patch("auth.router.auth_utils.set_refresh_token_cookie")
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_missing_csrf_with_stored_hash_succeeds(
         self,
         mock_get_session,
@@ -1122,6 +1219,7 @@ class TestRefreshEndpoint:
         now = datetime.now(UTC)
         mock_session = MagicMock()
         mock_session.id = "sid-reload"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("mock_rt")
         mock_session.csrf_token_hash = "stored-hmac"
         mock_session.token_family_id = "fam-1"
@@ -1155,17 +1253,17 @@ class TestRefreshEndpoint:
         assert response.status_code == 200
         assert response.json()["access_token"] == "new-at"
 
-    @patch("auth.router.users_session_utils.verify_csrf_token")
+    @patch("auth.router.auth_sessions_utils.verify_csrf_token")
     @patch("auth.router.idp_utils.refresh_idp_tokens_if_needed")
-    @patch("auth.router.users_session_utils.edit_session")
+    @patch("auth.router.auth_sessions_utils.edit_session")
     @patch("auth.router.auth_utils.create_tokens")
     @patch("auth.router.auth_utils.set_refresh_token_cookie")
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_mobile_bypasses_csrf_with_stored_hash(
         self,
         mock_get_session,
@@ -1214,6 +1312,7 @@ class TestRefreshEndpoint:
         now = datetime.now(UTC)
         mock_session = MagicMock()
         mock_session.id = "sid-mob-csrf"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("mock_rt")
         mock_session.csrf_token_hash = "stored-hmac"
         mock_session.token_family_id = "fam-1"
@@ -1248,8 +1347,8 @@ class TestRefreshEndpoint:
         mock_set_cookie.assert_not_called()
         assert "refresh_token" in response.json()
 
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_pending_pkce_no_refresh_token_returns_401(
         self,
         mock_get_session,
@@ -1274,6 +1373,7 @@ class TestRefreshEndpoint:
         """
         mock_session = MagicMock()
         mock_session.id = "sid-pkce"
+        mock_session.user_id = 1
         mock_session.refresh_token = None
         mock_session.csrf_token_hash = None
         mock_get_session.return_value = mock_session
@@ -1291,11 +1391,11 @@ class TestRefreshEndpoint:
         assert response.status_code == 401
         assert "PKCE" in response.json()["detail"]
 
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_utils.edit_session")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_utils.edit_session")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_wrong_hash_returns_401_no_side_effects(
         self,
         mock_get_session,
@@ -1328,6 +1428,7 @@ class TestRefreshEndpoint:
         """
         mock_session = MagicMock()
         mock_session.id = "sid-bad-rt"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("real_token")
         mock_session.csrf_token_hash = None
         mock_session.token_family_id = "fam-1"
@@ -1350,13 +1451,13 @@ class TestRefreshEndpoint:
         mock_store_rotated.assert_not_called()
         mock_edit_session.assert_not_called()
 
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_utils.edit_session")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_utils.edit_session")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_missing_user_returns_401(
         self,
         mock_get_session,
@@ -1393,6 +1494,7 @@ class TestRefreshEndpoint:
         """
         mock_session = MagicMock()
         mock_session.id = "sid-no-user"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("mock_rt")
         mock_session.csrf_token_hash = None
         mock_session.token_family_id = "fam-1"
@@ -1415,15 +1517,15 @@ class TestRefreshEndpoint:
         assert "authenticate" in response.json()["detail"].lower()
 
     @patch("auth.router.idp_utils.refresh_idp_tokens_if_needed")
-    @patch("auth.router.users_session_utils.edit_session")
+    @patch("auth.router.auth_sessions_utils.edit_session")
     @patch("auth.router.auth_utils.create_tokens")
     @patch("auth.router.auth_utils.set_refresh_token_cookie")
-    @patch("auth.router.users_session_rotated_tokens_utils.store_rotated_token")
-    @patch("auth.router.users_session_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
     @patch("auth.router.users_utils.check_user_is_active")
     @patch("auth.router.users_crud.get_user_by_id")
-    @patch("auth.router.users_session_utils.validate_session_timeout")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_refresh_mobile_success_includes_refresh_token_no_cookie(
         self,
         mock_get_session,
@@ -1470,6 +1572,7 @@ class TestRefreshEndpoint:
         now = datetime.now(UTC)
         mock_session = MagicMock()
         mock_session.id = "sid-mob"
+        mock_session.user_id = 1
         mock_session.refresh_token = password_hasher.hash_password("mock_rt")
         mock_session.csrf_token_hash = None
         mock_session.token_family_id = "fam-1"
@@ -1515,8 +1618,8 @@ class TestLogoutEndpoint:
     """Tests for POST /auth/logout endpoint."""
 
     @patch("auth.router.idp_utils.clear_all_idp_tokens")
-    @patch("auth.router.users_session_crud.delete_session")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.delete_session")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_success(
         self,
         mock_get_session,
@@ -1547,7 +1650,7 @@ class TestLogoutEndpoint:
         assert "message" in data
         mock_delete_session.assert_called_once()
 
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_invalid_refresh_token_returns_401(
         self,
         mock_get_session,
@@ -1573,8 +1676,8 @@ class TestLogoutEndpoint:
         assert "Invalid refresh token" in response.json()["detail"]
 
     @patch("auth.router.auth_utils.clear_refresh_token_cookies")
-    @patch("auth.router.users_session_crud.delete_session")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.delete_session")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_missing_session_is_idempotent_success(
         self,
         mock_get_session,
@@ -1612,7 +1715,7 @@ class TestLogoutEndpoint:
         assert response.status_code == 200
         mock_delete_session.assert_not_called()
 
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_pending_pkce_no_refresh_token_returns_401(
         self,
         mock_get_session,
@@ -1651,8 +1754,8 @@ class TestLogoutEndpoint:
 
     @patch("auth.router.auth_utils.clear_refresh_token_cookies")
     @patch("auth.router.idp_utils.clear_all_idp_tokens")
-    @patch("auth.router.users_session_crud.delete_session")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.delete_session")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_web_clears_refresh_cookies(
         self,
         mock_get_session,
@@ -1701,8 +1804,8 @@ class TestLogoutEndpoint:
 
     @patch("auth.router.auth_utils.clear_refresh_token_cookies")
     @patch("auth.router.idp_utils.clear_all_idp_tokens")
-    @patch("auth.router.users_session_crud.delete_session")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.delete_session")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_mobile_succeeds_without_cookie_clearing(
         self,
         mock_get_session,
@@ -1750,7 +1853,7 @@ class TestLogoutEndpoint:
         assert response.status_code == 200
         mock_clear_cookies.assert_not_called()
 
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_invalid_client_type_returns_403(
         self,
         mock_get_session,
@@ -1786,8 +1889,8 @@ class TestLogoutEndpoint:
         assert "client type" in response.json()["detail"].lower()
 
     @patch("auth.router.auth_utils.clear_refresh_token_cookies")
-    @patch("auth.router.users_session_crud.delete_session")
-    @patch("auth.router.users_session_crud.get_session_by_id_not_expired")
+    @patch("auth.router.auth_sessions_crud.delete_session")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
     def test_logout_missing_session_is_idempotent_success_mobile(
         self,
         mock_get_session,

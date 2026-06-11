@@ -669,11 +669,11 @@ class TestRedisPendingMFAStore:
         assert lockout_time > datetime.now(UTC)
 
     def test_reset_failed_attempts_clears_mfa_lockout(self):
-        """reset_failed_attempts removes the MFA lockout."""
+        """reset_attempts removes the MFA lockout."""
         store = _make_pending_mfa_store(FakeRedis())
         for _ in range(5):
             store.record_failed_attempt("alice")
-        store.reset_failed_attempts("alice")
+        store.reset_attempts("alice")
         assert store.is_locked_out("alice") is False
         assert store.get_lockout_time("alice") is None
 
@@ -823,12 +823,12 @@ class TestRedisFailureScenarios:
 
     def test_pending_mfa_reset_raises_on_delete_error(self):
         """
-        reset_failed_attempts raises AuthSecurityStoreUnavailableError
+        reset_attempts raises AuthSecurityStoreUnavailableError
         when the Redis DELETE fails (MFA store).
         """
         store = _make_pending_mfa_store(FailingRedis("delete"))
         with pytest.raises(security_stores.AuthSecurityStoreUnavailableError):
-            store.reset_failed_attempts("alice")
+            store.reset_attempts("alice")
 
     def test_clear_for_user_raises_on_scan_error(self):
         """

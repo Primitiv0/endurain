@@ -5,20 +5,13 @@ from collections.abc import Callable, Sequence
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import activities.activity.utils as activities_utils
-import auth.oauth_state.utils as oauth_state_utils
-import auth.security_stores as auth_security_stores
-import auth.sessions.utils as users_session_utils
+import auth.maintenance as auth_maintenance
 import core.logger as core_logger
 import core.network as core_network
 import garmin.activity_utils as garmin_activity_utils
 import garmin.health_utils as garmin_health_utils
-import password_reset_tokens.utils as password_reset_tokens_utils
-import sign_up_tokens.utils as sign_up_tokens_utils
 import strava.activity_utils as strava_activity_utils
 import strava.utils as strava_utils
-from auth.sessions.rotated_refresh_tokens import (
-    utils as rotated_tokens_utils,
-)
 
 scheduler = AsyncIOScheduler()
 
@@ -72,7 +65,7 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        password_reset_tokens_utils.delete_invalid_tokens_from_db,
+        auth_maintenance.delete_invalid_password_reset_tokens_from_db,
         "interval",
         60,
         [],
@@ -80,7 +73,7 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        sign_up_tokens_utils.delete_invalid_tokens_from_db,
+        auth_maintenance.delete_invalid_sign_up_tokens_from_db,
         "interval",
         60,
         [],
@@ -88,7 +81,7 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        oauth_state_utils.delete_expired_oauth_states_from_db,
+        auth_maintenance.delete_expired_oauth_states_from_db,
         "interval",
         5,
         [],
@@ -96,7 +89,15 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        users_session_utils.cleanup_idle_sessions,
+        auth_maintenance.delete_idp_link_expired_tokens_from_db,
+        "interval",
+        5,
+        [],
+        "delete expired IdP link tokens from the database",
+    )
+
+    add_scheduler_job(
+        auth_maintenance.cleanup_idle_sessions,
         "interval",
         15,
         [],
@@ -104,7 +105,7 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        rotated_tokens_utils.cleanup_expired_rotated_tokens,
+        auth_maintenance.cleanup_expired_rotated_tokens,
         "interval",
         1,
         [],
@@ -112,7 +113,7 @@ def start_scheduler() -> None:
     )
 
     add_scheduler_job(
-        auth_security_stores.cleanup_expired_pending_mfa_logins,
+        auth_maintenance.cleanup_expired_pending_mfa_logins,
         "interval",
         5,
         [],

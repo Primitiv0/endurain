@@ -111,6 +111,13 @@ class Settings(BaseSettings):
     RATE_LIMIT_STORAGE_URI: str = "memory://"
     AUTH_SECURITY_STORAGE_URI: str | None = None
 
+    # --- API key delivery ---
+    # Allow API keys to be passed as a ``?api_key=`` query parameter.
+    # Disabled by default because query-string credentials appear in
+    # access logs, proxy histories, and browser history.
+    # Enable only if you have integrations that cannot set custom headers.
+    ALLOW_API_KEY_QUERY_PARAM: bool = False
+
     # --- Reverse-geocoding providers ---
     REVERSE_GEO_PROVIDER: str = "nominatim"
     PHOTON_API_HOST: str = "photon.komoot.io"
@@ -345,6 +352,17 @@ class Settings(BaseSettings):
             self.TRUSTED_PROXIES = ["*"]
         return self
 
+    @property
+    def resolved_auth_security_storage_uri(self) -> str:
+        """Effective storage URI for auth-security and MFA stores.
+
+        Resolves the precedence shared by the auth security stores, MFA
+        setup-secret store, and Garmin MFA code store:
+        ``AUTH_SECURITY_STORAGE_URI`` overrides ``RATE_LIMIT_STORAGE_URI``,
+        falling back to ``memory://`` when neither is set.
+        """
+        return self.AUTH_SECURITY_STORAGE_URI or self.RATE_LIMIT_STORAGE_URI or "memory://"
+
     @model_validator(mode="after")
     def _warn_on_memory_security_storage(self) -> Self:
         """Warn when production-like auth protections are process-local."""
@@ -359,8 +377,7 @@ class Settings(BaseSettings):
                 "warning",
             )
 
-        auth_security_storage_uri = self.AUTH_SECURITY_STORAGE_URI or self.RATE_LIMIT_STORAGE_URI
-        if core_redis.is_memory_storage_uri(auth_security_storage_uri):
+        if core_redis.is_memory_storage_uri(self.resolved_auth_security_storage_uri):
             core_logger.print_to_log_and_console(
                 "AUTH_SECURITY_STORAGE_URI resolves to process-local "
                 "memory outside development. Login lockout and pending "

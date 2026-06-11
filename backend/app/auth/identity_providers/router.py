@@ -6,11 +6,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Security, status
 from sqlalchemy.orm import Session
 
+import auth.dependencies as auth_dependencies
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.dependencies as idp_dependencies
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.utils as idp_utils
-import auth.security as auth_security
 import core.database as core_database
 import users.users.schema as users_schema
 
@@ -26,7 +26,7 @@ router = APIRouter()
 async def list_identity_providers(
     _check_scopes: Annotated[
         users_schema.UsersRead,
-        Security(auth_security.check_scopes, scopes=["identity_providers:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["identity_providers:read"]),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[idp_schema.IdentityProvider]:
@@ -52,7 +52,7 @@ async def list_identity_providers(
 async def list_idp_templates(
     _check_scopes: Annotated[
         users_schema.UsersRead,
-        Security(auth_security.check_scopes, scopes=["identity_providers:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["identity_providers:read"]),
     ],
 ) -> list[idp_schema.IdentityProviderTemplate]:
     """
@@ -76,7 +76,7 @@ async def list_idp_templates(
 async def create_identity_provider(
     _check_scopes: Annotated[
         users_schema.UsersRead,
-        Security(auth_security.check_scopes, scopes=["identity_providers:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["identity_providers:write"]),
     ],
     idp_data: idp_schema.IdentityProviderCreate,
     db: Annotated[Session, Depends(core_database.get_db)],
@@ -110,7 +110,7 @@ async def update_identity_provider(
     _validate_id: Annotated[Callable, Depends(idp_dependencies.validate_idp_id)],
     _check_scopes: Annotated[
         users_schema.UsersRead,
-        Security(auth_security.check_scopes, scopes=["identity_providers:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["identity_providers:write"]),
     ],
     idp_data: idp_schema.IdentityProviderUpdate,
     db: Annotated[Session, Depends(core_database.get_db)],
@@ -141,7 +141,7 @@ async def delete_identity_provider(
     _validate_id: Annotated[Callable, Depends(idp_dependencies.validate_idp_id)],
     _check_scopes: Annotated[
         users_schema.UsersRead,
-        Security(auth_security.check_scopes, scopes=["identity_providers:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["identity_providers:write"]),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> None:

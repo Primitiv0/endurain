@@ -139,7 +139,6 @@ class TestProtocolConformance:
             "resolve_from_session_cookie",
             "issue_token_pair",
             "revoke_session",
-            "revoke_api_key",
             "check_scope",
         }
         for method in expected:
@@ -234,8 +233,10 @@ class TestResolveFromAccessToken:
         service: DefaultIdentityService,
         mock_token_manager: MagicMock,
     ):
-        """Propagates HTTPException from validate_token_expiration."""
-        mock_token_manager.validate_token_expiration.side_effect = HTTPException(status_code=401, detail="expired")
+        """Propagates HTTPException from validate_access_expiration_logged."""
+        mock_token_manager.validate_access_expiration_logged.side_effect = HTTPException(
+            status_code=401, detail="expired"
+        )
         with pytest.raises(HTTPException) as exc_info:
             service.resolve_from_access_token("expired_token")
 
@@ -314,11 +315,11 @@ class TestResolveFromApiKey:
 
         with (
             patch(
-                "auth.identity_service.users_api_keys_utils.hash_api_key",
+                "auth.identity_service.auth_api_keys_utils.hash_api_key",
                 return_value="a" * 64,
             ),
             patch(
-                "auth.identity_service.users_api_keys_crud.get_api_key_by_hash",
+                "auth.identity_service.auth_api_keys_crud.get_api_key_by_hash",
                 return_value=mock_db_key,
             ),
             patch(
@@ -326,9 +327,9 @@ class TestResolveFromApiKey:
                 return_value=mock_user,
             ),
             patch("auth.identity_service.users_utils.check_user_is_active"),
-            patch("auth.identity_service.users_api_keys_crud.update_last_used"),
+            patch("auth.identity_service.auth_api_keys_crud.update_last_used"),
             patch(
-                "auth.identity_service.users_api_keys_utils.json_to_scopes",
+                "auth.identity_service.auth_api_keys_utils.json_to_scopes",
                 return_value=["profile"],
             ),
         ):
@@ -349,11 +350,11 @@ class TestResolveFromApiKey:
 
         with (
             patch(
-                "auth.identity_service.users_api_keys_utils.hash_api_key",
+                "auth.identity_service.auth_api_keys_utils.hash_api_key",
                 return_value="b" * 64,
             ),
             patch(
-                "auth.identity_service.users_api_keys_crud.get_api_key_by_hash",
+                "auth.identity_service.auth_api_keys_crud.get_api_key_by_hash",
                 return_value=None,
             ),
             pytest.raises(HTTPException) as exc_info,
@@ -377,11 +378,11 @@ class TestResolveFromApiKey:
 
         with (
             patch(
-                "auth.identity_service.users_api_keys_utils.hash_api_key",
+                "auth.identity_service.auth_api_keys_utils.hash_api_key",
                 return_value="c" * 64,
             ),
             patch(
-                "auth.identity_service.users_api_keys_crud.get_api_key_by_hash",
+                "auth.identity_service.auth_api_keys_crud.get_api_key_by_hash",
                 return_value=mock_db_key,
             ),
             patch(
@@ -410,11 +411,11 @@ class TestResolveFromApiKey:
 
         with (
             patch(
-                "auth.identity_service.users_api_keys_utils.hash_api_key",
+                "auth.identity_service.auth_api_keys_utils.hash_api_key",
                 return_value="d" * 64,
             ),
             patch(
-                "auth.identity_service.users_api_keys_crud.get_api_key_by_hash",
+                "auth.identity_service.auth_api_keys_crud.get_api_key_by_hash",
                 return_value=mock_db_key,
             ),
             patch(
@@ -449,11 +450,11 @@ class TestResolveFromApiKey:
 
         with (
             patch(
-                "auth.identity_service.users_api_keys_utils.hash_api_key",
+                "auth.identity_service.auth_api_keys_utils.hash_api_key",
                 return_value="e" * 64,
             ),
             patch(
-                "auth.identity_service.users_api_keys_crud.get_api_key_by_hash",
+                "auth.identity_service.auth_api_keys_crud.get_api_key_by_hash",
                 return_value=mock_db_key,
             ),
             patch(
@@ -462,11 +463,11 @@ class TestResolveFromApiKey:
             ),
             patch("auth.identity_service.users_utils.check_user_is_active"),
             patch(
-                "auth.identity_service.users_api_keys_crud.update_last_used",
+                "auth.identity_service.auth_api_keys_crud.update_last_used",
                 side_effect=SQLAlchemyError("db down"),
             ),
             patch(
-                "auth.identity_service.users_api_keys_utils.json_to_scopes",
+                "auth.identity_service.auth_api_keys_utils.json_to_scopes",
                 return_value=["profile"],
             ),
         ):
@@ -495,7 +496,7 @@ class TestResolveFromSessionCookie:
 
         with (
             patch(
-                "auth.identity_service.users_sessions_crud.get_session_by_id_not_expired",
+                "auth.identity_service.auth_sessions_crud.get_session_by_id_not_expired",
                 return_value=mock_session,
             ),
             patch(
@@ -517,7 +518,7 @@ class TestResolveFromSessionCookie:
         """Raises 401 when the session is not found or expired."""
         with (
             patch(
-                "auth.identity_service.users_sessions_crud.get_session_by_id_not_expired",
+                "auth.identity_service.auth_sessions_crud.get_session_by_id_not_expired",
                 return_value=None,
             ),
             pytest.raises(HTTPException) as exc_info,
@@ -596,8 +597,8 @@ class TestRevokeSession:
         self,
         service: DefaultIdentityService,
     ):
-        """Delegates to users_sessions_crud.delete_session."""
-        with patch("auth.identity_service.users_sessions_crud.delete_session") as mock_delete:
+        """Delegates to auth_sessions_crud.delete_session."""
+        with patch("auth.identity_service.auth_sessions_crud.delete_session") as mock_delete:
             service.revoke_session("sess-1", user_id=42)
 
         mock_delete.assert_called_once_with("sess-1", 42, service._db)
@@ -609,47 +610,12 @@ class TestRevokeSession:
         """Propagates HTTPException(404) raised by delete_session."""
         with (
             patch(
-                "auth.identity_service.users_sessions_crud.delete_session",
+                "auth.identity_service.auth_sessions_crud.delete_session",
                 side_effect=HTTPException(status_code=404, detail="not found"),
             ),
             pytest.raises(HTTPException) as exc_info,
         ):
             service.revoke_session("missing-sess", user_id=1)
-
-        assert exc_info.value.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# revoke_api_key
-# ---------------------------------------------------------------------------
-
-
-class TestRevokeApiKey:
-    """Tests for DefaultIdentityService.revoke_api_key."""
-
-    def test_delegates_to_revoke_api_key(
-        self,
-        service: DefaultIdentityService,
-    ):
-        """Delegates to users_api_keys_crud.revoke_api_key."""
-        with patch("auth.identity_service.users_api_keys_crud.revoke_api_key") as mock_revoke:
-            service.revoke_api_key("key-uuid", user_id=7)
-
-        mock_revoke.assert_called_once_with("key-uuid", 7, service._db)
-
-    def test_propagates_404_from_crud(
-        self,
-        service: DefaultIdentityService,
-    ):
-        """Propagates HTTPException(404) raised by revoke_api_key CRUD."""
-        with (
-            patch(
-                "auth.identity_service.users_api_keys_crud.revoke_api_key",
-                side_effect=HTTPException(status_code=404, detail="not found"),
-            ),
-            pytest.raises(HTTPException) as exc_info,
-        ):
-            service.revoke_api_key("missing-key", user_id=5)
 
         assert exc_info.value.status_code == 404
 
@@ -804,85 +770,58 @@ class TestVerifyPassword:
     """Tests for DefaultIdentityService.verify_password."""
 
     def test_delegates_to_password_hasher(self, service, mock_password_hasher):
-        mock_password_hasher.verify.return_value = True
+        mock_password_hasher.verify_password.return_value = True
         result = service.verify_password("pass", "$argon2id$hash")
-        mock_password_hasher.verify.assert_called_once_with("pass", "$argon2id$hash")
+        mock_password_hasher.verify_password.assert_called_once_with("pass", "$argon2id$hash")
         assert result is True
 
 
 # ---------------------------------------------------------------------------
-# create_mfa_backup_codes
+# local credential accessors
 # ---------------------------------------------------------------------------
 
 
-class TestCreateMfaBackupCodes:
-    """Tests for DefaultIdentityService.create_mfa_backup_codes."""
+class TestGetPasswordHash:
+    """Tests for DefaultIdentityService.get_password_hash."""
 
-    def test_delegates_to_backup_codes_crud(self, service):
+    def test_returns_hash_when_credential_exists(self, service, mock_db):
+        credential = MagicMock()
+        credential.password_hash = "$argon2id$abc"
         with patch(
-            "auth.mfa_backup_codes.crud.create_backup_codes",
-            return_value=["code1", "code2"],
-        ) as mock_create:
-            result = service.create_mfa_backup_codes(1, count=5)
-        mock_create.assert_called_once_with(1, service._password_hasher, service._db, 5)
-        assert result == ["code1", "code2"]
+            "auth.identity_service.auth_credentials_crud.get_credential",
+            return_value=credential,
+        ) as get_credential:
+            result = service.get_password_hash(42)
+        get_credential.assert_called_once_with(42, mock_db)
+        assert result == "$argon2id$abc"
 
-
-# ---------------------------------------------------------------------------
-# verify_and_consume_mfa_backup_code
-# ---------------------------------------------------------------------------
-
-
-class TestVerifyAndConsumeMfaBackupCode:
-    """Tests for DefaultIdentityService.verify_and_consume_mfa_backup_code."""
-
-    def test_delegates_to_backup_codes_utils(self, service):
+    def test_returns_none_when_no_credential(self, service, mock_db):
         with patch(
-            "auth.mfa_backup_codes.utils.verify_and_consume_backup_code",
-            return_value=True,
-        ) as mock_verify:
-            result = service.verify_and_consume_mfa_backup_code(1, "ABCD-1234")
-        mock_verify.assert_called_once_with(1, "ABCD-1234", service._password_hasher, service._db)
-        assert result is True
+            "auth.identity_service.auth_credentials_crud.get_credential",
+            return_value=None,
+        ) as get_credential:
+            result = service.get_password_hash(42)
+        get_credential.assert_called_once_with(42, mock_db)
+        assert result is None
 
 
-# ---------------------------------------------------------------------------
-# link_external_identity
-# ---------------------------------------------------------------------------
+class TestSetLocalPasswordHash:
+    """Tests for DefaultIdentityService.set_local_password_hash."""
 
-
-class TestLinkExternalIdentity:
-    """Tests for DefaultIdentityService.link_external_identity."""
-
-    def test_delegates_to_identity_links_crud(self, service):
+    def test_delegates_to_crud(self, service, mock_db):
         with patch(
-            "auth.identity_service.auth_identity_links_crud.create_user_identity_provider",
-        ) as mock_link:
-            service.link_external_identity(1, 2, "ext-subject")
-        mock_link.assert_called_once_with(1, 2, "ext-subject", service._db)
+            "auth.identity_service.auth_credentials_crud.upsert_password_hash",
+        ) as upsert:
+            service.set_local_password_hash(42, "$argon2id$abc")
+        upsert.assert_called_once_with(42, "$argon2id$abc", mock_db)
 
 
-# ---------------------------------------------------------------------------
-# unlink_external_identity
-# ---------------------------------------------------------------------------
+class TestClearLocalPassword:
+    """Tests for DefaultIdentityService.clear_local_password."""
 
-
-class TestUnlinkExternalIdentity:
-    """Tests for DefaultIdentityService.unlink_external_identity."""
-
-    def test_happy_path_delegates_and_succeeds(self, service):
+    def test_delegates_to_crud(self, service, mock_db):
         with patch(
-            "auth.identity_service.auth_identity_links_crud.delete_user_identity_provider",
-            return_value=True,
-        ) as mock_unlink:
-            service.unlink_external_identity(1, 2)
-        mock_unlink.assert_called_once_with(1, 2, service._db)
-
-    def test_not_found_raises_404(self, service):
-        with patch(
-            "auth.identity_service.auth_identity_links_crud.delete_user_identity_provider",
-            return_value=False,
-        ):
-            with pytest.raises(HTTPException) as exc_info:
-                service.unlink_external_identity(99, 99)
-            assert exc_info.value.status_code == 404
+            "auth.identity_service.auth_credentials_crud.delete_credential",
+        ) as delete_credential:
+            service.clear_local_password(42)
+        delete_credential.assert_called_once_with(42, mock_db)

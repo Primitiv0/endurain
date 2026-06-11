@@ -5,14 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-import auth.api_keys.crud as api_keys_crud
+import auth.api_keys.crud as auth_api_keys_crud
 import auth.api_keys.schema as api_keys_schema
 import auth.api_keys.utils as api_keys_utils
-import auth.password_hasher as auth_password_hasher
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
+import auth.identity_service as auth_identity_service
+import auth.internal_dependencies as auth_internal_dependencies
+import auth.services.step_up_service as step_up_service
 import core.database as core_database
 import users.users.crud as users_crud
-import users.users.utils as users_utils
 
 # Define the API router
 router = APIRouter()
@@ -26,7 +27,7 @@ router = APIRouter()
 async def get_user_api_keys(
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_internal_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> list[api_keys_schema.UsersApiKeyRead]:
@@ -41,7 +42,7 @@ async def get_user_api_keys(
         List of API key objects. Raw keys and hashes
         are never included.
     """
-    return api_keys_crud.get_api_keys_by_user_id(token_user_id, db)  # type: ignore[return-value]
+    return auth_api_keys_crud.get_api_keys_by_user_id(token_user_id, db)  # type: ignore[return-value]
 
 
 @router.post(
@@ -53,11 +54,15 @@ async def create_user_api_key(
     data: api_keys_schema.UsersApiKeyCreate,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_internal_dependencies.get_sub_from_access_token),
     ],
-    password_hasher: Annotated[
-        auth_password_hasher.PasswordHasher,
-        Depends(auth_password_hasher.get_password_hasher),
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
+    ],
+    step_up_store: Annotated[
+        auth_dependencies.StepUpStore,
+        Depends(auth_dependencies.get_step_up_attempts),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> api_keys_schema.UsersApiKeyCreated:
@@ -77,7 +82,7 @@ async def create_user_api_key(
         data: Key creation data (name, scopes, expiry,
             step-up credentials).
         token_user_id: User ID from access token.
-        password_hasher: Password hasher dependency.
+        identity_service: Identity service dependency.
         db: Database session dependency.
 
     Returns:
@@ -95,11 +100,12 @@ async def create_user_api_key(
             detail="User not found",
         )
 
-    users_utils.verify_step_up_credentials(
+    step_up_service.verify_step_up_credentials(
         token_user_id,
         data.current_password,
         data.mfa_code,
-        password_hasher,
+        identity_service,
+        step_up_store,
         db,
     )
 
@@ -111,7 +117,7 @@ async def create_user_api_key(
             detail=str(exc),
         ) from exc
 
-    db_api_key, raw_key = api_keys_crud.create_api_key(token_user_id, data, db)
+    db_api_key, raw_key = auth_api_keys_crud.create_api_key(token_user_id, data, db)
 
     return api_keys_schema.UsersApiKeyCreated(
         id=db_api_key.id,
@@ -135,7 +141,7 @@ async def revoke_user_api_key(
     api_key_id: str,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_internal_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> None:
@@ -157,7 +163,7 @@ async def revoke_user_api_key(
         HTTPException: 404 if the key is not found or
             does not belong to the authenticated user.
     """
-    api_keys_crud.revoke_api_key(api_key_id, token_user_id, db)
+    auth_api_keys_crud.revoke_api_key(api_key_id, token_user_id, db)
 
 
 @router.delete(
@@ -168,7 +174,7 @@ async def delete_user_api_key(
     api_key_id: str,
     token_user_id: Annotated[
         int,
-        Depends(auth_security.get_sub_from_access_token),
+        Depends(auth_internal_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> None:
@@ -190,4 +196,4 @@ async def delete_user_api_key(
         HTTPException: 404 if the key is not found or
             does not belong to the authenticated user.
     """
-    api_keys_crud.delete_api_key(api_key_id, token_user_id, db)
+    auth_api_keys_crud.delete_api_key(api_key_id, token_user_id, db)

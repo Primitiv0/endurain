@@ -1,6 +1,6 @@
 """Tests for the users management router endpoints."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
@@ -61,15 +61,15 @@ def _make_mock_user(user_id, **overrides):
 class TestReadUsersAllPagination:
     @patch("users.users.router.users_crud.get_users_number")
     @patch("users.users.router.users_crud.get_users_with_pagination")
-    @patch("users.users.router.user_idp_crud.get_user_identity_providers_by_user_id")
     def test_success(
         self,
-        mock_get_idps,
         mock_get_paginated,
         mock_get_number,
         mock_db,
         auth_app,
     ):
+        mock_identity_service = MagicMock()
+        auth_app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: mock_identity_service
         auth_app.dependency_overrides[core_dependencies.validate_pagination_values_on_query] = lambda: None
         client = TestClient(auth_app)
 
@@ -78,7 +78,7 @@ class TestReadUsersAllPagination:
             _make_mock_user(1, name="Alice", email="alice@example.com"),
             _make_mock_user(2, name="Bob", email="bob@example.com"),
         ]
-        mock_get_idps.return_value = []
+        mock_identity_service.get_identity_link_counts_for_users.return_value = {}
 
         response = client.get("/users?page_number=1&num_records=10")
 
@@ -93,15 +93,15 @@ class TestReadUsersAllPagination:
 
     @patch("users.users.router.users_crud.get_users_number")
     @patch("users.users.router.users_crud.get_users_with_pagination")
-    @patch("users.users.router.user_idp_crud.get_user_identity_providers_by_user_id")
     def test_filter_external_auth_false(
         self,
-        mock_get_idps,
         mock_get_paginated,
         mock_get_number,
         mock_db,
         auth_app,
     ):
+        mock_identity_service = MagicMock()
+        auth_app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: mock_identity_service
         auth_app.dependency_overrides[core_dependencies.validate_pagination_values_on_query] = lambda: None
         client = TestClient(auth_app)
 
@@ -110,11 +110,8 @@ class TestReadUsersAllPagination:
             _make_mock_user(1, name="Alice"),
             _make_mock_user(2, name="Bob"),
         ]
-
-        def idp_side_effect(user_id, db):
-            return [MagicMock()] if user_id == 1 else []
-
-        mock_get_idps.side_effect = idp_side_effect
+        # Alice (id=1) has 1 IdP link; Bob (id=2) has none
+        mock_identity_service.get_identity_link_counts_for_users.return_value = {1: 1}
 
         response = client.get("/users?show_external_auth=false")
 
@@ -125,15 +122,15 @@ class TestReadUsersAllPagination:
 
     @patch("users.users.router.users_crud.get_users_number")
     @patch("users.users.router.users_crud.get_users_with_pagination")
-    @patch("users.users.router.user_idp_crud.get_user_identity_providers_by_user_id")
     def test_filter_local_auth_false(
         self,
-        mock_get_idps,
         mock_get_paginated,
         mock_get_number,
         mock_db,
         auth_app,
     ):
+        mock_identity_service = MagicMock()
+        auth_app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: mock_identity_service
         auth_app.dependency_overrides[core_dependencies.validate_pagination_values_on_query] = lambda: None
         client = TestClient(auth_app)
 
@@ -142,11 +139,8 @@ class TestReadUsersAllPagination:
             _make_mock_user(1, name="Alice"),
             _make_mock_user(2, name="Bob"),
         ]
-
-        def idp_side_effect(user_id, db):
-            return [MagicMock()] if user_id == 1 else []
-
-        mock_get_idps.side_effect = idp_side_effect
+        # Alice (id=1) has 1 IdP link; Bob (id=2) has none
+        mock_identity_service.get_identity_link_counts_for_users.return_value = {1: 1}
 
         response = client.get("/users?show_local_auth=false")
 
@@ -294,7 +288,7 @@ class TestCreateUser:
         assert data["name"] == "New User"
         assert data["username"] == "newuser"
         assert data["email"] == "new@example.com"
-        mock_default_data.assert_called_once_with(1, mock_db)
+        mock_default_data.assert_called_once_with(1, ANY, mock_db)
 
 
 class TestUploadUserImage:
@@ -321,9 +315,9 @@ class TestUploadUserImage:
 
 class TestEditUser:
     @patch("users.users.router.users_crud.edit_user", new_callable=AsyncMock)
-    @patch("users.users.router.user_idp_crud.get_user_identity_providers_by_user_id")
-    def test_success(self, mock_get_idps, mock_edit, mock_db, auth_app):
-        auth_app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: MagicMock()
+    def test_success(self, mock_edit, mock_db, auth_app):
+        mock_identity_service = MagicMock()
+        auth_app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: mock_identity_service
         auth_app.dependency_overrides[users_dependencies.validate_user_id] = lambda: None
         client = TestClient(auth_app)
 
@@ -333,7 +327,7 @@ class TestEditUser:
             username="updated",
             email="updated@example.com",
         )
-        mock_get_idps.return_value = [MagicMock(), MagicMock()]
+        mock_identity_service.get_identity_link_counts_for_users.return_value = {1: 2}
 
         response = client.put(
             "/users/1",
@@ -371,10 +365,7 @@ class TestApproveUser:
 
 
 class TestEditUserPassword:
-    @patch("users.users.router.users_crud.edit_user_password")
-    @patch("users.users.router.users_sessions_crud.delete_sessions_by_user")
-    @patch("users.users.router.auth_security_stores.clear_pending_mfa_for_user")
-    def test_success(self, mock_clear_mfa, mock_delete_sessions, mock_edit_pwd, mock_db, auth_app):
+    def test_success(self, mock_db, auth_app):
         mock_identity_service = MagicMock()
         auth_app.dependency_overrides[auth_identity_service.get_identity_service] = lambda: mock_identity_service
         auth_app.dependency_overrides[users_dependencies.validate_user_id] = lambda: None
@@ -387,9 +378,10 @@ class TestEditUserPassword:
 
         assert response.status_code == 200
         assert response.json() == {"message": "User ID 1 password updated successfully"}
-        mock_edit_pwd.assert_called_once_with(1, "newpassword123", mock_identity_service, mock_db)
-        mock_delete_sessions.assert_called_once_with(1, mock_db)
-        mock_clear_mfa.assert_called_once_with(1)
+        mock_identity_service.change_managed_user_password.assert_called_once_with(
+            1,
+            "newpassword123",
+        )
 
 
 class TestDeleteUserPhoto:

@@ -64,6 +64,7 @@ Table below shows supported environment variables. Variables marked with optiona
 | RATE_LIMIT_ENABLED | true | Yes | Enable or disable API rate limiting. Set to `false` to disable for development or testing. Accepted values are `true` and `false` |
 | RATE_LIMIT_STORAGE_URI | memory:// | Yes | Storage backend URI for rate limit counters. Use `memory://` for single-worker deployments or `redis://redis:6379/0` for multi-worker setups so all workers share counters. |
 | AUTH_SECURITY_STORAGE_URI | No default set | Yes | Storage backend URI for auth security state, including login lockout, pending MFA login state, and temporary MFA setup secrets. Defaults to `RATE_LIMIT_STORAGE_URI` when unset. Use `memory://` for single-worker deployments or Redis for shared multi-worker protection. |
+| ALLOW_API_KEY_QUERY_PARAM | false | Yes | Allow API keys to be passed as a `?api_key=` query parameter. Disabled by default because query-string credentials appear in server access logs, reverse-proxy logs, and browser history. Enable only for integrations that cannot set custom request headers (e.g. some webhook senders). The `X-API-Key` header is always preferred. When enabled, every request that uses the query parameter emits a warning in the application log. |
 
 ### TRUSTED_PROXIES Examples
 

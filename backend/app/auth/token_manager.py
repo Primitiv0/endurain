@@ -313,6 +313,36 @@ class TokenManager:
                 headers={"WWW-Authenticate": "Bearer"},
             ) from err
 
+    def validate_access_expiration_logged(self, access_token: str) -> None:
+        """
+        Validate an access token's expiration and log failures consistently.
+
+        Wraps :meth:`validate_token_expiration` for ``TokenType.ACCESS`` and
+        applies the shared logging policy used by the access-token validation
+        dependency and ``IdentityService``: expired tokens log at ``debug``
+        (an expected, routine condition) while all other validation failures
+        log at ``error``. The original :class:`HTTPException` is re-raised
+        unchanged so callers keep the same 401 semantics.
+
+        Args:
+            access_token: The raw JWT access token to validate.
+
+        Raises:
+            HTTPException: 401 if the token is missing claims, expired, not
+                yet valid, or otherwise invalid.
+        """
+        try:
+            self.validate_token_expiration(access_token, TokenType.ACCESS)
+        except HTTPException as http_err:
+            log_level = "debug" if "expired" in http_err.detail.lower() else "error"
+            core_logger.print_to_log(
+                f"Access token validation failed: {http_err.detail}",
+                log_level,
+                exc=http_err,
+                context={"access_token": "[REDACTED]"},
+            )
+            raise
+
     def create_token(
         self,
         session_id: str,

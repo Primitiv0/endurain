@@ -13,13 +13,16 @@ Exports:
       ``get_password_hasher``
     - JWT: ``TokenManager``, ``TokenType``, ``get_token_manager``
     - Security dependencies: ``AuthContext``, ``oauth2_scheme``,
-      ``validate_access_token``, ``validate_refresh_token``,
-      ``check_scopes``, ``check_auth_scopes``,
+      ``validate_access_token_expiration``, ``validate_refresh_token``,
+      ``check_auth_scopes``,
       ``get_sub_from_access_token``, ``get_sid_from_access_token``,
       ``get_sub_from_refresh_token``, ``get_sid_from_refresh_token``,
       ``validate_access_token_or_api_key``,
-      ``validate_websocket_access_token``,
       ``header_client_type_scheme``, ``header_csrf_token_scheme``
+
+      Scope enforcement (``check_scopes``) and WebSocket validation
+      (``validate_websocket_access_token``) are provided by
+      :mod:`auth.dependencies`, which resolves the full principal.
     - Schemas: ``LoginRequest``, ``MFALoginRequest``,
       ``MFARequiredResponse``, ``MobileSessionResponse``,
       ``TokenResponseWeb``, ``TokenResponseMobile``,
@@ -33,6 +36,24 @@ Exports:
       ``create_tokens``, ``create_mobile_pkce_session_response``
 """
 
+# Ensure the auth-owned credential ORM model is registered with SQLAlchemy's
+# mapper registry whenever the auth package loads, so the
+# ``Users.local_credential`` relationship resolves at mapper configuration time.
+from . import credentials  # noqa: F401
+from .dependencies import check_auth_scopes
+from .internal_dependencies import (
+    AuthContext,
+    get_sid_from_access_token,
+    get_sid_from_refresh_token,
+    get_sub_from_access_token,
+    get_sub_from_refresh_token,
+    header_client_type_scheme,
+    header_csrf_token_scheme,
+    oauth2_scheme,
+    validate_access_token_expiration,
+    validate_access_token_or_api_key,
+    validate_refresh_token,
+)
 from .password_hasher import (
     PasswordHasher,
     PasswordPolicyError,
@@ -47,32 +68,20 @@ from .schema import (
     TokenResponseMobile,
     TokenResponseWeb,
 )
-from .security import (
-    AuthContext,
-    check_auth_scopes,
-    check_scopes,
-    get_sid_from_access_token,
-    get_sid_from_refresh_token,
-    get_sub_from_access_token,
-    get_sub_from_refresh_token,
-    header_client_type_scheme,
-    header_csrf_token_scheme,
-    oauth2_scheme,
-    validate_access_token,
-    validate_access_token_or_api_key,
-    validate_refresh_token,
-    validate_websocket_access_token,
-)
 from .security_stores import (
     FailedLoginAttempts,
     PendingMFALogin,
     RedisFailedLoginAttempts,
     RedisPendingMFALogin,
+    RedisStepUpAttempts,
+    StepUpAttempts,
+    StepUpStore,
     cleanup_expired_pending_mfa_logins,
     clear_pending_mfa_for_user,
     create_auth_security_stores,
     get_failed_login_attempts,
     get_pending_mfa_store,
+    get_step_up_attempts,
 )
 from .token_manager import TokenManager, TokenType, get_token_manager
 from .utils import (
@@ -99,6 +108,9 @@ __all__ = [
     "PendingMFALogin",
     "RedisFailedLoginAttempts",
     "RedisPendingMFALogin",
+    "RedisStepUpAttempts",
+    "StepUpAttempts",
+    "StepUpStore",
     # JWT / token management
     "TokenManager",
     "TokenResponseMobile",
@@ -107,7 +119,6 @@ __all__ = [
     # Helpers
     "authenticate_user",
     "check_auth_scopes",
-    "check_scopes",
     "cleanup_expired_pending_mfa_logins",
     "clear_pending_mfa_for_user",
     "complete_login",
@@ -119,14 +130,14 @@ __all__ = [
     "get_pending_mfa_store",
     "get_sid_from_access_token",
     "get_sid_from_refresh_token",
+    "get_step_up_attempts",
     "get_sub_from_access_token",
     "get_sub_from_refresh_token",
     "get_token_manager",
     "header_client_type_scheme",
     "header_csrf_token_scheme",
     "oauth2_scheme",
-    "validate_access_token",
+    "validate_access_token_expiration",
     "validate_access_token_or_api_key",
     "validate_refresh_token",
-    "validate_websocket_access_token",
 ]

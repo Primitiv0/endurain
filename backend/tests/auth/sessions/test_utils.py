@@ -671,7 +671,7 @@ class TestCleanupIdleSessions:
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 24)
     @patch("auth.sessions.utils.SessionLocal")
-    @patch("auth.sessions.utils.users_session_crud.delete_idle_sessions")
+    @patch("auth.sessions.utils.auth_sessions_crud.delete_idle_sessions")
     def test_cleanup_idle_sessions_success(self, mock_delete_idle, mock_session_local):
         """
         Test successful cleanup of idle sessions.
@@ -690,7 +690,7 @@ class TestCleanupIdleSessions:
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_ENABLED", True)
     @patch("auth.sessions.utils.auth_constants.SESSION_IDLE_TIMEOUT_HOURS", 24)
     @patch("auth.sessions.utils.SessionLocal")
-    @patch("auth.sessions.utils.users_session_crud.delete_idle_sessions")
+    @patch("auth.sessions.utils.auth_sessions_crud.delete_idle_sessions")
     @patch("auth.sessions.utils.core_logger.print_to_log")
     def test_cleanup_idle_sessions_error_handling(self, mock_logger, mock_delete_idle, mock_session_local):
         """
@@ -721,7 +721,7 @@ class TestCreateSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch("auth.sessions.utils.users_session_crud.create_session")
+    @patch("auth.sessions.utils.auth_sessions_crud.create_session")
     def test_create_session_hashes_csrf_token_before_persistence(self, mock_crud_create, mock_db):
         """
         Test that create_session computes an HMAC-SHA256 of the
@@ -764,7 +764,7 @@ class TestCreateSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch("auth.sessions.utils.users_session_crud.create_session")
+    @patch("auth.sessions.utils.auth_sessions_crud.create_session")
     def test_create_session_none_csrf_token_stores_none(self, mock_crud_create, mock_db):
         """
         Test that create_session stores None for csrf_token_hash
@@ -804,7 +804,7 @@ class TestEditSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch("auth.sessions.utils.users_session_crud.edit_session")
+    @patch("auth.sessions.utils.auth_sessions_crud.edit_session")
     def test_edit_session_hashes_new_csrf_token_before_persistence(self, mock_crud_edit, mock_db):
         """
         Test that edit_session computes an HMAC-SHA256 of the
@@ -860,7 +860,7 @@ class TestEditSessionUtilsCsrf:
         "auth.sessions.utils.auth_constants.JWT_SECRET_KEY",
         _TEST_SECRET,
     )
-    @patch("auth.sessions.utils.users_session_crud.edit_session")
+    @patch("auth.sessions.utils.auth_sessions_crud.edit_session")
     def test_edit_session_none_csrf_token_stores_none(self, mock_crud_edit, mock_db):
         """
         Test that edit_session stores None for csrf_token_hash

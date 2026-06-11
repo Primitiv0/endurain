@@ -37,7 +37,7 @@ class TestPasswordHasherSecurity:
         password = "TestPassword123!"
         hashed = hasher.hash_password(password)
 
-        assert hasher.verify(password, hashed), "Default hasher should work correctly"
+        assert hasher.verify_password(password, hashed), "Default hasher should work correctly"
         assert len(hashed) > 0, "Hash should not be empty"
 
     def test_password_hasher_initialization_with_passwordhash_instance(self):
@@ -60,7 +60,7 @@ class TestPasswordHasherSecurity:
         password = "TestPassword123!"
         hashed = hasher.hash_password(password)
 
-        assert hasher.verify(password, hashed), "PasswordHash instance should work correctly"
+        assert hasher.verify_password(password, hashed), "PasswordHash instance should work correctly"
 
     def test_password_hasher_initialization_with_single_hasher(self):
         """
@@ -77,7 +77,7 @@ class TestPasswordHasherSecurity:
         password = "TestPassword123!"
         hashed = hasher.hash_password(password)
 
-        assert hasher.verify(password, hashed), "Iterable of hashers should work correctly"
+        assert hasher.verify_password(password, hashed), "Iterable of hashers should work correctly"
 
     def test_password_hasher_initialization_with_iterable(self):
         """
@@ -90,7 +90,7 @@ class TestPasswordHasherSecurity:
         password = "TestPassword123!"
         hashed = hasher.hash_password(password)
 
-        assert hasher.verify(password, hashed), "Iterable of hashers should work correctly"
+        assert hasher.verify_password(password, hashed), "Iterable of hashers should work correctly"
 
     def test_password_hasher_initialization_with_incorrect_type(self):
         """
@@ -121,7 +121,7 @@ class TestPasswordHasherSecurity:
         password = "TestPassword123!"
         hashed = hasher.hash_password(password)
 
-        assert hasher.verify(password, hashed), "Generic iterable (set) should work correctly"
+        assert hasher.verify_password(password, hashed), "Generic iterable (set) should work correctly"
 
     def test_hash_password_produces_different_hashes(self, password_hasher):
         """
@@ -149,7 +149,7 @@ class TestPasswordHasherSecurity:
         password = "CorrectPassword123!"
         hashed = password_hasher.hash_password(password)
 
-        assert password_hasher.verify(password, hashed), "Correct password should verify successfully"
+        assert password_hasher.verify_password(password, hashed), "Correct password should verify successfully"
 
     def test_verify_incorrect_password(self, password_hasher):
         """
@@ -164,7 +164,9 @@ class TestPasswordHasherSecurity:
         wrong_password = "WrongPassword123!"
         hashed = password_hasher.hash_password(correct_password)
 
-        assert not password_hasher.verify(wrong_password, hashed), "Incorrect password should fail verification"
+        assert not password_hasher.verify_password(wrong_password, hashed), (
+            "Incorrect password should fail verification"
+        )
 
     def test_verify_case_sensitivity(self, password_hasher):
         """
@@ -174,7 +176,9 @@ class TestPasswordHasherSecurity:
         password = "TestPassword123!"
         hashed = password_hasher.hash_password(password)
 
-        assert not password_hasher.verify("testpassword123!", hashed), "Password verification should be case-sensitive"
+        assert not password_hasher.verify_password("testpassword123!", hashed), (
+            "Password verification should be case-sensitive"
+        )
 
     def test_verify_and_update_returns_none_for_current_hash(self, password_hasher):
         """
@@ -408,7 +412,9 @@ class TestPasswordHasherSecurity:
         """
         long_password = "A1!" + "x" * 1000  # 1003 characters
         hashed = password_hasher.hash_password(long_password)
-        assert password_hasher.verify(long_password, hashed), "Very long passwords should hash and verify correctly"
+        assert password_hasher.verify_password(long_password, hashed), (
+            "Very long passwords should hash and verify correctly"
+        )
 
     def test_unicode_characters_in_password(self, password_hasher):
         """
@@ -417,7 +423,9 @@ class TestPasswordHasherSecurity:
         """
         unicode_password = "Tëst123!Pāśswörd"
         hashed = password_hasher.hash_password(unicode_password)
-        assert password_hasher.verify(unicode_password, hashed), "Unicode passwords should hash and verify correctly"
+        assert password_hasher.verify_password(unicode_password, hashed), (
+            "Unicode passwords should hash and verify correctly"
+        )
 
     def test_special_characters_in_password(self, password_hasher):
         """
@@ -433,7 +441,7 @@ class TestPasswordHasherSecurity:
 
         for password in special_passwords:
             hashed = password_hasher.hash_password(password)
-            assert password_hasher.verify(password, hashed), (
+            assert password_hasher.verify_password(password, hashed), (
                 f"Special character password '{password}' should work correctly"
             )
 

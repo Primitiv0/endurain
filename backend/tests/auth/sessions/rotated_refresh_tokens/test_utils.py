@@ -12,7 +12,7 @@ class TestHmacHashToken:
     Test suite for hmac_hash_token function.
     """
 
-    @patch("auth.sessions.rotated_refresh_tokens.utils.auth_constants")
+    @patch("auth.token_hashing.auth_constants")
     def test_hmac_hash_token_success(self, mock_auth_constants):
         """
         Test successful HMAC hashing of token.
@@ -28,7 +28,7 @@ class TestHmacHashToken:
         assert isinstance(result, str)
         assert len(result) == 64  # SHA256 hex output
 
-    @patch("auth.sessions.rotated_refresh_tokens.utils.auth_constants")
+    @patch("auth.token_hashing.auth_constants")
     def test_hmac_hash_token_deterministic(self, mock_auth_constants):
         """
         Test HMAC hash is deterministic (same input = same output).
@@ -44,7 +44,7 @@ class TestHmacHashToken:
         # Assert
         assert result1 == result2
 
-    @patch("auth.sessions.rotated_refresh_tokens.utils.auth_constants")
+    @patch("auth.token_hashing.auth_constants")
     def test_hmac_hash_token_different_tokens(self, mock_auth_constants):
         """
         Test different tokens produce different hashes.
@@ -61,7 +61,7 @@ class TestHmacHashToken:
         # Assert
         assert hash1 != hash2
 
-    @patch("auth.sessions.rotated_refresh_tokens.utils.auth_constants")
+    @patch("auth.token_hashing.auth_constants")
     def test_hmac_hash_token_no_secret(self, mock_auth_constants):
         """
         Test error when JWT_SECRET_KEY not configured.
@@ -177,7 +177,7 @@ class TestInvalidateTokenFamily:
     """
 
     @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
-    @patch("auth.sessions.rotated_refresh_tokens.utils.users_session_crud")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.auth_sessions_crud")
     def test_invalidate_token_family_success(self, mock_session_crud, mock_token_crud):
         """
         Test successful family invalidation.

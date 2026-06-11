@@ -1,4 +1,4 @@
-"""User session database models."""
+"""Auth-owned session database models (table: ``users_sessions``)."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING

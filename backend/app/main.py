@@ -19,8 +19,10 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 import activities.activity.utils as activities_utils
-import auth.idp_link_tokens.utils as idp_link_token_utils
+import auth.identity_providers.link_tokens.utils as idp_link_token_utils
 import auth.oauth_state.utils as oauth_state_utils
+import auth.password_reset_tokens.utils as password_reset_tokens_utils
+import auth.sign_up_tokens.utils as sign_up_tokens_utils
 import auth.utils as auth_utils
 import core.config as core_config
 import core.logger as core_logger
@@ -33,10 +35,8 @@ import core.scheduler as core_scheduler
 import core.tracing as core_tracing
 import garmin.activity_utils as garmin_activity_utils
 import garmin.health_utils as garmin_health_utils
-import password_reset_tokens.utils as password_reset_tokens_utils
 import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
-import sign_up_tokens.utils as sign_up_tokens_utils
 import strava.activity_utils as strava_activity_utils
 import strava.utils as strava_utils
 from core.database import SessionLocal

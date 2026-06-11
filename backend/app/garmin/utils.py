@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 import core.cryptography as core_cryptography
 import core.logger as core_logger
-import garmin.schema as garmin_schema
+import garmin.mfa_code_store as garmin_mfa_code_store
 import users.users_integrations.crud as user_integrations_crud
 import users.users_integrations.models as user_integrations_models
 import websocket.manager as websocket_manager
@@ -20,7 +20,7 @@ import websocket.utils as websocket_utils
 
 async def get_mfa(
     user_id: int,
-    mfa_codes: garmin_schema.MFACodeStore,
+    mfa_codes: garmin_mfa_code_store.GarminMFACodeStoreBackend,
     websocket_manager: websocket_manager.WebSocketManager,
 ) -> str:
     # Notify frontend that MFA is required
@@ -48,7 +48,7 @@ async def link_garminconnect(
     email: str,
     password: str,
     db: Session,
-    mfa_codes: garmin_schema.MFACodeStore,
+    mfa_codes: garmin_mfa_code_store.GarminMFACodeStoreBackend,
     websocket_manager: websocket_manager.WebSocketManager,
 ):
     # Capture the running event loop so the thread can schedule async work on it

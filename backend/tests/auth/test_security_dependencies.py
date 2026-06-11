@@ -11,13 +11,14 @@ Covers:
 """
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.security import SecurityScopes
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
+import auth.internal_dependencies as auth_security
 from auth.identity_service import IdentityService
 from auth.principal import AccessTokenCred, ApiKeyCred, Principal
 
@@ -234,7 +235,6 @@ class TestValidateAccessTokenOrApiKey:
             mock_svc,
             access_token="valid_jwt",
             api_key_header=None,
-            api_key_query=None,
         )
 
         assert ctx.user_id == 5
@@ -259,7 +259,6 @@ class TestValidateAccessTokenOrApiKey:
             mock_svc,
             access_token=None,
             api_key_header="raw-api-key",
-            api_key_query=None,
         )
 
         assert ctx.user_id == 9
@@ -267,31 +266,64 @@ class TestValidateAccessTokenOrApiKey:
         assert request.state.principal is principal
 
     @pytest.mark.asyncio
-    async def test_api_key_from_query_param(self):
-        """API key from ?api_key= query param is also accepted."""
+    async def test_api_key_query_string_ignored_when_disabled(self):
+        """Query-string API key is silently ignored when ALLOW_API_KEY_QUERY_PARAM is False."""
         request = _fresh_request()
-        principal = _make_principal(credential=ApiKeyCred(api_key_id=3, key_prefix="pfx_"))
+        mock_svc = MagicMock(spec=IdentityService)
+        mock_settings = MagicMock()
+        mock_settings.ALLOW_API_KEY_QUERY_PARAM = False
+
+        with (
+            patch("auth.internal_dependencies.core_config.settings", mock_settings),
+            pytest.raises(HTTPException) as exc,
+        ):
+            await auth_security.validate_access_token_or_api_key(
+                request,
+                mock_svc,
+                access_token=None,
+                api_key_header=None,
+                api_key_query="qk-456",
+            )
+        assert exc.value.status_code == 401
+        mock_svc.resolve_from_api_key.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_api_key_query_string_accepted_when_enabled(self):
+        """Query-string API key resolves when ALLOW_API_KEY_QUERY_PARAM is True."""
+        request = _fresh_request()
+        principal = _make_principal(
+            user_id=9,
+            credential=ApiKeyCred(api_key_id=3, key_prefix="pfx_"),
+        )
         mock_svc = MagicMock(spec=IdentityService)
         mock_svc.resolve_from_api_key.return_value = principal
+        mock_settings = MagicMock()
+        mock_settings.ALLOW_API_KEY_QUERY_PARAM = True
 
-        ctx = await auth_security.validate_access_token_or_api_key(
-            request,
-            mock_svc,
-            access_token=None,
-            api_key_header=None,
-            api_key_query="raw-api-key",
-        )
-
+        with patch("auth.internal_dependencies.core_config.settings", mock_settings):
+            ctx = await auth_security.validate_access_token_or_api_key(
+                request,
+                mock_svc,
+                access_token=None,
+                api_key_header=None,
+                api_key_query="qk-456",
+            )
         assert ctx.auth_type == "api_key"
-        mock_svc.resolve_from_api_key.assert_called_once_with("raw-api-key", request)
+        assert ctx.user_id == 9
+        mock_svc.resolve_from_api_key.assert_called_once_with("qk-456", request)
 
     @pytest.mark.asyncio
     async def test_no_credential_raises_401(self):
         """Neither JWT nor API key → 401."""
         request = _fresh_request()
         mock_svc = MagicMock(spec=IdentityService)
+        mock_settings = MagicMock()
+        mock_settings.ALLOW_API_KEY_QUERY_PARAM = False
 
-        with pytest.raises(HTTPException) as exc:
+        with (
+            patch("auth.internal_dependencies.core_config.settings", mock_settings),
+            pytest.raises(HTTPException) as exc,
+        ):
             await auth_security.validate_access_token_or_api_key(
                 request,
                 mock_svc,
@@ -314,7 +346,6 @@ class TestValidateAccessTokenOrApiKey:
             mock_svc,
             access_token="any_token",
             api_key_header=None,
-            api_key_query=None,
         )
 
         assert ctx.user_id == 11
@@ -334,7 +365,6 @@ class TestValidateAccessTokenOrApiKey:
                 mock_svc,
                 access_token="bad_token",
                 api_key_header=None,
-                api_key_query=None,
             )
         assert exc.value.status_code == 401
 
@@ -355,40 +385,11 @@ class TestValidateAccessTokenOrApiKey:
             mock_svc,
             access_token="valid_jwt",
             api_key_header="some-api-key",
-            api_key_query=None,
         )
 
         assert ctx.auth_type == "jwt"
         assert ctx.user_id == 20
         mock_svc.resolve_from_api_key.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_header_api_key_wins_over_query_param(self):
-        """X-API-Key header is preferred over ?api_key= query.
-
-        When both api_key_header and api_key_query are
-        provided, the header value must be passed to
-        resolve_from_api_key.
-        """
-        request = _fresh_request()
-        principal = _make_principal(
-            user_id=30,
-            credential=ApiKeyCred(api_key_id=1, key_prefix="hdr_"),
-        )
-        mock_svc = MagicMock(spec=IdentityService)
-        mock_svc.resolve_from_api_key.return_value = principal
-
-        ctx = await auth_security.validate_access_token_or_api_key(
-            request,
-            mock_svc,
-            access_token=None,
-            api_key_header="header-key",
-            api_key_query="query-key",
-        )
-
-        assert ctx.auth_type == "api_key"
-        assert ctx.user_id == 30
-        mock_svc.resolve_from_api_key.assert_called_once_with("header-key", request)
 
     @pytest.mark.asyncio
     async def test_api_key_failure_raises_401(self):
@@ -403,7 +404,6 @@ class TestValidateAccessTokenOrApiKey:
                 mock_svc,
                 access_token=None,
                 api_key_header="bad-key",
-                api_key_query=None,
             )
         assert exc.value.status_code == 401
 
@@ -440,7 +440,7 @@ class TestCheckAuthScopes:
         security_scopes = SecurityScopes(scopes=["profile"])
 
         # Should not raise
-        auth_security.check_auth_scopes(ctx, security_scopes)
+        auth_dependencies.check_auth_scopes(ctx, security_scopes)
 
     def test_missing_scope_raises_403(self):
         """Missing required scope raises 403."""
@@ -448,7 +448,7 @@ class TestCheckAuthScopes:
         security_scopes = SecurityScopes(scopes=["admin:write"])
 
         with pytest.raises(HTTPException) as exc:
-            auth_security.check_auth_scopes(ctx, security_scopes)
+            auth_dependencies.check_auth_scopes(ctx, security_scopes)
         assert exc.value.status_code == 403
         assert "Missing permissions" in exc.value.detail
 
@@ -457,7 +457,7 @@ class TestCheckAuthScopes:
         ctx = self._make_auth_ctx([])
         security_scopes = SecurityScopes(scopes=[])
 
-        auth_security.check_auth_scopes(ctx, security_scopes)
+        auth_dependencies.check_auth_scopes(ctx, security_scopes)
 
     def test_api_key_auth_type_scope_check(self):
         """Scope check also works for API key auth."""
@@ -465,5 +465,19 @@ class TestCheckAuthScopes:
         security_scopes = SecurityScopes(scopes=["profile"])
 
         with pytest.raises(HTTPException) as exc:
-            auth_security.check_auth_scopes(ctx, security_scopes)
+            auth_dependencies.check_auth_scopes(ctx, security_scopes)
         assert exc.value.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# AuthContext identity
+# ---------------------------------------------------------------------------
+
+
+class TestAuthContextIdentity:
+    """Assert that dependencies.AuthContext is the canonical security.AuthContext."""
+
+    def test_auth_context_is_same_type_as_dependencies(self):
+        import auth.dependencies as auth_dependencies
+
+        assert auth_security.AuthContext is auth_dependencies.AuthContext

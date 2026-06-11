@@ -10,6 +10,7 @@ import core.logger as core_logger
 import garmin.activity_utils as garmin_activity_utils
 import garmin.gear_utils as garmin_gear_utils
 import garmin.health_utils as garmin_health_utils
+import garmin.mfa_code_store as garmin_mfa_code_store
 import garmin.schema as garmin_schema
 import garmin.utils as garmin_utils
 import users.users_integrations.crud as user_integrations_crud
@@ -29,7 +30,10 @@ async def garminconnect_link(
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
-    mfa_codes: Annotated[garmin_schema.MFACodeStore, Depends(garmin_schema.get_mfa_store)],
+    mfa_codes: Annotated[
+        garmin_mfa_code_store.GarminMFACodeStoreBackend,
+        Depends(garmin_mfa_code_store.get_garmin_mfa_code_store),
+    ],
     websocket_manager: Annotated[
         websocket_manager.WebSocketManager,
         Depends(websocket_manager.get_websocket_manager),
@@ -56,7 +60,10 @@ async def garminconnect_mfa_code(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
-    mfa_codes: Annotated[garmin_schema.MFACodeStore, Depends(garmin_schema.get_mfa_store)],
+    mfa_codes: Annotated[
+        garmin_mfa_code_store.GarminMFACodeStoreBackend,
+        Depends(garmin_mfa_code_store.get_garmin_mfa_code_store),
+    ],
 ):
     # Store the MFA code
     mfa_codes.add_code(token_user_id, mfa_request.mfa_code)

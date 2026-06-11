@@ -5,7 +5,6 @@ Provides credential verification, JWT/CSRF token creation, and the
 both password and PKCE login flows.
 """
 
-import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -19,11 +18,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 import auth.constants as auth_constants
+import auth.credentials.crud as auth_credentials_crud
 import auth.identity_providers.utils as idp_utils
 import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.utils as oauth_state_utils
 import auth.password_hasher as auth_password_hasher
 import auth.schema as auth_schema
-import auth.sessions.utils as users_session_utils
+import auth.sessions.utils as auth_sessions_utils
 import auth.token_manager as auth_token_manager
 import core.config as core_config
 import users.users.crud as users_crud
@@ -83,11 +84,16 @@ def authenticate_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Load the user's local password hash from the auth-owned credential
+    # table. A missing row means the account has no local password.
+    credential = auth_credentials_crud.get_credential(user.id, db)
+    stored_hash = credential.password_hash if credential is not None else None
+
     # User has no local password (SSO-only account). Treat identically
     # to "wrong password" so neither the response body nor the timing
     # discloses the account's auth modality. The dummy verify keeps
     # the latency consistent with a normal Argon2 verify.
-    if not user.password:
+    if stored_hash is None:
         password_hasher.dummy_verify()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -96,7 +102,7 @@ def authenticate_user(
         )
 
     # Verify password and get updated hash if applicable
-    is_password_valid, updated_hash = password_hasher.verify_and_update(password, user.password)
+    is_password_valid, updated_hash = password_hasher.verify_and_update(password, stored_hash)
     if not is_password_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -106,7 +112,7 @@ def authenticate_user(
 
     # Update user hash if applicable
     if updated_hash:
-        users_crud.edit_user_password(user.id, updated_hash, password_hasher, db, is_hashed=True)
+        auth_credentials_crud.upsert_password_hash(user.id, updated_hash, db)
 
     # Return the user if the password is correct
     return user
@@ -217,6 +223,69 @@ def clear_refresh_token_cookies(response: Response) -> None:
         )
 
 
+def build_token_response(
+    response: Response,
+    client_type: str,
+    session_id: str,
+    access_token: str,
+    access_token_exp: datetime,
+    refresh_token: str,
+    refresh_token_exp: datetime,
+    csrf_token: str,
+) -> dict:
+    """Build the OAuth 2.1 token-response body for login and refresh.
+
+    Single source of truth for token delivery, shared by the password
+    login, SSO login, and ``/refresh`` flows so they cannot drift:
+
+    - Web clients receive the refresh token as an ``HttpOnly`` cookie
+      (set here via :func:`set_refresh_token_cookie`) and the CSRF token
+      in the body.
+    - Mobile clients receive the refresh token in the body and no CSRF
+      token.
+
+    ``expires_in`` / ``refresh_token_expires_in`` are seconds-until-expiry
+    per RFC 6749 §5.1.
+
+    Args:
+        response: HTTP response used to set the web refresh cookie.
+        client_type: ``"web"`` or any other value (treated as mobile).
+        session_id: Session identifier.
+        access_token: Newly minted access token.
+        access_token_exp: Access-token expiry datetime.
+        refresh_token: Newly minted refresh token.
+        refresh_token_exp: Refresh-token expiry datetime.
+        csrf_token: CSRF token (only returned to web clients).
+
+    Returns:
+        dict: Response body for the client type.
+
+    Raises:
+        None.
+    """
+    now = datetime.now(UTC)
+    body = {
+        "session_id": session_id,
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": int((access_token_exp - now).total_seconds()),
+        "refresh_token_expires_in": int((refresh_token_exp - now).total_seconds()),
+    }
+
+    if client_type == "web":
+        # Web: Refresh token as httpOnly cookie (XSS protection); CSRF
+        # token in body for in-memory storage. Cookie attributes are
+        # centralised in set_refresh_token_cookie so login, /refresh, and
+        # SSO token exchange stay in lockstep.
+        set_refresh_token_cookie(response, refresh_token)
+        body["csrf_token"] = csrf_token
+    else:
+        # Mobile: All tokens in JSON body for secure platform storage.
+        body["refresh_token"] = refresh_token
+
+    return body
+
+
 async def clear_refresh_token_cookie_exception_handler(
     _request: Request,
     exc: ClearRefreshTokenCookieHTTPException,
@@ -298,7 +367,7 @@ def complete_login(
     # This enables the OAuth 2.1 bootstrap pattern where the first /refresh call
     # after page reload establishes the CSRF binding. The httpOnly cookie is
     # sufficient authentication for the bootstrap refresh.
-    users_session_utils.create_session(
+    auth_sessions_utils.create_session(
         session_id,
         user,
         request,
@@ -307,39 +376,19 @@ def complete_login(
         db,
     )
 
-    # Token delivery based on client type
-    if client_type == "web":
-        # Web: Refresh token as httpOnly cookie (XSS protection).
-        # Cookie attributes (Secure, SameSite, Path, expiry) are
-        # centralised in set_refresh_token_cookie so password login,
-        # /refresh, and SSO token exchange stay in lockstep.
-        set_refresh_token_cookie(response, refresh_token)
-
-        # Return access token and CSRF token in body for in-memory storage
-        # expires_in / refresh_token_expires_in are seconds-until-expiry
-        # per RFC 6749 §5.1
-        now = datetime.now(UTC)
-        return {
-            "session_id": session_id,
-            "access_token": access_token,
-            "csrf_token": csrf_token,
-            "token_type": "bearer",
-            "expires_in": int((access_token_exp - now).total_seconds()),
-            "refresh_token_expires_in": int((refresh_token_exp - now).total_seconds()),
-        }
-    else:
-        # Mobile: All tokens in JSON response body for secure platform storage
-        # expires_in / refresh_token_expires_in are seconds-until-expiry
-        # per RFC 6749 §5.1
-        now = datetime.now(UTC)
-        return {
-            "session_id": session_id,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "expires_in": int((access_token_exp - now).total_seconds()),
-            "refresh_token_expires_in": int((refresh_token_exp - now).total_seconds()),
-        }
+    # Token delivery based on client type (web cookie vs mobile body) is
+    # centralised in build_token_response so login, /refresh, and SSO
+    # token exchange share one delivery contract.
+    return build_token_response(
+        response,
+        client_type,
+        session_id,
+        access_token,
+        access_token_exp,
+        refresh_token,
+        refresh_token_exp,
+        csrf_token,
+    )
 
 
 def create_mobile_pkce_session_response(
@@ -396,8 +445,7 @@ def create_mobile_pkce_session_response(
     session_id = str(uuid4())
 
     # Create OAuth state record for PKCE (reuse SSO infrastructure)
-    state_id = secrets.token_urlsafe(32)
-    nonce = secrets.token_urlsafe(32)
+    state_id, nonce = oauth_state_utils.create_state_id_and_nonce()
     client_ip = request.client.host if request.client else None
 
     oauth_state_crud.create_oauth_state(
@@ -412,7 +460,7 @@ def create_mobile_pkce_session_response(
     )
 
     # Create session linked to oauth_state (enables PKCE exchange)
-    users_session_utils.create_session(
+    auth_sessions_utils.create_session(
         session_id,
         user,
         request,

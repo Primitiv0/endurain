@@ -1,14 +1,18 @@
 """CRUD operations for user management."""
 
 import posixpath
+from typing import TYPE_CHECKING
 from urllib.parse import unquote
+
+if TYPE_CHECKING:
+    import auth.identity_service as auth_identity_service
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-import auth.mfa.models as auth_mfa_models
+import auth.password_policy as auth_password_policy
 import core.decorators as core_decorators
 import health.health_weight.utils as health_weight_utils
 import server_settings.schema as server_settings_schema
@@ -211,7 +215,7 @@ def get_users_admin(db: Session) -> list[users_models.Users]:
 @core_decorators.handle_db_errors
 def create_user(
     user: users_schema.UsersCreate,
-    identity_service: object,
+    identity_service: "auth_identity_service.IdentityService",
     db: Session,
 ) -> users_models.Users:
     """
@@ -237,22 +241,19 @@ def create_user(
         server_settings = server_settings_utils.get_server_settings_or_404(db)
 
         # Normalize access_type to string value
-        access_type_value = (
-            user.access_type.value if isinstance(user.access_type, users_schema.UserAccessType) else user.access_type
-        )
+        access_type_value = users_schema.normalize_access_type(user.access_type)
 
         # Hash the password with configurable policy and length
-        hashed_password = users_utils.check_password_and_hash(
-            user.password,
+        hashed_password = auth_password_policy.validate_and_hash_for_user(
             identity_service,
             server_settings,
             access_type_value,
+            user.password,
         )
 
         # Create a new user
         db_user = users_models.Users(
             **user.model_dump(exclude={"password", "access_type"}),
-            password=hashed_password,
             access_type=access_type_value,
         )
 
@@ -260,6 +261,9 @@ def create_user(
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
+
+        # Persist the password hash in the auth-owned credential table.
+        identity_service.set_local_password_hash(db_user.id, hashed_password)
 
         # Return user
         return db_user
@@ -282,8 +286,9 @@ def create_user(
 def create_signup_user(
     user: users_schema.UsersSignup,
     server_settings: server_settings_schema.ServerSettingsRead,
-    identity_service: object,
+    identity_service: "auth_identity_service.IdentityService",
     db: Session,
+    persist_credential: bool = True,
 ) -> users_models.Users:
     """
     Create a new user during signup process.
@@ -293,6 +298,11 @@ def create_signup_user(
         server_settings: Server config for signup requirements.
         identity_service: Identity service dependency.
         db: SQLAlchemy database session.
+        persist_credential: When ``True`` (default), validate the supplied
+            password and store its hash in the auth-owned credential table.
+            SSO-created accounts pass ``False`` so they get no local
+            credential row and remain SSO-only (``has_local_password`` then
+            correctly reports ``False``).
 
     Returns:
         Created Users model.
@@ -340,18 +350,30 @@ def create_signup_user(
             active=active,
             email_verified=email_verified,
             pending_admin_approval=pending_admin_approval,
-            password=users_utils.check_password_and_hash(
-                user.password,
+        )
+
+        # Hash the signup password with the configured policy. SSO-created
+        # accounts opt out (persist_credential=False) so the supplied
+        # placeholder password is never validated or hashed.
+        hashed_password: str | None = None
+        if persist_credential:
+            hashed_password = auth_password_policy.validate_and_hash_for_user(
                 identity_service,
                 server_settings,
                 users_schema.UserAccessType.REGULAR.value,
-            ),
-        )
+                user.password,
+            )
 
         # Add the user to the database
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
+
+        # Persist the password hash in the auth-owned credential table. Skipped
+        # for SSO-only accounts so that ``has_local_password`` stays a true row
+        # existence check.
+        if hashed_password is not None:
+            identity_service.set_local_password_hash(db_user.id, hashed_password)
 
         # Return user
         return db_user
@@ -633,63 +655,6 @@ def verify_user_email(
 
 
 @core_decorators.handle_db_errors
-def edit_user_password(
-    user_id: int,
-    password: str,
-    identity_service: object,
-    db: Session,
-    is_hashed: bool = False,
-    commit: bool = True,
-) -> None:
-    """
-    Update a user's password.
-
-    Args:
-        user_id: ID of user to update password for.
-        password: New password (plain text or hashed based on is_hashed).
-        identity_service: Identity service dependency.
-        db: SQLAlchemy database session.
-        is_hashed: Whether password is already hashed.
-        commit: Whether to commit the password update immediately.
-
-    Returns:
-        None
-
-    Raises:
-        HTTPException: 404 if user not found.
-        HTTPException: 500 if database error occurs.
-    """
-    # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
-
-    # Update the user
-    if is_hashed:
-        db_user.password = password
-    else:
-        # Get server settings to determine password policy
-        server_settings = server_settings_utils.get_server_settings_or_404(db)
-
-        # Normalize access_type to string value
-        access_type_value = (
-            db_user.access_type.value
-            if isinstance(db_user.access_type, users_schema.UserAccessType)
-            else db_user.access_type
-        )
-
-        # Hash the password with configurable policy and length
-        db_user.password = users_utils.check_password_and_hash(
-            password,
-            identity_service,
-            server_settings,
-            access_type_value,
-        )
-
-    if commit:
-        db.commit()
-        db.refresh(db_user)
-
-
-@core_decorators.handle_db_errors
 async def update_user_photo(user_id: int, db: Session, photo_path: str | None = None) -> str | None:
     """
     Update a user's photo path.
@@ -724,49 +689,6 @@ async def update_user_photo(user_id: int, db: Session, photo_path: str | None = 
         await users_utils.delete_user_photo_filesystem(user_id)
 
         return None
-
-
-@core_decorators.handle_db_errors
-def update_user_mfa(user_id: int, db: Session, encrypted_secret: str | None = None) -> None:
-    """
-    Update a user's MFA settings.
-
-    Args:
-        user_id: ID of user to update MFA for.
-        db: SQLAlchemy database session.
-        encrypted_secret: Encrypted MFA secret.
-            If None, disables MFA.
-
-    Returns:
-        None
-
-    Raises:
-        HTTPException: 404 if user not found.
-        HTTPException: 500 if database error occurs.
-    """
-    mfa_enabled = bool(encrypted_secret)
-    mfa_secret_value = encrypted_secret if encrypted_secret else None
-
-    # Verify the user exists (raises 404 if not found).
-    users_utils.get_user_by_id_or_404(user_id, db)
-
-    stmt = select(auth_mfa_models.AuthUserMFA).where(auth_mfa_models.AuthUserMFA.user_id == user_id)
-    mfa_row = db.execute(stmt).scalar_one_or_none()
-    if mfa_row is None:
-        # Row may be missing if the backfill migration has
-        # not yet created one for this user; create it on
-        # first write.
-        mfa_row = auth_mfa_models.AuthUserMFA(
-            user_id=user_id,
-            mfa_enabled=mfa_enabled,
-            mfa_secret=mfa_secret_value,
-        )
-        db.add(mfa_row)
-    else:
-        mfa_row.mfa_enabled = mfa_enabled
-        mfa_row.mfa_secret = mfa_secret_value
-
-    db.commit()
 
 
 @core_decorators.handle_db_errors

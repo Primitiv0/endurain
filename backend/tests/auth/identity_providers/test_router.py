@@ -9,7 +9,6 @@ def _build_app(mock_db):
     import auth.dependencies as auth_deps
     import auth.identity_providers.dependencies as idp_deps
     import auth.identity_providers.router as router
-    import auth.security as auth_security
     import core.database as core_db
 
     app = FastAPI()
@@ -18,7 +17,6 @@ def _build_app(mock_db):
     def _mock():
         return None
 
-    app.dependency_overrides[auth_security.check_scopes] = _mock
     app.dependency_overrides[auth_deps.check_scopes] = _mock
     app.dependency_overrides[idp_deps.validate_idp_id] = _mock
     app.dependency_overrides[core_db.get_db] = lambda: mock_db

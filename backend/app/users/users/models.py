@@ -11,11 +11,15 @@ from core.database import Base
 if TYPE_CHECKING:
     from activities.activity.models import Activity
     from auth.api_keys.models import UsersApiKeys
-    from auth.identity_links.models import UsersIdentityProvider
-    from auth.mfa.models import AuthUserMFA
-    from auth.mfa_backup_codes.models import MFABackupCode
+    from auth.credentials.models import LocalCredential
+    from auth.identity_providers.link_tokens.models import IdpLinkToken
+    from auth.identity_providers.links.models import IdentityLink
+    from auth.mfa.backup_codes.models import MFABackupCode
+    from auth.mfa.models import UsersMFA
     from auth.oauth_state.models import OAuthState
+    from auth.password_reset_tokens.models import PasswordResetToken
     from auth.sessions.models import UsersSessions
+    from auth.sign_up_tokens.models import SignUpToken
     from followers.models import Follower
     from gears.gear.models import Gear
     from gears.gear_components.models import GearComponents
@@ -27,8 +31,6 @@ if TYPE_CHECKING:
     from health.health_water.models import HealthWater
     from health.health_weight.models import HealthWeight
     from notifications.models import Notification
-    from password_reset_tokens.models import PasswordResetToken
-    from sign_up_tokens.models import SignUpToken
     from users.users_default_gear.models import UsersDefaultGear
     from users.users_goals.models import UsersGoal
     from users.users_integrations.models import UsersIntegrations
@@ -44,7 +46,6 @@ class Users(Base):
         name: User's real name (may include spaces).
         username: Unique username (letters, numbers, dots).
         email: Unique email address (max 250 characters).
-        password: User's password hash.
         city: User's city.
         birthdate: User's birthdate.
         preferred_language: Preferred language code.
@@ -89,6 +90,9 @@ class Users(Base):
         oauth_states: List of OAuth states for the user.
         mfa_backup_codes: List of MFA backup codes.
         auth_mfa: 1:1 MFA state row in ``users_mfa``
+        idp_link_tokens: List of short-lived IdP link tokens for the user.
+        local_credential: 1:1 local password credential row in
+            ``users_local_credentials`` (``None`` for SSO-only accounts).
         mfa_enabled: Computed property — ``True`` when
             ``auth_mfa.mfa_enabled`` is set.
     """
@@ -117,11 +121,6 @@ class Users(Base):
         unique=True,
         index=True,
         comment="User email (max 250 characters)",
-    )
-    password: Mapped[str] = mapped_column(
-        String(250),
-        nullable=False,
-        comment="User password (hash)",
     )
     city: Mapped[str | None] = mapped_column(
         String(250),
@@ -278,7 +277,7 @@ class Users(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    user_identity_providers: Mapped[list["UsersIdentityProvider"]] = relationship(
+    user_identity_providers: Mapped[list["IdentityLink"]] = relationship(
         back_populates="users",
         cascade="all, delete-orphan",
     )
@@ -290,13 +289,22 @@ class Users(Base):
         back_populates="users",
         cascade="all, delete-orphan",
     )
-    auth_mfa: Mapped["AuthUserMFA"] = relationship(
+    auth_mfa: Mapped["UsersMFA"] = relationship(
         back_populates="users",
         uselist=False,
         cascade="all, delete-orphan",
     )
     users_api_keys: Mapped[list["UsersApiKeys"]] = relationship(
         back_populates="users",
+        cascade="all, delete-orphan",
+    )
+    idp_link_tokens: Mapped[list["IdpLinkToken"]] = relationship(
+        back_populates="users",
+        cascade="all, delete-orphan",
+    )
+    local_credential: Mapped["LocalCredential | None"] = relationship(
+        back_populates="users",
+        uselist=False,
         cascade="all, delete-orphan",
     )
 
@@ -309,3 +317,13 @@ class Users(Base):
         any caller that checks MFA status on the profile row.
         """
         return bool(self.auth_mfa and self.auth_mfa.mfa_enabled)
+
+    @property
+    def has_local_password(self) -> bool:
+        """
+        Return whether this user has a local (non-SSO) password set.
+
+        A user has a local password when a row exists in the auth-owned
+        ``users_local_credentials`` table. SSO-only accounts have no row.
+        """
+        return self.local_credential is not None

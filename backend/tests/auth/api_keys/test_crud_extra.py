@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 
-import auth.api_keys.crud as users_api_keys_crud
+import auth.api_keys.crud as auth_api_keys_crud
 import auth.api_keys.models as users_api_keys_models
 import auth.api_keys.schema as users_api_keys_schema
 
@@ -30,7 +30,7 @@ class TestGetApiKeysByUserId:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_keys_by_user_id(user_id, mock_db)
+        result = auth_api_keys_crud.get_api_keys_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == [mock_key1, mock_key2]
@@ -47,7 +47,7 @@ class TestGetApiKeysByUserId:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_keys_by_user_id(user_id, mock_db)
+        result = auth_api_keys_crud.get_api_keys_by_user_id(user_id, mock_db)
 
         # Assert
         assert result == []
@@ -59,7 +59,7 @@ class TestGetApiKeysByUserId:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.get_api_keys_by_user_id(1, mock_db)
+            auth_api_keys_crud.get_api_keys_by_user_id(1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -78,7 +78,7 @@ class TestGetApiKeyById:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
 
         # Assert
         assert result == mock_key
@@ -91,7 +91,7 @@ class TestGetApiKeyById:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_key_by_id("nonexistent-uuid", 1, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_id("nonexistent-uuid", 1, mock_db)
 
         # Assert
         assert result is None
@@ -104,7 +104,7 @@ class TestGetApiKeyById:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_key_by_id("some-uuid", 999, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_id("some-uuid", 999, mock_db)
 
         # Assert
         assert result is None
@@ -116,7 +116,7 @@ class TestGetApiKeyById:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
+            auth_api_keys_crud.get_api_key_by_id("some-uuid", 1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -135,7 +135,7 @@ class TestGetApiKeyByHash:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_key_by_hash("a" * 64, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_hash("a" * 64, mock_db)
 
         # Assert
         assert result == mock_key
@@ -148,7 +148,7 @@ class TestGetApiKeyByHash:
         mock_db.execute.return_value = mock_result
 
         # Act
-        result = users_api_keys_crud.get_api_key_by_hash("b" * 64, mock_db)
+        result = auth_api_keys_crud.get_api_key_by_hash("b" * 64, mock_db)
 
         # Assert
         assert result is None
@@ -160,7 +160,7 @@ class TestGetApiKeyByHash:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.get_api_key_by_hash("c" * 64, mock_db)
+            auth_api_keys_crud.get_api_key_by_hash("c" * 64, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -190,7 +190,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             return_value=mock_orm_key,
         ):
-            result = users_api_keys_crud.create_api_key(1, data, mock_db)
+            result = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         # Assert
         assert isinstance(result, tuple)
@@ -209,7 +209,7 @@ class TestCreateApiKey:
         )
 
         # Act
-        users_api_keys_crud.create_api_key(1, data, mock_db)
+        auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         # Assert
         mock_db.add.assert_called_once()
@@ -229,7 +229,7 @@ class TestCreateApiKey:
         )
 
         # Act
-        _, raw_key = users_api_keys_crud.create_api_key(1, data, mock_db)
+        _, raw_key = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         # Assert
         assert raw_key.startswith("endurain_")
@@ -252,7 +252,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             side_effect=fake_constructor,
         ):
-            _, raw_key = users_api_keys_crud.create_api_key(1, data, mock_db)
+            _, raw_key = auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         # Assert — the key_prefix kwarg should be chars 9-17 of the raw key
         assert captured_kwargs["key_prefix"] == raw_key[9:17]
@@ -275,7 +275,7 @@ class TestCreateApiKey:
             "auth.api_keys.crud.api_keys_models.UsersApiKeys",
             side_effect=fake_constructor,
         ):
-            users_api_keys_crud.create_api_key(1, data, mock_db)
+            auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         # Assert
         assert captured_kwargs["is_active"] is True
@@ -291,7 +291,7 @@ class TestCreateApiKey:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.create_api_key(1, data, mock_db)
+            auth_api_keys_crud.create_api_key(1, data, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -310,7 +310,7 @@ class TestUpdateLastUsed:
         mock_db.execute.return_value = mock_result
 
         # Act
-        users_api_keys_crud.update_last_used("some-uuid", mock_db)
+        auth_api_keys_crud.update_last_used("some-uuid", mock_db)
 
         # Assert
         assert mock_key.last_used_at is not None
@@ -325,7 +325,7 @@ class TestUpdateLastUsed:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.update_last_used("nonexistent-uuid", mock_db)
+            auth_api_keys_crud.update_last_used("nonexistent-uuid", mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -336,7 +336,7 @@ class TestUpdateLastUsed:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.update_last_used("some-uuid", mock_db)
+            auth_api_keys_crud.update_last_used("some-uuid", mock_db)
 
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
@@ -355,7 +355,7 @@ class TestRevokeApiKey:
         mock_get_by_id.return_value = mock_key
 
         # Act
-        users_api_keys_crud.revoke_api_key("some-uuid", 1, mock_db)
+        auth_api_keys_crud.revoke_api_key("some-uuid", 1, mock_db)
 
         # Assert
         assert mock_key.is_active is False
@@ -369,7 +369,7 @@ class TestRevokeApiKey:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.revoke_api_key("nonexistent-uuid", 1, mock_db)
+            auth_api_keys_crud.revoke_api_key("nonexistent-uuid", 1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
 
@@ -387,7 +387,7 @@ class TestDeleteApiKey:
         mock_get_by_id.return_value = mock_key
 
         # Act
-        users_api_keys_crud.delete_api_key("some-uuid", 1, mock_db)
+        auth_api_keys_crud.delete_api_key("some-uuid", 1, mock_db)
 
         # Assert
         mock_db.delete.assert_called_once_with(mock_key)
@@ -401,6 +401,6 @@ class TestDeleteApiKey:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            users_api_keys_crud.delete_api_key("nonexistent-uuid", 1, mock_db)
+            auth_api_keys_crud.delete_api_key("nonexistent-uuid", 1, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND

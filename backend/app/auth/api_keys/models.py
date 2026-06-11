@@ -1,4 +1,4 @@
-"""User API key database models."""
+"""Auth-owned API key database models (table: ``users_api_keys``)."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING

@@ -47,7 +47,29 @@ class TestStartScheduler:
             from core.scheduler import start_scheduler
 
             start_scheduler()
-            assert mock_add_job.call_count == 12
+            assert mock_add_job.call_count == 13
+
+    def test_idp_link_token_cleanup_job_registered(self):
+        """IdP link token cleanup must be registered with a 5-minute interval."""
+        import auth.identity_providers.link_tokens.utils as idp_link_tokens_utils
+
+        with (
+            patch("core.scheduler.scheduler") as mock_scheduler,
+            patch("core.scheduler.add_scheduler_job") as mock_add_job,
+        ):
+            mock_scheduler.running = False
+            from core.scheduler import start_scheduler
+
+            start_scheduler()
+
+        calls = [(call.args[0], call.args[1], call.args[2], call.args[4]) for call in mock_add_job.call_args_list]
+        assert any(
+            func is idp_link_tokens_utils.delete_idp_link_expired_tokens_from_db
+            and trigger == "interval"
+            and minutes == 5
+            and "idp link token" in description.lower()
+            for func, trigger, minutes, description in calls
+        ), "IdP link token cleanup job not found or mis-configured"
 
 
 class TestAddSchedulerJob:

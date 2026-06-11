@@ -1,9 +1,9 @@
 """Authentication security stores for login and MFA lockout."""
 
-import hashlib
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from threading import Lock
-from typing import NoReturn
+from typing import NoReturn, Protocol, runtime_checkable
 from urllib.parse import unquote
 
 from redis import Redis, RedisError
@@ -33,14 +33,12 @@ def _raise_store_unavailable(operation: str, err: RedisError) -> NoReturn:
     Raises:
         AuthSecurityStoreUnavailableError: Always raised.
     """
-    try:
-        core_redis.raise_redis_storage_unavailable(
-            "auth security storage",
-            operation,
-            err,
-        )
-    except core_redis.RedisStorageUnavailableError as store_err:
-        raise AuthSecurityStoreUnavailableError("Auth security storage is unavailable") from store_err
+    core_redis.raise_storage_unavailable_as(
+        AuthSecurityStoreUnavailableError,
+        display_name="auth security storage",
+        operation=operation,
+        err=err,
+    )
 
 
 def normalize_username_key(username: str) -> str:
@@ -95,6 +93,275 @@ def _log_lockout(
     )
 
 
+@runtime_checkable
+class FailedLoginStore(Protocol):
+    """Contract for failed-login lockout stores (memory or Redis).
+
+    Implemented structurally by :class:`FailedLoginAttempts` and
+    :class:`RedisFailedLoginAttempts`. Keys are usernames, normalized
+    internally by each implementation.
+    """
+
+    def is_locked_out(self, username: str) -> bool: ...
+
+    def get_lockout_time(self, username: str) -> datetime | None: ...
+
+    def record_failed_attempt(self, username: str) -> int: ...
+
+    def reset_attempts(self, username: str) -> None: ...
+
+    def clear_all(self) -> None: ...
+
+
+@runtime_checkable
+class PendingMFAStore(Protocol):
+    """Contract for pending-MFA login stores (memory or Redis).
+
+    Implemented structurally by :class:`PendingMFALogin` and
+    :class:`RedisPendingMFALogin`. Combines pending-login bookkeeping
+    with the per-username MFA failure lockout.
+    """
+
+    def add_pending_login(self, username: str, user_id: int) -> None: ...
+
+    def get_pending_login(self, username: str) -> int | None: ...
+
+    def claim_pending_login(self, username: str) -> int | None: ...
+
+    def delete_pending_login(self, username: str) -> None: ...
+
+    def has_pending_login(self, username: str) -> bool: ...
+
+    def clear_for_user(self, user_id: int) -> int: ...
+
+    def cleanup_expired(self) -> int: ...
+
+    def is_locked_out(self, username: str) -> bool: ...
+
+    def get_lockout_time(self, username: str) -> datetime | None: ...
+
+    def record_failed_attempt(self, username: str) -> int: ...
+
+    def reset_attempts(self, username: str) -> None: ...
+
+    def clear_all(self) -> None: ...
+
+
+@runtime_checkable
+class StepUpStore(Protocol):
+    """Contract for step-up verification lockout stores (memory or Redis).
+
+    Implemented structurally by :class:`StepUpAttempts` and
+    :class:`RedisStepUpAttempts`. Keys are stable user identifiers such
+    as ``user:{user_id}`` and are not normalized.
+    """
+
+    def is_locked_out(self, key: str) -> bool: ...
+
+    def get_lockout_time(self, key: str) -> datetime | None: ...
+
+    def record_failed_attempt(self, key: str) -> int: ...
+
+    def reset_attempts(self, key: str) -> None: ...
+
+    def clear_all(self) -> None: ...
+
+
+class _InMemoryProgressiveLockout:
+    """
+    Process-local progressive-lockout counter shared by in-memory stores.
+
+    Mirrors :class:`_RedisProgressiveLockout` so the in-memory and Redis
+    variants of each store share the same thresholds, duration labels,
+    and lockout semantics. Keys may optionally be normalized (e.g.
+    usernames) before storage; step-up keys are already canonical and
+    pass through unchanged.
+
+    Attributes:
+        _display_name: Human-readable name used in lockout logs.
+        _thresholds: Ascending ``(threshold, lockout_seconds, label)``
+            tuples; the highest matched threshold wins.
+        _normalize_key: Callable applied to every key before storage.
+        _attempts: Failed-attempt counters keyed by (normalized) key.
+        _lock: Lock guarding ``_attempts``.
+    """
+
+    def __init__(
+        self,
+        display_name: str,
+        thresholds: tuple[tuple[int, int, str], ...],
+        normalize_key: Callable[[str], str] | None = None,
+    ) -> None:
+        """
+        Initialize the in-memory progressive lockout helper.
+
+        Args:
+            display_name: Human-readable name used in lockout logs.
+            thresholds: Exactly three ascending
+                ``(threshold, lockout_seconds, label)`` tuples.
+            normalize_key: Optional key normalizer; identity when None.
+
+        Raises:
+            ValueError: When not given exactly three thresholds.
+        """
+        if len(thresholds) != 3:
+            raise ValueError("In-memory lockout requires exactly 3 thresholds")
+        self._display_name = display_name
+        self._thresholds = thresholds
+        self._normalize_key = normalize_key or (lambda key: key)
+        self._attempts: dict[str, tuple[int, datetime | None]] = {}
+        self._lock = Lock()
+
+    def is_locked_out(self, key: str) -> bool:
+        """
+        Check whether a key is currently locked out.
+
+        Args:
+            key: Raw lockout key (normalized internally).
+
+        Returns:
+            True when a non-expired lockout exists.
+
+        Raises:
+            None.
+        """
+        key = self._normalize_key(key)
+        with self._lock:
+            entry = self._attempts.get(key)
+            if entry is None:
+                return False
+
+            _, lockout_until = entry
+            if lockout_until is None:
+                return False
+
+            if datetime.now(UTC) > lockout_until:
+                del self._attempts[key]
+                return False
+
+            return True
+
+    def get_lockout_time(self, key: str) -> datetime | None:
+        """
+        Get the current lockout expiry for a key.
+
+        Args:
+            key: Raw lockout key (normalized internally).
+
+        Returns:
+            Lockout expiry datetime, or None when not locked.
+
+        Raises:
+            None.
+        """
+        key = self._normalize_key(key)
+        with self._lock:
+            entry = self._attempts.get(key)
+            if entry is None:
+                return None
+
+            _, lockout_until = entry
+            if lockout_until and datetime.now(UTC) <= lockout_until:
+                return lockout_until
+
+            return None
+
+    def record_failed_attempt(self, key: str) -> int:
+        """
+        Record a failed attempt and apply lockout if a threshold is hit.
+
+        While a key is already locked out, the counter is left unchanged
+        and the current count is returned, matching the Redis variant.
+
+        Args:
+            key: Raw lockout key (normalized internally).
+
+        Returns:
+            Current failed-attempt count.
+
+        Raises:
+            None.
+        """
+        now = datetime.now(UTC)
+        key = self._normalize_key(key)
+        with self._lock:
+            entry = self._attempts.get(key)
+            if entry is not None:
+                failed_count, lockout_until = entry
+                if lockout_until and now <= lockout_until:
+                    return failed_count
+                failed_count += 1
+            else:
+                failed_count = 1
+
+            lockout_until = None
+            duration_label = None
+            for threshold, lockout_seconds, label in reversed(self._thresholds):
+                if failed_count >= threshold:
+                    lockout_until = now + timedelta(seconds=lockout_seconds)
+                    duration_label = label
+                    break
+
+            self._attempts[key] = (failed_count, lockout_until)
+
+        if duration_label:
+            _log_lockout(self._display_name, duration_label, key, failed_count)
+        return failed_count
+
+    def reset_attempts(self, key: str) -> None:
+        """
+        Clear failed attempts and lockout for a key.
+
+        Args:
+            key: Raw lockout key (normalized internally).
+
+        Returns:
+            None.
+
+        Raises:
+            None.
+        """
+        key = self._normalize_key(key)
+        with self._lock:
+            self._attempts.pop(key, None)
+
+    def clear_all(self) -> None:
+        """
+        Clear every failed-attempt record in this lockout counter.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Raises:
+            None.
+        """
+        with self._lock:
+            self._attempts.clear()
+
+
+# Progressive-lockout thresholds shared by the in-memory and Redis store
+# variants. Each entry is ``(failed_count_threshold, lockout_seconds,
+# duration_label)`` in ascending order; the highest matched threshold wins.
+_LOGIN_LOCKOUT_THRESHOLDS: tuple[tuple[int, int, str], ...] = (
+    (5, 5 * 60, "5 min"),
+    (10, 30 * 60, "30 min"),
+    (20, 24 * 60 * 60, "24 hours"),
+)
+_MFA_LOCKOUT_THRESHOLDS: tuple[tuple[int, int, str], ...] = (
+    (5, 5 * 60, "5 min"),
+    (10, 30 * 60, "30 min"),
+    (15, 2 * 60 * 60, "2 hours"),
+)
+_STEP_UP_LOCKOUT_THRESHOLDS: tuple[tuple[int, int, str], ...] = (
+    (5, 5 * 60, "5 min"),
+    (10, 30 * 60, "30 min"),
+    (15, 2 * 60 * 60, "2 hours"),
+)
+
+
 class PendingMFALogin:
     """
     Manage pending MFA login sessions in process-local memory.
@@ -121,9 +388,12 @@ class PendingMFALogin:
             None.
         """
         self._store: dict[str, tuple[int, datetime]] = {}
-        self._failed_attempts: dict[str, tuple[int, datetime | None]] = {}
         self._store_lock = Lock()
-        self._failed_attempts_lock = Lock()
+        self._lockout = _InMemoryProgressiveLockout(
+            "MFA",
+            _MFA_LOCKOUT_THRESHOLDS,
+            normalize_key=normalize_username_key,
+        )
 
     def add_pending_login(self, username: str, user_id: int) -> None:
         """
@@ -306,20 +576,7 @@ class PendingMFALogin:
         Raises:
             None.
         """
-        username = normalize_username_key(username)
-        with self._failed_attempts_lock:
-            if username not in self._failed_attempts:
-                return False
-
-            _, lockout_until = self._failed_attempts[username]
-            if lockout_until is None:
-                return False
-
-            if datetime.now(UTC) > lockout_until:
-                del self._failed_attempts[username]
-                return False
-
-            return True
+        return self._lockout.is_locked_out(username)
 
     def get_lockout_time(self, username: str) -> datetime | None:
         """
@@ -334,16 +591,7 @@ class PendingMFALogin:
         Raises:
             None.
         """
-        username = normalize_username_key(username)
-        with self._failed_attempts_lock:
-            if username not in self._failed_attempts:
-                return None
-
-            _, lockout_until = self._failed_attempts[username]
-            if lockout_until and datetime.now(UTC) <= lockout_until:
-                return lockout_until
-
-            return None
+        return self._lockout.get_lockout_time(username)
 
     def record_failed_attempt(self, username: str) -> int:
         """
@@ -358,37 +606,9 @@ class PendingMFALogin:
         Raises:
             None.
         """
-        now = datetime.now(UTC)
-        username = normalize_username_key(username)
-        with self._failed_attempts_lock:
-            if username in self._failed_attempts:
-                failed_count, lockout_until = self._failed_attempts[username]
-                if lockout_until and now <= lockout_until:
-                    return failed_count
-                failed_count += 1
-            else:
-                failed_count = 1
+        return self._lockout.record_failed_attempt(username)
 
-            lockout_until = None
-            if failed_count >= 15:
-                lockout_until = now + timedelta(hours=2)
-                duration_label = "2 hours"
-            elif failed_count >= 10:
-                lockout_until = now + timedelta(minutes=30)
-                duration_label = "30 min"
-            elif failed_count >= 5:
-                lockout_until = now + timedelta(minutes=5)
-                duration_label = "5 min"
-            else:
-                duration_label = None
-
-            self._failed_attempts[username] = (failed_count, lockout_until)
-
-        if duration_label:
-            _log_lockout("MFA", duration_label, username, failed_count)
-        return failed_count
-
-    def reset_failed_attempts(self, username: str) -> None:
+    def reset_attempts(self, username: str) -> None:
         """
         Reset failed MFA attempts for a username.
 
@@ -401,9 +621,7 @@ class PendingMFALogin:
         Raises:
             None.
         """
-        username = normalize_username_key(username)
-        with self._failed_attempts_lock:
-            self._failed_attempts.pop(username, None)
+        self._lockout.reset_attempts(username)
 
     def clear_all(self) -> None:
         """
@@ -420,8 +638,7 @@ class PendingMFALogin:
         """
         with self._store_lock:
             self._store.clear()
-        with self._failed_attempts_lock:
-            self._failed_attempts.clear()
+        self._lockout.clear_all()
 
 
 class FailedLoginAttempts:
@@ -429,7 +646,7 @@ class FailedLoginAttempts:
     Track failed login attempts in process-local memory.
 
     Attributes:
-        _attempts: Failed login attempts keyed by normalized username.
+        _lockout: Process-local progressive lockout counter.
     """
 
     def __init__(self) -> None:
@@ -445,8 +662,11 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        self._attempts: dict[str, tuple[int, datetime | None]] = {}
-        self._attempts_lock = Lock()
+        self._lockout = _InMemoryProgressiveLockout(
+            "Login",
+            _LOGIN_LOCKOUT_THRESHOLDS,
+            normalize_key=normalize_username_key,
+        )
 
     def is_locked_out(self, username: str) -> bool:
         """
@@ -461,20 +681,7 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        username = normalize_username_key(username)
-        with self._attempts_lock:
-            if username not in self._attempts:
-                return False
-
-            _, lockout_until = self._attempts[username]
-            if lockout_until is None:
-                return False
-
-            if datetime.now(UTC) > lockout_until:
-                del self._attempts[username]
-                return False
-
-            return True
+        return self._lockout.is_locked_out(username)
 
     def get_lockout_time(self, username: str) -> datetime | None:
         """
@@ -489,16 +696,7 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        username = normalize_username_key(username)
-        with self._attempts_lock:
-            if username not in self._attempts:
-                return None
-
-            _, lockout_until = self._attempts[username]
-            if lockout_until and datetime.now(UTC) <= lockout_until:
-                return lockout_until
-
-            return None
+        return self._lockout.get_lockout_time(username)
 
     def record_failed_attempt(self, username: str) -> int:
         """
@@ -513,35 +711,7 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        now = datetime.now(UTC)
-        username = normalize_username_key(username)
-        with self._attempts_lock:
-            if username in self._attempts:
-                failed_count, lockout_until = self._attempts[username]
-                if lockout_until and now <= lockout_until:
-                    return failed_count
-                failed_count += 1
-            else:
-                failed_count = 1
-
-            lockout_until = None
-            if failed_count >= 20:
-                lockout_until = now + timedelta(hours=24)
-                duration_label = "24 hours"
-            elif failed_count >= 10:
-                lockout_until = now + timedelta(minutes=30)
-                duration_label = "30 min"
-            elif failed_count >= 5:
-                lockout_until = now + timedelta(minutes=5)
-                duration_label = "5 min"
-            else:
-                duration_label = None
-
-            self._attempts[username] = (failed_count, lockout_until)
-
-        if duration_label:
-            _log_lockout("Login", duration_label, username, failed_count)
-        return failed_count
+        return self._lockout.record_failed_attempt(username)
 
     def reset_attempts(self, username: str) -> None:
         """
@@ -556,9 +726,7 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        username = normalize_username_key(username)
-        with self._attempts_lock:
-            self._attempts.pop(username, None)
+        self._lockout.reset_attempts(username)
 
     def clear_all(self) -> None:
         """
@@ -573,8 +741,7 @@ class FailedLoginAttempts:
         Raises:
             None.
         """
-        with self._attempts_lock:
-            self._attempts.clear()
+        self._lockout.clear_all()
 
 
 _REDIS_AUTH_KEY_PREFIX = "endurain:auth"
@@ -667,7 +834,7 @@ def _username_digest(username: str) -> str:
         None.
     """
     normalized_username = normalize_username_key(username)
-    return hashlib.sha256(normalized_username.encode()).hexdigest()
+    return core_redis.sha256_key_digest(normalized_username)
 
 
 def username_log_identifier(username: str) -> str:
@@ -696,7 +863,7 @@ def get_auth_security_storage_uri() -> str:
     Raises:
         None.
     """
-    return core_config.settings.AUTH_SECURITY_STORAGE_URI or core_config.settings.RATE_LIMIT_STORAGE_URI or "memory://"
+    return core_config.settings.resolved_auth_security_storage_uri
 
 
 class _RedisProgressiveLockout:
@@ -1297,7 +1464,7 @@ class RedisPendingMFALogin:
         """
         return self._lockout.record_failed_attempt(username)
 
-    def reset_failed_attempts(self, username: str) -> None:
+    def reset_attempts(self, username: str) -> None:
         """
         Reset failed attempt counter after successful MFA.
 
@@ -1333,8 +1500,214 @@ class RedisPendingMFALogin:
         self._lockout.clear_all()
 
 
-FailedLoginStore = FailedLoginAttempts | RedisFailedLoginAttempts
-PendingMFAStore = PendingMFALogin | RedisPendingMFALogin
+class StepUpAttempts:
+    """
+    Track failed step-up verification attempts in process-local memory.
+
+    Keys are stable user identifiers (e.g. ``user:{user_id}``).
+
+    Attributes:
+        _lockout: Process-local progressive lockout counter.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize the in-memory step-up attempts store.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Raises:
+            None.
+        """
+        self._lockout = _InMemoryProgressiveLockout(
+            "Step-up",
+            _STEP_UP_LOCKOUT_THRESHOLDS,
+        )
+
+    def is_locked_out(self, key: str) -> bool:
+        """
+        Check whether a key is locked out from step-up.
+
+        Args:
+            key: Stable user key (e.g. ``user:{user_id}``).
+
+        Returns:
+            True if the key is currently locked out.
+
+        Raises:
+            None.
+        """
+        return self._lockout.is_locked_out(key)
+
+    def get_lockout_time(self, key: str) -> datetime | None:
+        """
+        Get lockout expiry time for a user key.
+
+        Args:
+            key: Stable user key.
+
+        Returns:
+            Lockout expiry datetime if locked out.
+
+        Raises:
+            None.
+        """
+        return self._lockout.get_lockout_time(key)
+
+    def record_failed_attempt(self, key: str) -> int:
+        """
+        Record a failed step-up attempt.
+
+        Args:
+            key: Stable user key.
+
+        Returns:
+            Number of failed attempts.
+
+        Raises:
+            None.
+        """
+        return self._lockout.record_failed_attempt(key)
+
+    def reset_attempts(self, key: str) -> None:
+        """
+        Reset failed step-up attempts for a user key.
+
+        Args:
+            key: Stable user key.
+
+        Returns:
+            None.
+
+        Raises:
+            None.
+        """
+        self._lockout.reset_attempts(key)
+
+    def clear_all(self) -> None:
+        """
+        Clear all failed step-up attempt records.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Raises:
+            None.
+        """
+        self._lockout.clear_all()
+
+
+class RedisStepUpAttempts:
+    """
+    Track failed step-up verification attempts in Redis.
+
+    Attributes:
+        _lockout: Redis-backed progressive lockout helper.
+    """
+
+    def __init__(self, redis_client: Redis) -> None:
+        """
+        Initialize the Redis step-up attempts store.
+
+        Args:
+            redis_client: Redis client used for storage.
+
+        Raises:
+            RedisError: When script registration fails.
+        """
+        self._lockout = _RedisProgressiveLockout(
+            redis_client=redis_client,
+            name="step_up",
+            display_name="Step-up",
+            thresholds=(
+                (5, 5 * 60, "5 min"),
+                (10, 30 * 60, "30 min"),
+                (15, 2 * 60 * 60, "2 hours"),
+            ),
+            attempts_ttl_seconds=2 * 60 * 60,
+        )
+
+    def is_locked_out(self, key: str) -> bool:
+        """
+        Check if a key is locked out from step-up attempts.
+
+        Args:
+            key: Stable user key (e.g. ``user:{user_id}``).
+
+        Returns:
+            True if the key is currently locked out.
+
+        Raises:
+            RedisError: When Redis access fails.
+        """
+        return self._lockout.is_locked_out(key)
+
+    def get_lockout_time(self, key: str) -> datetime | None:
+        """
+        Get lockout expiry time for a user key.
+
+        Args:
+            key: Stable user key.
+
+        Returns:
+            Lockout expiry datetime if locked out.
+
+        Raises:
+            RedisError: When Redis access fails.
+        """
+        return self._lockout.get_lockout_time(key)
+
+    def record_failed_attempt(self, key: str) -> int:
+        """
+        Record a failed step-up attempt.
+
+        Args:
+            key: Stable user key.
+
+        Returns:
+            Number of failed attempts.
+
+        Raises:
+            RedisError: When Redis access fails.
+        """
+        return self._lockout.record_failed_attempt(key)
+
+    def reset_attempts(self, key: str) -> None:
+        """
+        Clear failed step-up attempts for a user key.
+
+        Args:
+            key: Stable user key.
+
+        Returns:
+            None.
+
+        Raises:
+            RedisError: When Redis access fails.
+        """
+        self._lockout.reset_attempts(key)
+
+    def clear_all(self) -> None:
+        """
+        Clear all failed step-up attempt records.
+
+        Args:
+            None.
+
+        Returns:
+            None.
+
+        Raises:
+            RedisError: When Redis access fails.
+        """
+        self._lockout.clear_all()
 
 
 def create_auth_security_stores(
@@ -1353,21 +1726,16 @@ def create_auth_security_stores(
         RuntimeError: When Redis cannot be initialized.
         ValueError: When the storage URI scheme is unsupported.
     """
-    normalized_storage_uri = storage_uri.strip() or "memory://"
-    if core_redis.is_memory_storage_uri(normalized_storage_uri):
-        return FailedLoginAttempts(), PendingMFALogin()
-    if core_redis.is_redis_storage_uri(normalized_storage_uri):
-        redis_client = core_redis.create_redis_client(
-            normalized_storage_uri,
-            "auth security storage",
-        )
-        return (
+    return core_redis.select_storage_backend(
+        storage_uri,
+        purpose="auth security storage",
+        scheme_error_label="AUTH_SECURITY_STORAGE_URI",
+        memory_factory=lambda: (FailedLoginAttempts(), PendingMFALogin()),
+        redis_factory=lambda redis_client: (
             RedisFailedLoginAttempts(redis_client),
             RedisPendingMFALogin(redis_client),
-        )
-
-    storage_scheme = normalized_storage_uri.split(":", 1)[0]
-    raise ValueError(f"Unsupported AUTH_SECURITY_STORAGE_URI scheme: {storage_scheme or 'unknown'}")
+        ),
+    )
 
 
 failed_login_attempts, pending_mfa_store = create_auth_security_stores(get_auth_security_storage_uri())
@@ -1444,3 +1812,42 @@ def clear_pending_mfa_for_user(user_id: int) -> int:
             exc=err,
         )
         return 0
+
+
+def _create_step_up_store(storage_uri: str) -> StepUpStore:
+    """
+    Create a step-up attempts store for the configured backend.
+
+    Args:
+        storage_uri: Storage URI selecting memory or Redis.
+
+    Returns:
+        Step-up attempts store instance.
+
+    Raises:
+        RuntimeError: When Redis cannot be initialized.
+        ValueError: When the storage URI scheme is unsupported.
+    """
+    return core_redis.select_storage_backend(
+        storage_uri,
+        purpose="auth security storage",
+        scheme_error_label="AUTH_SECURITY_STORAGE_URI",
+        memory_factory=StepUpAttempts,
+        redis_factory=RedisStepUpAttempts,
+    )
+
+
+step_up_attempts: StepUpStore = _create_step_up_store(get_auth_security_storage_uri())
+
+
+def get_step_up_attempts() -> StepUpStore:
+    """
+    Dependency injection for step-up attempt tracking.
+
+    Returns:
+        Global step-up attempts store.
+
+    Raises:
+        None.
+    """
+    return step_up_attempts

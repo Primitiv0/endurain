@@ -1,6 +1,5 @@
 """Public (unauthenticated) HTTP routes for identity provider SSO flows."""
 
-import secrets
 from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
@@ -14,9 +13,10 @@ import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
 import auth.identity_providers.utils as idp_utils
 import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.utils as oauth_state_utils
 import auth.password_hasher as auth_password_hasher
-import auth.sessions.crud as users_session_crud
-import auth.sessions.utils as users_session_utils
+import auth.sessions.crud as auth_sessions_crud
+import auth.sessions.utils as auth_sessions_utils
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
 import core.config as core_config
@@ -35,7 +35,7 @@ router = APIRouter()
     response_model=list[idp_schema.IdentityProviderPublic],
     status_code=status.HTTP_200_OK,
 )
-async def get_enabled_providers(db: Annotated[Session, Depends(core_database.get_db)]):
+async def get_enabled_identity_providers(db: Annotated[Session, Depends(core_database.get_db)]):
     """
     Retrieve a list of enabled identity providers from the database.
 
@@ -45,7 +45,7 @@ async def get_enabled_providers(db: Annotated[Session, Depends(core_database.get
     Returns:
         List[IdentityProviderPublic]: A list of enabled identity providers, each represented as an IdentityProviderPublic schema.
     """
-    providers = idp_crud.get_enabled_providers(db)
+    providers = idp_crud.get_enabled_identity_providers(db)
     return [
         idp_schema.IdentityProviderPublic(
             id=p.id,
@@ -143,8 +143,7 @@ async def initiate_login(
                 client_type = "web"  # Default to web if invalid
 
         # Generate OAuth state and nonce
-        state_id = secrets.token_urlsafe(32)
-        nonce = secrets.token_urlsafe(32)
+        state_id, nonce = oauth_state_utils.create_state_id_and_nonce()
 
         # Get client IP address
         client_ip = request.client.host if request.client else None
@@ -253,6 +252,26 @@ async def handle_callback(
                 detail="Invalid or expired OAuth state",
             )
 
+        # Bind the OAuth state to the IdP named in the callback URL.
+        # The `idp` is resolved from the URL slug while the `oauth_state`
+        # is looked up by the opaque `state` parameter; without this check
+        # a state minted during one provider's login could be replayed
+        # against a different provider's callback. Cross-provider misuse is
+        # already blocked cryptographically (the code is exchanged at the
+        # URL-IdP's token endpoint and the ID token is verified against that
+        # IdP's JWKS), but asserting the binding here fails fast and protects
+        # deployments where two IdP entries share an authorization server.
+        if oauth_state.idp_id is not None and oauth_state.idp_id != idp.id:
+            core_logger.print_to_log(
+                f"OAuth state IdP mismatch for state {state[:8]}...: "
+                f"state.idp_id={oauth_state.idp_id}, callback idp.id={idp.id}",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired OAuth state",
+            )
+
         # Mark state as used atomically (prevents replay attacks).
         # Two concurrent callbacks can both reach this point with the same
         # `oauth_state` row in memory; only the caller whose conditional UPDATE
@@ -311,7 +330,7 @@ async def handle_callback(
                 detail="OAuth state required for token exchange",
             )
 
-        users_session_utils.create_session(
+        auth_sessions_utils.create_session(
             session_id,
             user_read,
             request,
@@ -414,7 +433,7 @@ async def exchange_tokens_for_session(
     """
     try:
         # Retrieve session with OAuth state relationship
-        session_with_state = users_session_crud.get_session_with_oauth_state(session_id, db)
+        session_with_state = auth_sessions_crud.get_session_with_oauth_state(session_id, db)
 
         if not session_with_state:
             core_logger.print_to_log(
@@ -472,72 +491,19 @@ async def exchange_tokens_for_session(
             code_challenge_method=oauth_state.code_challenge_method,
         )
 
-        # PKCE verification successful - retrieve user and create tokens
-        user = session_obj.users
-        # Validate that the user is still active before minting tokens
-        users_utils.check_user_is_active(user)
-        user_read = users_schema.UsersRead.model_validate(user)
-
-        # Create JWT tokens (now that PKCE is verified)
-        (
-            _,
-            access_token_exp,
-            access_token,
-            refresh_token_exp,
-            refresh_token,
-            csrf_token,
-        ) = auth_utils.create_tokens(user_read, token_manager, session_id)
-
-        # Calculate expires_in from access token expiration
-        expires_in = int((access_token_exp - datetime.now(UTC)).total_seconds())
-
-        # Calculate refresh_token_expires_in from refresh token expiration
-        refresh_token_expires_in = int((refresh_token_exp - datetime.now(UTC)).total_seconds())
-
-        # Capture the stored client_type from the OAuth state BEFORE
-        # claiming the session — claim_session_for_token_exchange
-        # deletes the OAuth state row as part of its cleanup, after
-        # which any attribute access on ``oauth_state`` would trigger
-        # a lazy reload and raise ObjectDeletedError.
-        stored_client_type = oauth_state.client_type
-
-        # Update session with the actual hashed refresh token AND
-        # mark tokens as exchanged in a single atomic conditional
-        # UPDATE. This closes the check-then-act race where two
-        # concurrent exchanges with the correct verifier could both
-        # pass the ``tokens_exchanged`` guard, both mint refresh
-        # tokens, and the second overwrite the first — handing the
-        # second caller a working refresh token while invalidating
-        # the first.
-        # Note: csrf_token_hash is NOT stored here (OAuth 2.1
-        # bootstrap pattern). The first /refresh call after page
-        # reload establishes the CSRF binding.
-        claimed = users_session_crud.claim_session_for_token_exchange(
-            session_id,
-            password_hasher.hash_password(refresh_token),
-            db,
-        )
-        if not claimed:
-            core_logger.print_to_log(
-                f"Token exchange lost race for session {session_id[:8]}...",
-                "warning",
-            )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Tokens already exchanged for this session",
-            )
-
-        # Determine client_type for this token exchange.
+        # Determine client_type for this token exchange before minting
+        # tokens or claiming the one-shot session. A mismatched
+        # X-Client-Type must not be able to burn an otherwise valid
+        # PKCE session by flipping tokens_exchanged first.
         #
         # Authority order:
-        #   1. ``oauth_state.client_type`` (captured above as
-        #      ``stored_client_type``) — set when the IdP flow was
+        #   1. ``oauth_state.client_type`` — set when the IdP flow was
         #      initiated by an authenticated client that DID send
         #      ``X-Client-Type``. When this is non-None it represents
         #      the original, server-recorded intent and the exchange
         #      caller MUST NOT override it.
         #   2. ``X-Client-Type`` header on the exchange request —
-        #      only consulted when ``stored_client_type`` is None,
+        #      only consulted when ``oauth_state.client_type`` is None,
         #      which is the genuine system-browser case (the OS
         #      browser carries no custom headers when opening
         #      ``/initiate_login``, so the original intent could not
@@ -550,6 +516,7 @@ async def exchange_tokens_for_session(
         # at will — bypassing the cookie-set decision and the
         # response shape that should follow from how the flow was
         # actually initiated.
+        stored_client_type = oauth_state.client_type
         header_client_type = request.headers.get("X-Client-Type")
         if header_client_type not in ("web", "mobile"):
             header_client_type = None
@@ -575,6 +542,54 @@ async def exchange_tokens_for_session(
             # Genuine system-browser flow — fall back to the header,
             # defaulting to ``web`` when the header is absent.
             client_type = header_client_type or "web"
+
+        # PKCE verification successful - retrieve user and create tokens
+        user = session_obj.users
+        # Validate that the user is still active before minting tokens
+        users_utils.check_user_is_active(user)
+        user_read = users_schema.UsersRead.model_validate(user)
+
+        # Create JWT tokens (now that PKCE is verified)
+        (
+            _,
+            access_token_exp,
+            access_token,
+            refresh_token_exp,
+            refresh_token,
+            csrf_token,
+        ) = auth_utils.create_tokens(user_read, token_manager, session_id)
+
+        # Calculate expires_in from access token expiration
+        expires_in = int((access_token_exp - datetime.now(UTC)).total_seconds())
+
+        # Calculate refresh_token_expires_in from refresh token expiration
+        refresh_token_expires_in = int((refresh_token_exp - datetime.now(UTC)).total_seconds())
+
+        # Update session with the actual hashed refresh token AND
+        # mark tokens as exchanged in a single atomic conditional
+        # UPDATE. This closes the check-then-act race where two
+        # concurrent exchanges with the correct verifier could both
+        # pass the ``tokens_exchanged`` guard, both mint refresh
+        # tokens, and the second overwrite the first — handing the
+        # second caller a working refresh token while invalidating
+        # the first.
+        # Note: csrf_token_hash is NOT stored here (OAuth 2.1
+        # bootstrap pattern). The first /refresh call after page
+        # reload establishes the CSRF binding.
+        claimed = auth_sessions_crud.claim_session_for_token_exchange(
+            session_id,
+            password_hasher.hash_password(refresh_token),
+            db,
+        )
+        if not claimed:
+            core_logger.print_to_log(
+                f"Token exchange lost race for session {session_id[:8]}...",
+                "warning",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Tokens already exchanged for this session",
+            )
 
         # Set refresh token cookie for web clients (enables logout).
         # Cookie attributes (Secure, SameSite, Path, expiry) are

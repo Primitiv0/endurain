@@ -1,14 +1,15 @@
 import os
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import auth.identity_service as auth_identity_service
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-import auth.mfa.crud as auth_mfa_crud
 import core.config as core_config
 import core.file_uploads as core_file_uploads
 import health.health_targets.crud as health_targets_crud
-import server_settings.models as server_settings_models
-import server_settings.schema as server_settings_schema
 import users.users.crud as users_crud
 import users.users.models as users_models
 import users.users.schema as users_schema
@@ -44,91 +45,6 @@ def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
     return db_user
 
 
-def verify_step_up_credentials(
-    user_id: int,
-    current_password: str | None,
-    mfa_code: str | None,
-    identity_service: object,
-    db: Session,
-) -> None:
-    """
-    Enforce step-up verification for sensitive account operations.
-
-    A valid access token alone is not sufficient authorisation for
-    operations that grant persistent account access (password
-    change, API-key creation, MFA enrolment, MFA backup-code
-    regeneration, MFA disable, etc.). This helper requires the
-    caller to re-prove possession of the current password and —
-    when MFA is enabled — a fresh TOTP or backup code.
-
-    SSO-only accounts have no local password (``db_user.password``
-    is ``None`` or empty). For those callers the password factor
-    is skipped because there is nothing to verify against; this
-    is a known coverage gap that should eventually be closed by
-    requiring a fresh IdP re-authentication on the same set of
-    sensitive endpoints. Until that flow exists, SSO-only users
-    rely on the access-token check plus (when applicable) MFA.
-
-    Args:
-        user_id: ID of the authenticated user.
-        current_password: The user's current password as supplied
-            in the request body. May be ``None`` for SSO-only
-            accounts; ignored when the account has no local
-            password.
-        mfa_code: TOTP or backup code, required when MFA is
-            enabled. Ignored when MFA is disabled.
-        identity_service: Identity service dependency.
-        db: SQLAlchemy database session.
-
-    Raises:
-        HTTPException: 401 if the current password is wrong, is
-            missing for an account that has one, or when MFA is
-            enabled and the supplied code is missing or invalid.
-            The error message intentionally does not distinguish
-            the failure modes.
-    """
-    # Local import to avoid a circular dependency between
-    # users.users.utils and profile.utils (which imports
-    # users.users.crud at module load time).
-    import profile.utils as profile_utils
-
-    db_user = get_user_by_id_or_404(user_id, db)
-
-    has_local_password = bool(db_user.password)
-    if has_local_password:
-        if not current_password:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Step-up verification failed",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        if not identity_service.verify_password(
-            current_password,
-            db_user.password,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Step-up verification failed",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    # else: SSO-only account; no password to verify. See docstring
-    # for the known coverage gap and planned IdP re-auth flow.
-
-    if profile_utils.is_mfa_enabled_for_user(user_id, db):
-        if not mfa_code:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="MFA code required for this operation",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        if not profile_utils.verify_user_mfa(user_id, mfa_code, identity_service, db):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Step-up verification failed",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-
 def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
     """
     Retrieve all admin users from database or raise 404 error.
@@ -151,44 +67,6 @@ def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
         )
 
     return admins
-
-
-def check_password_and_hash(
-    password: str,
-    identity_service: object,
-    server_settings: (server_settings_models.ServerSettings | server_settings_schema.ServerSettingsRead),
-    user_access_type: str,
-) -> str:
-    """
-    Validates password against the configured policy and hashes it.
-
-    Args:
-        password (str): The password to validate and hash.
-        identity_service: Identity service dependency.
-        server_settings (ServerSettings | ServerSettingsRead): The server settings containing password policies.
-        user_access_type (str): The access type of the user (e.g., "regular" or "admin").
-
-    Returns:
-        str: The hashed password.
-
-    Raises:
-        HTTPException: If password validation fails.
-    """
-    # Determine minimum length based on user access type
-    min_length = (
-        server_settings.password_length_admin_users
-        if user_access_type == users_schema.UserAccessType.ADMIN.value
-        else server_settings.password_length_regular_users
-    )
-    # Check if password meets requirements
-    hashed_password = identity_service.validate_and_hash_password(
-        password,
-        min_length,
-        str(server_settings.password_type),
-    )
-
-    # Return the hashed password
-    return hashed_password
 
 
 def check_user_is_active(
@@ -214,12 +92,18 @@ def check_user_is_active(
         )
 
 
-def create_user_default_data(user_id: int, db: Session) -> None:
+def create_user_default_data(
+    user_id: int,
+    identity_service: "auth_identity_service.IdentityService",
+    db: Session,
+) -> None:
     """
     Create default data for newly created user.
 
     Args:
         user_id: ID of user to create default data for.
+        identity_service: Identity service used to initialise the
+            auth-owned MFA row through the auth boundary.
         db: SQLAlchemy database session.
 
     Returns:
@@ -237,8 +121,8 @@ def create_user_default_data(user_id: int, db: Session) -> None:
     # Create the user default gear
     user_default_gear_crud.create_user_default_gear(user_id, db)
 
-    # Create the user's MFA row (disabled by default)
-    auth_mfa_crud.create_users_mfa_row(user_id, db)
+    # Create the user's MFA row (disabled by default) via the auth boundary.
+    identity_service.initialize_user_mfa(user_id)
 
 
 _ALLOWED_USER_IMAGE_EXTENSIONS: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".webp"})

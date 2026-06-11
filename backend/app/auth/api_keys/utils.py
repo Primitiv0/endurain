@@ -1,8 +1,11 @@
 """User API key utility functions."""
 
-import hashlib
 import json
 import secrets
+
+import auth.token_hashing as token_hashing
+
+SUPPORTED_API_KEY_SCOPES = frozenset({"activities:upload"})
 
 
 def generate_api_key() -> str:
@@ -34,7 +37,7 @@ def hash_api_key(raw_key: str) -> str:
     Returns:
         Lowercase hex-encoded SHA-256 digest (64 chars).
     """
-    return hashlib.sha256(raw_key.encode()).hexdigest()
+    return token_hashing.sha256_hex(raw_key)
 
 
 def validate_api_key_scopes(
@@ -59,10 +62,9 @@ def validate_api_key_scopes(
     Raises:
         ValueError: If any requested scope is not supported.
     """
-    allowed = {"activities:upload"}
-    unsupported = set(requested_scopes) - allowed
+    unsupported = set(requested_scopes) - SUPPORTED_API_KEY_SCOPES
     if unsupported or not requested_scopes:
-        raise ValueError(f"Unsupported API key scopes: {unsupported}. Valid scopes: {allowed}")
+        raise ValueError(f"Unsupported API key scopes: {unsupported}. Valid scopes: {SUPPORTED_API_KEY_SCOPES}")
 
 
 def scopes_to_json(scopes: list[str]) -> str:

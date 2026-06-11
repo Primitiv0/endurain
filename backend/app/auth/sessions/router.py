@@ -10,9 +10,9 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-import auth.security as auth_security
-import auth.sessions.crud as users_session_crud
-import auth.sessions.schema as users_session_schema
+import auth.dependencies as auth_dependencies
+import auth.sessions.crud as auth_sessions_crud
+import auth.sessions.schema as auth_sessions_schema
 import core.config as core_config
 import core.database as core_database
 import core.logger as core_logger
@@ -23,17 +23,17 @@ router = APIRouter()
 
 @router.get(
     "/user/{user_id}",
-    response_model=list[users_session_schema.UsersSessionsRead],
+    response_model=list[auth_sessions_schema.UsersSessionsRead],
     status_code=status.HTTP_200_OK,
 )
 async def read_sessions_user(
     user_id: int,
     _check_scope: Annotated[
         None,
-        Security(auth_security.check_scopes, scopes=["sessions:read"]),
+        Security(auth_dependencies.check_scopes, scopes=["sessions:read"]),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
-) -> list[users_session_schema.UsersSessionsRead]:
+) -> list[auth_sessions_schema.UsersSessionsRead]:
     """
     Retrieve all sessions associated with a specific user.
 
@@ -46,7 +46,7 @@ async def read_sessions_user(
         List of session objects for the specified user.
     """
     if core_config.settings.ENVIRONMENT != "demo":
-        return users_session_crud.get_user_sessions(user_id, db)
+        return auth_sessions_crud.get_user_sessions(user_id, db)
     else:
         core_logger.print_to_log(
             "Session retrieval in demo environment - returning empty",
@@ -64,7 +64,7 @@ async def delete_session_user(
     user_id: int,
     _check_scope: Annotated[
         None,
-        Security(auth_security.check_scopes, scopes=["sessions:write"]),
+        Security(auth_dependencies.check_scopes, scopes=["sessions:write"]),
     ],
     db: Annotated[Session, Depends(core_database.get_db)],
 ) -> None:
@@ -83,4 +83,4 @@ async def delete_session_user(
     Raises:
         HTTPException: If session not found or unauthorized.
     """
-    users_session_crud.delete_session(session_id, user_id, db)
+    auth_sessions_crud.delete_session(session_id, user_id, db)

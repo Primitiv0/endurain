@@ -11,11 +11,11 @@ class TestCreateUsersMFARow:
 
     def test_creates_disabled_row(self):
         db = MagicMock()
-        fake_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        fake_row = MagicMock(spec=auth_mfa_models.UsersMFA)
 
         with patch.object(
             auth_mfa_crud.auth_mfa_models,
-            "AuthUserMFA",
+            "UsersMFA",
             return_value=fake_row,
         ) as ctor:
             row = auth_mfa_crud.create_users_mfa_row(42, db)
@@ -25,11 +25,11 @@ class TestCreateUsersMFARow:
 
     def test_persists_via_db(self):
         db = MagicMock()
-        fake_row = MagicMock(spec=auth_mfa_models.AuthUserMFA)
+        fake_row = MagicMock(spec=auth_mfa_models.UsersMFA)
 
         with patch.object(
             auth_mfa_crud.auth_mfa_models,
-            "AuthUserMFA",
+            "UsersMFA",
             return_value=fake_row,
         ):
             row = auth_mfa_crud.create_users_mfa_row(7, db)

@@ -1,6 +1,6 @@
 """Tests for user management router functions."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -14,14 +14,7 @@ class TestEditUserPassword:
     """
 
     @pytest.mark.asyncio
-    @patch("users.users.router.users_sessions_crud.delete_sessions_by_user")
-    @patch("users.users.router.users_crud.edit_user_password")
-    async def test_revokes_target_sessions_after_password_reset(
-        self,
-        mock_edit_password,
-        mock_delete_sessions,
-        mock_db,
-    ):
+    async def test_revokes_target_sessions_after_password_reset(self):
         """
         Test admin password resets delete existing target sessions.
         """
@@ -36,14 +29,10 @@ class TestEditUserPassword:
             user_attributes=user_attributes,
             _check_scope=MagicMock(),
             identity_service=identity_service,
-            db=mock_db,
         )
 
-        mock_edit_password.assert_called_once_with(
+        identity_service.change_managed_user_password.assert_called_once_with(
             user_id,
             new_password,
-            identity_service,
-            mock_db,
         )
-        mock_delete_sessions.assert_called_once_with(user_id, mock_db)
         assert result == {"message": f"User ID {user_id} password updated successfully"}

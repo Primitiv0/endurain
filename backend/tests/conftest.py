@@ -8,9 +8,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 import auth.dependencies as auth_dependencies
+import auth.internal_dependencies as auth_internal_dependencies
 import auth.password_hasher as auth_password_hasher
-import auth.security as auth_security
-import auth.sessions.router as users_session_router
+import auth.security_stores as auth_security_stores
 import auth.token_manager as auth_token_manager
 import users.users.schema as user_schema
 
@@ -362,10 +362,6 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         """Return mock session ID from refresh token"""
         return app.state.mock_session_id
 
-    def _mock_get_and_return_access_token():
-        """Return mock access token"""
-        return app.state.mock_access_token
-
     def _mock_get_and_return_refresh_token():
         """Return mock refresh token"""
         return app.state.mock_refresh_token
@@ -374,41 +370,26 @@ def fast_api_app(password_hasher, token_manager, mock_db) -> FastAPI:
         """Mock scope check that always passes"""
         return None
 
-    with contextlib.suppress(Exception):
-        app.dependency_overrides[users_session_router.auth_security.header_client_type_scheme] = _client_type_override
-        app.dependency_overrides[users_session_router.users_session_schema.get_pending_mfa_store] = lambda: fake_store
+    app.dependency_overrides[auth_internal_dependencies.header_client_type_scheme] = _client_type_override
+    app.dependency_overrides[auth_security_stores.get_pending_mfa_store] = lambda: fake_store
 
-        # Override security dependencies for authenticated endpoint testing
-        app.dependency_overrides[users_session_router.auth_security.validate_access_token] = _mock_validate_access_token
-        app.dependency_overrides[users_session_router.auth_security.validate_refresh_token] = (
-            _mock_validate_refresh_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.get_access_token] = _mock_get_access_token
-        app.dependency_overrides[users_session_router.auth_security.get_refresh_token] = _mock_get_refresh_token
-        app.dependency_overrides[users_session_router.auth_security.get_sub_from_access_token] = (
-            _mock_get_sub_from_access_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.get_sid_from_access_token] = (
-            _mock_get_sid_from_access_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.get_sub_from_refresh_token] = (
-            _mock_get_sub_from_refresh_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.get_sid_from_refresh_token] = (
-            _mock_get_sid_from_refresh_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.get_and_return_access_token] = (
-            _mock_get_and_return_access_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.get_and_return_refresh_token] = (
-            _mock_get_and_return_refresh_token
-        )
-        app.dependency_overrides[users_session_router.auth_security.check_scopes] = _mock_check_scopes
+    # Override auth-internal dependencies for auth router endpoint tests.
+    app.dependency_overrides[auth_internal_dependencies.validate_access_token_expiration] = _mock_validate_access_token
+    app.dependency_overrides[auth_internal_dependencies.validate_refresh_token] = _mock_validate_refresh_token
+    app.dependency_overrides[auth_internal_dependencies.get_access_token] = _mock_get_access_token
+    app.dependency_overrides[auth_internal_dependencies.get_refresh_token] = _mock_get_refresh_token
+    app.dependency_overrides[auth_internal_dependencies.get_sub_from_access_token] = _mock_get_sub_from_access_token
+    app.dependency_overrides[auth_internal_dependencies.get_sid_from_access_token] = _mock_get_sid_from_access_token
+    app.dependency_overrides[auth_internal_dependencies.get_sub_from_refresh_token] = _mock_get_sub_from_refresh_token
+    app.dependency_overrides[auth_internal_dependencies.get_sid_from_refresh_token] = _mock_get_sid_from_refresh_token
+    app.dependency_overrides[auth_internal_dependencies.get_and_return_refresh_token] = (
+        _mock_get_and_return_refresh_token
+    )
+    app.dependency_overrides[auth_dependencies.check_scopes] = _mock_check_scopes
 
     # Override public auth dependencies used by non-auth routers
     with contextlib.suppress(Exception):
-        app.dependency_overrides[auth_security.check_scopes] = _mock_check_scopes
-        app.dependency_overrides[auth_security.get_sub_from_access_token] = _mock_get_sub_from_access_token
+        app.dependency_overrides[auth_internal_dependencies.get_sub_from_access_token] = _mock_get_sub_from_access_token
         app.dependency_overrides[auth_dependencies.check_scopes] = _mock_check_scopes
         app.dependency_overrides[auth_dependencies.get_sub_from_access_token] = _mock_get_sub_from_access_token
         app.dependency_overrides[auth_dependencies.validate_access_token] = _mock_validate_access_token

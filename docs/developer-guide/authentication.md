@@ -142,7 +142,7 @@ For integrations that do not maintain a JWT session, API keys provide a stateles
 
 1. Generate an API key via the web UI (Settings → Security → API Keys) or the management API (requires JWT)
 2. Store the raw key securely — it is shown only once at creation time
-3. Include the key in requests to supported endpoints via the `X-API-Key` header or the `?api_key=` query parameter
+3. Include the key in requests to supported endpoints via the `X-API-Key` header, or via the `?api_key=` query parameter only when `ALLOW_API_KEY_QUERY_PARAM=true` is explicitly enabled
 4. The backend validates the key hash, checks revocation and expiry, and resolves the user identity and scopes
 5. The endpoint processes the request if the required scope is present in the key's grant
 
@@ -203,8 +203,68 @@ Require JWT authentication with the standard `X-Client-Type` requirement; state-
 
 | What | Url | Expected Information |
 | ---- | --- | -------------------- |
-| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file. Accepts JWT **or** API key (`X-API-Key` header / `?api_key=` query param) with `activities:upload` scope. This unified-auth endpoint does not require `X-Client-Type` |
+| **Activity Upload** | `/activities/create/upload` | .gpx, .tcx, .gz or .fit file. Accepts JWT **or** API key (`X-API-Key` header, or `?api_key=` query param only when `ALLOW_API_KEY_QUERY_PARAM=true`) with `activities:upload` scope. This unified-auth endpoint does not require `X-Client-Type` |
 | **Set Weight** | `/health/weight` | JSON `{'weight': <number>, 'created_at': 'yyyy-MM-dd'}` |
+
+## Step-up Authentication
+
+Certain sensitive account operations require the user to re-prove possession of their credentials even when they already hold a valid access token. This is called **step-up verification**.
+
+### Operations That Require Step-up
+
+| Operation | Endpoint |
+| --------- | -------- |
+| Change own password | `PATCH /users/{user_id}/password` |
+| Enable MFA | `POST /profile/mfa/enable` |
+| Disable MFA | `DELETE /profile/mfa/disable` |
+| Regenerate MFA backup codes | `POST /profile/mfa/backup-codes` |
+| Create API key | `POST /profile/api_keys` |
+| Generate IdP link token | `POST /profile/idp/{idp_id}/link/token` |
+| Remove IdP link | `DELETE /profile/idp/{idp_id}/link` |
+
+### Step-up Request Body
+
+All step-up operations accept the following fields in their JSON request body (alongside any operation-specific fields):
+
+| Field | Required | Description |
+| ----- | -------- | ----------- |
+| `current_password` | Conditionally | Required for accounts with a local password. Omit for SSO-only accounts (no local credential exists) |
+| `mfa_code` | Conditionally | Required when MFA is enabled on the account. Accepts TOTP codes or backup codes |
+
+**Example:**
+
+```json
+{
+  "current_password": "current-password",
+  "mfa_code": "123456"
+}
+```
+
+SSO-only accounts (no local password) may omit `current_password`. The password factor is skipped because there is nothing to verify against. If MFA is enabled, the `mfa_code` is still required regardless of account type.
+
+### Step-up Lockout Policy
+
+Failed step-up verifications are tracked per-user with progressive lockout, independent of login lockout counters:
+
+| Failed Attempts | Lockout Duration |
+|-----------------|------------------|
+| 5 failures | 5 minutes |
+| 10 failures | 30 minutes |
+| 15 failures | 2 hours |
+
+The lockout check happens **before** any password or MFA comparison, so the number of guesses is bounded even when an attacker has a valid access token.
+
+**Lockout Response (HTTP 429):**
+
+```json
+{
+  "detail": "Too many failed step-up attempts. Try again later."
+}
+```
+
+The response also includes a `Retry-After` header indicating how many seconds remain before the lockout expires.
+
+The counter resets automatically on a successful step-up verification.
 
 ## Progressive Account Lockout
 
@@ -486,8 +546,10 @@ Content-Type: multipart/form-data
 (file body)
 ```
 
-!!! tip "Header vs Query Parameter"
-    The `X-API-Key` header is strongly preferred. Query parameters may appear in server access logs, reverse-proxy logs, and browser history, increasing the risk of key exposure. Use the query parameter only when setting custom headers is not possible.
+!!! warning "Query parameter delivery is disabled by default"
+    The `?api_key=` query parameter is **disabled by default**. To enable it, set `ALLOW_API_KEY_QUERY_PARAM=true` in your environment. This option exists for self-hosted deployments where an integration cannot set custom request headers (e.g. certain webhook senders). When enabled, every request using this method emits a warning in the application log.
+
+    Query-string credentials appear in server access logs, reverse-proxy logs, and browser history. Use the `X-API-Key` header whenever possible.
 
 If both the `X-API-Key` header and the `?api_key=` query parameter are present, the **header takes precedence**.
 
@@ -1152,8 +1214,18 @@ The following environment variables control authentication behavior:
 | Variable | Description | Default | Required |
 | -------- | ----------- | ------- | -------- |
 | `ENVIRONMENT` | Controls refresh cookie security for login, refresh, and OAuth/SSO token exchange. `production` and `demo` set the refresh cookie `Secure` flag. | `production` | No |
+| `FRONTEND_PROTOCOL` | Protocol used for cookie security. Set to `https` when running behind HTTPS to enable the `Secure` flag on authentication cookies. | `http` | No |
 | `ALLOWED_REDIRECT_SCHEMES` | Comma-separated custom URI schemes allowed as SSO redirect targets (e.g., `endurain,gadgetbridge`). Defaults to `endurain` when unset. If set, the provided list is used as-is (it does not merge with the default). External `http`/`https` redirects are always rejected. | `endurain` | No |
 | `SSRF_ALLOWED_HOSTS` | SSRF allowlist for admin-configured outbound calls (currently OIDC discovery and JWKS fetch only). Comma-separated list of exact hostnames (case-insensitive) and/or explicit IP CIDR ranges. Supports self-hosted identity providers on private networks. Examples: `auth.internal.example.com` or `auth.internal.example.com,10.10.0.0/24,fd00::/64`. Wildcards are rejected. IPv4 prefix must be ≥ /8, IPv6 ≥ /32. Every allowlisted outbound call is logged at INFO level for audit. | `` | No |
+
+#### Rate Limiting and Auth Security Storage
+
+| Variable | Description | Default | Required |
+| -------- | ----------- | ------- | -------- |
+| `RATE_LIMIT_ENABLED` | Enable or disable API rate limiting. Set to `false` to disable for development or testing. | `true` | No |
+| `RATE_LIMIT_STORAGE_URI` | Storage backend URI for rate limit counters. Use `memory://` for single-worker deployments or `redis://redis:6379/0` for multi-worker setups so all workers share counters. | `memory://` | No |
+| `AUTH_SECURITY_STORAGE_URI` | Storage backend URI for auth security state: login lockout counters, step-up lockout counters, pending MFA login state, and temporary MFA setup secrets. Defaults to `RATE_LIMIT_STORAGE_URI` when unset. Use Redis for multi-worker deployments so protections are shared across all workers. | *(uses `RATE_LIMIT_STORAGE_URI`)* | No |
+| `ALLOW_API_KEY_QUERY_PARAM` | Allow API keys via the `?api_key=` query parameter. Disabled by default because query-string credentials appear in server access logs, reverse-proxy logs, and browser history. Enable only for integrations that cannot set custom request headers. The `X-API-Key` header is always preferred. | `false` | No |
 
 ### Cookie Configuration
 
@@ -1302,7 +1374,7 @@ Scopes are automatically assigned based on user permissions and are embedded in 
 ### For API Key Integrations
 
 1. **Store the key securely** — use a secrets manager, environment variable, or encrypted config file. Never hardcode it in source code
-2. **Use the `X-API-Key` header** rather than the `?api_key=` query parameter to avoid key exposure in logs
+2. **Use the `X-API-Key` header** rather than the `?api_key=` query parameter to avoid key exposure in logs. The query parameter is disabled by default and must be explicitly enabled with `ALLOW_API_KEY_QUERY_PARAM=true`
 3. **Grant only supported scopes** — API keys currently accept only `activities:upload`
 4. **Set an expiry date** when creating keys for temporary or one-off integrations
 5. **Rotate keys periodically** — delete the old key and create a new one; update any dependent services before deleting

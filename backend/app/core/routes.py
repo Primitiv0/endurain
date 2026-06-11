@@ -1,8 +1,5 @@
 """Aggregate application routers under the API root."""
 
-import profile.browser_redirect_router as profile_browser_redirect_router
-import profile.router as profile_router
-
 from fastapi import APIRouter, Depends, Security
 
 import activities.activity.public_router as activities_public_router
@@ -16,12 +13,13 @@ import activities.activity_sets.public_router as activity_sets_public_router
 import activities.activity_sets.router as activity_sets_router
 import activities.activity_streams.router as activity_streams_router
 import activities.activity_summaries.router as activity_summaries_router
-import auth.api_keys.router as users_api_keys_router
+import auth.api_keys.router as auth_api_keys_router
 import auth.dependencies as auth_dependencies
 import auth.identity_providers.router as identity_providers_router
-import auth.identity_providers.router as user_identity_providers_router
+import auth.password_reset_tokens.router as password_reset_tokens_router
 import auth.router as auth_router
-import auth.sessions.router as users_session_router
+import auth.sessions.router as auth_sessions_router
+import auth.sign_up_tokens.router as sign_up_tokens_router
 import core.config as core_config
 import core.router as core_router
 import followers.router as followers_router
@@ -37,15 +35,15 @@ import health.health_water.router as health_water_router
 import health.health_weight.router as health_weight_router
 import health.router as health_router
 import notifications.router as notifications_router
-import password_reset_tokens.router as password_reset_tokens_router
 import server_settings.public_router as server_settings_public_router
 import server_settings.router as server_settings_router
-import sign_up_tokens.router as sign_up_tokens_router
 import strava.router as strava_router
 import users.users.public_router as users_public_router
 import users.users.router as users_router
 import users.users_default_gear.router as user_default_gear_router
 import users.users_goals.router as user_goals_router
+import users.users_profile.browser_redirect_router as profile_browser_redirect_router
+import users.users_profile.router as profile_router
 import websocket.router as websocket_router
 from activities.activity_exercise_titles import (
     public_router as activity_exercise_titles_public_router,
@@ -245,7 +243,7 @@ router.include_router(
     dependencies=[Depends(auth_dependencies.validate_access_token)],
 )
 router.include_router(
-    users_session_router.router,
+    auth_sessions_router.router,
     prefix=core_config.ROOT_PATH + "/sessions",
     tags=["sessions"],
     dependencies=[Depends(auth_dependencies.validate_access_token)],
@@ -279,19 +277,13 @@ router.include_router(
     ],
 )
 router.include_router(
-    users_api_keys_router.router,
+    auth_api_keys_router.router,
     prefix=core_config.ROOT_PATH + "/profile/api_keys",
     tags=["api_keys"],
     dependencies=[
         Depends(auth_dependencies.validate_access_token),
         Security(auth_dependencies.check_scopes, scopes=["profile"]),
     ],
-)
-router.include_router(
-    user_identity_providers_router.router,
-    prefix=core_config.ROOT_PATH,
-    tags=["user_identity_providers"],
-    dependencies=[Depends(auth_dependencies.validate_access_token)],
 )
 router.include_router(
     users_router.router,

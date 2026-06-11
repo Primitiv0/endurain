@@ -2,8 +2,9 @@
 
 Defines the ``IdentityService`` boundary type that non-auth modules must use
 to consume identity.  The boundary hides the concrete helpers
-(:mod:`auth.security`, :mod:`auth.password_hasher`, :mod:`auth.token_manager`)
-from external callers and makes them mockable in isolation.
+(:mod:`auth.internal_dependencies`, :mod:`auth.password_hasher`,
+:mod:`auth.token_manager`) from external callers and makes them mockable in
+isolation.
 
 Transaction contract
 --------------------
@@ -30,17 +31,21 @@ from __future__ import annotations
 
 import hmac
 from datetime import UTC, datetime
-from typing import Annotated, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Annotated, Protocol, runtime_checkable
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-import auth.api_keys.crud as users_api_keys_crud
-import auth.api_keys.utils as users_api_keys_utils
-import auth.identity_links.crud as auth_identity_links_crud
+import auth.api_keys.crud as auth_api_keys_crud
+import auth.api_keys.utils as auth_api_keys_utils
+import auth.credentials.crud as auth_credentials_crud
+import auth.mfa.crud as auth_mfa_crud
 import auth.password_hasher as auth_password_hasher
-import auth.sessions.crud as users_sessions_crud
+import auth.services.account_security_service as auth_account_security_service
+import auth.services.identity_link_service as auth_identity_link_service
+import auth.services.mfa_workflow as auth_mfa_workflow
+import auth.sessions.crud as auth_sessions_crud
 import auth.token_manager as auth_token_manager
 import auth.utils as auth_utils
 import core.database as core_database
@@ -55,6 +60,15 @@ from auth.principal import (
     Principal,
     SessionCookieCred,
 )
+
+if TYPE_CHECKING:
+    import auth.identity_providers.link_tokens.schema as auth_idp_link_tokens_schema
+    import auth.identity_providers.links.schema as auth_identity_links_schema
+    import auth.mfa.backup_codes.schema as auth_mfa_backup_codes_schema
+    import auth.mfa.schema as auth_mfa_schema
+    import auth.mfa.setup_store as auth_mfa_setup_store
+    import auth.security_stores as auth_security_stores
+    import auth.sessions.schema as auth_sessions_schema
 
 __all__ = [
     "DefaultIdentityService",
@@ -201,60 +215,6 @@ class IdentityService(Protocol):
         """
         ...
 
-    def revoke_api_key(
-        self,
-        api_key_id: str,
-        user_id: int,
-    ) -> None:
-        """Soft-revoke an API key (sets ``is_active=False``).
-
-        Args:
-            api_key_id: UUID of the API key.
-            user_id: Owner of the API key (prevents
-                cross-user revocations).
-
-        Raises:
-            HTTPException: 404 if the key is not found
-                for this user.
-        """
-        ...
-
-    def link_external_identity(
-        self,
-        user_id: int,
-        idp_id: int,
-        idp_subject: str,
-    ) -> None:
-        """Create a link between a user and an identity provider.
-
-        Args:
-            user_id: The ID of the user to link.
-            idp_id: The ID of the identity provider.
-            idp_subject: Subject identifier from the IdP.
-
-        Raises:
-            HTTPException: 409 if link already exists.
-            HTTPException: 500 if database operation fails.
-        """
-        ...
-
-    def unlink_external_identity(
-        self,
-        user_id: int,
-        idp_id: int,
-    ) -> None:
-        """Remove a user-to-identity-provider link.
-
-        Args:
-            user_id: The ID of the user.
-            idp_id: The ID of the identity provider to unlink.
-
-        Raises:
-            HTTPException: 404 if the link is not found.
-            HTTPException: 500 if database operation fails.
-        """
-        ...
-
     def check_scope(
         self,
         principal: Principal,
@@ -321,35 +281,347 @@ class IdentityService(Protocol):
         """
         ...
 
-    def create_mfa_backup_codes(
-        self,
-        user_id: int,
-        count: int = 10,
-    ) -> list[str]:
-        """Create and persist MFA backup codes for a user.
+    def get_password_hash(self, user_id: int) -> str | None:
+        """Return a user's stored local password hash, or ``None``.
+
+        ``None`` means the account has no local password (for example an
+        SSO-only account).
 
         Args:
-            user_id: User ID to create backup codes for.
-            count: Number of codes to create.
+            user_id: ID of the user to read the credential for.
 
         Returns:
-            Plaintext backup codes to show once.
+            The stored password hash, or ``None`` if no credential exists.
         """
         ...
 
-    def verify_and_consume_mfa_backup_code(
-        self,
-        user_id: int,
-        code: str,
-    ) -> bool:
-        """Verify and consume an MFA backup code.
+    def set_local_password_hash(self, user_id: int, password_hash: str) -> None:
+        """Insert or update a user's local password hash.
 
         Args:
-            user_id: User ID to verify the backup code for.
-            code: Plaintext backup code supplied by the user.
+            user_id: ID of the user to write the credential for.
+            password_hash: Argon2/bcrypt password hash to store.
 
         Returns:
-            True if the backup code matched and was consumed.
+            None.
+        """
+        ...
+
+    def clear_local_password(self, user_id: int) -> None:
+        """Remove a user's local password credential, if present.
+
+        Args:
+            user_id: ID of the user whose credential should be removed.
+
+        Returns:
+            None.
+        """
+        ...
+
+    def initialize_user_mfa(self, user_id: int) -> None:
+        """Create the default (disabled) MFA row for a new user.
+
+        Establishes the 1:1 ``users``↔``users_mfa`` invariant so non-auth
+        modules never touch the auth-owned MFA table directly.
+
+        Args:
+            user_id: ID of the newly created user.
+
+        Returns:
+            None.
+        """
+        ...
+
+    # ------------------------------------------------------------------
+    # Account-security workflows
+    #
+    # These are higher-level, route-facing workflows (sessions, password
+    # change, MFA lifecycle, IdP linking) consumed by non-auth routers
+    # (e.g. ``users.users_profile``). They are part of the public auth
+    # boundary: implementations live in ``auth.services.*`` and are reached
+    # only through this contract, never imported directly by non-auth code.
+    # ------------------------------------------------------------------
+
+    def get_user_sessions(self, user_id: int) -> list[auth_sessions_schema.UsersSessionsRead]:
+        """Return the authenticated user's active sessions.
+
+        Args:
+            user_id: ID of the authenticated user.
+
+        Returns:
+            List of the user's active sessions (empty in the demo environment).
+        """
+        ...
+
+    def delete_user_session(self, session_id: str, user_id: int) -> None:
+        """Delete one of the authenticated user's own sessions.
+
+        Args:
+            session_id: ID of the session to delete.
+            user_id: Owner of the session.
+
+        Returns:
+            None.
+        """
+        ...
+
+    def change_own_password(
+        self,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+        mfa_code: str | None,
+        step_up_store: auth_security_stores.StepUpStore,
+        revoke_other_sessions: bool = False,
+        current_session_id: str | None = None,
+    ) -> None:
+        """Change the authenticated user's password after step-up verification.
+
+        Args:
+            user_id: ID of the authenticated user.
+            current_password: Current password supplied for step-up.
+            new_password: New plaintext password to store.
+            mfa_code: Optional MFA code supplied for step-up.
+            step_up_store: Step-up lockout store.
+            revoke_other_sessions: When True, revoke all of the user's
+                other sessions (keeping ``current_session_id``).
+            current_session_id: Caller's session ID, preserved when
+                ``revoke_other_sessions`` is True.
+
+        Returns:
+            None.
+
+        Raises:
+            HTTPException: If step-up verification or persistence fails.
+        """
+        ...
+
+    def change_managed_user_password(self, user_id: int, new_password: str) -> None:
+        """Change a managed user's password and revoke their auth state.
+
+        Args:
+            user_id: ID of the user whose password is changed.
+            new_password: New plaintext password to store.
+
+        Returns:
+            None.
+
+        Raises:
+            HTTPException: If password persistence fails.
+        """
+        ...
+
+    def get_mfa_status(self, user_id: int) -> auth_mfa_schema.MFAStatusResponse:
+        """Return whether MFA is enabled for the user.
+
+        Args:
+            user_id: ID of the authenticated user.
+
+        Returns:
+            MFA status response.
+        """
+        ...
+
+    def get_backup_code_status(self, user_id: int) -> auth_mfa_backup_codes_schema.MFABackupCodeStatus:
+        """Return the user's MFA backup-code status.
+
+        Args:
+            user_id: ID of the authenticated user.
+
+        Returns:
+            Backup-code status response.
+        """
+        ...
+
+    def setup_mfa(
+        self,
+        user_id: int,
+        mfa_secret_store: auth_mfa_setup_store.MFASecretStoreBackend,
+    ) -> auth_mfa_schema.MFASetupResponse:
+        """Create MFA setup material and store the pending setup secret.
+
+        Args:
+            user_id: ID of the authenticated user.
+            mfa_secret_store: Pending MFA setup-secret store.
+
+        Returns:
+            MFA setup response with QR/secret material.
+        """
+        ...
+
+    def enable_mfa(
+        self,
+        request: auth_mfa_schema.MFASetupRequest,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+        mfa_secret_store: auth_mfa_setup_store.MFASecretStoreBackend,
+    ) -> dict:
+        """Enable MFA using the pending secret and a verification code.
+
+        Args:
+            request: MFA setup request carrying credentials and code.
+            user_id: ID of the authenticated user.
+            step_up_store: Step-up lockout store.
+            mfa_secret_store: Pending MFA setup-secret store.
+
+        Returns:
+            Confirmation payload including backup codes.
+
+        Raises:
+            HTTPException: If step-up or verification fails.
+        """
+        ...
+
+    def disable_mfa(
+        self,
+        request: auth_mfa_schema.MFADisableRequest,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> dict:
+        """Disable MFA after step-up verification.
+
+        Args:
+            request: MFA disable request carrying credentials and code.
+            user_id: ID of the authenticated user.
+            step_up_store: Step-up lockout store.
+
+        Returns:
+            Confirmation payload.
+
+        Raises:
+            HTTPException: If step-up verification fails.
+        """
+        ...
+
+    def verify_mfa(self, request: auth_mfa_schema.MFARequest, user_id: int) -> dict:
+        """Verify an MFA code for the authenticated user.
+
+        Args:
+            request: MFA request carrying the code to verify.
+            user_id: ID of the authenticated user.
+
+        Returns:
+            Confirmation payload.
+
+        Raises:
+            HTTPException: If the code is invalid.
+        """
+        ...
+
+    def generate_backup_codes(
+        self,
+        step_up: users_schema.StepUpVerification,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> auth_mfa_backup_codes_schema.MFABackupCodesResponse:
+        """Generate new backup codes for an MFA-enabled account.
+
+        Args:
+            step_up: Step-up verification payload.
+            user_id: ID of the authenticated user.
+            step_up_store: Step-up lockout store.
+
+        Returns:
+            Newly generated backup codes.
+
+        Raises:
+            HTTPException: If MFA is disabled or step-up fails.
+        """
+        ...
+
+    def generate_link_token(
+        self,
+        idp_id: int,
+        link_request: auth_idp_link_tokens_schema.IdpLinkTokenRequest,
+        request: Request,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> auth_idp_link_tokens_schema.IdpLinkTokenResponse:
+        """Generate a one-time IdP link token after step-up verification.
+
+        Args:
+            idp_id: ID of the identity provider to link.
+            link_request: Link-token request payload (credentials).
+            request: Current HTTP request (for client IP).
+            user_id: ID of the authenticated user.
+            step_up_store: Step-up lockout store.
+
+        Returns:
+            The generated one-time link token.
+
+        Raises:
+            HTTPException: If step-up fails, the IdP is missing/disabled, or
+                already linked.
+        """
+        ...
+
+    def delete_identity_provider_link(
+        self,
+        idp_id: int,
+        step_up: users_schema.StepUpVerification,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> None:
+        """Unlink an IdP while enforcing anti-lockout checks.
+
+        Args:
+            idp_id: ID of the identity provider to unlink.
+            step_up: Step-up verification payload.
+            user_id: ID of the authenticated user.
+            step_up_store: Step-up lockout store.
+
+        Returns:
+            None.
+
+        Raises:
+            HTTPException: If step-up fails, the link is missing, or unlinking
+                would remove the last authentication method.
+        """
+        ...
+
+    def get_user_identity_provider_links(
+        self,
+        user_id: int,
+    ) -> list[auth_identity_links_schema.UsersIdentityProviderResponse]:
+        """Return enriched identity-provider links for the user.
+
+        Args:
+            user_id: ID of the authenticated user.
+
+        Returns:
+            List of enriched identity-provider link responses.
+        """
+        ...
+
+    def validate_and_claim_browser_link_token(
+        self,
+        link_token: str,
+        idp_id: int,
+        client_ip: str | None,
+    ) -> int:
+        """Validate, IP-check, and atomically claim a browser-redirect link token.
+
+        Args:
+            link_token: Plaintext one-time link token from the query string.
+            idp_id: The identity provider ID expected in the token.
+            client_ip: Caller IP address for the soft IP-match check.
+
+        Returns:
+            The user ID encoded in the token.
+
+        Raises:
+            HTTPException: 401/400/409 on invalid, replayed, or conflicting tokens.
+        """
+        ...
+
+    def get_identity_link_counts_for_users(self, user_ids: list[int]) -> dict[int, int]:
+        """Return identity-link count per user ID in a single grouped query.
+
+        Args:
+            user_ids: List of user IDs to query.
+
+        Returns:
+            Mapping of user_id to link count (users with no links are absent).
         """
         ...
 
@@ -479,20 +751,7 @@ class DefaultIdentityService:
             HTTPException: 401 if the token is expired,
                 invalid, or the user is not found.
         """
-        try:
-            self._token_manager.validate_token_expiration(
-                access_token,
-                auth_token_manager.TokenType.ACCESS,
-            )
-        except HTTPException as http_err:
-            log_level = "debug" if "expired" in http_err.detail.lower() else "error"
-            core_logger.print_to_log(
-                f"Access token validation failed: {http_err.detail}",
-                log_level,
-                exc=http_err,
-                context={"access_token": "[REDACTED]"},
-            )
-            raise
+        self._token_manager.validate_access_expiration_logged(access_token)
 
         sub = self._token_manager.get_token_claim(access_token, "sub")
         if not isinstance(sub, int):
@@ -546,8 +805,8 @@ class DefaultIdentityService:
             HTTPException: 401 if the key is not found,
                 revoked, or expired.
         """
-        computed_hash = users_api_keys_utils.hash_api_key(raw_key)
-        db_key = users_api_keys_crud.get_api_key_by_hash(computed_hash, self._db)
+        computed_hash = auth_api_keys_utils.hash_api_key(raw_key)
+        db_key = auth_api_keys_crud.get_api_key_by_hash(computed_hash, self._db)
 
         # Constant-time comparison prevents timing attacks
         # even when the key is not found.
@@ -581,7 +840,7 @@ class DefaultIdentityService:
 
         # Best-effort last_used_at update; never fails the request.
         try:
-            users_api_keys_crud.update_last_used(db_key.id, self._db)
+            auth_api_keys_crud.update_last_used(db_key.id, self._db)
         except SQLAlchemyError as err:
             core_logger.print_to_log(
                 f"Failed to update last_used_at for API key {db_key.id}: {err}",
@@ -600,7 +859,7 @@ class DefaultIdentityService:
             },
         )
 
-        scopes = users_api_keys_utils.json_to_scopes(db_key.scopes)
+        scopes = auth_api_keys_utils.json_to_scopes(db_key.scopes)
         return self._build_principal(
             user,
             scopes,
@@ -628,7 +887,7 @@ class DefaultIdentityService:
             HTTPException: 401 if the session is not
                 found or has expired.
         """
-        db_session = users_sessions_crud.get_session_by_id_not_expired(session_id, self._db)
+        db_session = auth_sessions_crud.get_session_by_id_not_expired(session_id, self._db)
         if db_session is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -681,75 +940,7 @@ class DefaultIdentityService:
             HTTPException: 404 if the session is not
                 found for this user.
         """
-        users_sessions_crud.delete_session(session_id, user_id, self._db)
-
-    def revoke_api_key(
-        self,
-        api_key_id: str,
-        user_id: int,
-    ) -> None:
-        """Soft-revoke an API key (sets ``is_active=False``).
-
-        Args:
-            api_key_id: UUID of the API key.
-            user_id: Owner of the API key (prevents
-                cross-user revocations).
-
-        Raises:
-            HTTPException: 404 if the key is not found
-                for this user.
-        """
-        users_api_keys_crud.revoke_api_key(api_key_id, user_id, self._db)
-
-    def link_external_identity(
-        self,
-        user_id: int,
-        idp_id: int,
-        idp_subject: str,
-    ) -> None:
-        """Create a link between a user and an identity provider.
-
-        Args:
-            user_id: The ID of the user to link.
-            idp_id: The ID of the identity provider.
-            idp_subject: Subject identifier from the IdP.
-
-        Raises:
-            HTTPException: 409 if link already exists.
-            HTTPException: 500 if database operation fails.
-        """
-        auth_identity_links_crud.create_user_identity_provider(
-            user_id,
-            idp_id,
-            idp_subject,
-            self._db,
-        )
-
-    def unlink_external_identity(
-        self,
-        user_id: int,
-        idp_id: int,
-    ) -> None:
-        """Remove a user-to-identity-provider link.
-
-        Args:
-            user_id: The ID of the user.
-            idp_id: The ID of the identity provider to unlink.
-
-        Raises:
-            HTTPException: 404 if the link is not found.
-            HTTPException: 500 if database operation fails.
-        """
-        deleted = auth_identity_links_crud.delete_user_identity_provider(
-            user_id,
-            idp_id,
-            self._db,
-        )
-        if not deleted:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=(f"Identity link not found for user {user_id} and IdP {idp_id}"),
-            )
+        auth_sessions_crud.delete_session(session_id, user_id, self._db)
 
     def check_scope(
         self,
@@ -831,53 +1022,219 @@ class DefaultIdentityService:
         Returns:
             True if the password matches, False otherwise.
         """
-        return self._password_hasher.verify(password, password_hash)
+        return self._password_hasher.verify_password(password, password_hash)
 
-    def create_mfa_backup_codes(
-        self,
-        user_id: int,
-        count: int = 10,
-    ) -> list[str]:
-        """Create and persist MFA backup codes for a user.
+    def get_password_hash(self, user_id: int) -> str | None:
+        """Return a user's stored local password hash, or ``None``.
 
-        Args:
-            user_id: User ID to create backup codes for.
-            count: Number of codes to create.
-
-        Returns:
-            Plaintext backup codes to show once.
-        """
-        import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
-
-        return mfa_backup_codes_crud.create_backup_codes(
-            user_id,
-            self._password_hasher,
-            self._db,
-            count,
-        )
-
-    def verify_and_consume_mfa_backup_code(
-        self,
-        user_id: int,
-        code: str,
-    ) -> bool:
-        """Verify and consume an MFA backup code.
+        ``None`` means the account has no local password (for example an
+        SSO-only account).
 
         Args:
-            user_id: User ID to verify the backup code for.
-            code: Plaintext backup code supplied by the user.
+            user_id: ID of the user to read the credential for.
 
         Returns:
-            True if the backup code matched and was consumed.
+            The stored password hash, or ``None`` if no credential exists.
         """
-        import auth.mfa_backup_codes.utils as mfa_backup_codes_utils
+        credential = auth_credentials_crud.get_credential(user_id, self._db)
+        return credential.password_hash if credential is not None else None
 
-        return mfa_backup_codes_utils.verify_and_consume_backup_code(
+    def set_local_password_hash(self, user_id: int, password_hash: str) -> None:
+        """Insert or update a user's local password hash.
+
+        Args:
+            user_id: ID of the user to write the credential for.
+            password_hash: Argon2/bcrypt password hash to store.
+
+        Returns:
+            None.
+        """
+        auth_credentials_crud.upsert_password_hash(user_id, password_hash, self._db)
+
+    def clear_local_password(self, user_id: int) -> None:
+        """Remove a user's local password credential, if present.
+
+        Args:
+            user_id: ID of the user whose credential should be removed.
+
+        Returns:
+            None.
+        """
+        auth_credentials_crud.delete_credential(user_id, self._db)
+
+    def initialize_user_mfa(self, user_id: int) -> None:
+        """Create the default (disabled) MFA row for a new user.
+
+        Establishes the 1:1 ``users``↔``users_mfa`` invariant so non-auth
+        modules never touch the auth-owned MFA table directly.
+
+        Args:
+            user_id: ID of the newly created user.
+
+        Returns:
+            None.
+        """
+        auth_mfa_crud.create_users_mfa_row(user_id, self._db)
+
+    # ------------------------------------------------------------------
+    # Account-security workflows (delegate to auth.services.*)
+    # ------------------------------------------------------------------
+
+    def get_user_sessions(self, user_id: int) -> list[auth_sessions_schema.UsersSessionsRead]:
+        """Return the authenticated user's active sessions."""
+        return auth_account_security_service.get_user_sessions(user_id, self._db)
+
+    def delete_user_session(self, session_id: str, user_id: int) -> None:
+        """Delete one of the authenticated user's own sessions."""
+        auth_account_security_service.delete_user_session(session_id, user_id, self._db)
+
+    def change_own_password(
+        self,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+        mfa_code: str | None,
+        step_up_store: auth_security_stores.StepUpStore,
+        revoke_other_sessions: bool = False,
+        current_session_id: str | None = None,
+    ) -> None:
+        """Change the authenticated user's password after step-up verification."""
+        auth_account_security_service.change_own_password(
             user_id,
-            code,
-            self._password_hasher,
+            current_password,
+            new_password,
+            mfa_code,
+            self,
+            step_up_store,
+            self._db,
+            revoke_other_sessions=revoke_other_sessions,
+            current_session_id=current_session_id,
+        )
+
+    def change_managed_user_password(self, user_id: int, new_password: str) -> None:
+        """Change a managed user's password and revoke their auth state."""
+        auth_account_security_service.change_managed_user_password(
+            user_id,
+            new_password,
+            self,
             self._db,
         )
+
+    def get_mfa_status(self, user_id: int) -> auth_mfa_schema.MFAStatusResponse:
+        """Return whether MFA is enabled for the user."""
+        return auth_mfa_workflow.get_mfa_status(user_id, self._db)
+
+    def get_backup_code_status(self, user_id: int) -> auth_mfa_backup_codes_schema.MFABackupCodeStatus:
+        """Return the user's MFA backup-code status."""
+        return auth_mfa_workflow.get_backup_code_status(user_id, self._db)
+
+    def setup_mfa(
+        self,
+        user_id: int,
+        mfa_secret_store: auth_mfa_setup_store.MFASecretStoreBackend,
+    ) -> auth_mfa_schema.MFASetupResponse:
+        """Create MFA setup material and store the pending setup secret."""
+        return auth_mfa_workflow.setup_mfa(user_id, self._db, mfa_secret_store)
+
+    def enable_mfa(
+        self,
+        request: auth_mfa_schema.MFASetupRequest,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+        mfa_secret_store: auth_mfa_setup_store.MFASecretStoreBackend,
+    ) -> dict:
+        """Enable MFA using the pending secret and a verification code."""
+        return auth_mfa_workflow.enable_mfa(
+            request,
+            user_id,
+            self,
+            step_up_store,
+            self._db,
+            mfa_secret_store,
+        )
+
+    def disable_mfa(
+        self,
+        request: auth_mfa_schema.MFADisableRequest,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> dict:
+        """Disable MFA after step-up verification."""
+        return auth_mfa_workflow.disable_mfa(request, user_id, self, step_up_store, self._db)
+
+    def verify_mfa(self, request: auth_mfa_schema.MFARequest, user_id: int) -> dict:
+        """Verify an MFA code for the authenticated user."""
+        return auth_mfa_workflow.verify_mfa(request, user_id, self, self._db)
+
+    def generate_backup_codes(
+        self,
+        step_up: users_schema.StepUpVerification,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> auth_mfa_backup_codes_schema.MFABackupCodesResponse:
+        """Generate new backup codes for an MFA-enabled account."""
+        return auth_mfa_workflow.generate_backup_codes(step_up, user_id, self, step_up_store, self._db)
+
+    def generate_link_token(
+        self,
+        idp_id: int,
+        link_request: auth_idp_link_tokens_schema.IdpLinkTokenRequest,
+        request: Request,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> auth_idp_link_tokens_schema.IdpLinkTokenResponse:
+        """Generate a one-time IdP link token after step-up verification."""
+        return auth_identity_link_service.generate_link_token(
+            idp_id,
+            link_request,
+            request,
+            user_id,
+            self,
+            step_up_store,
+            self._db,
+        )
+
+    def delete_identity_provider_link(
+        self,
+        idp_id: int,
+        step_up: users_schema.StepUpVerification,
+        user_id: int,
+        step_up_store: auth_security_stores.StepUpStore,
+    ) -> None:
+        """Unlink an IdP while enforcing anti-lockout checks."""
+        auth_identity_link_service.delete_identity_provider_link(
+            idp_id,
+            step_up,
+            user_id,
+            self,
+            step_up_store,
+            self._db,
+        )
+
+    def get_user_identity_provider_links(
+        self,
+        user_id: int,
+    ) -> list[auth_identity_links_schema.UsersIdentityProviderResponse]:
+        """Return enriched identity-provider links for the user."""
+        return auth_identity_link_service.get_user_identity_provider_links(user_id, self._db)
+
+    def validate_and_claim_browser_link_token(
+        self,
+        link_token: str,
+        idp_id: int,
+        client_ip: str | None,
+    ) -> int:
+        """Validate, IP-check, and atomically claim a browser-redirect link token."""
+        return auth_identity_link_service.validate_and_claim_browser_link_token(
+            link_token,
+            idp_id,
+            client_ip,
+            self._db,
+        )
+
+    def get_identity_link_counts_for_users(self, user_ids: list[int]) -> dict[int, int]:
+        """Return identity-link count per user ID in a single grouped query."""
+        return auth_identity_link_service.get_identity_link_counts_for_users(user_ids, self._db)
 
 
 # ---------------------------------------------------------------------------

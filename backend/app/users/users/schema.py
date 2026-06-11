@@ -103,6 +103,23 @@ class UserAccessType(Enum):
     ADMIN = "admin"
 
 
+def normalize_access_type(access_type: "UserAccessType | str") -> str:
+    """
+    Return the string value of an access type.
+
+    Accepts either a :class:`UserAccessType` enum member or its raw
+    string value and always returns the plain string form (e.g.
+    ``"admin"`` or ``"regular"``).
+
+    Args:
+        access_type: A ``UserAccessType`` member or its string value.
+
+    Returns:
+        The access type as a plain string.
+    """
+    return access_type.value if isinstance(access_type, UserAccessType) else access_type
+
+
 class UsersBase(BaseModel):
     """
     Base users schema with common fields.
@@ -400,6 +417,15 @@ class UsersEditPassword(BaseModel):
         max_length=32,
         description="TOTP or backup code, required when MFA is enabled",
     )
+    revoke_other_sessions: StrictBool = Field(
+        default=False,
+        description=(
+            "When true, revoke all of the user's other sessions "
+            "(keeping the current one) after the password change. "
+            "Use this to evict an attacker when changing a password "
+            "because of a suspected compromise."
+        ),
+    )
 
     model_config = ConfigDict(
         extra="forbid",
@@ -443,8 +469,9 @@ class StepUpVerification(BaseModel):
 
     For SSO-only accounts (no local password set), the password
     field may be omitted and the password check is skipped — see
-    :func:`users.users.utils.verify_step_up_credentials` for the
-    rationale and the known coverage gap.
+    :func:`auth.services.step_up_service.verify_step_up_credentials`
+    and ``docs/developer-guide/auth-boundary.md`` for the rationale
+    and the tracked SSO-only step-up gap.
 
     Attributes:
         current_password: Caller's existing password. Required

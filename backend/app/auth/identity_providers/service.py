@@ -21,14 +21,16 @@ from joserfc.errors import (
 from joserfc.jwk import ECKey, OctKey, RSAKey
 from sqlalchemy.orm import Session
 
-import auth.identity_links.crud as user_idp_crud
-import auth.identity_links.models as user_idp_models
-import auth.identity_links.utils as user_idp_utils
 import auth.identity_providers.crud as idp_crud
+import auth.identity_providers.links.crud as auth_identity_links_crud
+import auth.identity_providers.links.models as auth_identity_links_models
+import auth.identity_providers.links.utils as auth_identity_links_utils
 import auth.identity_providers.models as idp_models
+import auth.identity_service as auth_identity_service
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.models as oauth_state_models
 import auth.password_hasher as auth_password_hasher
+import auth.token_manager as auth_token_manager
 import core.config as core_config
 import core.cryptography as core_cryptography
 import core.logger as core_logger
@@ -45,6 +47,31 @@ MAX_IDP_TOKEN_AGE_DAYS = 90
 TOKEN_EXPIRY_THRESHOLD_MINUTES = 5
 TOKEN_REFRESH_RATE_LIMIT_MINUTES = 1
 DEFAULT_TOKEN_EXPIRY_SECONDS = 300
+
+# Allow-list of acceptable ID-token signature algorithms.
+#
+# OIDC ID tokens are verified against the IdP's *public* JWKS keys, so only
+# asymmetric algorithms are valid. Pinning this list (and passing it to
+# ``jwt.decode``) is mandatory defense-in-depth: without it the verifier would
+# trust whatever ``alg`` the token header advertises. That would re-open two
+# classic attacks — ``alg=none`` (no signature) and RS256→HS256 confusion
+# (an attacker signs an HS256 token using the well-known RSA public key bytes
+# as the HMAC secret). Symmetric ``HS*`` algorithms are intentionally excluded
+# so a JWKS that publishes an ``oct`` key cannot be abused for key confusion.
+ID_TOKEN_ALLOWED_ALGORITHMS: frozenset[str] = frozenset(
+    {
+        "RS256",
+        "RS384",
+        "RS512",
+        "PS256",
+        "PS384",
+        "PS512",
+        "ES256",
+        "ES384",
+        "ES512",
+        "EdDSA",
+    }
+)
 
 
 class TokenAction(Enum):
@@ -322,6 +349,20 @@ class IdentityProviderService:
                     detail="ID token missing algorithm",
                 )
 
+            # Reject disallowed algorithms before importing the key.
+            # This blocks ``alg=none`` and symmetric ``HS*`` algorithms,
+            # which would otherwise enable signature-bypass and RS256→HS256
+            # key-confusion attacks against the public JWKS keys.
+            if alg not in ID_TOKEN_ALLOWED_ALGORITHMS:
+                core_logger.print_to_log(
+                    f"ID token uses disallowed algorithm: {alg}",
+                    "warning",
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="ID token uses an unsupported signature algorithm",
+                )
+
             core_logger.print_to_log(f"ID token header: kid={kid}, alg={alg}", "debug")
 
             # Step 2: Fetch JWKS from IdP
@@ -363,8 +404,16 @@ class IdentityProviderService:
                 )
 
             # Step 5: Verify signature and decode claims
-            # joserfc will verify the signature using the public key
-            decoded = jwt.decode(id_token, key)
+            # joserfc will verify the signature using the public key.
+            # The ``algorithms`` allow-list is mandatory: it pins the
+            # acceptable signature algorithms so a forged ``alg`` header
+            # (``none`` or a symmetric ``HS*`` confusion attack) cannot
+            # bypass verification, mirroring TokenManager.decode_token.
+            decoded = jwt.decode(
+                id_token,
+                key,
+                algorithms=list(ID_TOKEN_ALLOWED_ALGORITHMS),
+            )
             claims = decoded.claims
 
             # Step 5a: Validate claims (iss, aud, exp, iat)
@@ -655,6 +704,13 @@ class IdentityProviderService:
                     "to SSRF_ALLOWED_HOSTS."
                 ),
             )
+
+        # SSRF guard: the token endpoint can come from admin config or from
+        # the discovery document (whose contents are not otherwise
+        # re-validated), so a trusted issuer could still advertise an
+        # internal target. Refuse private/internal addresses unless
+        # explicitly opted in via SSRF_ALLOWED_HOSTS.
+        core_network.reject_private_url(token_endpoint, purpose="oidc_token")
 
         return token_endpoint
 
@@ -1095,7 +1151,9 @@ class IdentityProviderService:
                     )
 
                 # Check if this IdP subject is already linked to ANY user
-                existing_link = user_idp_crud.get_user_identity_provider_by_subject_and_idp_id(idp.id, subject, db)
+                existing_link = auth_identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(
+                    idp.id, subject, db
+                )
                 if existing_link:
                     # Check if it's already linked to THIS user
                     if existing_link.user_id == link_user_id:
@@ -1111,7 +1169,7 @@ class IdentityProviderService:
                         )
 
                 # Create the link
-                user_idp_crud.create_user_identity_provider(
+                auth_identity_links_crud.create_user_identity_provider(
                     user_id=link_user_id, idp_id=idp.id, idp_subject=subject, db=db
                 )
 
@@ -1208,6 +1266,15 @@ class IdentityProviderService:
         # Try to get from userinfo endpoint first
         userinfo_claims = None
         if userinfo_endpoint:
+            # SSRF guard: the userinfo endpoint can come from admin config or
+            # from the discovery document (whose contents are not otherwise
+            # re-validated). Because this request carries the OAuth access
+            # token in an Authorization header, an internal target could also
+            # exfiltrate that token. Refuse private/internal addresses unless
+            # explicitly opted in via SSRF_ALLOWED_HOSTS. Raised outside the
+            # try/except below so the guard's 4xx is not swallowed as a
+            # userinfo fetch failure.
+            core_network.reject_private_url(userinfo_endpoint, purpose="oidc_userinfo")
             try:
                 # Use the access token to fetch userinfo
                 access_token = token_response.get("access_token")
@@ -1373,7 +1440,7 @@ class IdentityProviderService:
             access_token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
             # Store encrypted token and metadata in database
-            user_idp_crud.store_user_identity_provider_tokens(
+            auth_identity_links_crud.store_user_identity_provider_tokens(
                 user_id=user_id,
                 idp_id=idp_id,
                 encrypted_refresh_token=encrypted_refresh,
@@ -1433,6 +1500,29 @@ class IdentityProviderService:
 
         return result
 
+    @staticmethod
+    def _is_email_verified(claims: dict[str, Any]) -> bool:
+        """Return ``True`` only when the IdP asserts a verified email.
+
+        Honors the standard OIDC ``email_verified`` claim. Providers may
+        send it as a JSON boolean (``true``) or, less correctly, as the
+        string ``"true"``; both are accepted. Any other value — including
+        a missing claim — is treated as *unverified* so that email-based
+        account linking fails closed.
+
+        Args:
+            claims: Raw userinfo/ID-token claims from the identity provider.
+
+        Returns:
+            ``True`` if the email is explicitly asserted as verified.
+        """
+        value = claims.get("email_verified")
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() == "true"
+        return False
+
     async def _find_or_create_user(
         self,
         idp: idp_models.IdentityProvider,
@@ -1446,7 +1536,9 @@ class IdentityProviderService:
 
         This method attempts to:
         1. Find a user by their identity provider (IdP) link using the subject identifier.
-        2. If not found, find a user by email and link their account to the IdP.
+        2. If not found, find a user by email and link their account to the IdP,
+           but only when the IdP asserts the email is verified (account-takeover
+           prevention via the OIDC ``email_verified`` claim).
         3. If still not found and auto-creation is enabled, create a new user from the IdP information.
 
         Args:
@@ -1460,30 +1552,56 @@ class IdentityProviderService:
             users_models.Users: The found or newly created user instance.
 
         Raises:
-            HTTPException: If user creation is disabled for the identity provider and no existing user is found.
+            HTTPException: If an existing account matches the email but the IdP
+                did not assert a verified email (403), or if user creation is
+                disabled for the identity provider and no existing user is found.
         """
         # Try to find existing user by IdP link
-        link = user_idp_crud.get_user_identity_provider_by_subject_and_idp_id(idp.id, subject, db)
+        link = auth_identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(idp.id, subject, db)
 
         if link:
             user = link.users
             # Update last login timestamp
-            user_idp_crud.update_user_identity_provider_last_login(link.user_id, idp.id, db)
+            auth_identity_links_crud.update_user_identity_provider_last_login(link.user_id, idp.id, db)
 
             # Update user info if sync is enabled
             if idp.sync_user_info:
                 user = await self._update_user_from_idp(user, idp, userinfo, db)
             return user
 
-        # Try to find by email (for linking existing accounts)
+        # Try to find by email (for linking existing accounts).
+        #
+        # SECURITY (account-takeover prevention): only auto-link an
+        # external identity to an EXISTING local account when the IdP
+        # asserts that the email is verified (standard OIDC
+        # ``email_verified`` claim). Without this gate, an attacker who
+        # registers an unverified address matching a victim's email at a
+        # permissive IdP would be auto-linked into — and gain control of —
+        # the victim's existing account on first SSO login. Subject-based
+        # linking above is unaffected; this only guards the email fallback.
         mapped_data = self._map_user_claims(idp, userinfo)
         email = mapped_data.get("email")
 
         if email:
             user = users_crud.get_user_by_email(email, db)
             if user:
+                if not self._is_email_verified(userinfo):
+                    core_logger.print_to_log(
+                        f"Refusing to link IdP {idp.name} to existing account "
+                        f"{user.username}: provider did not assert a verified email",
+                        "warning",
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=(
+                            "Cannot link this identity provider to an existing "
+                            "account because the provider did not verify the "
+                            "email address."
+                        ),
+                    )
+
                 # Link existing account to IdP
-                user_idp_crud.create_user_identity_provider(user.id, idp.id, subject, db)
+                auth_identity_links_crud.create_user_identity_provider(user.id, idp.id, subject, db)
 
                 core_logger.print_to_log(f"Linked existing user {user.username} to IdP {idp.name}", "info")
 
@@ -1515,9 +1633,11 @@ class IdentityProviderService:
         Creates a new user in the database based on identity provider (IdP) information.
 
         This method generates a unique username, creates a user with mapped data from the IdP
-        using the existing CRUD layer, and links the user to the IdP subject. The password is
-        randomly generated and properly hashed but not intended for SSO users. The user's email
-        is marked as verified since we trust the IdP's verification.
+        using the existing CRUD layer, and links the user to the IdP subject. SSO accounts get
+        no local password credential — ``create_signup_user`` is called with
+        ``persist_credential=False`` so no row is written to ``users_local_credentials`` and
+        ``has_local_password`` correctly reports ``False``. The user's email is marked as
+        verified since we trust the IdP's verification.
 
         Args:
             idp (idp_models.IdentityProvider): The identity provider instance.
@@ -1532,7 +1652,10 @@ class IdentityProviderService:
         Raises:
             HTTPException: If user creation fails (e.g., duplicate username/email).
         """
-        # Generate a random password (won't be used for SSO users)
+        # Generate a random password solely to satisfy the required
+        # UsersSignup.password field. It is never validated, hashed, or
+        # stored because the user is created with persist_credential=False
+        # (SSO accounts have no local credential row).
         random_password = password_hasher.generate_password(length=16)
 
         # Ensure username is unique
@@ -1561,13 +1684,28 @@ class IdentityProviderService:
 
         server_settings = server_settings_utils.get_server_settings_or_404(db)
 
-        created_user = users_crud.create_signup_user(user_signup, server_settings, password_hasher, db)
+        # Build a real identity service to satisfy the create_signup_user
+        # signature. SSO accounts opt out of local-credential persistence
+        # (persist_credential=False) so no password hash is written.
+        identity_service = auth_identity_service.DefaultIdentityService(
+            db=db,
+            token_manager=auth_token_manager.get_token_manager(),
+            password_hasher=password_hasher,
+        )
+
+        created_user = users_crud.create_signup_user(
+            user_signup,
+            server_settings,
+            identity_service,
+            db,
+            persist_credential=False,
+        )
 
         # Create default data for the user
-        users_utils.create_user_default_data(created_user.id, db)
+        users_utils.create_user_default_data(created_user.id, identity_service, db)
 
         # Create the IdP link
-        user_idp_crud.create_user_identity_provider(created_user.id, idp.id, subject, db)
+        auth_identity_links_crud.create_user_identity_provider(created_user.id, idp.id, subject, db)
 
         core_logger.print_to_log(f"Created new user {created_user.username} from IdP {idp.name}", "info")
 
@@ -1688,8 +1826,10 @@ class IdentityProviderService:
             )
 
         # Get the encrypted refresh token from database
-        encrypted_refresh_token = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-            user_id, idp_id, db
+        encrypted_refresh_token = (
+            auth_identity_links_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
+                user_id, idp_id, db
+            )
         )
 
         if not encrypted_refresh_token:
@@ -1711,7 +1851,9 @@ class IdentityProviderService:
                 exc=err,
             )
             # Clear corrupted token
-            user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(user_id, idp_id, db)
+            auth_identity_links_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
+                user_id, idp_id, db
+            )
             return None
 
         # Resolve endpoints and credentials using helper methods
@@ -1763,7 +1905,9 @@ class IdentityProviderService:
                     exc=err,
                 )
                 # Clear invalid token from database
-                user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(user_id, idp_id, db)
+                auth_identity_links_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
+                    user_id, idp_id, db
+                )
                 return None
             else:
                 # Other HTTP errors (5xx) - don't clear token
@@ -1848,8 +1992,10 @@ class IdentityProviderService:
                 return False
 
             # Get the encrypted refresh token from database
-            encrypted_refresh_token = user_idp_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
-                user_id, idp_id, db
+            encrypted_refresh_token = (
+                auth_identity_links_utils.get_user_identity_provider_refresh_token_by_user_id_and_idp_id(
+                    user_id, idp_id, db
+                )
             )
 
             if not encrypted_refresh_token:
@@ -1974,7 +2120,7 @@ class IdentityProviderService:
             )
             return False
 
-    def _is_token_expired_by_age(self, link: user_idp_models.UsersIdentityProvider) -> bool:
+    def _is_token_expired_by_age(self, link: auth_identity_links_models.IdentityLink) -> bool:
         """
         Check if an IdP refresh token has exceeded the maximum age policy.
 
@@ -1983,7 +2129,7 @@ class IdentityProviderService:
         configured maximum age.
 
         Args:
-            link (user_idp_models.UsersIdentityProvider): The user-IdP link containing token metadata.
+            link (auth_identity_links_models.IdentityLink): The user-IdP link containing token metadata.
 
         Returns:
             bool: True if the token exceeds maximum age, False otherwise.
@@ -2024,7 +2170,7 @@ class IdentityProviderService:
         max_age = timedelta(days=MAX_IDP_TOKEN_AGE_DAYS)
         return token_age > max_age
 
-    def _should_refresh_idp_token(self, link: user_idp_models.UsersIdentityProvider) -> TokenAction:
+    def _should_refresh_idp_token(self, link: auth_identity_links_models.IdentityLink) -> TokenAction:
         """
         Determine what action to take for an IdP token based on expiry and age policies.
 
@@ -2035,7 +2181,7 @@ class IdentityProviderService:
         4. Rate limiting - whether the token was refreshed very recently
 
         Args:
-            link (user_idp_models.UsersIdentityProvider): The user-IdP link containing token metadata.
+            link (auth_identity_links_models.IdentityLink): The user-IdP link containing token metadata.
 
         Returns:
             TokenAction: The action to take (SKIP, REFRESH, or CLEAR).
@@ -2049,12 +2195,12 @@ class IdentityProviderService:
             - SKIP if token is still valid and not close to expiry
 
         Example usage:
-            link = user_idp_crud.get_user_identity_provider_by_user_id_and_idp_id(user_id, idp_id, db)
+            link = auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(user_id, idp_id, db)
             action = self._should_refresh_idp_token(link)
             if action == TokenAction.REFRESH:
                 await self.refresh_idp_session(user_id, idp_id, db)
             elif action == TokenAction.CLEAR:
-                user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(user_id, idp_id, db)
+                auth_identity_links_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(user_id, idp_id, db)
         """
         # Check if refresh token exists
         if not link or not link.idp_refresh_token:

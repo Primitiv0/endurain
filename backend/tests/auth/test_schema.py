@@ -330,14 +330,14 @@ class TestPendingMFALogin:
             results.append(store.record_failed_attempt("testuser"))
             finished.set()
 
-        store._failed_attempts_lock.acquire()
+        store._lockout._lock.acquire()
         try:
             thread = Thread(target=record_attempt)
             thread.start()
             assert started.wait(timeout=1)
             assert not finished.wait(timeout=0.05)
         finally:
-            store._failed_attempts_lock.release()
+            store._lockout._lock.release()
 
         thread.join(timeout=1)
         assert results == [1]
@@ -371,7 +371,7 @@ class TestPendingMFALogin:
         store = auth_security_stores.PendingMFALogin()
         store.record_failed_attempt("testuser")
         store.record_failed_attempt("testuser")
-        store.reset_failed_attempts("testuser")
+        store.reset_attempts("testuser")
         assert store.is_locked_out("testuser") is False
         assert store.get_lockout_time("testuser") is None
 
@@ -445,14 +445,14 @@ class TestFailedLoginAttempts:
             results.append(tracker.record_failed_attempt("testuser"))
             finished.set()
 
-        tracker._attempts_lock.acquire()
+        tracker._lockout._lock.acquire()
         try:
             thread = Thread(target=record_attempt)
             thread.start()
             assert started.wait(timeout=1)
             assert not finished.wait(timeout=0.05)
         finally:
-            tracker._attempts_lock.release()
+            tracker._lockout._lock.release()
 
         thread.join(timeout=1)
         assert results == [1]
@@ -749,6 +749,7 @@ class TestAuthRouterErrors:
                 client_type="mobile",
                 failed_attempts=object(),
                 pending_mfa_store=object(),
+                identity_service=object(),
                 password_hasher=object(),
                 token_manager=object(),
                 db=object(),
@@ -792,7 +793,7 @@ class TestAuthRouterErrors:
             log_messages.append(message)
 
         monkeypatch.setattr(
-            auth_router.profile_utils,
+            auth_router.mfa_service,
             "verify_user_mfa",
             lambda *args: False,
         )
@@ -819,6 +820,7 @@ class TestAuthRouterErrors:
                 client_type="web",
                 failed_attempts=object(),
                 pending_mfa_store=PendingMFAStore(),
+                identity_service=object(),
                 password_hasher=object(),
                 token_manager=object(),
                 db=object(),
@@ -853,7 +855,7 @@ class TestAuthRouterErrors:
                 return None
 
         monkeypatch.setattr(
-            auth_router.profile_utils,
+            auth_router.mfa_service,
             "verify_user_mfa",
             lambda *args: True,
         )
@@ -875,6 +877,7 @@ class TestAuthRouterErrors:
                 client_type="web",
                 failed_attempts=object(),
                 pending_mfa_store=PendingMFAStore(),
+                identity_service=object(),
                 password_hasher=object(),
                 token_manager=object(),
                 db=object(),
@@ -1028,11 +1031,11 @@ class TestDependencyFunctions:
 
         # Simulate lockout in the past
         past_time = datetime.now(UTC) - timedelta(hours=1)
-        store._failed_attempts["testuser"] = (5, past_time)
+        store._lockout._attempts["testuser"] = (5, past_time)
 
         # Check if locked out - should return False and reset
         assert store.is_locked_out("testuser") is False
-        assert "testuser" not in store._failed_attempts
+        assert "testuser" not in store._lockout._attempts
 
     def test_failed_login_attempts_lockout_expired_auto_reset(self):
         """Test that expired lockout is automatically reset when checking."""
@@ -1041,11 +1044,11 @@ class TestDependencyFunctions:
 
         # Simulate lockout in the past
         past_time = datetime.now(UTC) - timedelta(hours=1)
-        store._attempts["testuser"] = (5, past_time)
+        store._lockout._attempts["testuser"] = (5, past_time)
 
         # Check if locked out - should return False and reset
         assert store.is_locked_out("testuser") is False
-        assert "testuser" not in store._attempts
+        assert "testuser" not in store._lockout._attempts
 
     def test_pending_mfa_get_lockout_time_expired(self):
         """Test get_lockout_time returns None for expired lockouts."""
@@ -1054,7 +1057,7 @@ class TestDependencyFunctions:
 
         # Simulate expired lockout
         past_time = datetime.now(UTC) - timedelta(hours=1)
-        store._failed_attempts["testuser"] = (5, past_time)
+        store._lockout._attempts["testuser"] = (5, past_time)
 
         # Should return None for expired lockout
         assert store.get_lockout_time("testuser") is None
@@ -1066,7 +1069,7 @@ class TestDependencyFunctions:
 
         # Simulate expired lockout
         past_time = datetime.now(UTC) - timedelta(hours=1)
-        store._attempts["testuser"] = (5, past_time)
+        store._lockout._attempts["testuser"] = (5, past_time)
 
         # Should return None for expired lockout
         assert store.get_lockout_time("testuser") is None

@@ -298,6 +298,7 @@ def setup_main_logger():
         ),
         handlers,
     )
+    safeuploads_audit_logger.propagate = True
 
     return main_logger
 

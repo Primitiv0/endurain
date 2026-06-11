@@ -42,6 +42,10 @@ jobs:
         working-directory: backend
         run: uv sync --frozen --no-dev --group test --no-install-project
 
+      - name: Check auth import boundaries
+        working-directory: backend
+        run: PYTHONPATH=app uv run --no-sync lint-imports
+
       - name: Run tests
         working-directory: backend
         run: uv run --no-sync pytest

@@ -240,6 +240,15 @@ class TestSetupMainLogger:
             logger = core_logger.setup_main_logger()
         assert logger.level == logging.WARNING
 
+    def test_safeuploads_audit_logger_propagates(self, tmp_path):
+        with (
+            patch("core.config.settings.ENVIRONMENT", "development"),
+            patch("core.config.settings.LOG_LEVEL", "warning"),
+            patch("core.config.settings.LOGS_DIR", str(tmp_path)),
+        ):
+            core_logger.setup_main_logger()
+        assert logging.getLogger("safeuploads.audit").propagate is True
+
 
 class TestGetMainLogger:
     """Tests for get_main_logger function."""

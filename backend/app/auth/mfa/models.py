@@ -1,10 +1,11 @@
 """SQLAlchemy ORM model for the ``users_mfa`` table.
 
 This module defines the 1:1 companion table that owns MFA
-state for a user. Rows are written and read exclusively by
-``users.users.crud.update_user_mfa`` and the ``Users``
-relationship; the legacy ``users.mfa_enabled`` /
-``users.mfa_secret`` columns no longer exist.
+state for a user. Rows are written by
+``auth.mfa.crud.update_user_mfa`` and created by
+``auth.mfa.crud.create_users_mfa_row``; the legacy
+``users.mfa_enabled`` / ``users.mfa_secret`` columns no
+longer exist.
 """
 
 from typing import TYPE_CHECKING
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     from users.users.models import Users
 
 
-class AuthUserMFA(Base):
+class UsersMFA(Base):
     """
     1:1 MFA state table keyed by user_id.
 

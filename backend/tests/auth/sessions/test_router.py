@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-import auth.security as auth_security
+import auth.dependencies as auth_dependencies
 import auth.sessions.router as users_sessions_router
 import auth.sessions.schema as users_session_schema
 import core.database as core_database
@@ -50,7 +50,7 @@ def sessions_app(mock_db) -> FastAPI:
     )
 
     app.dependency_overrides[core_database.get_db] = lambda: mock_db
-    app.dependency_overrides[auth_security.check_scopes] = lambda: None
+    app.dependency_overrides[auth_dependencies.check_scopes] = lambda: None
 
     return app
 
@@ -77,7 +77,7 @@ def sessions_client(sessions_app: FastAPI) -> TestClient:
 class TestReadSessionsUser:
     """Tests for GET /sessions/user/{user_id}."""
 
-    @patch("auth.sessions.router.users_session_crud.get_user_sessions")
+    @patch("auth.sessions.router.auth_sessions_crud.get_user_sessions")
     @patch("auth.sessions.router.core_config.settings")
     def test_returns_sessions_list_for_user(
         self,
@@ -112,7 +112,7 @@ class TestReadSessionsUser:
         assert isinstance(response.json(), list)
         mock_get_sessions.assert_called_once()
 
-    @patch("auth.sessions.router.users_session_crud.get_user_sessions")
+    @patch("auth.sessions.router.auth_sessions_crud.get_user_sessions")
     @patch("auth.sessions.router.core_config.settings")
     def test_returns_empty_list_when_user_has_no_sessions(
         self,
@@ -148,7 +148,7 @@ class TestReadSessionsUser:
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == []
 
-    @patch("auth.sessions.router.users_session_crud.get_user_sessions")
+    @patch("auth.sessions.router.auth_sessions_crud.get_user_sessions")
     @patch("auth.sessions.router.core_config.settings")
     def test_propagates_database_error_as_500(
         self,
@@ -178,7 +178,7 @@ class TestReadSessionsUser:
 class TestDeleteSessionUser:
     """Tests for DELETE /sessions/{session_id}/user/{user_id}."""
 
-    @patch("auth.sessions.router.users_session_crud.delete_session")
+    @patch("auth.sessions.router.auth_sessions_crud.delete_session")
     def test_delete_session_success_returns_204(
         self,
         mock_delete,
@@ -194,7 +194,7 @@ class TestDeleteSessionUser:
         assert response.status_code == status.HTTP_204_NO_CONTENT
         mock_delete.assert_called_once()
 
-    @patch("auth.sessions.router.users_session_crud.delete_session")
+    @patch("auth.sessions.router.auth_sessions_crud.delete_session")
     def test_delete_nonexistent_session_returns_404(
         self,
         mock_delete,
@@ -212,7 +212,7 @@ class TestDeleteSessionUser:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch("auth.sessions.router.users_session_crud.delete_session")
+    @patch("auth.sessions.router.auth_sessions_crud.delete_session")
     def test_delete_session_for_different_user_propagates_error(
         self,
         mock_delete,
@@ -231,7 +231,7 @@ class TestDeleteSessionUser:
 
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
-    @patch("auth.sessions.router.users_session_crud.delete_session")
+    @patch("auth.sessions.router.auth_sessions_crud.delete_session")
     def test_delete_session_calls_crud_with_correct_args(
         self,
         mock_delete,
@@ -248,7 +248,7 @@ class TestDeleteSessionUser:
 
         mock_delete.assert_called_once_with("my-session-id", 7, mock_db)
 
-    @patch("auth.sessions.router.users_session_crud.delete_session")
+    @patch("auth.sessions.router.auth_sessions_crud.delete_session")
     def test_delete_session_database_error_returns_500(
         self,
         mock_delete,

@@ -57,7 +57,7 @@ applyTo: '**/*.py'
 - Always prioritize readability and clarity
 
 # PEP 8 Line Limits
-- Code lines: **79 characters maximum**
+- Code lines: **120 characters maximum**
 - Comments and docstrings: **72 characters maximum**
 - Enforce strictly - no exceptions
 

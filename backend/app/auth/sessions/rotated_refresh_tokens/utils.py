@@ -1,15 +1,13 @@
 """Utility functions for refresh token reuse detection."""
 
-import hashlib
-import hmac
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-import auth.constants as auth_constants
-import auth.sessions.crud as users_session_crud
+import auth.sessions.crud as auth_sessions_crud
 import auth.sessions.rotated_refresh_tokens.crud as rotated_token_crud
 import auth.sessions.rotated_refresh_tokens.schema as rotated_token_schema
+import auth.token_hashing as token_hashing
 import core.logger as core_logger
 from core.database import SessionLocal
 
@@ -35,15 +33,7 @@ def hmac_hash_token(token: str) -> str:
     Raises:
         ValueError: If JWT_SECRET_KEY is not configured.
     """
-    secret_key = auth_constants.JWT_SECRET_KEY
-    if not secret_key:
-        raise ValueError("JWT_SECRET_KEY is not configured")
-
-    return hmac.new(
-        secret_key.encode(),
-        token.encode(),
-        hashlib.sha256,
-    ).hexdigest()
+    return token_hashing.hmac_sha256(token)
 
 
 def store_rotated_token(
@@ -154,7 +144,7 @@ def invalidate_token_family(token_family_id: str, db: Session) -> int:
         HTTPException: If invalidation fails.
     """
     # Delete all sessions in the family
-    num_sessions_deleted = users_session_crud.delete_sessions_by_family(token_family_id, db)
+    num_sessions_deleted = auth_sessions_crud.delete_sessions_by_family(token_family_id, db)
 
     # Delete all rotated tokens for this family
     num_tokens_deleted = rotated_token_crud.delete_by_family(token_family_id, db)

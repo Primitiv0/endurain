@@ -9,7 +9,7 @@ verification via JWKS, and admin CRUD for provider configuration.
 Exports:
     - CRUD: get_identity_provider, get_identity_provider_by_slug,
       get_all_identity_providers, get_identity_providers_by_ids,
-      get_enabled_providers, create_identity_provider,
+      get_enabled_identity_providers, create_identity_provider,
       update_identity_provider, delete_identity_provider
     - Schemas: IdentityProvider, IdentityProviderBase,
       IdentityProviderCreate, IdentityProviderUpdate,
@@ -26,7 +26,7 @@ from .crud import (
     create_identity_provider,
     delete_identity_provider,
     get_all_identity_providers,
-    get_enabled_providers,
+    get_enabled_identity_providers,
     get_identity_provider,
     get_identity_provider_by_slug,
     get_identity_providers_by_ids,
@@ -73,7 +73,7 @@ __all__ = [
     "create_identity_provider",
     "delete_identity_provider",
     "get_all_identity_providers",
-    "get_enabled_providers",
+    "get_enabled_identity_providers",
     # CRUD operations
     "get_identity_provider",
     "get_identity_provider_by_slug",

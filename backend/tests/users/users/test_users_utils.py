@@ -57,38 +57,6 @@ class TestGetAdminUsersOr404:
         assert exc.value.status_code == 404
 
 
-class TestCheckPasswordAndHash:
-    """check_password_and_hash: validate and hash password."""
-
-    def test_admin_user_uses_admin_min_length(self):
-        from users.users.utils import check_password_and_hash
-
-        mock_identity = MagicMock()
-        mock_identity.validate_and_hash_password.return_value = "hashed_admin_pw"
-        mock_settings = MagicMock()
-        mock_settings.password_length_admin_users = 12
-        mock_settings.password_type = "strict"
-
-        result = check_password_and_hash("AdminPass1", mock_identity, mock_settings, "admin")
-
-        assert result == "hashed_admin_pw"
-        mock_identity.validate_and_hash_password.assert_called_once_with("AdminPass1", 12, "strict")
-
-    def test_regular_user_uses_regular_min_length(self):
-        from users.users.utils import check_password_and_hash
-
-        mock_identity = MagicMock()
-        mock_identity.validate_and_hash_password.return_value = "hashed_regular_pw"
-        mock_settings = MagicMock()
-        mock_settings.password_length_regular_users = 8
-        mock_settings.password_type = "strict"
-
-        result = check_password_and_hash("RegularPass1", mock_identity, mock_settings, "regular")
-
-        assert result == "hashed_regular_pw"
-        mock_identity.validate_and_hash_password.assert_called_once_with("RegularPass1", 8, "strict")
-
-
 class TestCheckUserIsActive:
     """check_user_is_active: verify user is active."""
 
@@ -119,21 +87,22 @@ class TestCreateUserDefaultData:
         from users.users.utils import create_user_default_data
 
         mock_db = MagicMock(spec=Session)
+        mock_identity = MagicMock()
 
         with (
             patch("users.users_integrations.crud.create_user_integrations") as mock_integrations,
             patch("users.users_privacy_settings.crud.create_user_privacy_settings") as mock_privacy,
             patch("health.health_targets.crud.create_health_targets") as mock_targets,
             patch("users.users_default_gear.crud.create_user_default_gear") as mock_gear,
-            patch("auth.mfa.crud.create_users_mfa_row") as mock_mfa,
         ):
-            create_user_default_data(1, mock_db)
+            create_user_default_data(1, mock_identity, mock_db)
 
         mock_integrations.assert_called_once_with(1, mock_db)
         mock_privacy.assert_called_once_with(1, mock_db)
         mock_targets.assert_called_once_with(1, mock_db)
         mock_gear.assert_called_once_with(1, mock_db)
-        mock_mfa.assert_called_once_with(1, mock_db)
+        # MFA row is created through the auth boundary.
+        mock_identity.initialize_user_mfa.assert_called_once_with(1)
 
 
 class TestSaveUserImageFile:
@@ -215,174 +184,3 @@ class TestDeleteUserPhotoFilesystem:
         mock_delete.assert_called_once()
         args, _ = mock_delete.call_args
         assert args[1] == "42.*"
-
-
-class TestVerifyStepUpCredentials:
-    """verify_step_up_credentials: step-up verification for sensitive operations."""
-
-    def test_no_local_password_no_mfa_success(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = None
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=False),
-        ):
-            verify_step_up_credentials(1, None, None, mock_identity, mock_db)
-
-    def test_no_local_password_mfa_missing_code_raises_401(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = None
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=True),
-            pytest.raises(HTTPException) as exc,
-        ):
-            verify_step_up_credentials(1, None, None, mock_identity, mock_db)
-
-        assert exc.value.status_code == 401
-        assert exc.value.detail == "MFA code required for this operation"
-
-    def test_no_local_password_mfa_wrong_code_raises_401(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = None
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=True),
-            patch("profile.utils.verify_user_mfa", return_value=False),
-            pytest.raises(HTTPException) as exc,
-        ):
-            verify_step_up_credentials(1, None, "wrong_code", mock_identity, mock_db)
-
-        assert exc.value.status_code == 401
-
-    def test_no_local_password_mfa_correct_code_success(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = None
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=True),
-            patch("profile.utils.verify_user_mfa", return_value=True),
-        ):
-            verify_step_up_credentials(1, None, "123456", mock_identity, mock_db)
-
-    def test_local_password_missing_raises_401(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = "hashed_pw"
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            pytest.raises(HTTPException) as exc,
-        ):
-            verify_step_up_credentials(1, None, None, mock_identity, mock_db)
-
-        assert exc.value.status_code == 401
-
-    def test_local_password_wrong_raises_401(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = "hashed_pw"
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-        mock_identity.verify_password.return_value = False
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            pytest.raises(HTTPException) as exc,
-        ):
-            verify_step_up_credentials(1, "wrong_pw", None, mock_identity, mock_db)
-
-        assert exc.value.status_code == 401
-
-    def test_local_password_correct_no_mfa_success(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = "hashed_pw"
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-        mock_identity.verify_password.return_value = True
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=False),
-        ):
-            verify_step_up_credentials(1, "correct_pw", None, mock_identity, mock_db)
-
-    def test_local_password_correct_mfa_missing_code_raises_401(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = "hashed_pw"
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-        mock_identity.verify_password.return_value = True
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=True),
-            pytest.raises(HTTPException) as exc,
-        ):
-            verify_step_up_credentials(1, "correct_pw", None, mock_identity, mock_db)
-
-        assert exc.value.status_code == 401
-        assert exc.value.detail == "MFA code required for this operation"
-
-    def test_local_password_correct_mfa_correct_code_success(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = "hashed_pw"
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-        mock_identity.verify_password.return_value = True
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=True),
-            patch("profile.utils.verify_user_mfa", return_value=True),
-        ):
-            verify_step_up_credentials(1, "correct_pw", "123456", mock_identity, mock_db)
-
-    def test_local_password_correct_mfa_wrong_code_raises_401(self):
-        from users.users.utils import verify_step_up_credentials
-
-        mock_user = MagicMock()
-        mock_user.password = "hashed_pw"
-        mock_db = MagicMock(spec=Session)
-        mock_identity = MagicMock()
-        mock_identity.verify_password.return_value = True
-
-        with (
-            patch("users.users.utils.get_user_by_id_or_404", return_value=mock_user),
-            patch("profile.utils.is_mfa_enabled_for_user", return_value=True),
-            patch("profile.utils.verify_user_mfa", return_value=False),
-            pytest.raises(HTTPException) as exc,
-        ):
-            verify_step_up_credentials(1, "correct_pw", "wrong_code", mock_identity, mock_db)
-
-        assert exc.value.status_code == 401

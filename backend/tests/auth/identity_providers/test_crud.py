@@ -202,7 +202,7 @@ class TestGetAllIdentityProviders:
 
 
 class TestGetEnabledProviders:
-    """Test suite for get_enabled_providers function."""
+    """Test suite for get_enabled_identity_providers function."""
 
     def test_get_enabled_providers_success(self, mock_db):
         """Test successfully retrieving enabled identity providers.
@@ -219,7 +219,7 @@ class TestGetEnabledProviders:
         mock_db.execute.return_value.scalars.return_value.all.return_value = mock_idps
 
         # Act
-        result = idp_crud.get_enabled_providers(mock_db)
+        result = idp_crud.get_enabled_identity_providers(mock_db)
 
         # Assert
         assert result == mock_idps
@@ -239,13 +239,13 @@ class TestGetEnabledProviders:
         (mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value) = []
 
         # Act
-        result = idp_crud.get_enabled_providers(mock_db)
+        result = idp_crud.get_enabled_identity_providers(mock_db)
 
         # Assert
         assert result == []
 
     def test_get_enabled_providers_database_error(self, mock_db):
-        """Test get_enabled_providers handles database errors.
+        """Test get_enabled_identity_providers handles database errors.
 
         Args:
             mock_db: Mocked database session
@@ -258,7 +258,7 @@ class TestGetEnabledProviders:
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
-            idp_crud.get_enabled_providers(mock_db)
+            idp_crud.get_enabled_identity_providers(mock_db)
 
         assert exc_info.value.status_code == 500
 
@@ -660,7 +660,7 @@ class TestUpdateIdentityProvider:
 class TestDeleteIdentityProvider:
     """Test suite for delete_identity_provider function."""
 
-    @patch("auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id")
+    @patch("auth.identity_providers.crud.auth_identity_links_crud.check_user_identity_providers_by_idp_id")
     @patch("auth.identity_providers.crud.get_identity_provider")
     def test_delete_identity_provider_success(self, mock_get, mock_check_users, mock_db):
         """Test successfully deleting an identity provider.
@@ -711,7 +711,7 @@ class TestDeleteIdentityProvider:
         assert exc_info.value.status_code == 404
         assert "not found" in str(exc_info.value.detail)
 
-    @patch("auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id")
+    @patch("auth.identity_providers.crud.auth_identity_links_crud.check_user_identity_providers_by_idp_id")
     @patch("auth.identity_providers.crud.get_identity_provider")
     def test_delete_identity_provider_with_linked_users(self, mock_get, mock_check_users, mock_db):
         """Test deleting identity provider with linked users.
@@ -737,7 +737,7 @@ class TestDeleteIdentityProvider:
         assert exc_info.value.status_code == 409
         assert "linked users" in str(exc_info.value.detail)
 
-    @patch("auth.identity_providers.crud.user_identity_providers_crud.check_user_identity_providers_by_idp_id")
+    @patch("auth.identity_providers.crud.auth_identity_links_crud.check_user_identity_providers_by_idp_id")
     @patch("auth.identity_providers.crud.get_identity_provider")
     def test_delete_identity_provider_database_error(self, mock_get, mock_check_users, mock_db):
         """Test delete_identity_provider handles database errors.

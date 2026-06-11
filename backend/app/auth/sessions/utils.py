@@ -1,6 +1,5 @@
 """Session utility functions and classes."""
 
-import hashlib
 import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -16,9 +15,10 @@ from user_agents import parse
 
 import auth.constants as auth_constants
 import auth.password_hasher as auth_password_hasher
-import auth.sessions.crud as users_session_crud
-import auth.sessions.models as users_session_models
-import auth.sessions.schema as users_session_schema
+import auth.sessions.crud as auth_sessions_crud
+import auth.sessions.models as auth_sessions_models
+import auth.sessions.schema as auth_sessions_schema
+import auth.token_hashing as token_hashing
 import core.logger as core_logger
 import core.network as core_network
 import users.users.schema as users_schema
@@ -72,15 +72,11 @@ def _hash_csrf_token(token: str) -> str:
 
     Returns:
         Hex-encoded HMAC-SHA256 digest.
+
+    Raises:
+        ValueError: If JWT_SECRET_KEY is not configured.
     """
-    # JWT_SECRET_KEY is validated non-None at application startup
-    if not auth_constants.JWT_SECRET_KEY:
-        raise RuntimeError("SECRET_KEY must be configured")
-    return hmac.new(
-        auth_constants.JWT_SECRET_KEY.encode(),
-        token.encode(),
-        hashlib.sha256,
-    ).hexdigest()
+    return token_hashing.hmac_sha256(token)
 
 
 def verify_csrf_token(candidate: str, stored_hmac: str) -> bool:
@@ -101,7 +97,7 @@ def verify_csrf_token(candidate: str, stored_hmac: str) -> bool:
 
 
 def validate_session_timeout(
-    session: users_session_models.UsersSessions,
+    session: auth_sessions_models.UsersSessions,
 ) -> None:
     """
     Validate session hasn't exceeded idle or absolute timeout.
@@ -149,7 +145,7 @@ def create_session_object(
     refresh_token_exp: datetime,
     oauth_state_id: str | None = None,
     csrf_token_hash: str | None = None,
-) -> users_session_schema.UsersSessionsInternal:
+) -> auth_sessions_schema.UsersSessionsInternal:
     """
     Create session object with device and request metadata.
 
@@ -170,7 +166,7 @@ def create_session_object(
 
     now = datetime.now(UTC)
 
-    return users_session_schema.UsersSessionsInternal(
+    return auth_sessions_schema.UsersSessionsInternal(
         id=session_id,
         user_id=user.id,
         refresh_token=hashed_refresh_token,
@@ -196,9 +192,9 @@ def edit_session_object(
     request: Request,
     hashed_refresh_token: str,
     refresh_token_exp: datetime,
-    session: users_session_schema.UsersSessionsInternal,
+    session: auth_sessions_schema.UsersSessionsInternal,
     csrf_token_hash: str | None = None,
-) -> users_session_schema.UsersSessionsInternal:
+) -> auth_sessions_schema.UsersSessionsInternal:
     """
     Create updated session object with new token and metadata.
 
@@ -218,7 +214,7 @@ def edit_session_object(
     now = datetime.now(UTC)
     new_rotation_count = session.rotation_count + 1
 
-    return users_session_schema.UsersSessionsInternal(
+    return auth_sessions_schema.UsersSessionsInternal(
         id=session.id,
         user_id=session.user_id,
         refresh_token=hashed_refresh_token,
@@ -284,11 +280,11 @@ def create_session(
     )
 
     # Add the session to the database
-    users_session_crud.create_session(new_session, db)
+    auth_sessions_crud.create_session(new_session, db)
 
 
 def edit_session(
-    session: users_session_schema.UsersSessionsInternal,
+    session: auth_sessions_schema.UsersSessionsInternal,
     request: Request,
     new_refresh_token: str,
     password_hasher: auth_password_hasher.PasswordHasher,
@@ -325,7 +321,7 @@ def edit_session(
     )
 
     # Update the session in the database
-    users_session_crud.edit_session(updated_session, db)
+    auth_sessions_crud.edit_session(updated_session, db)
 
 
 def get_user_agent(request: Request) -> str:
@@ -383,7 +379,7 @@ def cleanup_idle_sessions() -> None:
             cutoff_time = datetime.now(UTC) - timedelta(hours=auth_constants.SESSION_IDLE_TIMEOUT_HOURS)
 
             # Delete sessions with last_activity_at older than cutoff
-            deleted_count = users_session_crud.delete_idle_sessions(cutoff_time, db)
+            deleted_count = auth_sessions_crud.delete_idle_sessions(cutoff_time, db)
 
             if deleted_count > 0:
                 core_logger.print_to_log(f"Cleaned up {deleted_count} idle sessions", "info")

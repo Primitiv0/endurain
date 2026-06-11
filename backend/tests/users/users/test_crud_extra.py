@@ -367,7 +367,7 @@ class TestCreateUser:
 
         with (
             patch("users.users.crud.server_settings_utils.get_server_settings_or_404", return_value=mock_settings),
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value=mock_hashed),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value=mock_hashed),
             patch("users.users.crud.users_models.Users", return_value=mock_db_user),
         ):
             result = create_user(mock_user_schema, mock_identity, mock_db)
@@ -400,7 +400,7 @@ class TestCreateUser:
 
         with (
             patch("users.users.crud.server_settings_utils.get_server_settings_or_404", return_value=mock_settings),
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=MagicMock()),
         ):
             mock_db.add.side_effect = None
@@ -433,7 +433,7 @@ class TestCreateUser:
 
         with (
             patch("users.users.crud.server_settings_utils.get_server_settings_or_404", return_value=mock_settings),
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=MagicMock()),
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
@@ -464,7 +464,7 @@ class TestCreateSignupUser:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=mock_db_user),
         ):
             result = create_signup_user(mock_user_schema, mock_settings, mock_identity, mock_db)
@@ -473,6 +473,45 @@ class TestCreateSignupUser:
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once()
+        # Default signup persists a local credential.
+        mock_identity.set_local_password_hash.assert_called_once_with(mock_db_user.id, "hash")
+
+    def test_sso_optout_skips_credential(self):
+        """persist_credential=False must not hash or store a credential."""
+        from users.users.crud import create_signup_user
+
+        mock_db = MagicMock(spec=Session)
+        mock_user_schema = MagicMock()
+        mock_user_schema.username = "ssouser"
+        mock_user_schema.email = "sso@example.com"
+        mock_user_schema.password = "placeholderPass123"
+        mock_user_schema.model_dump.return_value = {"name": "SSO User"}
+
+        mock_settings = MagicMock()
+        mock_settings.signup_require_email_verification = False
+        mock_settings.signup_require_admin_approval = False
+
+        mock_identity = MagicMock()
+        mock_db_user = MagicMock()
+
+        with (
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash") as mock_hash,
+            patch("users.users.crud.users_models.Users", return_value=mock_db_user),
+        ):
+            result = create_signup_user(
+                mock_user_schema,
+                mock_settings,
+                mock_identity,
+                mock_db,
+                persist_credential=False,
+            )
+
+        assert result == mock_db_user
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+        # No password validation/hash and no credential write for SSO accounts.
+        mock_hash.assert_not_called()
+        mock_identity.set_local_password_hash.assert_not_called()
 
     def test_success_with_email_verification(self):
         from users.users.crud import create_signup_user
@@ -492,7 +531,7 @@ class TestCreateSignupUser:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=mock_db_user),
         ):
             result = create_signup_user(mock_user_schema, mock_settings, mock_identity, mock_db)
@@ -517,7 +556,7 @@ class TestCreateSignupUser:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=mock_db_user),
         ):
             result = create_signup_user(mock_user_schema, mock_settings, mock_identity, mock_db)
@@ -541,7 +580,7 @@ class TestCreateSignupUser:
         mock_identity = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=MagicMock()),
         ):
             mock_db.commit.side_effect = __import__("sqlalchemy.exc", fromlist=["IntegrityError"]).IntegrityError(
@@ -571,7 +610,7 @@ class TestCreateSignupUser:
         mock_identity = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="hash"),
+            patch("users.users.crud.auth_password_policy.validate_and_hash_for_user", return_value="hash"),
             patch("users.users.crud.users_models.Users", return_value=MagicMock()),
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
@@ -1022,70 +1061,6 @@ class TestVerifyUserEmail:
             assert exc.value.status_code == 500
 
 
-class TestEditUserPassword:
-    """edit_user_password: password update with hashing options."""
-
-    def test_success_already_hashed(self):
-        from users.users.crud import edit_user_password
-
-        mock_db = MagicMock(spec=Session)
-        mock_db_user = MagicMock()
-
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
-            edit_user_password(1, "already_hashed_value", None, mock_db, is_hashed=True)
-
-        assert mock_db_user.password == "already_hashed_value"
-        mock_db.commit.assert_called_once()
-        mock_db.refresh.assert_called_once()
-
-    def test_success_plain_password(self):
-        from users.users.crud import edit_user_password
-
-        mock_db = MagicMock(spec=Session)
-        mock_db_user = MagicMock()
-        mock_db_user.access_type = "regular"
-
-        mock_settings = MagicMock()
-        mock_identity = MagicMock()
-
-        with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
-            patch("users.users.crud.server_settings_utils.get_server_settings_or_404", return_value=mock_settings),
-            patch("users.users.crud.users_utils.check_password_and_hash", return_value="new_hashed"),
-        ):
-            edit_user_password(1, "plainPass123", mock_identity, mock_db, is_hashed=False)
-
-        assert mock_db_user.password == "new_hashed"
-        mock_db.commit.assert_called_once()
-        mock_db.refresh.assert_called_once()
-
-    def test_without_commit(self):
-        from users.users.crud import edit_user_password
-
-        mock_db = MagicMock(spec=Session)
-        mock_db_user = MagicMock()
-
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
-            edit_user_password(1, "hashed_value", None, mock_db, is_hashed=True, commit=False)
-
-        assert mock_db_user.password == "hashed_value"
-        mock_db.commit.assert_not_called()
-        mock_db.refresh.assert_not_called()
-
-    def test_db_error(self):
-        from users.users.crud import edit_user_password
-
-        mock_db = MagicMock(spec=Session)
-        mock_db_user = MagicMock()
-
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
-            mock_db.commit.side_effect = SQLAlchemyError("DB error")
-
-            with pytest.raises(HTTPException) as exc:
-                edit_user_password(1, "hash", None, mock_db, is_hashed=True)
-            assert exc.value.status_code == 500
-
-
 class TestUpdateUserPhoto:
     """update_user_photo: set or clear user photo path (async)."""
 
@@ -1174,98 +1149,3 @@ class TestDeleteUser:
 
             with pytest.raises(SQLAlchemyError):
                 await delete_user(1, mock_db)
-
-
-class TestUpdateUserMfa:
-    """update_user_mfa: enable/disable MFA."""
-
-    def _patch_select_and_auth_mfa(self):
-        """Patch select and AuthUserMFA to avoid SQLAlchemy mapper initialization."""
-        mock_stmt = MagicMock()
-        mock_select = patch("users.users.crud.select").start()
-        mock_select.return_value.where.return_value = mock_stmt
-        mock_auth_model = patch("users.users.crud.auth_mfa_models.AuthUserMFA").start()
-        mock_mfa_instance = MagicMock()
-        mock_auth_model.return_value = mock_mfa_instance
-        return mock_stmt, mock_mfa_instance
-
-    def test_enable_mfa_new_row(self):
-        from users.users.crud import update_user_mfa
-
-        mock_db = MagicMock(spec=Session)
-        mock_db.execute.return_value.scalar_one_or_none.return_value = None
-        _, _ = self._patch_select_and_auth_mfa()
-
-        try:
-            with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=MagicMock()):
-                update_user_mfa(1, mock_db, encrypted_secret="encrypted_secret_value")
-        finally:
-            patch.stopall()
-
-        mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-
-    def test_enable_mfa_existing_row(self):
-        from users.users.crud import update_user_mfa
-
-        mock_db = MagicMock(spec=Session)
-        existing_row = MagicMock()
-        mock_db.execute.return_value.scalar_one_or_none.return_value = existing_row
-        _, _ = self._patch_select_and_auth_mfa()
-
-        try:
-            with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=MagicMock()):
-                update_user_mfa(1, mock_db, encrypted_secret="encrypted_secret_value")
-        finally:
-            patch.stopall()
-
-        assert existing_row.mfa_enabled is True
-        assert existing_row.mfa_secret == "encrypted_secret_value"
-        mock_db.commit.assert_called_once()
-
-    def test_disable_mfa_existing_row(self):
-        from users.users.crud import update_user_mfa
-
-        mock_db = MagicMock(spec=Session)
-        existing_row = MagicMock()
-        existing_row.mfa_enabled = True
-        existing_row.mfa_secret = "some_secret"
-        mock_db.execute.return_value.scalar_one_or_none.return_value = existing_row
-        _, _ = self._patch_select_and_auth_mfa()
-
-        try:
-            with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=MagicMock()):
-                update_user_mfa(1, mock_db, encrypted_secret=None)
-        finally:
-            patch.stopall()
-
-        assert existing_row.mfa_enabled is False
-        assert existing_row.mfa_secret is None
-        mock_db.commit.assert_called_once()
-
-    def test_disable_mfa_new_row(self):
-        from users.users.crud import update_user_mfa
-
-        mock_db = MagicMock(spec=Session)
-        mock_db.execute.return_value.scalar_one_or_none.return_value = None
-        _, _ = self._patch_select_and_auth_mfa()
-
-        try:
-            with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=MagicMock()):
-                update_user_mfa(1, mock_db, encrypted_secret=None)
-        finally:
-            patch.stopall()
-
-        mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-
-    def test_db_error(self):
-        from users.users.crud import update_user_mfa
-
-        mock_db = MagicMock(spec=Session)
-        mock_db.execute.side_effect = SQLAlchemyError("DB error")
-
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=MagicMock()):
-            with pytest.raises(HTTPException) as exc:
-                update_user_mfa(1, mock_db, encrypted_secret="secret")
-            assert exc.value.status_code == 500

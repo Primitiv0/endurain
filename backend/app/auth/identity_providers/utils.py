@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-import auth.identity_links.crud as user_idp_crud
+import auth.identity_providers.links.crud as auth_identity_links_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
 import core.config as core_config
@@ -333,7 +333,7 @@ async def refresh_idp_tokens_if_needed(user_id: int, db: Session) -> None:
     """
     try:
         # Get all IdP links for this user
-        idp_links = user_idp_crud.get_user_identity_providers_by_user_id(user_id, db)
+        idp_links = auth_identity_links_crud.get_user_identity_providers_by_user_id(user_id, db)
 
         if not idp_links:
             # User has no IdP links - nothing to refresh
@@ -374,7 +374,7 @@ async def refresh_idp_tokens_if_needed(user_id: int, db: Session) -> None:
                         "info",
                     )
 
-                    success = user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
+                    success = auth_identity_links_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
                         user_id, link.idp_id, db
                     )
 
@@ -444,7 +444,7 @@ async def clear_all_idp_tokens(user_id: int, db: Session, revoke_at_idp: bool = 
     """
     try:
         # Get all IdP links for this user
-        idp_links = user_idp_crud.get_user_identity_providers_by_user_id(user_id, db)
+        idp_links = auth_identity_links_crud.get_user_identity_providers_by_user_id(user_id, db)
 
         if not idp_links:
             # User has no IdP links - nothing to clear
@@ -478,7 +478,7 @@ async def clear_all_idp_tokens(user_id: int, db: Session, revoke_at_idp: bool = 
                         )
 
                 # Always clear locally regardless of revocation result
-                success = user_idp_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
+                success = auth_identity_links_crud.clear_user_identity_provider_refresh_token_by_user_id_and_idp_id(
                     user_id, link.idp_id, db
                 )
 

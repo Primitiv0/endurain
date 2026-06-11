@@ -9,7 +9,7 @@ from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 import auth.oauth_state.models as oauth_state_models
-import auth.sessions.models as users_session_models
+import auth.sessions.models as auth_sessions_models
 import core.decorators as core_decorators
 import core.logger as core_logger
 
@@ -107,7 +107,7 @@ def get_oauth_state_by_session_id(session_id: str, db: Session) -> oauth_state_m
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(users_session_models.UsersSessions).where(users_session_models.UsersSessions.id == session_id)
+    stmt = select(auth_sessions_models.UsersSessions).where(auth_sessions_models.UsersSessions.id == session_id)
     session = db.execute(stmt).scalar_one_or_none()
 
     if not session or not session.oauth_state_id:

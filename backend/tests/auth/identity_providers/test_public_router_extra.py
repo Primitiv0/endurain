@@ -18,7 +18,7 @@ def _build_app(mock_db) -> TestClient:
 
 
 class TestGetEnabledProviders:
-    @patch("auth.identity_providers.public_router.idp_crud.get_enabled_providers")
+    @patch("auth.identity_providers.public_router.idp_crud.get_enabled_identity_providers")
     def test_success(self, mock_get, mock_db):
         client = _build_app(mock_db)
         provider = MagicMock()
@@ -34,7 +34,7 @@ class TestGetEnabledProviders:
         assert len(data) == 1
         assert data[0]["name"] == "Google"
 
-    @patch("auth.identity_providers.public_router.idp_crud.get_enabled_providers")
+    @patch("auth.identity_providers.public_router.idp_crud.get_enabled_identity_providers")
     def test_empty(self, mock_get, mock_db):
         client = _build_app(mock_db)
         mock_get.return_value = []
@@ -186,7 +186,7 @@ class TestHandleCallback:
 
 
 class TestTokenExchange:
-    @patch("auth.identity_providers.public_router.users_session_crud.get_session_with_oauth_state")
+    @patch("auth.identity_providers.public_router.auth_sessions_crud.get_session_with_oauth_state")
     def test_session_not_found(self, mock_get_session, mock_db):
         client = _build_app(mock_db)
         mock_get_session.return_value = None
@@ -196,3 +196,37 @@ class TestTokenExchange:
             json={"code_verifier": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"},
         )
         assert response.status_code == 404
+
+    @patch("auth.identity_providers.public_router.auth_sessions_crud.claim_session_for_token_exchange")
+    @patch("auth.identity_providers.public_router.auth_utils.create_tokens")
+    @patch("auth.identity_providers.public_router.idp_utils.validate_pkce_verifier")
+    @patch("auth.identity_providers.public_router.auth_sessions_crud.get_session_with_oauth_state")
+    def test_client_type_mismatch_does_not_mint_tokens_or_claim_session(
+        self,
+        mock_get_session,
+        mock_validate_pkce,
+        mock_create_tokens,
+        mock_claim_session,
+        mock_db,
+    ):
+        client = _build_app(mock_db)
+        session = MagicMock()
+        session.tokens_exchanged = False
+        oauth_state = MagicMock()
+        oauth_state.id = "oauth-state-id"
+        oauth_state.code_challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        oauth_state.code_challenge_method = "S256"
+        oauth_state.client_type = "mobile"
+        mock_get_session.return_value = (session, oauth_state)
+        mock_validate_pkce.return_value = None
+
+        response = client.post(
+            "/api/v1/public/idp/session/session-id/tokens",
+            json={"code_verifier": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"},
+            headers={"X-Client-Type": "web"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "client_type does not match the OAuth state"
+        mock_create_tokens.assert_not_called()
+        mock_claim_session.assert_not_called()
