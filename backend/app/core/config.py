@@ -492,41 +492,24 @@ def _is_safe_path(file_path: Path) -> bool:
         True if path is safe, False otherwise.
     """
     try:
-        resolved_path = Path(file_path).resolve()
+        # Resolve symlinks so comparisons are consistent across platforms
+        # (e.g. /var/run → /private/var/run on macOS).
+        resolved = Path(str(file_path)).resolve()
 
-        # Allow common Docker secrets locations
-        allowed_directories = [
-            Path("/run/secrets"),  # Standard Docker secrets mount point
-            Path("/var/run/secrets"),  # Alternative Docker secrets location
-            Path("/secrets"),  # Custom secrets directory
+        # Allow common Docker secrets locations (resolve them too so that
+        # e.g. /var/run/secrets → /private/var/run/secrets on macOS).
+        allowed_dirs = [
+            Path("/run/secrets").resolve(),  # Standard Docker secrets mount point
+            Path("/var/run/secrets").resolve(),  # Alternative Docker secrets location
+            Path("/secrets").resolve(),  # Custom secrets directory
         ]
 
-        # For development, also allow paths in the working directory.
+        # For development, also allow the system temp dir and cwd.
         if settings.ENVIRONMENT == "development":
-            tmp_dir = Path(gettempdir()).resolve()
-            allowed_directories.append(tmp_dir)
+            allowed_dirs.append(Path(gettempdir()).resolve())
+            allowed_dirs.append(Path.cwd().resolve())
 
-            try:
-                resolved_path.relative_to(tmp_dir)
-                return True
-            except ValueError:
-                pass
-
-            cwd = Path.cwd().resolve()
-            try:
-                resolved_path.relative_to(cwd)
-                return True
-            except ValueError:
-                pass
-
-        for allowed_dir in allowed_directories:
-            try:
-                resolved_path.relative_to(allowed_dir.resolve())
-                return True
-            except ValueError:
-                continue
-
-        return False
+        return any(resolved == allowed or resolved.is_relative_to(allowed) for allowed in allowed_dirs)
 
     except (OSError, ValueError, TypeError):
         return False

@@ -582,23 +582,34 @@ class TestWriteJsonToZip:
 
         assert counts["profile"] == 1
 
-    def test_with_empty_data(self):
+    def test_with_empty_dict_writes_to_zip(self):
         mock_zip = MagicMock()
         counts = {}
 
         profile_utils.write_json_to_zip(mock_zip, "activities/data.json", {}, counts)
 
-        assert "data" not in counts
-        mock_zip.writestr.assert_not_called()
+        assert counts["data"] == 1
+        mock_zip.writestr.assert_called_once()
 
-    def test_with_none_data(self):
+    def test_with_empty_list_writes_to_zip(self):
+        mock_zip = MagicMock()
+        counts = {}
+
+        profile_utils.write_json_to_zip(mock_zip, "activities/data.json", [], counts)
+
+        assert counts["data"] == 0
+        mock_zip.writestr.assert_called_once()
+
+    def test_with_none_data_coerces_to_empty_list(self):
         mock_zip = MagicMock()
         counts = {}
 
         profile_utils.write_json_to_zip(mock_zip, "activities/data.json", None, counts)
 
-        assert "data" not in counts
-        mock_zip.writestr.assert_not_called()
+        assert counts["data"] == 0
+        mock_zip.writestr.assert_called_once()
+        _, written_content = mock_zip.writestr.call_args[0]
+        assert written_content == "[]"
 
 
 class TestCheckTimeout:

@@ -11,6 +11,7 @@ from profile.exceptions import (
     FileSizeError,
     FileSystemError,
     JSONParseError,
+    MemoryAllocationError,
 )
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
@@ -163,6 +164,37 @@ class TestImportServiceLoadSingleJson:
         with zipfile.ZipFile(BytesIO(buf.getvalue())) as z, pytest.raises(JSONParseError):
             service._load_single_json(z, "data/bad.json")
 
+    def test_load_single_json_type_guard_non_list_returns_empty(self) -> None:
+        mock_db = MagicMock(spec=Session)
+        mock_ws = MagicMock()
+        service = profile_import_service.ImportService(
+            user_id=1,
+            db=mock_db,
+            websocket_manager=mock_ws,
+        )
+        service.performance_config.enable_memory_monitoring = False
+
+        for non_list_data in (None, {}, "string", 42):
+            zip_data = _make_zip_with_json({"data/test.json": non_list_data})
+            with zipfile.ZipFile(BytesIO(zip_data)) as z:
+                result = service._load_single_json(z, "data/test.json")
+            assert result == [], f"Expected [] for {type(non_list_data).__name__}"
+
+    def test_load_single_json_missing_file_returns_empty(self) -> None:
+        mock_db = MagicMock(spec=Session)
+        mock_ws = MagicMock()
+        service = profile_import_service.ImportService(
+            user_id=1,
+            db=mock_db,
+            websocket_manager=mock_ws,
+        )
+
+        zip_data = _make_zip_with_json({"other.json": []})
+        with zipfile.ZipFile(BytesIO(zip_data)) as z:
+            result = service._load_single_json(z, "data/missing.json")
+
+        assert result == []
+
 
 class TestImportServiceGetSplitFiles:
     def test_get_split_files_list_returns_sorted(self) -> None:
@@ -275,7 +307,7 @@ class TestImportServiceUserData:
         await service.collect_and_import_user_default_gear([], {})
         assert service.counts["user_default_gear"] == 0
 
-    async def test_collect_and_import_user_default_gear_no_existing(self) -> None:
+    async def test_collect_and_import_user_default_gear_creates_when_missing(self) -> None:
         mock_db = MagicMock(spec=Session)
         mock_ws = MagicMock()
         service = profile_import_service.ImportService(
@@ -283,12 +315,19 @@ class TestImportServiceUserData:
             db=mock_db,
             websocket_manager=mock_ws,
         )
-        with patch(
-            "profile.import_service.user_default_gear_crud.get_user_default_gear_by_user_id",
-            return_value=None,
+        mock_new_gear = MagicMock()
+        mock_new_gear.id = 99
+        with (
+            patch(
+                "profile.import_service.user_default_gear_crud.get_user_default_gear_by_user_id",
+                side_effect=[None, mock_new_gear],
+            ),
+            patch("profile.import_service.user_default_gear_crud.create_user_default_gear") as mock_create,
+            patch("profile.import_service.user_default_gear_crud.edit_user_default_gear"),
         ):
             await service.collect_and_import_user_default_gear([{"run_gear_id": 5}], {5: 10})
-        assert service.counts["user_default_gear"] == 0
+        assert service.counts["user_default_gear"] == 1
+        mock_create.assert_called_once_with(1, mock_db)
 
     async def test_collect_and_import_user_default_gear_with_remapping(self) -> None:
         mock_db = MagicMock(spec=Session)
@@ -427,7 +466,7 @@ class TestImportServiceUserData:
 
         assert service.counts["user"] == 1
 
-    async def test_collect_and_import_user_data_empty(self) -> None:
+    async def test_collect_and_import_user_data_empty_still_imports_sub_settings(self) -> None:
         mock_db = MagicMock(spec=Session)
         mock_ws = MagicMock()
         service = profile_import_service.ImportService(
@@ -436,8 +475,21 @@ class TestImportServiceUserData:
             websocket_manager=mock_ws,
         )
 
-        await service.collect_and_import_user_data([], [], [], [], [], [], {})
+        with (
+            patch.object(service, "collect_and_import_user_default_gear", new_callable=AsyncMock) as mock_gear,
+            patch.object(service, "collect_and_import_user_goals", new_callable=AsyncMock) as mock_goals,
+            patch.object(service, "collect_and_import_user_identity_providers", new_callable=AsyncMock) as mock_idp,
+            patch.object(service, "collect_and_import_user_integrations", new_callable=AsyncMock) as mock_int,
+            patch.object(service, "collect_and_import_user_privacy_settings", new_callable=AsyncMock) as mock_priv,
+        ):
+            await service.collect_and_import_user_data([], [], [], [], [], [], {})
+
         assert service.counts.get("user", 0) == 0
+        mock_gear.assert_called_once()
+        mock_goals.assert_called_once()
+        mock_idp.assert_called_once()
+        mock_int.assert_called_once()
+        mock_priv.assert_called_once()
 
     async def test_collect_and_import_user_integrations(self) -> None:
         mock_db = MagicMock(spec=Session)
@@ -819,9 +871,9 @@ class TestImportServiceFromZip:
 
         zip_data = _make_zip_with_json(
             {
-                "data/gears.json": [],
+                "data/gears.json": [{"id": 1, "nickname": "Garmin", "gear_type": 1}],
                 "data/gear_components.json": [],
-                "data/user.json": [],
+                "data/user.json": [{"username": "test"}],
                 "data/user_default_gear.json": [],
                 "data/user_goals.json": [],
                 "data/user_identity_providers.json": [],
@@ -834,8 +886,12 @@ class TestImportServiceFromZip:
             }
         )
 
+        async def _increment_gears(_data):
+            service.counts["gears"] = 1
+            return {}
+
         with (
-            patch.object(service, "collect_and_import_gears_data", return_value={}),
+            patch.object(service, "collect_and_import_gears_data", side_effect=_increment_gears),
             patch.object(service, "collect_and_import_gear_components_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_user_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_activities_data_batched", return_value={}),
@@ -865,6 +921,48 @@ class TestImportServiceFromZip:
         with (
             patch.object(service, "collect_and_import_gears_data", side_effect=OSError("disk full")),
             pytest.raises(FileSystemError),
+        ):
+            await service.import_from_zip_data(zip_data)
+
+    async def test_import_from_zip_all_empty_raises_error(self) -> None:
+        mock_db = MagicMock(spec=Session)
+        mock_ws = MagicMock()
+        service = profile_import_service.ImportService(
+            user_id=1,
+            db=mock_db,
+            websocket_manager=mock_ws,
+        )
+        service.performance_config.enable_memory_monitoring = False
+        service.performance_config.max_file_size_mb = 100
+
+        zip_data = _make_zip_with_json(
+            {
+                "data/gears.json": [],
+                "data/gear_components.json": [],
+                "data/user.json": [],
+                "data/user_default_gear.json": [],
+                "data/user_goals.json": [],
+                "data/user_identity_providers.json": [],
+                "data/user_integrations.json": [],
+                "data/user_privacy_settings.json": [],
+                "data/activities.json": [],
+                "data/notifications.json": [],
+                "data/health_weight.json": [],
+                "data/health_targets.json": [],
+            }
+        )
+
+        with (
+            patch.object(service, "collect_and_import_gears_data", return_value={}),
+            patch.object(service, "collect_and_import_gear_components_data", new_callable=AsyncMock),
+            patch.object(service, "collect_and_import_user_data", new_callable=AsyncMock),
+            patch.object(service, "collect_and_import_activities_data_batched", return_value={}),
+            patch.object(service, "collect_and_import_notifications_data", new_callable=AsyncMock),
+            patch.object(service, "collect_and_import_health_weight", new_callable=AsyncMock),
+            patch.object(service, "add_activity_files_from_zip", new_callable=AsyncMock),
+            patch.object(service, "add_activity_media_from_zip", new_callable=AsyncMock),
+            patch.object(service, "add_user_images_from_zip", new_callable=AsyncMock),
+            pytest.raises(FileFormatError, match="zero items"),
         ):
             await service.import_from_zip_data(zip_data)
 
@@ -1007,7 +1105,7 @@ class TestImportServiceLoadComponentsForBatch:
             )
         assert result == []
 
-    def test_load_components_for_batch_generic_exception(self) -> None:
+    def test_load_components_for_batch_file_format_error_caught(self) -> None:
         mock_db = MagicMock(spec=Session)
         mock_ws = MagicMock()
         service = profile_import_service.ImportService(
@@ -1016,15 +1114,51 @@ class TestImportServiceLoadComponentsForBatch:
             websocket_manager=mock_ws,
         )
 
-        zip_data = _make_zip_with_json({"other.json": []})
-        with zipfile.ZipFile(BytesIO(zip_data)) as z:
+        buf = BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("data/laps.json", b"x" * 2048)
+        zip_data = buf.getvalue()
+
+        with (
+            zipfile.ZipFile(BytesIO(zip_data)) as z,
+            patch.object(
+                service,
+                "_read_zip_entry",
+                side_effect=FileFormatError("bad format"),
+            ),
+        ):
             result = service._load_components_for_batch(
                 z,
-                ["data/nonexistent.json"],
+                ["data/laps.json"],
                 [{"id": 1}],
                 "laps",
             )
         assert result == []
+
+    def test_load_components_for_batch_memory_error_propagates(self) -> None:
+        mock_db = MagicMock(spec=Session)
+        mock_ws = MagicMock()
+        service = profile_import_service.ImportService(
+            user_id=1,
+            db=mock_db,
+            websocket_manager=mock_ws,
+        )
+        zip_data = _make_zip_with_json({"data/laps.json": [{"activity_id": 1}]})
+        with (
+            zipfile.ZipFile(BytesIO(zip_data)) as z,
+            patch.object(
+                service,
+                "_read_zip_entry",
+                side_effect=MemoryAllocationError("oom"),
+            ),
+            pytest.raises(MemoryAllocationError),
+        ):
+            service._load_components_for_batch(
+                z,
+                ["data/laps.json"],
+                [{"id": 1}],
+                "laps",
+            )
 
 
 class TestImportServiceActivityComponentsMedia:

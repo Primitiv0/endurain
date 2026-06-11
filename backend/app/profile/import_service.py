@@ -293,6 +293,13 @@ class ImportService:
         except OSError as e:
             raise FileSystemError(f"File system error during import: {e!s}") from e
 
+        # Guard: if nothing was imported, fail visibly instead of
+        # returning a misleading "success" with zero counts.
+        if all(v == 0 for v in self.counts.values()):
+            raise FileFormatError(
+                "Import completed with zero items imported. The ZIP file contains no importable data."
+            )
+
         return {"detail": "Import completed", "imported": self.counts}
 
     def _load_single_json(self, zipf: zipfile.ZipFile, filename: str, check_memory: bool = True) -> list[Any]:
@@ -313,11 +320,23 @@ class ImportService:
         try:
             file_list = set(zipf.namelist())
             if filename not in file_list:
+                core_logger.print_to_log(
+                    f"Expected data file {filename} not found in ZIP archive",
+                    "warning",
+                )
                 return []
 
             data = json.loads(self._read_zip_entry(zipf, filename))
+
+            if not isinstance(data, list):
+                core_logger.print_to_log(
+                    f"Expected list in {filename}, got {type(data).__name__}, returning empty list",
+                    "warning",
+                )
+                return []
+
             core_logger.print_to_log(
-                f"Loaded {len(data) if isinstance(data, list) else 1} items from {filename}",
+                f"Loaded {len(data)} items from {filename}",
                 "debug",
             )
 
@@ -463,33 +482,36 @@ class ImportService:
             user_privacy_settings_data: Privacy settings.
             gears_id_mapping: Mapping of old to new gear IDs.
         """
-        if not user_data:
-            core_logger.print_to_log("No user data to import", "info")
-            return
+        if user_data:
+            # Import user profile
+            user_profile = user_data[0]
+            user_profile["id"] = self.user_id
 
-        # Import user profile
-        user_profile = user_data[0]
-        user_profile["id"] = self.user_id
+            # Handle photo path
+            photo_path = user_profile.get("photo_path")
+            if isinstance(photo_path, str) and photo_path.startswith("data/user_images/"):
+                extension = photo_path.split(".")[-1]
+                user_profile["photo_path"] = f"data/user_images/{self.user_id}.{extension}"
 
-        # Handle photo path
-        photo_path = user_profile.get("photo_path")
-        if isinstance(photo_path, str) and photo_path.startswith("data/user_images/"):
-            extension = photo_path.split(".")[-1]
-            user_profile["photo_path"] = f"data/user_images/{self.user_id}.{extension}"
+            # Strict allow-list before persistence: profile import is a
+            # self-service operation and MUST NOT be a back door for
+            # privilege escalation. Even if the source ZIP was crafted
+            # to set ``access_type``, ``active``, ``mfa_enabled``,
+            # ``mfa_secret``, ``email_verified``, or
+            # ``pending_admin_approval``, those fields are dropped here
+            # before reaching the database.
+            sanitized = {
+                key: value for key, value in user_profile.items() if key in users_crud.PROFILE_SELF_SERVICE_FIELDS
+            }
+            profile_payload = users_schema.ProfileUpdate.model_validate(sanitized)
+            await users_crud.edit_profile_user(self.user_id, profile_payload, self.db)
+            self.counts["user"] += 1
+        else:
+            core_logger.print_to_log("No user data to import, but continuing with sub-settings", "info")
 
-        # Strict allow-list before persistence: profile import is a
-        # self-service operation and MUST NOT be a back door for
-        # privilege escalation. Even if the source ZIP was crafted
-        # to set ``access_type``, ``active``, ``mfa_enabled``,
-        # ``mfa_secret``, ``email_verified``, or
-        # ``pending_admin_approval``, those fields are dropped here
-        # before reaching the database.
-        sanitized = {key: value for key, value in user_profile.items() if key in users_crud.PROFILE_SELF_SERVICE_FIELDS}
-        profile_payload = users_schema.ProfileUpdate.model_validate(sanitized)
-        await users_crud.edit_profile_user(self.user_id, profile_payload, self.db)
-        self.counts["user"] += 1
-
-        # Import user-related settings
+        # Import user-related settings — always attempt, even if
+        # user_data was empty, so that sub-setting data loaded from
+        # the ZIP is not silently discarded.
         await self.collect_and_import_user_default_gear(user_default_gear_data, gears_id_mapping)
         await self.collect_and_import_user_goals(user_goals_data)
         await self.collect_and_import_user_identity_providers(user_identity_providers_data)
@@ -513,8 +535,9 @@ class ImportService:
         current_user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(self.user_id, self.db)
 
         if current_user_default_gear is None:
-            core_logger.print_to_log("No existing user default gear to update", "info")
-            return
+            core_logger.print_to_log("No existing user default gear, creating new record", "info")
+            user_default_gear_crud.create_user_default_gear(self.user_id, self.db)
+            current_user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(self.user_id, self.db)
 
         gear_data = user_default_gear_data[0]
         gear_data["id"] = current_user_default_gear.id
@@ -984,7 +1007,7 @@ class ImportService:
                     )
             except json.JSONDecodeError as err:
                 core_logger.print_to_log(f"Failed to parse {filename}: {err}", "warning")
-            except Exception as err:
+            except (FileFormatError, FileSizeError, OSError) as err:
                 core_logger.print_to_log(f"Error loading {filename}: {err}", "warning")
 
         return all_components

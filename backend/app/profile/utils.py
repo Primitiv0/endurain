@@ -407,12 +407,13 @@ def write_json_to_zip(
         counts: Dictionary to update with item counts.
         ensure_ascii: Whether to ensure ASCII encoding.
     """
-    if data:
-        counts[filename.split("/")[-1].replace(".json", "")] = len(data) if isinstance(data, (list, tuple)) else 1
-        zipf.writestr(
-            filename,
-            json.dumps(data, default=str, ensure_ascii=ensure_ascii),
-        )
+    if data is None:
+        data = []
+    counts[filename.split("/")[-1].replace(".json", "")] = len(data) if isinstance(data, (list, tuple)) else 1
+    zipf.writestr(
+        filename,
+        json.dumps(data, default=str, ensure_ascii=ensure_ascii),
+    )
 
 
 def check_timeout(
