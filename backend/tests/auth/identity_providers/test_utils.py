@@ -561,21 +561,21 @@ class TestValidateRedirectUrl:
         """
         with patch(
             "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
-            {"gadgetbridge"},
+            {"endurain"},
         ):
-            validate_redirect_url("gadgetbridge://endurain/oauth/callback")
+            validate_redirect_url("endurain://endurain/oauth/callback")
 
     def test_custom_scheme_case_insensitive(self):
         """Scheme comparison must be case-insensitive.
 
         Asserts:
-            - GADGETBRIDGE:// is allowed when 'gadgetbridge' configured
+            - ENDURAIN:// is allowed when 'endurain' configured
         """
         with patch(
             "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
-            {"gadgetbridge"},
+            {"endurain"},
         ):
-            validate_redirect_url("GADGETBRIDGE://endurain/callback")
+            validate_redirect_url("ENDURAIN://endurain/callback")
 
     def test_multiple_custom_schemes_allowed(self):
         """Multiple schemes can be configured simultaneously.
@@ -583,12 +583,12 @@ class TestValidateRedirectUrl:
         Asserts:
             - Both schemes accepted independently
         """
-        schemes = {"gadgetbridge", "myapp"}
+        schemes = {"endurain", "myapp"}
         with patch(
             "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
             schemes,
         ):
-            validate_redirect_url("gadgetbridge://callback")
+            validate_redirect_url("endurain://callback")
             validate_redirect_url("myapp://callback")
 
     # ------------------------------------------------------------------
@@ -638,7 +638,7 @@ class TestValidateRedirectUrl:
             ),
             pytest.raises(HTTPException) as exc_info,
         ):
-            validate_redirect_url("gadgetbridge://callback")
+            validate_redirect_url("endurain://callback")
         assert exc_info.value.status_code == 400
         assert "not allowed" in exc_info.value.detail.lower()
 
@@ -651,7 +651,7 @@ class TestValidateRedirectUrl:
         with (
             patch(
                 "auth.identity_providers.utils.core_config.settings.ALLOWED_REDIRECT_SCHEMES",
-                {"gadgetbridge"},
+                {"endurain"},
             ),
             pytest.raises(HTTPException) as exc_info,
         ):

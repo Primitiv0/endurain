@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # comma-separated env value (e.g. "a,b,c") rather than
     # JSON. Without this pydantic-settings would attempt
     # ``json.loads`` first and raise on plain strings.
-    ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = set()
+    ALLOWED_REDIRECT_SCHEMES: Annotated[set[str], NoDecode] = {"endurain"}
     TRUSTED_PROXIES: Annotated[list[str], NoDecode] = []
     # Narrow SSRF exception list for admin-configured
     # outbound calls (currently OIDC discovery / JWKS).
@@ -172,8 +172,8 @@ class Settings(BaseSettings):
         if v is None or v == "":
             return set()
         if isinstance(v, str):
-            return {s.strip() for s in v.split(",") if s.strip()}
-        return v
+            return {s.strip().lower() for s in v.split(",") if s.strip()}
+        return {str(s).strip().lower() for s in v if str(s).strip()}
 
     @field_validator("TRUSTED_PROXIES", mode="before")
     @classmethod
