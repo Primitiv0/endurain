@@ -7,7 +7,8 @@ Provides:
     every log record so all logs from a single request
     can be correlated.
   - _build_handler: environment-aware handler factory
-    (stdout JSON in production, file in development).
+    (stdout JSON always in production/demo; file when
+    LOGS_DIR is set; file-only in development).
   - setup_main_logger: configures the main, Alembic, and
     APScheduler loggers.
   - Utility helpers for application-level log routing.
@@ -160,51 +161,63 @@ class _DevFormatter(logging.Formatter):
         return f"{base} | {ctx_str}"
 
 
-def _build_handler(log_level: int) -> logging.Handler:
+def _build_handler(log_level: int) -> list[logging.Handler]:
     """
-    Build the appropriate log handler for the environment.
+    Build the appropriate log handlers for the environment.
 
-    Production emits JSON to stdout so container
+    Production always emits JSON to stdout so container
     orchestrators can collect structured logs without file
-    mounts. Development writes human-readable text to
-    ``{LOGS_DIR}/app.log``.
+    mounts. If ``LOGS_DIR`` is configured, a ``FileHandler``
+    writing JSON to ``{LOGS_DIR}/app.log`` is also added so
+    Docker volume mounts continue to receive log output.
+    Development writes human-readable text to
+    ``{LOGS_DIR}/app.log`` only.
 
     Args:
         log_level: Python logging level constant.
 
     Returns:
-        Configured :class:`logging.Handler` instance.
+        List of configured :class:`logging.Handler` instances.
     """
     # Local import: see top-of-module note. ``setup_main_logger`` /
     # ``_build_handler`` run at app startup, never at import time, so by the
     # time we get here ``core.config`` is fully initialized.
     import core.config as core_config
 
+    def _configure(handler: logging.Handler, formatter: logging.Formatter) -> logging.Handler:
+        handler.setFormatter(formatter)
+        handler.setLevel(log_level)
+        handler.addFilter(RequestIdFilter())
+        return handler
+
     # Treat both "production" and "demo" as deployed
     # environments where stdout JSON is preferred.
     is_deployed = core_config.settings.ENVIRONMENT in ("production", "demo")
     if is_deployed:
-        handler: logging.Handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(JsonFormatter())
+        handlers: list[logging.Handler] = [_configure(logging.StreamHandler(sys.stdout), JsonFormatter())]
+        # Also write to file when LOGS_DIR is configured so that Docker
+        # volume mounts (e.g. /app/backend/logs) continue to receive log
+        # output regardless of the ENVIRONMENT value.
+        if core_config.settings.LOGS_DIR:
+            log_path = f"{core_config.settings.LOGS_DIR}/app.log"
+            handlers.append(_configure(logging.FileHandler(log_path), JsonFormatter()))
     else:
         log_path = f"{core_config.settings.LOGS_DIR}/app.log"
-        handler = logging.FileHandler(log_path)
-        handler.setFormatter(_DevFormatter())
-    handler.setLevel(log_level)
-    handler.addFilter(RequestIdFilter())
-    return handler
+        handlers = [_configure(logging.FileHandler(log_path), _DevFormatter())]
+
+    return handlers
 
 
 def _replace_handlers(
     loggers: tuple[logging.Logger, ...],
-    handler: logging.Handler,
+    handlers: list[logging.Handler],
 ) -> None:
     """
     Replace handlers on a set of related loggers.
 
     Args:
-        loggers: Loggers that should share one handler.
-        handler: Handler to attach to every logger.
+        loggers: Loggers that should share the given handlers.
+        handlers: Handlers to attach to every logger.
 
     Returns:
         None.
@@ -217,7 +230,8 @@ def _replace_handlers(
         old_handlers.update(logger.handlers)
         for old_handler in list(logger.handlers):
             logger.removeHandler(old_handler)
-        logger.addHandler(handler)
+        for handler in handlers:
+            logger.addHandler(handler)
         logger.propagate = False
 
     for old_handler in old_handlers:
@@ -274,7 +288,7 @@ def setup_main_logger():
     ):
         logger.setLevel(log_level)
 
-    handler = _build_handler(log_level)
+    handlers = _build_handler(log_level)
     _replace_handlers(
         (
             main_logger,
@@ -282,7 +296,7 @@ def setup_main_logger():
             scheduler_logger,
             safeuploads_audit_logger,
         ),
-        handler,
+        handlers,
     )
 
     return main_logger

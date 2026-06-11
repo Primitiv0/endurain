@@ -149,15 +149,25 @@ class TestBuildHandler:
     """Tests for _build_handler function."""
 
     def test_production_returns_stream_handler(self):
-        with patch("core.config.settings.ENVIRONMENT", "production"):
-            handler = core_logger._build_handler(logging.INFO)
+        with (
+            patch("core.config.settings.ENVIRONMENT", "production"),
+            patch("core.config.settings.LOGS_DIR", ""),
+        ):
+            handlers = core_logger._build_handler(logging.INFO)
+        assert len(handlers) == 1
+        handler = handlers[0]
         assert isinstance(handler, logging.StreamHandler)
         assert isinstance(handler.formatter, core_logger.JsonFormatter)
         assert handler.level == logging.INFO
 
     def test_demo_returns_stream_handler(self):
-        with patch("core.config.settings.ENVIRONMENT", "demo"):
-            handler = core_logger._build_handler(logging.WARNING)
+        with (
+            patch("core.config.settings.ENVIRONMENT", "demo"),
+            patch("core.config.settings.LOGS_DIR", ""),
+        ):
+            handlers = core_logger._build_handler(logging.WARNING)
+        assert len(handlers) == 1
+        handler = handlers[0]
         assert isinstance(handler, logging.StreamHandler)
         assert isinstance(handler.formatter, core_logger.JsonFormatter)
 
@@ -166,7 +176,9 @@ class TestBuildHandler:
             patch("core.config.settings.ENVIRONMENT", "development"),
             patch("core.config.settings.LOGS_DIR", str(tmp_path)),
         ):
-            handler = core_logger._build_handler(logging.DEBUG)
+            handlers = core_logger._build_handler(logging.DEBUG)
+        assert len(handlers) == 1
+        handler = handlers[0]
         assert isinstance(handler, logging.FileHandler)
         assert isinstance(handler.formatter, core_logger._DevFormatter)
         assert handler.level == logging.DEBUG
@@ -181,7 +193,7 @@ class TestReplaceHandlers:
         logger = logging.Logger("test_replace")
         logger.addHandler(old_handler)
 
-        core_logger._replace_handlers((logger,), new_handler)
+        core_logger._replace_handlers((logger,), [new_handler])
 
         assert logger.handlers == [new_handler]
         assert logger.propagate is False
@@ -192,7 +204,7 @@ class TestReplaceHandlers:
         logger = logging.Logger("test_close")
         logger.addHandler(old_handler)
 
-        core_logger._replace_handlers((logger,), new_handler)
+        core_logger._replace_handlers((logger,), [new_handler])
 
         old_handler.close.assert_called_once()
 
