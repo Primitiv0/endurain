@@ -1,13 +1,14 @@
 """Activity exercise titles CRUD operations."""
 
-import activities.activity_exercise_titles.models as activity_exercise_titles_models
-import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
-import core.decorators as core_decorators
-import server_settings.utils as server_settings_utils
 from fastapi import HTTPException, status
 from sqlalchemy import select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+import activities.activity_exercise_titles.models as activity_exercise_titles_models
+import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
+import core.decorators as core_decorators
+import server_settings.utils as server_settings_utils
 
 
 @core_decorators.handle_db_errors

@@ -2,6 +2,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, available_timezones
 
+import fitdecode
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
@@ -10,13 +14,10 @@ import activities.activity_file_import.utils as activity_file_import_utils
 import activities.activity_workout_steps.schema as activity_workout_steps_schema
 import core.config as core_config
 import core.logger as core_logger
-import fitdecode
 import garmin.utils as garmin_utils
 import gears.gear.crud as gears_crud
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 
 def create_activity_objects(

@@ -2,16 +2,17 @@ import contextlib
 from importlib import import_module
 from unittest.mock import MagicMock
 
+import pytest
+from fastapi import FastAPI, Request
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import auth.password_hasher as auth_password_hasher
 import auth.security as auth_security
 import auth.sessions.router as users_session_router
 import auth.token_manager as auth_token_manager
-import pytest
 import users.users.schema as user_schema
-from fastapi import FastAPI, Request
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 # Variables and constants
 DEFAULT_ROUTER_MODULES = [

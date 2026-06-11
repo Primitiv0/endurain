@@ -5,9 +5,10 @@ import time
 from fnmatch import fnmatch
 from unittest.mock import patch
 
-import core.redis as core_redis
 import pytest
 from redis import RedisError
+
+import core.redis as core_redis
 
 
 class FakeRedis:

@@ -31,7 +31,6 @@ from pathlib import Path, PureWindowsPath
 
 import aiofiles
 import aiofiles.os
-import core.logger as core_logger
 from fastapi import HTTPException, UploadFile, status
 from safeuploads import (
     FileSecurityConfig,
@@ -53,6 +52,8 @@ from safeuploads.exceptions import (
     WindowsReservedNameError,
     ZipBombError,
 )
+
+import core.logger as core_logger
 
 # ---------------------------------------------------------------------------
 # Module-level configuration and shared validator

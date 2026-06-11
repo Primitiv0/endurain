@@ -116,8 +116,9 @@ class TestGetUserNotificationsWithPagination:
 
 class TestCreateNotification:
     def test_success(self, mock_db):
-        import notifications.crud as crud
         from pydantic import BaseModel
+
+        import notifications.crud as crud
 
         class NC(BaseModel):
             user_id: int = 1
@@ -131,8 +132,9 @@ class TestCreateNotification:
         mock_db.refresh.assert_called_once()
 
     def test_db_error(self, mock_db):
-        import notifications.crud as crud
         from pydantic import BaseModel
+
+        import notifications.crud as crud
 
         mock_db.add.side_effect = SQLAlchemyError("err")
 

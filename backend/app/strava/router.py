@@ -6,6 +6,10 @@ from datetime import UTC, date, datetime
 from functools import partial
 from typing import Annotated
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status
+from sqlalchemy.orm import Session
+from stravalib.exc import AccessUnauthorized
+
 import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
 import auth.dependencies as auth_dependencies
@@ -21,9 +25,6 @@ import strava.schema as strava_schema
 import strava.utils as strava_utils
 import users.users_integrations.crud as user_integrations_crud
 import websocket.manager as websocket_manager
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Security, status
-from sqlalchemy.orm import Session
-from stravalib.exc import AccessUnauthorized
 
 # Define the API router
 router = APIRouter()

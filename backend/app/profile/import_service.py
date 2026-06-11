@@ -27,6 +27,9 @@ from profile.exceptions import (
 )
 from typing import Any
 
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activity_schema
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
@@ -66,8 +69,6 @@ import users.users_integrations.schema as users_integrations_schema
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 import users.users_privacy_settings.schema as users_privacy_settings_schema
 import websocket.manager as websocket_manager
-from fastapi import HTTPException
-from sqlalchemy.orm import Session
 
 
 class ImportPerformanceConfig(profile_utils.BasePerformanceConfig):
@@ -218,8 +219,8 @@ class ImportService:
                 file_list = set(zipf.namelist())
 
                 # Create ID mappings for relationships
-                gears_id_mapping = {}
-                activities_id_mapping = {}
+                gears_id_mapping: dict[int, int] = {}
+                activities_id_mapping: dict[int, int] = {}
 
                 # Import data in dependency order using streaming approach
                 # Load and import gears
@@ -412,7 +413,7 @@ class ImportService:
         Returns:
             Dictionary mapping old gear IDs to new IDs.
         """
-        gears_id_mapping = {}
+        gears_id_mapping: dict[int, int] = {}
 
         if not gears_data:
             core_logger.print_to_log("No gears data to import", "info")
@@ -850,7 +851,7 @@ class ImportService:
             ActivityLimitError: If too many activities.
             ImportTimeoutError: If operation times out.
         """
-        activities_id_mapping = {}
+        activities_id_mapping: dict[int, int] = {}
 
         # Load activities list
         activities_data = self._load_single_json(zipf, "data/activities.json")

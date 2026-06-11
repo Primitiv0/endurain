@@ -1,13 +1,14 @@
+import garminconnect
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activities_schema
 import core.logger as core_logger
 import garmin.utils as garmin_utils
-import garminconnect
 import gears.gear.crud as gears_crud
 import gears.gear.schema as gears_schema
 import users.users_integrations.crud as user_integrations_crud
 from core.database import SessionLocal
-from sqlalchemy.orm import Session
 
 
 def fetch_and_process_gear(garminconnect_client: garminconnect.Garmin, user_id: int, db: Session) -> int:

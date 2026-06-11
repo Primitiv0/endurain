@@ -1,8 +1,9 @@
 """Tests for user goals Pydantic schemas."""
 
 import pytest
-import users.users_goals.schema as user_goals_schema
 from pydantic import ValidationError
+
+import users.users_goals.schema as user_goals_schema
 
 
 class TestIntervalEnum:

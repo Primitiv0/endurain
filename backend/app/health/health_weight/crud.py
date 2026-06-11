@@ -1,15 +1,16 @@
 from typing import cast
 
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 import core.decorators as core_decorators
 import health.constants as health_constants
 import health.health_weight.models as health_weight_models
 import health.health_weight.schema as health_weight_schema
 import health.health_weight.utils as health_weight_utils
 import health.utils as health_utils
-from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -30,7 +31,7 @@ def get_all_health_weight(
     """
     # Get the health_weight from the database
     stmt = select(health_weight_models.HealthWeight).order_by(desc(health_weight_models.HealthWeight.date))
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -88,7 +89,7 @@ def get_all_health_weight_by_user_id(user_id: int, db: Session) -> list[health_w
         .where(health_weight_models.HealthWeight.user_id == user_id)
         .order_by(desc(health_weight_models.HealthWeight.date))
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -160,7 +161,7 @@ def get_health_weight_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors

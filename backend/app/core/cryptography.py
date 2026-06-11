@@ -1,9 +1,10 @@
 """Fernet token encryption helpers."""
 
-import core.config as core_config
-import core.logger as core_logger
 from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
+
+import core.config as core_config
+import core.logger as core_logger
 
 
 def create_fernet_cipher() -> Fernet:

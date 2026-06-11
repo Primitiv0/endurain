@@ -1,9 +1,10 @@
 from datetime import date as datetime_date
 from datetime import datetime
 
-import health.health_sleep.schema as health_sleep_schema
 import pytest
 from pydantic import ValidationError
+
+import health.health_sleep.schema as health_sleep_schema
 
 
 class TestHealthSleepSchema:

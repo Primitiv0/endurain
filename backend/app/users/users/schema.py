@@ -3,7 +3,6 @@
 from datetime import date as datetime_date
 from enum import Enum
 
-import server_settings.schema as server_settings_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -14,6 +13,8 @@ from pydantic import (
     StrictStr,
     field_validator,
 )
+
+import server_settings.schema as server_settings_schema
 
 
 class Gender(Enum):

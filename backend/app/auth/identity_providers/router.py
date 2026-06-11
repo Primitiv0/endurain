@@ -3,6 +3,9 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
+
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.dependencies as idp_dependencies
 import auth.identity_providers.schema as idp_schema
@@ -10,8 +13,6 @@ import auth.identity_providers.utils as idp_utils
 import auth.security as auth_security
 import core.database as core_database
 import users.users.schema as users_schema
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

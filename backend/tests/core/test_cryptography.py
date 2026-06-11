@@ -12,9 +12,10 @@ Verifies:
 from unittest.mock import patch
 
 import pytest
-from core import cryptography
 from cryptography.fernet import Fernet
 from fastapi import HTTPException
+
+from core import cryptography
 
 
 class TestCreateFernetCipher:

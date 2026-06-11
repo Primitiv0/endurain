@@ -1,8 +1,9 @@
 """CRUD helpers for the ``users_mfa`` 1:1 companion table."""
 
+from sqlalchemy.orm import Session
+
 import auth.mfa.models as auth_mfa_models
 import core.decorators as core_decorators
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors

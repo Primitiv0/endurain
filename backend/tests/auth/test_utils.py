@@ -3,10 +3,11 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import auth.schema as auth_schema
-import auth.utils as auth_utils
 import pytest
 from fastapi import HTTPException, Response
+
+import auth.schema as auth_schema
+import auth.utils as auth_utils
 
 
 def _set_cookie_headers(response: Response) -> list[str]:

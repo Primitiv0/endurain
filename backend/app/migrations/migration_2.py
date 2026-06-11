@@ -1,13 +1,14 @@
 """Migration 2: populate activity timezones and health BMI."""
 
+from sqlalchemy.orm import Session
+from timezonefinder import TimezoneFinder
+
 import activities.activity.crud as activities_crud
 import activities.activity_streams.crud as activity_streams_crud
 import core.config as core_config
 import core.logger as core_logger
 import health.health_weight.crud as health_weight_crud
 import migrations.crud as migrations_crud
-from sqlalchemy.orm import Session
-from timezonefinder import TimezoneFinder
 
 
 def process_migration_2(db: Session) -> None:

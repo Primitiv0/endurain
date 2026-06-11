@@ -5,6 +5,10 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import uuid4
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
@@ -21,9 +25,6 @@ import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 import users.users.schema as users_schema
 import users.users.utils as users_utils
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

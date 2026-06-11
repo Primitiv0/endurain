@@ -2,7 +2,6 @@
 
 from datetime import datetime
 
-import core.timezone as core_timezone
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -12,6 +11,8 @@ from pydantic import (
     StrictStr,
     field_serializer,
 )
+
+import core.timezone as core_timezone
 
 
 class ActivitySetsBase(BaseModel):

@@ -3,15 +3,16 @@
 from collections.abc import Callable
 from typing import Annotated
 
-import activities.activity.crud as activities_crud
-import activities.activity.dependencies as activities_dependencies
-import activities.activity.schema as activities_schema
-import core.database as core_database
 from fastapi import (
     APIRouter,
     Depends,
 )
 from sqlalchemy.orm import Session
+
+import activities.activity.crud as activities_crud
+import activities.activity.dependencies as activities_dependencies
+import activities.activity.schema as activities_schema
+import core.database as core_database
 
 # Define the API router
 router = APIRouter()

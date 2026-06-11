@@ -54,6 +54,12 @@ dependencies = [
 [dependency-groups]
 typecheck = [
     "mypy>=1.20.2",
+    "types-requests",
+    "types-bleach",
+    "types-psutil",
+    "types-qrcode",
+    "types-aiofiles",
+    "types-Authlib",
 ]
 lint = [
     "ruff>=0.15.12",
@@ -143,12 +149,27 @@ exclude_lines = [
 python_version = "3.13"
 incremental = false
 check_untyped_defs = true
+mypy_path = ["app"]
 files = ["app"]
 exclude = ["tests/", "alembic/"]
+
+[[tool.mypy.overrides]]
+module = [
+    "apscheduler.*",
+    "staticmap",
+    "fitdecode",
+    "garminconnect",
+    "geopy.*",
+    "tcxreader",
+    "user_agents",
+    "safeuploads.*",
+]
+ignore_missing_imports = true
 
 [tool.ruff]
 target-version = "py313"
 line-length = 120
+src = ["app", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -167,14 +188,20 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
-    "B008",   # do not perform function calls in argument defaults (FastAPI Depends)
-    "S105",   # possible hardcoded password (too many false positives with field names)
-    "S106",   # possible hardcoded password
+    "B008",   # do not perform function calls in argument defaults (FastAPI Depends/Query) — tracked in https://codeberg.org/endurain-project/endurain/issues/680
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]  # allow assert in tests
+"tests/**/*.py" = ["S101", "S105", "S106"]  # allow assert and test data with password-like strings
 "app/alembic/**/*.py" = ["E402", "I001"]  # alembic migrations have specific import order
+"app/alembic/versions/v0_3_0_migration.py" = ["S105", "S106"]  # legitimate password hashes in seed migration
+"app/auth/identity_providers/public_router.py" = ["S105", "S106"]  # false positive on token_type
+"app/auth/schema.py" = ["S105", "S106"]  # false positive on token_type Literal defaults
+"app/auth/security.py" = ["S105", "S106"]  # false positive on token_type string comparisons
+"app/auth/utils.py" = ["S105", "S106"]  # false positive on cookie name constants
+"app/main.py" = ["S105"]  # false positive on env var value
+"app/profile/mfa_store.py" = ["S105"]  # false positive on Redis key prefix
+"app/profile/**/*.py" = ["A005"]  # tracked in https://codeberg.org/endurain-project/endurain/issues/677
 
 [tool.ruff.format]
 quote-style = "double"

@@ -3,6 +3,9 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Query, Security, UploadFile, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import auth.identity_links.crud as user_idp_crud
 import auth.identity_service as auth_identity_service
@@ -16,8 +19,6 @@ import users.users.crud as users_crud
 import users.users.dependencies as users_dependencies
 import users.users.schema as users_schema
 import users.users.utils as users_utils
-from fastapi import APIRouter, Depends, Query, Security, UploadFile, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -290,7 +291,8 @@ async def upload_user_image(
         Path to uploaded image.
     """
     await users_utils.save_user_image_file(user_id, file, db)
-    return users_crud.get_user_by_id(user_id, db).photo_path
+    user = users_crud.get_user_by_id(user_id, db)
+    return user.photo_path if user and user.photo_path else ""
 
 
 @router.put("/{user_id}", status_code=status.HTTP_200_OK, response_model=users_schema.UsersRead)

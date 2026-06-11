@@ -1,15 +1,17 @@
 """CRUD operations for OAuth state (PKCE, nonce, replay prevention)."""
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from sqlalchemy import CursorResult, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 import auth.oauth_state.models as oauth_state_models
 import auth.sessions.models as users_session_models
 import core.decorators as core_decorators
 import core.logger as core_logger
-from sqlalchemy import delete as sa_delete
-from sqlalchemy import select
-from sqlalchemy import update as sa_update
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -202,7 +204,7 @@ def mark_oauth_state_used(state_id: str, db: Session) -> bool:
         )
         .values(used=True)
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
 
     claimed = result.rowcount == 1
@@ -231,7 +233,7 @@ def delete_oauth_state(oauth_state_id: str, db: Session) -> int:
         HTTPException: 500 error if database operation fails.
     """
     stmt = sa_delete(oauth_state_models.OAuthState).where(oauth_state_models.OAuthState.id == oauth_state_id)
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
     return result.rowcount
 
@@ -252,7 +254,7 @@ def delete_expired_oauth_states(db: Session) -> int:
         HTTPException: 500 error if database operation fails.
     """
     stmt = sa_delete(oauth_state_models.OAuthState).where(oauth_state_models.OAuthState.expires_at < datetime.now(UTC))
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
 
     deleted_count = result.rowcount

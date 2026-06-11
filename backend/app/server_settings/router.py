@@ -1,15 +1,6 @@
 from collections.abc import Callable
 from typing import Annotated
 
-import activities.activity.utils as activities_utils
-import auth.dependencies as auth_dependencies
-import core.config as core_config
-import core.database as core_database
-import core.file_uploads as core_file_uploads
-import core.logger as core_logger
-import server_settings.crud as server_settings_crud
-import server_settings.schema as server_settings_schema
-import server_settings.utils as server_settings_utils
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -20,6 +11,16 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
+
+import activities.activity.utils as activities_utils
+import auth.dependencies as auth_dependencies
+import core.config as core_config
+import core.database as core_database
+import core.file_uploads as core_file_uploads
+import core.logger as core_logger
+import server_settings.crud as server_settings_crud
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
 
 # Define the API router
 router = APIRouter()

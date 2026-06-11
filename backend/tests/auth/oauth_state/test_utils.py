@@ -2,9 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.utils as oauth_state_utils
-import pytest
 
 
 class TestCreateStateIdAndNonce:

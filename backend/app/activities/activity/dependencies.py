@@ -1,6 +1,7 @@
+from fastapi import HTTPException, Query, status
+
 import core.dependencies as core_dependencies
 from activities.activity.utils import ACTIVITY_ID_TO_NAME
-from fastapi import HTTPException, Query, status
 
 
 def validate_activity_id(activity_id: int):

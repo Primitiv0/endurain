@@ -10,23 +10,7 @@ import zipfile
 import zlib
 from pathlib import Path
 
-import core.file_uploads as core_file_uploads
 import pytest
-from core.file_uploads import (
-    UploadKind,
-    _resolve_upload_path,
-    _stream_to_path,
-    _to_http_exception,
-    extract_validated_zip,
-    move_within,
-    resolve_storage_path,
-    safe_remove_within,
-    save_file,
-    save_validated_bytes,
-    save_validated_upload,
-    validate_bytes,
-    validate_upload,
-)
 from fastapi import HTTPException, UploadFile
 from safeuploads.exceptions import (
     CompressionSecurityError,
@@ -41,6 +25,23 @@ from safeuploads.exceptions import (
     UnicodeSecurityError,
     WindowsReservedNameError,
     ZipBombError,
+)
+
+import core.file_uploads as core_file_uploads
+from core.file_uploads import (
+    UploadKind,
+    _resolve_upload_path,
+    _stream_to_path,
+    _to_http_exception,
+    extract_validated_zip,
+    move_within,
+    resolve_storage_path,
+    safe_remove_within,
+    save_file,
+    save_validated_bytes,
+    save_validated_upload,
+    validate_bytes,
+    validate_upload,
 )
 
 # ---------------------------------------------------------------------------

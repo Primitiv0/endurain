@@ -1,6 +1,10 @@
 """CRUD operations for activity summary aggregations."""
 
 from datetime import date, timedelta
+from typing import Any
+
+from sqlalchemy import ColumnElement, case, extract, func, select
+from sqlalchemy.orm import Session
 
 from activities.activity.models import Activity
 from activities.activity.utils import (
@@ -19,8 +23,6 @@ from activities.activity_summaries.schema import (
     YearlyPeriodSummary,
     YearlySummaryResponse,
 )
-from sqlalchemy import case, extract, func, select
-from sqlalchemy.orm import Session
 
 
 def _apply_activity_type_filter(
@@ -147,7 +149,7 @@ def get_weekly_summary(
     # MySQL: DAYOFWEEK (1=Sun, 7=Sat) -> ISO
     engine_name = db.get_bind().dialect.name
     if engine_name == "postgresql":
-        iso_dow = extract("isodow", Activity.start_time)
+        iso_dow: ColumnElement[Any] = extract("isodow", Activity.start_time)
     else:
         iso_dow = case(
             (

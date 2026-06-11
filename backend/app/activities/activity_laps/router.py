@@ -3,13 +3,14 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Security
+from sqlalchemy.orm import Session
+
 import activities.activity.dependencies as activities_dependencies
 import activities.activity_laps.crud as activity_laps_crud
 import activities.activity_laps.schema as activity_laps_schema
 import auth.dependencies as auth_dependencies
 import core.database as core_database
-from fastapi import APIRouter, Depends, Security
-from sqlalchemy.orm import Session
 
 router = APIRouter()
 

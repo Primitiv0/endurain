@@ -8,6 +8,9 @@ including CRUD operations, active fast tracking, and statistics.
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import core.dependencies as core_dependencies
@@ -15,8 +18,6 @@ import health.constants as health_constants
 import health.health_fasting.crud as health_fasting_crud
 import health.health_fasting.schema as health_fasting_schema
 import health.health_fasting.utils as health_fasting_utils
-from fastapi import APIRouter, Depends, HTTPException, Query, Security, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

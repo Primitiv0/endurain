@@ -2,9 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
-import core.redis as core_redis
 import pytest
 from redis import RedisError
+
+import core.redis as core_redis
 
 
 class TestRedisStorageUnavailableError:

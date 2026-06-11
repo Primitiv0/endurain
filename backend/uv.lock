@@ -703,6 +703,12 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "types-aiofiles" },
+    { name = "types-authlib" },
+    { name = "types-bleach" },
+    { name = "types-psutil" },
+    { name = "types-qrcode" },
+    { name = "types-requests" },
 ]
 docs = [
     { name = "mkdocs-material" },
@@ -722,6 +728,12 @@ test = [
 ]
 typecheck = [
     { name = "mypy" },
+    { name = "types-aiofiles" },
+    { name = "types-authlib" },
+    { name = "types-bleach" },
+    { name = "types-psutil" },
+    { name = "types-qrcode" },
+    { name = "types-requests" },
 ]
 
 [package.metadata]
@@ -783,6 +795,12 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.15.12" },
+    { name = "types-aiofiles" },
+    { name = "types-authlib" },
+    { name = "types-bleach" },
+    { name = "types-psutil" },
+    { name = "types-qrcode" },
+    { name = "types-requests" },
 ]
 docs = [
     { name = "mkdocs-material", specifier = ">=9.6.0" },
@@ -798,7 +816,15 @@ test = [
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
 ]
-typecheck = [{ name = "mypy", specifier = ">=1.20.2" }]
+typecheck = [
+    { name = "mypy", specifier = ">=1.20.2" },
+    { name = "types-aiofiles" },
+    { name = "types-authlib" },
+    { name = "types-bleach" },
+    { name = "types-psutil" },
+    { name = "types-qrcode" },
+    { name = "types-requests" },
+]
 
 [[package]]
 name = "faker"
@@ -2754,6 +2780,93 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/04/af/88fdebf242bc7bc4957c96c5358a2b2b0f07e5001401906783a521ea9f54/trove_classifiers-2026.4.28.13.tar.gz", hash = "sha256:c85bb8a53c3de7330d1699b844ed9fb809a602a09ac15dc79ad6d1a509be0676", size = 17035, upload-time = "2026-04-28T13:45:41.495Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d6/bb/fbdc4e57731efb86b4209ffdd2519520782bf27b3c961beac3e5c20d2b87/trove_classifiers-2026.4.28.13-py3-none-any.whl", hash = "sha256:8f4b1eb4e16296b57d612965444f87a83861cc989a0451ac97fe4265ddef03b8", size = 14216, upload-time = "2026-04-28T13:45:39.943Z" },
+]
+
+[[package]]
+name = "types-aiofiles"
+version = "25.1.0.20260508"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/d9/60e8b26ad7e57eb3b58f3370b35f0d740dd0909079417e784f4e6c0f92f6/types_aiofiles-25.1.0.20260508.tar.gz", hash = "sha256:d26b07bb28f36c154c77d33982e506ee462044932d42c4eea6e78f69d1de5b84", size = 14851, upload-time = "2026-05-08T04:49:48.446Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f2/88/31d8fb1a3d0a96e1e41cfc58c67f48634e840e2598336887fa5be1dd9c82/types_aiofiles-25.1.0.20260508-py3-none-any.whl", hash = "sha256:c35d2be25a7e4b881da7f62ff3823db3770b2f704f31ac69681c227569e808cc", size = 14365, upload-time = "2026-05-08T04:49:47.302Z" },
+]
+
+[[package]]
+name = "types-authlib"
+version = "1.6.11.20260508"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/af/78/6a19fff9d55ed6331d06fdb48b365a333b777c6c70f25c150a9bfef867ec/types_authlib-1.6.11.20260508.tar.gz", hash = "sha256:0787b2c9f0c2fbcb27a689f4ef80c189588fc66c0a9ad1d5e2688c018bf4f639", size = 46885, upload-time = "2026-05-08T04:51:07.742Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3c/76/e224e2c7d4026af392f58158eecafe31a0c97aa3d07986787543390ac570/types_authlib-1.6.11.20260508-py3-none-any.whl", hash = "sha256:09bda18061f8e0213c3e20cacdb032778c1cc887be9bb0acfb2cbdb2f6e64fdd", size = 103885, upload-time = "2026-05-08T04:51:06.817Z" },
+]
+
+[[package]]
+name = "types-bleach"
+version = "6.3.0.20260508"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "types-html5lib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fa/23/dc5aae645229625676071911fedaeb9bec8c945a1c8be5c01bc4c61052de/types_bleach-6.3.0.20260508.tar.gz", hash = "sha256:2d1b6b5baf99fe330af28040e9f688d12fea0ac65657669f850bb687c65b1509", size = 11678, upload-time = "2026-05-08T04:52:52.218Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/54/c736f77d60b25913bb2711ce5a364186c50e12f8c652b52f6893e5d5bee0/types_bleach-6.3.0.20260508-py3-none-any.whl", hash = "sha256:103627b46343017cf3f05e791f96810bf0ed8b4f32c736a72a055a60c00729f4", size = 11988, upload-time = "2026-05-08T04:52:51.134Z" },
+]
+
+[[package]]
+name = "types-html5lib"
+version = "1.1.11.20260508"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "types-webencodings" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/d7/8512bdd1d3102a12d5125ad0850153c795bd99f4f5ef496498e494912787/types_html5lib-1.1.11.20260508.tar.gz", hash = "sha256:f44f55f3bd1f7a55477851165c8955a821f2342447a995a17f10a376134ea049", size = 18377, upload-time = "2026-05-08T04:51:35.25Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/e5/f1c8f553b392c447fbab985e100cf3998e657c10b5996de88f2815b09234/types_html5lib-1.1.11.20260508-py3-none-any.whl", hash = "sha256:cb85cb9dd46cdb18349f9ad08df69cc911921849e154860dad9029da4a2c1c39", size = 24312, upload-time = "2026-05-08T04:51:34.383Z" },
+]
+
+[[package]]
+name = "types-psutil"
+version = "7.2.2.20260508"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/cc/5ac56357b08655ff93106d6391b72d50c47416a044041312550bcd806827/types_psutil-7.2.2.20260508.tar.gz", hash = "sha256:8cfd8339f5e898570f80486423e65d87558d89d0181bf723d20ac5e778fe218e", size = 26575, upload-time = "2026-05-08T04:46:48.388Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/44/4467583df75313c28abaadfab12f102fba9db7285323e75601acf936d996/types_psutil-7.2.2.20260508-py3-none-any.whl", hash = "sha256:b142452e0953f2d07dbdbb98d81f3a629f5906cc2d94bb7e34da0fba55fbab4a", size = 32777, upload-time = "2026-05-08T04:46:46.972Z" },
+]
+
+[[package]]
+name = "types-qrcode"
+version = "8.2.0.20260508"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/f1/1363a9c951dbe141968e20b3e662c40506629e5f4de0dec7f9f602dfac12/types_qrcode-8.2.0.20260508.tar.gz", hash = "sha256:8d610ee09910653047fb680045797bdf6210f95927aae2f2dba074c7118fa9db", size = 15248, upload-time = "2026-05-08T04:51:55.188Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e1/99/57d891724cea5e020a25b5b7790b6d39da75a66910fc1004bb8a701ef202/types_qrcode-8.2.0.20260508-py3-none-any.whl", hash = "sha256:153fe7786d7ada13bb88c3c7ae535cca722569300cbf594b5d517898ab3ab014", size = 19813, upload-time = "2026-05-08T04:51:54.284Z" },
+]
+
+[[package]]
+name = "types-requests"
+version = "2.33.0.20260508"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c7/6b/eb226bdd61a982c9a03e02c657fb4ab001733506e6423906ac142331f2e3/types_requests-2.33.0.20260508.tar.gz", hash = "sha256:81b2ae5f0d20967714a6aa5ef9284c05570d7cb06b7de8f2a77b918b63ddd411", size = 23991, upload-time = "2026-05-08T04:50:56.818Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/96/080db0afdf2c5cc5fe512b41354e8d114fe8f65e9510c56ff8dfd40216ce/types_requests-2.33.0.20260508-py3-none-any.whl", hash = "sha256:fa01459cca184229713df03709db46a905325906d27e042cd4fd7ea3d15d3400", size = 20722, upload-time = "2026-05-08T04:50:55.548Z" },
+]
+
+[[package]]
+name = "types-webencodings"
+version = "0.5.0.20260408"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/d2/21567fac142315580ce3ee37d08a4e8819921dae833bbcd27b9f8b373799/types_webencodings-0.5.0.20260408.tar.gz", hash = "sha256:28c596619f367e43eee393d85f63e8d2fdb6874c654a8d441c37f8afe29c6d0d", size = 7504, upload-time = "2026-04-08T04:28:51.735Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/e4/f13be8f6d9a561166f7d963012d0ccc833e13aee3044c4f1a8fb1fee462a/types_webencodings-0.5.0.20260408-py3-none-any.whl", hash = "sha256:19a2afe5c22d9b1e880b49ff823c7b531f473a390fe47ac903c0bdb5cd677dd9", size = 8717, upload-time = "2026-04-08T04:28:50.943Z" },
 ]
 
 [[package]]

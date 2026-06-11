@@ -1,13 +1,14 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+
 import auth.sessions.rotated_refresh_tokens.crud as rotated_token_crud
 import auth.sessions.rotated_refresh_tokens.models as _auth_rotated_token_models
 import auth.sessions.rotated_refresh_tokens.models as rotated_token_models
 import auth.sessions.rotated_refresh_tokens.schema as rotated_token_schema
-import pytest
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetRotatedTokenByHash:

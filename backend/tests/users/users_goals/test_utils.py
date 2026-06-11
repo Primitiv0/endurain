@@ -4,11 +4,12 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
 import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
 import users.users_goals.utils as user_goals_utils
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 
 class TestCalculateUserGoals:

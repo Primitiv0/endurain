@@ -1,20 +1,21 @@
 import asyncio
 import json
 
-import core.cryptography as core_cryptography
-import core.logger as core_logger
-import garmin.schema as garmin_schema
 import garminconnect
 import requests
-import users.users_integrations.crud as user_integrations_crud
-import users.users_integrations.models as user_integrations_models
-import websocket.manager as websocket_manager
-import websocket.utils as websocket_utils
 from fastapi import (
     HTTPException,
     status,
 )
 from sqlalchemy.orm import Session
+
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import garmin.schema as garmin_schema
+import users.users_integrations.crud as user_integrations_crud
+import users.users_integrations.models as user_integrations_models
+import websocket.manager as websocket_manager
+import websocket.utils as websocket_utils
 
 
 async def get_mfa(

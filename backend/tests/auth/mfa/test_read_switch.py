@@ -11,10 +11,11 @@ import profile.utils as profile_utils
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import auth.mfa.models as auth_mfa_models
 import pytest
-import users.users.models as users_models
 from fastapi import HTTPException, status
+
+import auth.mfa.models as auth_mfa_models
+import users.users.models as users_models
 
 # ---------------------------------------------------------------------------
 # Helpers

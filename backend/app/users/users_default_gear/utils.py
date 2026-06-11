@@ -1,9 +1,10 @@
 """User default gear utility functions."""
 
-import core.logger as core_logger
-import users.users_default_gear.crud as user_default_gear_crud
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
+import core.logger as core_logger
+import users.users_default_gear.crud as user_default_gear_crud
 
 # Activity type to gear attribute mapping
 ACTIVITY_TYPE_TO_GEAR_ATTR: dict[int, str] = {

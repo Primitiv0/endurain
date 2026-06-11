@@ -2,9 +2,10 @@
 
 from unittest.mock import patch
 
-import core.network as core_network
 import pytest
 from fastapi import HTTPException
+
+import core.network as core_network
 
 
 class TestIsTrustedPeerEdgeCases:

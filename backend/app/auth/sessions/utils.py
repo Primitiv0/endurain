@@ -6,6 +6,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 
+from fastapi import (
+    HTTPException,
+    Request,
+    status,
+)
+from sqlalchemy.orm import Session
+from user_agents import parse
+
 import auth.constants as auth_constants
 import auth.password_hasher as auth_password_hasher
 import auth.sessions.crud as users_session_crud
@@ -15,13 +23,6 @@ import core.logger as core_logger
 import core.network as core_network
 import users.users.schema as users_schema
 from core.database import SessionLocal
-from fastapi import (
-    HTTPException,
-    Request,
-    status,
-)
-from sqlalchemy.orm import Session
-from user_agents import parse
 
 
 class DeviceType(Enum):

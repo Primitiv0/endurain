@@ -1,12 +1,15 @@
 """CRUD operations for gear components."""
 
+from typing import Any
+
+from fastapi import HTTPException, status
+from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy.orm import Session
+
 import activities.activity.models as activity_models
 import core.decorators as core_decorators
 import gears.gear_components.models as gear_components_models
 import gears.gear_components.schema as gear_components_schema
-from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
 
 # Fields that must never be overwritten via
 # user-supplied data during updates.
@@ -222,7 +225,7 @@ def delete_gear_component(
         gear_components_models.GearComponents.user_id == user_id,
         gear_components_models.GearComponents.id == gear_component_id,
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
 
     if result.rowcount == 0:
         raise HTTPException(

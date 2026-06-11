@@ -2,13 +2,14 @@
 
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activity_crud
 import core.logger as core_logger
 import users.users_goals.crud as user_goals_crud
 import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 _ACTIVITY_TYPE_MAP: dict[str, list[int]] = {
     user_goals_schema.ActivityType.RUN.value: [1, 2, 3, 34, 40],

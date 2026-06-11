@@ -2,10 +2,11 @@
 
 from unittest.mock import patch
 
-from core.router import router
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.testclient import TestClient
+
+from core.router import router
 
 app = FastAPI()
 app.include_router(router)

@@ -1,5 +1,8 @@
 """Utility functions for notification creation."""
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
 import core.logger as core_logger
 import notifications.constants as notifications_constants
 import notifications.crud as notifications_crud
@@ -11,8 +14,6 @@ import users.users.utils as users_utils
 import websocket.manager as websocket_manager
 import websocket.utils as websocket_utils
 from core.database import SessionLocal
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 
 async def _create_and_notify(

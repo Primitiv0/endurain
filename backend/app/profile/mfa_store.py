@@ -5,11 +5,12 @@ import threading
 import time
 from typing import NoReturn
 
+from redis import Redis, RedisError
+
 import core.config as core_config
 import core.cryptography as core_cryptography
 import core.logger as core_logger
 import core.redis as core_redis
-from redis import Redis, RedisError
 
 _REDIS_MFA_SECRET_KEY_PREFIX = "endurain:auth:mfa:setup_secret"
 

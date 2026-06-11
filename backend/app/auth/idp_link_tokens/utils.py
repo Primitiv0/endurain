@@ -5,11 +5,12 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from sqlalchemy.orm import Session
+
 import auth.idp_link_tokens.crud as idp_link_token_crud
 import auth.idp_link_tokens.schema as idp_link_token_schema
 import core.database as core_database
 import core.logger as core_logger
-from sqlalchemy.orm import Session
 
 # Token expiry duration in seconds
 TOKEN_EXPIRY_SECONDS = 60

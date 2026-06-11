@@ -1,13 +1,14 @@
 """Activity laps CRUD operations."""
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
 import activities.activity_laps.models as activity_laps_models
 import activities.activity_laps.schema as activity_laps_schema
 import core.decorators as core_decorators
 import server_settings.utils as server_settings_utils
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 _LAP_COLUMNS: tuple[str, ...] = (
     "start_time",

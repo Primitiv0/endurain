@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
+import garminconnect
+from sqlalchemy.orm import Session
+
 import core.logger as core_logger
 import garmin.utils as garmin_utils
-import garminconnect
 import health.health_sleep.crud as health_sleep_crud
 import health.health_sleep.schema as health_sleep_schema
 import health.health_steps.crud as health_steps_crud
@@ -14,7 +16,6 @@ import users.users.crud as users_crud
 import users.users_integrations.crud as user_integrations_crud
 import websocket.manager as websocket_manager_module
 from core.database import SessionLocal
-from sqlalchemy.orm import Session
 
 
 def fetch_and_process_bc_by_dates(

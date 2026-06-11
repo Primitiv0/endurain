@@ -2,6 +2,11 @@ import threading
 import time
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from stravalib.client import Client as StravaClient
+from stravalib.exc import Fault as StravaFault
+
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activities_schema
 import core.cryptography as core_cryptography
@@ -10,10 +15,6 @@ import users.users.crud as users_crud
 import users.users_integrations.crud as user_integrations_crud
 import users.users_integrations.models as user_integrations_models
 from core.database import SessionLocal
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from stravalib.client import Client as StravaClient
-from stravalib.exc import Fault as StravaFault
 
 
 class StravaRateLimitTracker:

@@ -3,10 +3,11 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from auth.identity_links import crud as identity_links_crud
-from auth.identity_links.models import UsersIdentityProvider
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
+
+from auth.identity_links import crud as identity_links_crud
+from auth.identity_links.models import UsersIdentityProvider
 
 
 class TestCheckUserIdentityProvidersByIdpId:

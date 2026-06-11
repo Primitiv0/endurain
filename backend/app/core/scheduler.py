@@ -2,6 +2,8 @@
 
 from collections.abc import Callable, Sequence
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 import activities.activity.utils as activities_utils
 import auth.oauth_state.utils as oauth_state_utils
 import auth.security_stores as auth_security_stores
@@ -14,7 +16,6 @@ import password_reset_tokens.utils as password_reset_tokens_utils
 import sign_up_tokens.utils as sign_up_tokens_utils
 import strava.activity_utils as strava_activity_utils
 import strava.utils as strava_utils
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from auth.sessions.rotated_refresh_tokens import (
     utils as rotated_tokens_utils,
 )

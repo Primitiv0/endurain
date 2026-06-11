@@ -1,14 +1,15 @@
 """Activity sets CRUD operations."""
 
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
 import activities.activity_sets.models as activity_sets_models
 import activities.activity_sets.schema as activity_sets_schema
 import core.decorators as core_decorators
 import server_settings.utils as server_settings_utils
-from pydantic import BaseModel
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 def _to_read_schema(
@@ -110,10 +111,10 @@ def get_activities_sets(
     if not allowed_ids:
         return []
 
-    stmt = select(activity_sets_models.ActivitySets).where(
+    sets_stmt = select(activity_sets_models.ActivitySets).where(
         activity_sets_models.ActivitySets.activity_id.in_(allowed_ids)
     )
-    activity_sets = db.scalars(stmt).all()
+    activity_sets = db.scalars(sets_stmt).all()
 
     if not activity_sets:
         return []

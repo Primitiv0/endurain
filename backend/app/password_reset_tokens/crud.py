@@ -1,14 +1,16 @@
 """CRUD operations for password reset tokens."""
 
 from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import CursorResult, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 import core.decorators as core_decorators
 import password_reset_tokens.models as password_reset_tokens_models
 import password_reset_tokens.schema as password_reset_tokens_schema
-from sqlalchemy import delete as sa_delete
-from sqlalchemy import select
-from sqlalchemy import update as sa_update
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -120,7 +122,7 @@ def mark_user_password_reset_tokens_used(user_id: int, db: Session) -> int:
         )
         .values(used=True)
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     return result.rowcount or 0
 
 
@@ -170,6 +172,6 @@ def delete_expired_password_reset_tokens(db: Session) -> int:
     stmt = sa_delete(password_reset_tokens_models.PasswordResetToken).where(
         password_reset_tokens_models.PasswordResetToken.expires_at < datetime.now(UTC)
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
     return result.rowcount

@@ -6,13 +6,14 @@ import hmac
 import re
 from typing import Any
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
 import auth.identity_links.crud as user_idp_crud
 import auth.identity_providers.schema as idp_schema
 import auth.identity_providers.service as idp_service
 import core.config as core_config
 import core.logger as core_logger
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 
 def validate_redirect_url(redirect: str | None) -> None:
@@ -200,7 +201,7 @@ def _secure_compare(a: str, b: str) -> bool:
 
 
 # Pre-configured templates for common IdPs
-IDP_TEMPLATES = {
+IDP_TEMPLATES: dict[str, dict[str, Any]] = {
     "authelia": {
         "name": "Authelia",
         "provider_type": "oidc",

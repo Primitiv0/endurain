@@ -2,9 +2,10 @@ from datetime import date as datetime_date
 from datetime import datetime
 from unittest.mock import ANY, MagicMock, patch
 
+from fastapi import HTTPException, status
+
 import health.health_sleep.models as health_sleep_models
 import health.health_sleep.schema as health_sleep_schema
-from fastapi import HTTPException, status
 
 
 class TestReadHealthSleepAll:

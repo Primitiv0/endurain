@@ -3,8 +3,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import websocket.router as websocket_router
 from fastapi import WebSocketDisconnect
+
+import websocket.router as websocket_router
 
 
 class TestWebSocketEndpoint:

@@ -3,6 +3,8 @@
 import profile.browser_redirect_router as profile_browser_redirect_router
 import profile.router as profile_router
 
+from fastapi import APIRouter, Depends, Security
+
 import activities.activity.public_router as activities_public_router
 
 # Alphabetized router imports
@@ -63,7 +65,6 @@ from activities.activity_workout_steps import (
 from auth.identity_providers import (
     public_router as identity_providers_public_router,
 )
-from fastapi import APIRouter, Depends, Security
 
 router = APIRouter()
 

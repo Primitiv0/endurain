@@ -2,12 +2,13 @@
 
 from unittest.mock import MagicMock, patch
 
-import auth.api_keys.crud as users_api_keys_crud
-import auth.api_keys.models as users_api_keys_models
-import auth.api_keys.schema as users_api_keys_schema
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
+
+import auth.api_keys.crud as users_api_keys_crud
+import auth.api_keys.models as users_api_keys_models
+import auth.api_keys.schema as users_api_keys_schema
 
 
 class TestGetApiKeysByUserId:

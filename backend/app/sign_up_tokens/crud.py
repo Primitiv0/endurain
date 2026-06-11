@@ -1,13 +1,15 @@
 """CRUD operations for sign-up tokens."""
 
 from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import CursorResult, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy.orm import Session
 
 import core.decorators as core_decorators
 import sign_up_tokens.models as sign_up_tokens_models
 import sign_up_tokens.schema as sign_up_tokens_schema
-from sqlalchemy import delete as sa_delete
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -108,6 +110,6 @@ def delete_expired_sign_up_tokens(db: Session) -> int:
     stmt = sa_delete(sign_up_tokens_models.SignUpToken).where(
         sign_up_tokens_models.SignUpToken.expires_at < datetime.now(UTC)
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
     return result.rowcount

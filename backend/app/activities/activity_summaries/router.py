@@ -4,11 +4,6 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime
 from typing import Annotated
 
-import activities.activity_summaries.crud as summary_crud
-import activities.activity_summaries.dependencies as summary_deps
-import activities.activity_summaries.schema as summary_schema
-import auth.dependencies as auth_dependencies
-import core.database as core_database
 from fastapi import (
     APIRouter,
     Depends,
@@ -18,6 +13,12 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
+
+import activities.activity_summaries.crud as summary_crud
+import activities.activity_summaries.dependencies as summary_deps
+import activities.activity_summaries.schema as summary_schema
+import auth.dependencies as auth_dependencies
+import core.database as core_database
 
 router = APIRouter()
 

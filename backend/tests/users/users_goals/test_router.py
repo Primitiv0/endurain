@@ -2,9 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+from fastapi import HTTPException, status
+
 import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
-from fastapi import HTTPException, status
 
 
 class TestGetUserGoals:

@@ -1,9 +1,10 @@
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+
 import auth.dependencies as auth_dependencies
 import core.logger as core_logger
 import websocket.manager as websocket_manager
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 # Define the API router
 router = APIRouter()

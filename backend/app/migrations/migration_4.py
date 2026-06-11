@@ -1,9 +1,10 @@
 """Migration 4: prefix user photo paths with 'data/'."""
 
+from sqlalchemy.orm import Session
+
 import core.logger as core_logger
 import migrations.crud as migrations_crud
 import users.users.crud as user_crud
-from sqlalchemy.orm import Session
 
 
 async def process_migration_4(db: Session) -> None:

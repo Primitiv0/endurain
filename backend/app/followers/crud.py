@@ -1,14 +1,17 @@
 """CRUD operations for follower relationships."""
 
+from typing import Any
+
+from fastapi import HTTPException, status
+from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session
+
 import core.decorators as core_decorators
 import core.logger as core_logger
 import followers.models as followers_models
 import notifications.utils as notifications_utils
 import websocket.manager as websocket_manager
-from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -326,7 +329,7 @@ def delete_follower(user_id: int, target_user_id: int, db: Session) -> None:
         followers_models.Follower.follower_id == user_id,
         followers_models.Follower.following_id == target_user_id,
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
 
     if result.rowcount == 0:
         # Roll back so the no-op transaction does not stay open.

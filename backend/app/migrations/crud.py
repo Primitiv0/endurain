@@ -1,10 +1,11 @@
 """CRUD operations for migration tracking."""
 
-import core.decorators as core_decorators
-import migrations.models as migrations_models
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+import core.decorators as core_decorators
+import migrations.models as migrations_models
 
 
 @core_decorators.handle_db_errors

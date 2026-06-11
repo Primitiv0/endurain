@@ -1,15 +1,17 @@
 """CRUD operations for IdP link tokens."""
 
 from datetime import UTC, datetime
+from typing import Any
+
+from sqlalchemy import CursorResult, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 import auth.idp_link_tokens.models as idp_link_token_models
 import auth.idp_link_tokens.schema as idp_link_token_schema
 import core.decorators as core_decorators
 import core.logger as core_logger
-from sqlalchemy import delete as sa_delete
-from sqlalchemy import select
-from sqlalchemy import update as sa_update
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -85,7 +87,7 @@ def mark_token_as_used(token_hash: str, db: Session) -> bool:
         )
         .values(used=True)
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
 
     claimed = result.rowcount == 1
@@ -110,7 +112,7 @@ def delete_expired_tokens(db: Session) -> int:
     stmt = sa_delete(idp_link_token_models.IdpLinkToken).where(
         idp_link_token_models.IdpLinkToken.expires_at < datetime.now(UTC)
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
 
     deleted_count = result.rowcount

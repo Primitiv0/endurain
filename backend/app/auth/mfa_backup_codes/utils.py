@@ -2,9 +2,10 @@
 
 import secrets
 
+from sqlalchemy.orm import Session
+
 import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
 import auth.password_hasher as auth_password_hasher
-from sqlalchemy.orm import Session
 
 # Backup-code alphabet: uppercase ASCII + digits with visually ambiguous
 # characters removed (0, O, 1, I) to reduce user transcription errors.

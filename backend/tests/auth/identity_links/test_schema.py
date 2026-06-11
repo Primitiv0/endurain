@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
+
 from auth.identity_links.schema import (
     UsersIdentityProviderBase,
     UsersIdentityProviderCreate,
@@ -10,7 +12,6 @@ from auth.identity_links.schema import (
     UsersIdentityProviderResponse,
     UsersIdentityProviderTokenUpdate,
 )
-from pydantic import ValidationError
 
 
 class TestUserIdentityProviderBase:

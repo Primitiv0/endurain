@@ -9,6 +9,15 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from fastapi import (
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+
 import auth.constants as auth_constants
 import auth.identity_providers.utils as idp_utils
 import auth.oauth_state.crud as oauth_state_crud
@@ -19,14 +28,6 @@ import auth.token_manager as auth_token_manager
 import core.config as core_config
 import users.users.crud as users_crud
 import users.users.schema as users_schema
-from fastapi import (
-    HTTPException,
-    Request,
-    Response,
-    status,
-)
-from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
 
 REFRESH_TOKEN_COOKIE_NAME = "endurain_refresh_token"
 REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"

@@ -3,14 +3,15 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import core.dependencies as core_dependencies
 import notifications.crud as notifications_crud
 import notifications.dependencies as notifications_dependencies
 import notifications.schema as notifications_schema
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
 
 router = APIRouter()
 

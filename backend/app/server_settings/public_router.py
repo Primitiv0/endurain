@@ -1,10 +1,11 @@
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Request, Response
+from sqlalchemy.orm import Session
+
 import core.database as core_database
 import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
-from fastapi import APIRouter, Depends, Request, Response
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

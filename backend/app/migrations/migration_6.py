@@ -1,10 +1,11 @@
 """Migration 6: lowercase usernames and normalise birthdates."""
 
+from sqlalchemy.orm import Session
+
 import core.logger as core_logger
 import migrations.crud as migrations_crud
 import users.users.crud as user_crud
 import users.users.schema as users_schema
-from sqlalchemy.orm import Session
 
 
 async def process_migration_6(db: Session) -> None:

@@ -3,14 +3,15 @@
 from datetime import UTC
 from unittest.mock import MagicMock, patch
 
-import auth.security as auth_security
-import auth.sessions.router as users_sessions_router
-import auth.sessions.schema as users_session_schema
-import core.database as core_database
 import pytest
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+import auth.security as auth_security
+import auth.sessions.router as users_sessions_router
+import auth.sessions.schema as users_session_schema
+import core.database as core_database
 
 # ---------------------------------------------------------------------------
 # Fixtures

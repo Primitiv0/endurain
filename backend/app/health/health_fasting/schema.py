@@ -8,7 +8,6 @@ including validation rules and enumerations for fasting types and statuses.
 from datetime import datetime
 from enum import Enum
 
-import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -17,6 +16,8 @@ from pydantic import (
     StrictStr,
     model_validator,
 )
+
+import health.schema as health_schema
 
 
 class Source(Enum):

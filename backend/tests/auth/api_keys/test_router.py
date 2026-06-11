@@ -3,8 +3,9 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import auth.api_keys.models as users_api_keys_models
 from fastapi import HTTPException, status
+
+import auth.api_keys.models as users_api_keys_models
 
 
 class TestGetUserApiKeys:

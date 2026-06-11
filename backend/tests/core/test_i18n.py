@@ -2,8 +2,9 @@
 
 import json
 
-import core.i18n as core_i18n
 import pytest
+
+import core.i18n as core_i18n
 
 
 @pytest.fixture

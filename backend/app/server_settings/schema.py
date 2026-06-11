@@ -1,7 +1,6 @@
 import re
 from enum import Enum
 
-import core.sanitization as core_sanitization
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -11,6 +10,8 @@ from pydantic import (
     StrictStr,
     field_validator,
 )
+
+import core.sanitization as core_sanitization
 
 # Default allowed tile domains for map tiles
 DEFAULT_ALLOWED_TILE_DOMAINS: list[str] = [

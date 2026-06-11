@@ -1,7 +1,8 @@
 """Tests for users_api_keys utility functions."""
 
-import auth.api_keys.utils as users_api_keys_utils
 import pytest
+
+import auth.api_keys.utils as users_api_keys_utils
 
 
 class TestGenerateApiKey:

@@ -3,12 +3,13 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-import auth.oauth_state.crud as oauth_state_crud
-import auth.oauth_state.models as oauth_state_models
-import auth.sessions.models as users_session_models
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
+
+import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.models as oauth_state_models
+import auth.sessions.models as users_session_models
 
 
 class TestGetOAuthStateById:

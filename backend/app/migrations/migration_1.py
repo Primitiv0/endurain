@@ -2,13 +2,14 @@
 
 from datetime import datetime
 
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
 import activities.activity_streams.crud as activity_streams_crud
 import core.logger as core_logger
 import migrations.crud as migrations_crud
 from migrations.schema import StreamType
-from sqlalchemy.orm import Session
 
 
 def process_migration_1(db: Session) -> None:

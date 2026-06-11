@@ -2,13 +2,14 @@
 
 from collections.abc import Awaitable, Callable
 
-import core.config as core_config
-import server_settings.schema as server_settings_schema
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
+
+import core.config as core_config
+import server_settings.schema as server_settings_schema
 
 _DEPLOYED_ENVIRONMENTS = {"production", "demo"}
 _CSRF_METHODS = {"POST", "PUT", "DELETE", "PATCH"}

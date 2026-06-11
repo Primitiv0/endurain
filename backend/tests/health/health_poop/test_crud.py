@@ -1,12 +1,13 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import health.health_poop.crud as health_poop_crud
-import health.health_poop.models as health_poop_models
-import health.health_poop.schema as health_poop_schema
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+
+import health.health_poop.crud as health_poop_crud
+import health.health_poop.models as health_poop_models
+import health.health_poop.schema as health_poop_schema
 
 
 class TestGetHealthPoopNumber:

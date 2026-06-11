@@ -2,7 +2,10 @@ import asyncio
 import os
 import time
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
+
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
 
 import activities.activity.models as activities_models
 import activities.activity.utils as activities_utils
@@ -16,8 +19,6 @@ import core.text_imports as core_text_imports
 import gears.gear.crud as gears_crud
 import users.users.crud as users_crud
 import websocket.manager as websocket_manager
-from fastapi import Depends, HTTPException
-from sqlalchemy.orm import Session
 
 _STRAVA_ACTIVITIES_HEADERS = {
     "Filename",
@@ -282,7 +283,7 @@ def build_metadata_dict(
 
     Returns: Dictionary that contains the gear name as a key to look up the gear ID.
     """
-    strava_activity_metadata = {}
+    strava_activity_metadata: dict[str, Any] = {}
     if isinstance(strava_activities, dict) and strava_activities.get(
         file_base_name
     ):  # We have information on the activity
@@ -345,7 +346,7 @@ def build_import_dictionary(
 
     Returns: Dictionary that contains the import_dict values for the activity (which is then added to the activity as a dictionary in the "import_info" field of the activity).
     """
-    import_dict = {}
+    import_dict: dict[str, Any] = {}
     if is_strava_bulk_import:
         import_dict["imported"] = True
         import_dict["import_source"] = "Strava bulk import"

@@ -3,6 +3,11 @@
 import posixpath
 from urllib.parse import unquote
 
+from fastapi import HTTPException, status
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 import auth.mfa.models as auth_mfa_models
 import core.decorators as core_decorators
 import health.health_weight.utils as health_weight_utils
@@ -11,10 +16,6 @@ import server_settings.utils as server_settings_utils
 import users.users.models as users_models
 import users.users.schema as users_schema
 import users.users.utils as users_utils
-from fastapi import HTTPException, status
-from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -32,7 +33,7 @@ def get_all_users(db: Session) -> list[users_models.Users]:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(users_models.Users)
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -98,7 +99,7 @@ def get_users_with_pagination(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -133,7 +134,7 @@ def get_user_by_username(
         stmt = select(users_models.Users).where(
             func.lower(users_models.Users.username).like(f"%{escaped_username}%", escape="\\")
         )
-        return db.execute(stmt).scalars().all()
+        return list(db.execute(stmt).scalars().all())
     else:
         # Exact match - no LIKE escaping needed
         stmt = select(users_models.Users).where(users_models.Users.username == normalized_username)
@@ -204,7 +205,7 @@ def get_users_admin(db: Session) -> list[users_models.Users]:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(users_models.Users).where(users_models.Users.access_type == users_schema.UserAccessType.ADMIN.value)
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors

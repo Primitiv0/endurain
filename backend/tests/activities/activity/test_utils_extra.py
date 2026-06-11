@@ -165,8 +165,9 @@ class TestHandleGzippedFile:
     @patch("activities.activity.utils.core_logger")
     @patch("activities.activity.utils.Path")
     def test_handle_invalid_gzip_raises_400(self, mock_path_cls, mock_logger, mock_move, mock_tempfile, mock_gzip_open):
-        from activities.activity.utils import handle_gzipped_file
         from fastapi import HTTPException
+
+        from activities.activity.utils import handle_gzipped_file
 
         mock_path_cls.return_value.stem = "activity_123.fit"
         mock_path_cls.return_value.suffix = ".fit"
@@ -190,9 +191,10 @@ class TestHandleGzippedFile:
     def test_handle_exceeds_max_size_raises_413(
         self, mock_path_cls, mock_logger, mock_move, mock_tempfile, mock_gzip_open
     ):
+        from fastapi import HTTPException
+
         import activities.activity.utils as utils
         from activities.activity.utils import handle_gzipped_file
-        from fastapi import HTTPException
 
         mock_path_cls.return_value.stem = "activity_123.fit"
         mock_path_cls.return_value.suffix = ".fit"
@@ -643,8 +645,9 @@ class TestParseFile:
 
     @patch("activities.activity.utils.core_logger")
     def test_raises_on_unsupported_extension(self, mock_logger):
-        from activities.activity.utils import parse_file
         from fastapi import HTTPException
+
+        from activities.activity.utils import parse_file
 
         with pytest.raises(HTTPException) as exc:
             parse_file(
@@ -694,8 +697,9 @@ class TestStoreActivity:
     def test_raises_when_activity_none(self, mock_logger, mock_crud):
         import asyncio
 
-        from activities.activity.utils import store_activity
         from fastapi import HTTPException
+
+        from activities.activity.utils import store_activity
 
         mock_crud.create_activity = AsyncMock(return_value=None)
 
@@ -708,8 +712,9 @@ class TestStoreActivity:
     def test_raises_when_id_none(self, mock_logger, mock_crud):
         import asyncio
 
-        from activities.activity.utils import store_activity
         from fastapi import HTTPException
+
+        from activities.activity.utils import store_activity
 
         mock_crud.create_activity = AsyncMock(return_value=MagicMock(id=None))
 
@@ -727,8 +732,9 @@ class TestHandleGzippedFileCleanup:
     @patch("activities.activity.utils.core_logger")
     @patch("activities.activity.utils.Path")
     def test_cleanup_on_eof_during_read(self, mock_path_cls, mock_logger, mock_move, mock_tempfile, mock_gzip_open):
-        from activities.activity.utils import handle_gzipped_file
         from fastapi import HTTPException
+
+        from activities.activity.utils import handle_gzipped_file
 
         mock_path_cls.return_value.stem = "activity.fit"
         mock_path_cls.return_value.suffix = ".fit"
@@ -753,8 +759,9 @@ class TestParseFileError:
     @patch("activities.activity.utils.gpx_utils")
     @patch("activities.activity.utils.core_logger")
     def test_raises_500_on_parse_error(self, mock_logger, mock_gpx):
-        from activities.activity.utils import parse_file
         from fastapi import HTTPException
+
+        from activities.activity.utils import parse_file
 
         mock_gpx.parse_gpx_file.side_effect = ValueError("bad data")
 

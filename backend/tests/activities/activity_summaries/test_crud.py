@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
-
 from tests._helpers.db import setup_mock_execute
 from tests._helpers.models import mock_model
 

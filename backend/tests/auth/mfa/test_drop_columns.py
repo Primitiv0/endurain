@@ -12,8 +12,9 @@ Verifies that:
 import contextlib
 from unittest.mock import MagicMock, patch
 
-import auth.mfa.models as auth_mfa_models
 import pytest
+
+import auth.mfa.models as auth_mfa_models
 import users.users.crud as users_crud
 import users.users.models as users_models
 

@@ -7,6 +7,7 @@ construction, and the discriminated-union round-trip.
 from datetime import UTC, datetime
 
 import pytest
+
 from auth.principal import (
     AccessTokenCred,
     AnyCredential,

@@ -1,6 +1,9 @@
 from datetime import UTC, date, datetime
 from typing import Annotated
 
+from fastapi import APIRouter, BackgroundTasks, Depends
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import core.logger as core_logger
@@ -11,8 +14,6 @@ import garmin.schema as garmin_schema
 import garmin.utils as garmin_utils
 import users.users_integrations.crud as user_integrations_crud
 import websocket.manager as websocket_manager
-from fastapi import APIRouter, BackgroundTasks, Depends
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

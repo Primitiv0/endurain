@@ -1,7 +1,8 @@
 """Tests for user_identity_providers.models module."""
 
-from auth.identity_links.models import UsersIdentityProvider
 from sqlalchemy import inspect
+
+from auth.identity_links.models import UsersIdentityProvider
 
 
 class TestUserIdentityProviderModel:

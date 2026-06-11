@@ -1,15 +1,17 @@
 """CRUD operations for MFA backup codes."""
 
 from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import HTTPException, status
+from sqlalchemy import CursorResult, delete, or_, select
+from sqlalchemy.orm import Session
 
 import auth.mfa_backup_codes.models as mfa_backup_codes_models
 import auth.mfa_backup_codes.utils as mfa_backup_codes_utils
 import auth.password_hasher as auth_password_hasher
 import core.decorators as core_decorators
 import core.logger as core_logger
-from fastapi import HTTPException, status
-from sqlalchemy import delete, or_, select
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -29,7 +31,7 @@ def get_user_backup_codes(user_id: int, db: Session) -> list[mfa_backup_codes_mo
     stmt = select(mfa_backup_codes_models.MFABackupCode).where(
         mfa_backup_codes_models.MFABackupCode.user_id == user_id,
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -55,7 +57,7 @@ def get_user_unused_backup_codes(user_id: int, db: Session) -> list[mfa_backup_c
             mfa_backup_codes_models.MFABackupCode.expires_at > now,
         ),
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -160,7 +162,7 @@ def delete_user_backup_codes(user_id: int, db: Session) -> int:
         HTTPException: If a database error occurs.
     """
     stmt = delete(mfa_backup_codes_models.MFABackupCode).where(mfa_backup_codes_models.MFABackupCode.user_id == user_id)
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
 
     num_deleted = result.rowcount or 0

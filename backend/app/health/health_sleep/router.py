@@ -1,6 +1,9 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Query, Security, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import core.dependencies as core_dependencies
@@ -8,8 +11,6 @@ import health.constants as health_constants
 import health.health_sleep.crud as health_sleep_crud
 import health.health_sleep.schema as health_sleep_schema
 import health.health_sleep.sleep_scoring as health_sleep_sleep_scoring
-from fastapi import APIRouter, Depends, Query, Security, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

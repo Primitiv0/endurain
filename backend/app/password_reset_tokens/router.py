@@ -2,12 +2,6 @@
 
 from typing import Annotated
 
-import auth.identity_service as auth_identity_service
-import core.apprise as core_apprise
-import core.database as core_database
-import core.rate_limit as core_rate_limit
-import password_reset_tokens.schema as password_reset_tokens_schema
-import password_reset_tokens.utils as password_reset_tokens_utils
 from fastapi import (
     APIRouter,
     Depends,
@@ -16,6 +10,13 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
+
+import auth.identity_service as auth_identity_service
+import core.apprise as core_apprise
+import core.database as core_database
+import core.rate_limit as core_rate_limit
+import password_reset_tokens.schema as password_reset_tokens_schema
+import password_reset_tokens.utils as password_reset_tokens_utils
 
 # Define the API router
 router = APIRouter()

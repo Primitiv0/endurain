@@ -6,10 +6,11 @@ from threading import Lock
 from typing import NoReturn
 from urllib.parse import unquote
 
+from redis import Redis, RedisError
+
 import core.config as core_config
 import core.logger as core_logger
 import core.redis as core_redis
-from redis import Redis, RedisError
 
 
 class AuthSecurityStoreUnavailableError(RuntimeError):

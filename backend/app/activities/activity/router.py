@@ -10,6 +10,18 @@ from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from typing import Annotated
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Security,
+    UploadFile,
+    status,
+)
+from fastapi.concurrency import run_in_threadpool
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.dependencies as activities_dependencies
 import activities.activity.schema as activities_schema
@@ -25,17 +37,6 @@ import gears.gear.dependencies as gears_dependencies
 import strava.activity_utils as strava_activity_utils
 import users.users.dependencies as users_dependencies
 import websocket.manager as websocket_manager
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-    Security,
-    UploadFile,
-    status,
-)
-from fastapi.concurrency import run_in_threadpool
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -115,7 +116,7 @@ async def read_activities_user_activities_this_week_stats(
     today = datetime.now(UTC)
     start_of_week = today - timedelta(days=today.weekday())
     end_of_week = start_of_week + timedelta(days=6)
-    activities = []
+    activities: list[activities_schema.Activity] | None = None
 
     if user_id == token_user_id:
         # Get all user activities for the requested week if the user is the owner of the token
@@ -157,7 +158,7 @@ async def read_activities_user_activities_this_month_stats(
     today = datetime.now(UTC)
     start_of_month = today.replace(day=1)
     end_of_month = start_of_month.replace(day=calendar.monthrange(today.year, today.month)[1])
-    activities = []
+    activities: list[activities_schema.Activity] | None = None
 
     if user_id == token_user_id:
         # Get all user activities for the requested month if the user is the owner of the token
@@ -779,7 +780,7 @@ async def create_activity_with_bulk_import(
 
         def _log_bulk_import_failure(fut: asyncio.Future) -> None:
             exc = fut.exception()
-            if exc is not None:
+            if exc is not None and isinstance(exc, Exception):
                 core_logger.print_to_log(
                     f"Bulk import background task failed: {exc}",
                     "error",

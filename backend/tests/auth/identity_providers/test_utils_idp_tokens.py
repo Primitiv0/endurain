@@ -7,9 +7,10 @@ including refresh_idp_tokens_if_needed and clear_all_idp_tokens.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import auth.identity_providers.utils as idp_utils
 import pytest
 from sqlalchemy.orm import Session
+
+import auth.identity_providers.utils as idp_utils
 
 
 class TestRefreshIdpTokensIfNeeded:

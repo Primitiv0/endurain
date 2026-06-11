@@ -2,8 +2,9 @@
 
 from typing import NoReturn
 
-import core.logger as core_logger
 from redis import Redis, RedisError
+
+import core.logger as core_logger
 
 DEFAULT_REDIS_SOCKET_TIMEOUT_SECONDS: float = 2.0
 

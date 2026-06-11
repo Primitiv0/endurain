@@ -1,9 +1,10 @@
 from typing import cast
 
+from sqlalchemy.orm import Session
+
 import health.health_weight.crud as health_weight_crud
 import health.health_weight.schema as health_weight_schema
 import users.users.crud as users_crud
-from sqlalchemy.orm import Session
 
 
 def calculate_bmi(

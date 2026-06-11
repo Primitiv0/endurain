@@ -8,9 +8,10 @@ at activity import time and served as static files.
 import re
 from pathlib import Path
 
+from staticmap import CircleMarker, Line, StaticMap
+
 import core.config as core_config
 import core.logger as core_logger
-from staticmap import CircleMarker, Line, StaticMap
 
 # Fallback tile URL used when server settings are unavailable.
 # Uses a fixed subdomain; staticmap does not support {s} rotation.

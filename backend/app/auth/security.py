@@ -10,12 +10,6 @@ to endpoints that accept either auth method.
 from dataclasses import dataclass
 from typing import Annotated
 
-import auth.constants as auth_constants
-import auth.identity_service as auth_identity_service
-import auth.token_manager as auth_token_manager
-import auth.utils as auth_utils
-import core.logger as core_logger
-from auth.principal import AccessTokenCred, Principal
 from fastapi import (
     Depends,
     HTTPException,
@@ -32,6 +26,13 @@ from fastapi.security import (
     SecurityScopes,
 )
 from joserfc.errors import MissingClaimError
+
+import auth.constants as auth_constants
+import auth.identity_service as auth_identity_service
+import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
+import core.logger as core_logger
+from auth.principal import AccessTokenCred, Principal
 
 # Define the OAuth2 scheme for handling bearer tokens
 oauth2_scheme = OAuth2PasswordBearer(

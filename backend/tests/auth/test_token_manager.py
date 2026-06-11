@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import auth.token_manager as auth_token_manager
 import pytest
 from fastapi import HTTPException
 from joserfc.errors import (
@@ -10,6 +9,8 @@ from joserfc.errors import (
     InvalidTokenError,
     MissingClaimError,
 )
+
+import auth.token_manager as auth_token_manager
 from users.users.schema import UserAccessType, UsersRead
 
 

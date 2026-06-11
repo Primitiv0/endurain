@@ -63,8 +63,9 @@ class TestServeFrom:
         assert result is None
 
     def test_returns_file_response_for_valid_path(self, tmp_path):
-        from core.utils import _serve_from
         from fastapi.responses import FileResponse
+
+        from core.utils import _serve_from
 
         child = tmp_path / "valid.txt"
         child.write_text("hello")

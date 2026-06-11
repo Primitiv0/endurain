@@ -8,11 +8,12 @@ including retrieval and update operations.
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+
 import server_settings.crud as server_settings_crud
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetServerSettings:

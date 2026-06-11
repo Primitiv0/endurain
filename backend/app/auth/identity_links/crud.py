@@ -2,11 +2,12 @@
 
 from datetime import UTC, datetime
 
-import auth.identity_links.models as user_idp_models
-import core.decorators as core_decorators
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
+
+import auth.identity_links.models as user_idp_models
+import core.decorators as core_decorators
 
 
 @core_decorators.handle_db_errors

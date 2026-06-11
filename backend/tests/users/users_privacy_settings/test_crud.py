@@ -1,11 +1,12 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 import users.users_privacy_settings.models as users_privacy_settings_models
 import users.users_privacy_settings.schema as users_privacy_settings_schema
-from fastapi import HTTPException, status
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 
 class TestGetUserPrivacySettingsByUserId:

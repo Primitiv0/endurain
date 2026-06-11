@@ -6,13 +6,17 @@ from math import isfinite
 from pathlib import Path
 from typing import TypedDict
 
+import gpxpy
+import gpxpy.gpx
+from fastapi import HTTPException, status
+from geopy.distance import geodesic
+from sqlalchemy.orm import Session
+
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
-import gpxpy
-import gpxpy.gpx
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
 
@@ -22,9 +26,6 @@ from activities.activity_file_import.utils import (
     LapMetrics,
     generate_activity_laps,
 )
-from fastapi import HTTPException, status
-from geopy.distance import geodesic
-from sqlalchemy.orm import Session
 
 # ISO 8601 datetime format used throughout this module
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"
@@ -359,13 +360,14 @@ def _process_trackpoint(
             state.country = location_data["country"]
             state.location_resolved = True
 
-    heart_rate, cadence, power = _extract_extension_data(point)
+    heart_rate, cadence, raw_power = _extract_extension_data(point)
+    power: int | None = raw_power
 
     if heart_rate != 0:
         state.is_heart_rate_set = True
     if cadence != 0:
         state.is_cadence_set = True
-    if power != 0:
+    if raw_power != 0:
         state.is_power_set = True
     else:
         power = None
@@ -379,7 +381,7 @@ def _process_trackpoint(
         state.prev_longitude,
     )
 
-    instant_pace = 0
+    instant_pace: float = 0
     if instant_speed > 0:
         instant_pace = 1 / instant_speed
         state.is_velocity_set = True
@@ -469,7 +471,7 @@ def _compute_derived_metrics(
     )
 
     state.activity_type = activities_utils.define_activity_type(
-        state.activity_type,
+        str(state.activity_type),
     )
 
     state.gear_id = user_default_gear_utils.get_user_default_gear_by_activity_type(
@@ -535,13 +537,18 @@ def _build_activity_schema(
         Populated Activity schema instance.
     """
     privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(user_privacy_settings)
+    if state.first_waypoint_time is None or state.last_waypoint_time is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Missing waypoint timestamps in GPX parse state",
+        )
     elapsed = (state.last_waypoint_time - state.first_waypoint_time).total_seconds()
     return activities_schema.Activity(
         user_id=user_id,
         name=state.activity_name,
         description=state.activity_description,
         distance=round(state.distance) if state.distance else 0,
-        activity_type=state.activity_type,
+        activity_type=int(state.activity_type),
         start_time=state.first_waypoint_time.strftime(_DT_FMT),
         end_time=state.last_waypoint_time.strftime(_DT_FMT),
         timezone=state.timezone,
@@ -662,16 +669,23 @@ def parse_gpx_file(
                 )
             )
 
-        waypoints = {
-            "ele_waypoints": state.ele_waypoints,
-            "power_waypoints": state.power_waypoints,
-            "hr_waypoints": state.hr_waypoints,
-            "vel_waypoints": state.vel_waypoints,
-            "pace_waypoints": state.pace_waypoints,
-            "cad_waypoints": state.cad_waypoints,
-            "lat_lon_waypoints": state.lat_lon_waypoints,
-        }
-        return ParsedGpxData(**activity_file_import_utils.build_activity_file_payload(activity, waypoints, laps))
+        return ParsedGpxData(
+            activity=activity,
+            is_elevation_set=bool(state.ele_waypoints),
+            ele_waypoints=state.ele_waypoints,
+            is_power_set=bool(state.power_waypoints),
+            power_waypoints=state.power_waypoints,
+            is_heart_rate_set=bool(state.hr_waypoints),
+            hr_waypoints=state.hr_waypoints,
+            is_velocity_set=bool(state.vel_waypoints),
+            vel_waypoints=state.vel_waypoints,
+            pace_waypoints=state.pace_waypoints,
+            is_cadence_set=bool(state.cad_waypoints),
+            cad_waypoints=state.cad_waypoints,
+            is_lat_lon_set=bool(state.lat_lon_waypoints),
+            lat_lon_waypoints=state.lat_lon_waypoints,
+            laps=laps,
+        )
 
     except HTTPException as http_err:
         raise http_err

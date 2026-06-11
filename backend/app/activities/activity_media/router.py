@@ -5,6 +5,9 @@ from collections.abc import Callable
 from pathlib import PurePosixPath
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Security, UploadFile, status
+from sqlalchemy.orm import Session
+
 import activities.activity.dependencies as activities_dependencies
 import activities.activity_media.crud as activity_media_crud
 import activities.activity_media.dependencies as activities_media_dependencies
@@ -13,8 +16,6 @@ import auth.dependencies as auth_dependencies
 import core.config as core_config
 import core.database as core_database
 import core.file_uploads as core_file_uploads
-from fastapi import APIRouter, Depends, HTTPException, Security, UploadFile, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

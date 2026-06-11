@@ -1,7 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-import health.health_targets.models as health_targets_models
 from fastapi import HTTPException, status
+
+import health.health_targets.models as health_targets_models
 
 
 class TestReadHealthTargetsAll:

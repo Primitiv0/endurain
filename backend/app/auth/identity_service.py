@@ -32,6 +32,10 @@ import hmac
 from datetime import UTC, datetime
 from typing import Annotated, Protocol, runtime_checkable
 
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 import auth.api_keys.crud as users_api_keys_crud
 import auth.api_keys.utils as users_api_keys_utils
 import auth.identity_links.crud as auth_identity_links_crud
@@ -51,9 +55,6 @@ from auth.principal import (
     Principal,
     SessionCookieCred,
 )
-from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 __all__ = [
     "DefaultIdentityService",

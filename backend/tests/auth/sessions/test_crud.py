@@ -1,13 +1,14 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+
 import auth.sessions.crud as users_session_crud
 import auth.sessions.models as _auth_sessions_models
 import auth.sessions.models as users_session_models
 import auth.sessions.schema as users_session_schema
-import pytest
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetUserSessions:

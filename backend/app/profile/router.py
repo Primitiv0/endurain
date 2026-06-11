@@ -19,6 +19,18 @@ import profile.utils as profile_utils
 from datetime import UTC, datetime
 from typing import Annotated
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import auth.identity_links.crud as user_idp_crud
 import auth.identity_links.schema as user_idp_schema
@@ -44,17 +56,6 @@ import users.users_integrations.crud as user_integrations_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 import users.users_privacy_settings.schema as users_privacy_settings_schema
 import websocket.manager as websocket_manager
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Request,
-    Response,
-    UploadFile,
-    status,
-)
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

@@ -2,11 +2,12 @@
 
 from unittest.mock import MagicMock, patch
 
-import core.decorators as core_decorators
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+
+import core.decorators as core_decorators
 
 
 class TestHandleDbErrors:

@@ -14,9 +14,10 @@ import threading
 import time
 from urllib.parse import urlparse
 
+from fastapi import HTTPException, Request, status
+
 import core.config as core_config
 import core.logger as core_logger
-from fastapi import HTTPException, Request, status
 
 _TRUSTED_PROXY_HOSTNAME_REFRESH_SECONDS = 60.0
 _trusted_proxy_hostname_refresh_lock = threading.Lock()
@@ -83,7 +84,7 @@ def _resolve_hostname(hostname: str) -> list[str]:
     """
     try:
         infos = socket.getaddrinfo(hostname, None)
-        ips = [info[4][0] for info in infos]
+        ips = [str(info[4][0]) for info in infos]
         # Deduplicate while preserving order
         seen: set[str] = set()
         unique_ips = []

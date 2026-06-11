@@ -2,10 +2,11 @@
 
 from unittest.mock import MagicMock, patch
 
-import auth.identity_providers.models as idp_models
-import auth.identity_providers.public_router as public_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+import auth.identity_providers.models as idp_models
+import auth.identity_providers.public_router as public_router
 
 
 def _build_app() -> TestClient:

@@ -11,14 +11,15 @@ from fnmatch import fnmatch
 from threading import Event, Thread
 from types import SimpleNamespace
 
-import auth.router as auth_router
-import auth.schema as auth_schema
-import auth.security_stores as auth_security_stores
-import core.redis as core_redis
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
 from redis import RedisError
+
+import auth.router as auth_router
+import auth.schema as auth_schema
+import auth.security_stores as auth_security_stores
+import core.redis as core_redis
 
 
 class FakeRedis:

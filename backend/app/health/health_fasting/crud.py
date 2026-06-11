@@ -5,15 +5,18 @@ This module provides database operations for creating, reading, updating,
 and deleting fasting session records.
 """
 
+from typing import Any
+
+from fastapi import HTTPException, status
+from sqlalchemy import CursorResult, desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 import core.decorators as core_decorators
 import health.constants as health_constants
 import health.health_fasting.models as health_fasting_models
 import health.health_fasting.schema as health_fasting_schema
 import health.utils as health_utils
-from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -119,7 +122,7 @@ def get_health_fasting_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -197,7 +200,7 @@ def get_total_fasting_seconds(user_id: int, db: Session) -> int:
             health_fasting_models.HealthFasting.status == "completed",
         )
     )
-    return db.execute(stmt).scalar_one()
+    return db.execute(stmt).scalar_one() or 0
 
 
 @core_decorators.handle_db_errors
@@ -223,7 +226,7 @@ def get_avg_fasting_duration(user_id: int, db: Session) -> int | None:
             health_fasting_models.HealthFasting.status == "completed",
         )
     )
-    result = db.execute(stmt).scalar_one()
+    result: CursorResult[Any] = db.execute(stmt).scalar_one()
     return int(result) if result else None
 
 
@@ -252,7 +255,7 @@ def get_completed_fasting_ordered_by_date_and_user_id(
         )
         .order_by(health_fasting_models.HealthFasting.fast_start_time)
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors

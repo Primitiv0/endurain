@@ -1,9 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import auth.sessions.rotated_refresh_tokens.models as rotated_token_models
 import auth.sessions.rotated_refresh_tokens.utils as rotated_token_utils
-import pytest
 
 
 class TestHmacHashToken:

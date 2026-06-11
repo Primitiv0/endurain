@@ -4,8 +4,9 @@ import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import sign_up_tokens.utils as sign_up_tokens_utils
 from fastapi import HTTPException, status
+
+import sign_up_tokens.utils as sign_up_tokens_utils
 
 
 def _make_email_service(configured: bool = True) -> MagicMock:

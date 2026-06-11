@@ -2,9 +2,10 @@
 
 from urllib.parse import unquote
 
+from sqlalchemy import func
+
 import gears.gear.models as gears_models
 import gears.gear.schema as gears_schema
-from sqlalchemy import func
 
 # Global gear type integer to gear name mapping (ID to name)
 GEAR_ID_TO_NAME = {

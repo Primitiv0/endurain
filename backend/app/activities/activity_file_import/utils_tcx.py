@@ -2,16 +2,17 @@
 
 from typing import Any
 
+import tcxreader
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
-import tcxreader
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
 
 def _parse_lap_power(

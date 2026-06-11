@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import core.text_imports as core_text_imports
 import pytest
 from fastapi import HTTPException
+
+import core.text_imports as core_text_imports
 
 
 def _write_csv(path: Path, rows: int, header: str = "name,value") -> None:

@@ -8,12 +8,6 @@ records, including CRUD operations with pagination and filtering.
 from collections.abc import Callable
 from typing import Annotated
 
-import auth.dependencies as auth_dependencies
-import core.database as core_database
-import core.dependencies as core_dependencies
-import health.constants as health_constants
-import health.health_water.crud as health_water_crud
-import health.health_water.schema as health_water_schema
 from fastapi import (
     APIRouter,
     Depends,
@@ -23,6 +17,13 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
+
+import auth.dependencies as auth_dependencies
+import core.database as core_database
+import core.dependencies as core_dependencies
+import health.constants as health_constants
+import health.health_water.crud as health_water_crud
+import health.health_water.schema as health_water_schema
 
 # Define the API router
 router = APIRouter()

@@ -1,11 +1,12 @@
 """CRUD operations for user goals."""
 
-import core.decorators as core_decorators
-import users.users_goals.models as user_goals_models
-import users.users_goals.schema as user_goals_schema
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+import core.decorators as core_decorators
+import users.users_goals.models as user_goals_models
+import users.users_goals.schema as user_goals_schema
 
 
 @core_decorators.handle_db_errors
@@ -41,7 +42,7 @@ def get_user_goals_by_user_id(
     if goal_type is not None:
         stmt = stmt.where(user_goals_models.UsersGoal.goal_type == goal_type.value)
 
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors

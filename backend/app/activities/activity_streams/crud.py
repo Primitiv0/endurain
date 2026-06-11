@@ -1,5 +1,10 @@
 """CRUD operations for activity stream data."""
 
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
 import activities.activity_streams.models as activity_streams_models
@@ -7,10 +12,6 @@ import activities.activity_streams.schema as activity_streams_schema
 import activities.activity_streams.utils as activity_streams_utils
 import core.logger as core_logger
 import server_settings.utils as server_settings_utils
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 
 def get_activity_streams(

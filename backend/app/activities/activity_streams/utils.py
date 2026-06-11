@@ -2,13 +2,14 @@
 
 import datetime
 
+import numpy as np
+from sqlalchemy.orm import Session
+
 import activities.activity.models as activity_models
 import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.models as activity_streams_models
 import activities.activity_streams.schema as activity_streams_schema
-import numpy as np
 import users.users.crud as users_crud
-from sqlalchemy.orm import Session
 
 # Map stream type to activity hide attribute
 _STREAM_HIDE_MAP: dict[int, str] = {

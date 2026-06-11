@@ -1,6 +1,9 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+import garminconnect
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
@@ -8,13 +11,11 @@ import core.config as core_config
 import core.file_uploads as file_uploads
 import core.logger as core_logger
 import garmin.utils as garmin_utils
-import garminconnect
 import notifications.utils as notifications_utils
 import users.users.crud as users_crud
 import users.users_integrations.crud as user_integrations_crud
 import websocket.manager as websocket_manager
 from core.database import SessionLocal
-from sqlalchemy.orm import Session
 
 
 async def fetch_and_process_activities_by_dates(
@@ -59,7 +60,7 @@ async def fetch_and_process_activities_by_dates(
         # Return 0 to indicate no activities were processed
         return None
 
-    parsed_activities = []
+    parsed_activities: list[activities_schema.Activity] = []
 
     # Download activities
     for activity in garmin_activities:

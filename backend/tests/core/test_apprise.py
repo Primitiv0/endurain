@@ -3,8 +3,9 @@
 import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import core.apprise as core_apprise
 import pytest
+
+import core.apprise as core_apprise
 
 
 class TestAppriseServiceInit:

@@ -6,8 +6,9 @@ including validation rules and field constraints.
 """
 
 import pytest
-import server_settings.schema as server_settings_schema
 from pydantic import ValidationError
+
+import server_settings.schema as server_settings_schema
 
 
 class TestUnitsEnum:

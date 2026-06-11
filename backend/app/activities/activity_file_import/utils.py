@@ -5,12 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TypedDict
 
+from geopy.distance import geodesic
+from timezonefinder import TimezoneFinder
+
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
 import users.users_privacy_settings.utils as users_privacy_settings_utils
-from geopy.distance import geodesic
-from timezonefinder import TimezoneFinder
 
 # ISO 8601 datetime format used throughout the import pipeline
 _DT_FMT = "%Y-%m-%dT%H:%M:%S"

@@ -1,8 +1,9 @@
 from datetime import date as datetime_date
 from unittest.mock import ANY, MagicMock, patch
 
-import health.health_steps.models as health_steps_models
 from fastapi import HTTPException, status
+
+import health.health_steps.models as health_steps_models
 
 
 class TestReadHealthStepsAll:

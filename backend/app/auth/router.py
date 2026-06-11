@@ -3,6 +3,18 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Annotated
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+
 import auth.identity_providers.utils as idp_utils
 import auth.password_hasher as auth_password_hasher
 import auth.schema as auth_schema
@@ -18,17 +30,6 @@ import core.logger as core_logger
 import core.rate_limit as core_rate_limit
 import users.users.crud as users_crud
 import users.users.utils as users_utils
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    Response,
-    status,
-)
-from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

@@ -2,6 +2,15 @@
 
 from typing import Annotated
 
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Request,
+    status,
+)
+from sqlalchemy.orm import Session
+
 import auth.identity_service as auth_identity_service
 import core.apprise as core_apprise
 import core.database as core_database
@@ -14,14 +23,6 @@ import users.users.crud as users_crud
 import users.users.schema as users_schema
 import users.users.utils as users_utils
 import websocket.manager as websocket_manager
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Request,
-    status,
-)
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()
@@ -48,7 +49,7 @@ async def signup(
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> sign_up_tokens_schema.SignUpResponse:
     """
     Handle user sign-up request.
 
@@ -126,7 +127,7 @@ async def verify_email(
         Session,
         Depends(core_database.get_db),
     ],
-):
+) -> sign_up_tokens_schema.SignUpResponse:
     """
     Verify user email via sign-up token.
 

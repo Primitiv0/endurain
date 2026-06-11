@@ -2,20 +2,13 @@
 
 from collections import defaultdict
 from datetime import UTC, date, datetime
+from typing import Any
 from urllib.parse import unquote
 
-import activities.activity.models as activities_models
-import activities.activity.schema as activities_schema
-import activities.activity.utils as activities_utils
-import core.logger as core_logger
-import core.sanitization as core_sanitization
-import followers.models as followers_models
-import notifications.utils as notifications_utils
-import server_settings.utils as server_settings_utils
-import websocket.manager as websocket_manager
 from fastapi import HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import (
+    CursorResult,
     and_,
     desc,
     func,
@@ -30,6 +23,16 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
+import activities.activity.models as activities_models
+import activities.activity.schema as activities_schema
+import activities.activity.utils as activities_utils
+import core.logger as core_logger
+import core.sanitization as core_sanitization
+import followers.models as followers_models
+import notifications.utils as notifications_utils
+import server_settings.utils as server_settings_utils
+import websocket.manager as websocket_manager
 
 # Mapping from frontend sort keys to model columns
 SORT_MAP = {
@@ -405,7 +408,7 @@ def get_user_activities_with_pagination(
             order_cols = [col.asc() if sort_ascending else col.desc() for col in location_cols]
             stmt = stmt.order_by(*order_cols)
         else:
-            sort_column = SORT_MAP.get(sort_by, activities_models.Activity.start_time)
+            sort_column = SORT_MAP.get(sort_by or "", activities_models.Activity.start_time)
             if sort_column in _NUMERIC_SORT_COLUMNS:
                 ordered = func.coalesce(sort_column, -999999)
                 stmt = stmt.order_by(ordered.asc() if sort_ascending else ordered.desc())
@@ -1176,7 +1179,7 @@ async def create_activity(
 
 def set_activity_thumbnail_path(
     activity_id: int,
-    thumbnail_path: str,
+    thumbnail_path: str | None,
     db: Session,
 ) -> None:
     """Set the map thumbnail path for an activity.
@@ -1359,7 +1362,7 @@ def edit_user_activities_visibility(user_id: int, visibility: int, db: Session) 
             .where(activities_models.Activity.user_id == user_id)
             .values(visibility=visibility)
         )
-        result = db.execute(stmt)
+        result: CursorResult[Any] = db.execute(stmt)
         db.commit()
         return result.rowcount or 0
     except SQLAlchemyError as err:
@@ -1409,7 +1412,7 @@ def bulk_set_activities_gear_id(
                 )
                 .values(gear_id=gear_id)
             )
-            result = db.execute(stmt)
+            result: CursorResult[Any] = db.execute(stmt)
             total += result.rowcount or 0
         db.commit()
         return total
@@ -1470,7 +1473,7 @@ def delete_activity(activity_id: int, db: Session) -> None:
     """
     try:
         stmt = sa_delete(activities_models.Activity).where(activities_models.Activity.id == activity_id)
-        result = db.execute(stmt)
+        result: CursorResult[Any] = db.execute(stmt)
         if result.rowcount == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1503,7 +1506,7 @@ def delete_all_strava_activities_for_user(user_id: int, db: Session) -> int:
             activities_models.Activity.user_id == user_id,
             activities_models.Activity.strava_activity_id.isnot(None),
         )
-        result = db.execute(stmt)
+        result: CursorResult[Any] = db.execute(stmt)
         if result.rowcount:
             db.commit()
         return result.rowcount or 0

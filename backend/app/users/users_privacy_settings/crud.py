@@ -1,12 +1,13 @@
 """CRUD operations for user privacy settings."""
 
-import core.decorators as core_decorators
-import users.users_privacy_settings.models as users_privacy_settings_models
-import users.users_privacy_settings.schema as users_privacy_settings_schema
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+import core.decorators as core_decorators
+import users.users_privacy_settings.models as users_privacy_settings_models
+import users.users_privacy_settings.schema as users_privacy_settings_schema
 
 
 @core_decorators.handle_db_errors

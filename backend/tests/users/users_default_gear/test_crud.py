@@ -7,12 +7,13 @@ This module tests CRUD operations for user default gear.
 from unittest.mock import MagicMock, patch
 
 import pytest
-import users.users_default_gear.crud as user_default_gear_crud
-import users.users_default_gear.models as user_default_gear_models
-import users.users_default_gear.schema as user_default_gear_schema
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
+import users.users_default_gear.crud as user_default_gear_crud
+import users.users_default_gear.models as user_default_gear_models
+import users.users_default_gear.schema as user_default_gear_schema
 
 
 @pytest.fixture

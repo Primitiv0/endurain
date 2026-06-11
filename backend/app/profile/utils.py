@@ -21,15 +21,16 @@ from profile.exceptions import (
 )
 from typing import Any, TypeVar
 
-import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
-import core.cryptography as core_cryptography
-import core.logger as core_logger
 import psutil
 import pyotp
 import qrcode
-import users.users.crud as users_crud
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
+
+import auth.mfa_backup_codes.crud as mfa_backup_codes_crud
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import users.users.crud as users_crud
 
 # Type variable for performance config classes
 T_PerformanceConfig = TypeVar("T_PerformanceConfig", bound="BasePerformanceConfig")
@@ -393,7 +394,7 @@ def sqlalchemy_obj_to_dict(obj: Any) -> dict[str, Any]:
 def write_json_to_zip(
     zipf: zipfile.ZipFile,
     filename: str,
-    data: dict,
+    data: dict | list[Any],
     counts: dict,
     ensure_ascii: bool = False,
 ) -> None:
@@ -497,7 +498,7 @@ def check_memory_usage(
     is_memory_intensive = any(op in operation.lower() for op in memory_intensive_operations)
 
     # Use a higher threshold for memory-intensive operations
-    effective_limit = max_memory_mb
+    effective_limit: float = max_memory_mb
     if is_memory_intensive:
         effective_limit = max_memory_mb * 1.5  # Allow 50% more for intensive ops
 

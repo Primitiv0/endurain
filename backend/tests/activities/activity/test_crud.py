@@ -1,9 +1,9 @@
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
-
 from tests._helpers.db import setup_mock_execute
 from tests._helpers.models import mock_model
 
@@ -244,7 +244,7 @@ class TestCreateActivity:
         mock_transform.return_value = m
         a = MagicMock()
         a.user_id = 1
-        a.start_time = None
+        a.start_time = datetime.now(UTC)
         a.is_hidden = False
         await crud.create_activity(activity=a, websocket_manager=MagicMock(), db=mock_db)
         assert a.is_hidden is True
@@ -270,8 +270,9 @@ class TestCreateActivity:
 class TestEditActivity:
     @patch("activities.activity.crud.activities_utils.serialize_activity")
     def test_success(self, mock_ser, mock_db):
-        import activities.activity.crud as crud
         from pydantic import BaseModel
+
+        import activities.activity.crud as crud
 
         db_act = MagicMock()
         db_act.id = 1
@@ -286,8 +287,9 @@ class TestEditActivity:
         assert r is not None
 
     def test_not_found(self, mock_db):
-        import activities.activity.crud as crud
         from pydantic import BaseModel
+
+        import activities.activity.crud as crud
 
         setup_mock_execute(mock_db, return_one_or_none=None)
 
@@ -323,8 +325,9 @@ class TestEditActivity:
         assert mock_sanitize.call_count == 2
 
     def test_db_error(self, mock_db):
-        import activities.activity.crud as crud
         from pydantic import BaseModel
+
+        import activities.activity.crud as crud
 
         db_act = MagicMock()
         db_act.id = 1

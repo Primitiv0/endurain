@@ -3,6 +3,8 @@
 from unittest.mock import patch
 
 import pytest
+from fastapi import HTTPException
+
 from auth.identity_providers.schema import IdentityProviderTemplate
 from auth.identity_providers.utils import (
     _secure_compare,
@@ -12,7 +14,6 @@ from auth.identity_providers.utils import (
     validate_pkce_verifier,
     validate_redirect_url,
 )
-from fastapi import HTTPException
 
 
 class TestValidatePkceChallenge:

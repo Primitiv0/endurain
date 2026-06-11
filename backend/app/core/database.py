@@ -4,7 +4,6 @@ import os
 from collections.abc import Generator
 from datetime import datetime
 
-import core.config as core_config
 from sqlalchemy import DateTime, create_engine, func
 from sqlalchemy.engine.url import URL
 from sqlalchemy.orm import (
@@ -14,6 +13,8 @@ from sqlalchemy.orm import (
     mapped_column,
     sessionmaker,
 )
+
+import core.config as core_config
 
 # Resolve and validate the database password before
 # building the connection URL so the failure mode is a

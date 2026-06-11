@@ -3,11 +3,12 @@
 import profile.browser_redirect_router as profile_browser_redirect_router
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import core.config as core_config
-import core.database as core_database
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+import core.config as core_config
+import core.database as core_database
 
 
 class TestLinkIdentityProvider:

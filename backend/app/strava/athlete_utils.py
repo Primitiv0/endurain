@@ -1,6 +1,7 @@
-import core.logger as core_logger
 from fastapi import HTTPException, status
 from stravalib.client import Client
+
+import core.logger as core_logger
 
 
 def get_strava_athlete(strava_client: Client):

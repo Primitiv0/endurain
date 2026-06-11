@@ -8,10 +8,11 @@ including settings retrieval and tile map templates.
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException, status
+
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
-from fastapi import HTTPException, status
 
 
 class TestGetServerSettings:

@@ -7,25 +7,7 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
-import auth.identity_links.crud as user_idp_crud
-import auth.identity_links.models as user_idp_models
-import auth.identity_links.utils as user_idp_utils
-import auth.identity_providers.crud as idp_crud
-import auth.identity_providers.models as idp_models
-import auth.oauth_state.crud as oauth_state_crud
-import auth.oauth_state.models as oauth_state_models
-import auth.password_hasher as auth_password_hasher
-import core.config as core_config
-import core.cryptography as core_cryptography
-import core.logger as core_logger
-import core.network as core_network
 import httpx
-import server_settings.schema as server_settings_schema
-import server_settings.utils as server_settings_utils
-import users.users.crud as users_crud
-import users.users.models as users_models
-import users.users.schema as users_schema
-import users.users.utils as users_utils
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from fastapi import HTTPException, Request, status
 from joserfc import jwt
@@ -38,6 +20,25 @@ from joserfc.errors import (
 )
 from joserfc.jwk import ECKey, OctKey, RSAKey
 from sqlalchemy.orm import Session
+
+import auth.identity_links.crud as user_idp_crud
+import auth.identity_links.models as user_idp_models
+import auth.identity_links.utils as user_idp_utils
+import auth.identity_providers.crud as idp_crud
+import auth.identity_providers.models as idp_models
+import auth.oauth_state.crud as oauth_state_crud
+import auth.oauth_state.models as oauth_state_models
+import auth.password_hasher as auth_password_hasher
+import core.config as core_config
+import core.cryptography as core_cryptography
+import core.logger as core_logger
+import core.network as core_network
+import server_settings.schema as server_settings_schema
+import server_settings.utils as server_settings_utils
+import users.users.crud as users_crud
+import users.users.models as users_models
+import users.users.schema as users_schema
+import users.users.utils as users_utils
 
 # Constants for token rotation policy
 MAX_IDP_TOKEN_AGE_DAYS = 90

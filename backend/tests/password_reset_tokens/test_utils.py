@@ -3,10 +3,11 @@
 import hashlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import password_reset_tokens.utils as password_reset_tokens_utils
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
+
+import password_reset_tokens.utils as password_reset_tokens_utils
 
 
 class TestUsePasswordResetToken:

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
 from users.users_integrations import crud as user_integrations_crud
 from users.users_integrations.models import UsersIntegrations
 

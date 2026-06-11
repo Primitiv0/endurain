@@ -3,14 +3,15 @@
 import uuid
 from datetime import UTC, datetime
 
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 import auth.api_keys.models as api_keys_models
 import auth.api_keys.schema as api_keys_schema
 import auth.api_keys.utils as api_keys_utils
 import core.decorators as core_decorators
 import core.logger as core_logger
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors

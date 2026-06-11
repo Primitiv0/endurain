@@ -1,12 +1,13 @@
 """CRUD operations for user default gear."""
 
-import core.decorators as core_decorators
-import users.users_default_gear.models as user_default_gear_models
-import users.users_default_gear.schema as user_default_gear_schema
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+import core.decorators as core_decorators
+import users.users_default_gear.models as user_default_gear_models
+import users.users_default_gear.schema as user_default_gear_schema
 
 
 @core_decorators.handle_db_errors

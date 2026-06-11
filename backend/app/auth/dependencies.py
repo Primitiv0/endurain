@@ -11,11 +11,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
+from fastapi import Depends, HTTPException, Query, Request, WebSocket, status
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer, SecurityScopes
+
 import auth.constants as auth_constants
 import auth.identity_service as auth_identity_service
 import core.logger as core_logger
-from fastapi import Depends, HTTPException, Query, Request, WebSocket, status
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer, SecurityScopes
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login",

@@ -1,5 +1,9 @@
 import os
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from stravalib.client import Client
+
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activities_schema
 import core.config as core_config
@@ -12,9 +16,6 @@ import strava.athlete_utils as strava_athlete_utils
 import strava.utils as strava_utils
 import users.users_integrations.crud as user_integrations_crud
 from core.database import SessionLocal
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from stravalib.client import Client
 
 
 def get_strava_gear(gear_id: str, strava_client: Client):

@@ -4,6 +4,12 @@ import hashlib
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from fastapi import (
+    HTTPException,
+    status,
+)
+from sqlalchemy.orm import Session
+
 import core.apprise as core_apprise
 import core.i18n as core_i18n
 import core.logger as core_logger
@@ -14,11 +20,6 @@ import users.users.crud as users_crud
 import users.users.models as users_models
 import users.users.utils as users_utils
 from core.database import SessionLocal
-from fastapi import (
-    HTTPException,
-    status,
-)
-from sqlalchemy.orm import Session
 
 
 def create_sign_up_token(user_id: int, db: Session) -> str:

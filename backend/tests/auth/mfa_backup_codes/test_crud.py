@@ -2,12 +2,13 @@
 
 from unittest.mock import MagicMock, patch
 
-import auth.mfa_backup_codes.crud as backup_crud
-import auth.mfa_backup_codes.models as backup_models
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import operators
+
+import auth.mfa_backup_codes.crud as backup_crud
+import auth.mfa_backup_codes.models as backup_models
 
 
 class TestGetUserBackupCodes:

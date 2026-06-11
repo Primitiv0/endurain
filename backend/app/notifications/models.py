@@ -3,10 +3,11 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from core.database import Base
 from sqlalchemy import JSON, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+
+from core.database import Base
 
 if TYPE_CHECKING:
     from users.users.models import Users

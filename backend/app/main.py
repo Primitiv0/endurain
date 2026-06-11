@@ -2,14 +2,21 @@ import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-from alembic import command
 from alembic.config import Config
+
+from alembic import command
 
 # Silence stravalib token warnings as early as
 # possible: this env var is consulted at import time by
 # stravalib, so it must be set before any module that
 # transitively imports it runs.
 os.environ["SILENCE_TOKEN_WARNINGS"] = "TRUE"
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from slowapi.middleware import SlowAPIMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 import activities.activity.utils as activities_utils
 import auth.idp_link_tokens.utils as idp_link_token_utils
@@ -35,11 +42,6 @@ import strava.utils as strava_utils
 from core.database import SessionLocal
 from core.database import engine as core_db_engine
 from core.routes import router as api_router
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from slowapi.middleware import SlowAPIMiddleware
-from starlette.middleware.sessions import SessionMiddleware
 
 _DEPLOYED_ENVIRONMENTS = {"production", "demo"}
 

@@ -15,8 +15,9 @@ import os
 from collections.abc import Iterator
 from pathlib import Path
 
-import core.logger as core_logger
 from fastapi import HTTPException, status
+
+import core.logger as core_logger
 
 # Hard ceiling on a single CSV file size and row count. Strava
 # exports of bikes/shoes are tiny in practice (kilobytes / dozens of

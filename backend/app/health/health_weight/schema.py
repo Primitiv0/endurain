@@ -1,7 +1,6 @@
 from datetime import date as datetime_date
 from enum import Enum
 
-import health.schema as health_schema
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -10,6 +9,8 @@ from pydantic import (
     StrictInt,
     model_validator,
 )
+
+import health.schema as health_schema
 
 
 class Source(Enum):

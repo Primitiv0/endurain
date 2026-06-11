@@ -4,9 +4,10 @@ import ipaddress
 import socket
 from unittest.mock import MagicMock, patch
 
-import core.network as core_network
 import pytest
 from fastapi import HTTPException, Request
+
+import core.network as core_network
 
 
 class TestIsValidHostname:

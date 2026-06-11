@@ -1,10 +1,11 @@
 """Migration 5: prefix photo and media paths with '/app/backend/'."""
 
+from sqlalchemy.orm import Session
+
 import activities.activity_media.crud as activity_media_crud
 import core.logger as core_logger
 import migrations.crud as migrations_crud
 import users.users.crud as user_crud
-from sqlalchemy.orm import Session
 
 
 async def process_migration_5(db: Session) -> None:

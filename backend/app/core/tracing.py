@@ -55,6 +55,7 @@ def setup_tracing(app: FastAPI) -> None:
         f"{os.environ.get('JAEGER_PORT', '4317')}"
     )
     resource = Resource.create({"service.name": "backend_api"})
-    trace.set_tracer_provider(TracerProvider(resource=resource))
-    trace.get_tracer_provider().add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
+    provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(provider)
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint)))
     FastAPIInstrumentor.instrument_app(app)

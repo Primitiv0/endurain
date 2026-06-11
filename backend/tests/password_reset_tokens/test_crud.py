@@ -4,13 +4,14 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-import password_reset_tokens.crud as password_reset_tokens_crud
-import password_reset_tokens.models as password_reset_tokens_models
-import password_reset_tokens.schema as password_reset_tokens_schema
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import operators
+
+import password_reset_tokens.crud as password_reset_tokens_crud
+import password_reset_tokens.models as password_reset_tokens_models
+import password_reset_tokens.schema as password_reset_tokens_schema
 
 
 class TestClaimPasswordResetToken:

@@ -1,14 +1,16 @@
+from typing import Any
 from urllib.parse import urlparse
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 import core.cryptography as core_cryptography
 import core.logger as core_logger
 import server_settings.crud as server_settings_crud
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
-TILE_MAPS_TEMPLATES = {
+TILE_MAPS_TEMPLATES: dict[str, dict[str, Any]] = {
     "openstreetmap": {
         "name": "OpenStreetMap",
         "url_template": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -114,7 +116,7 @@ def get_tile_maps_templates() -> list[server_settings_schema.TileMapsTemplate]:
         list[server_settings_schema.TileMapsTemplate]:
             A list of TileMapsTemplate objects for all tile maps.
     """
-    templates = []
+    templates: list[server_settings_schema.TileMapsTemplate] = []
     for template_id, template_data in TILE_MAPS_TEMPLATES.items():
         templates.append(server_settings_schema.TileMapsTemplate(template_id=template_id, **template_data))
     return templates

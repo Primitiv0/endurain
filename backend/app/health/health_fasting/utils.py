@@ -1,7 +1,8 @@
 from datetime import date, timedelta
 
-import health.health_fasting.crud as health_fasting_crud
 from sqlalchemy.orm import Session
+
+import health.health_fasting.crud as health_fasting_crud
 
 
 def calculate_streaks(user_id: int, db: Session) -> tuple[int, int]:

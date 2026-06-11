@@ -1,5 +1,10 @@
 """CRUD operations for activity media records."""
 
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
 import activities.activity_media.models as activity_media_models
@@ -8,10 +13,6 @@ import core.config as core_config
 import core.decorators as core_decorators
 import core.file_uploads as core_file_uploads
 import core.logger as core_logger
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -96,8 +97,8 @@ def get_activities_media(
         return []
 
     if not activities:
-        stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
-        activities = list(db.scalars(stmt).all())
+        activity_stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
+        activities = list(db.scalars(activity_stmt).all())
 
     if not activities:
         return []
@@ -106,10 +107,10 @@ def get_activities_media(
     if not allowed_ids:
         return []
 
-    stmt = select(activity_media_models.ActivityMedia).where(
+    media_stmt = select(activity_media_models.ActivityMedia).where(
         activity_media_models.ActivityMedia.activity_id.in_(allowed_ids)
     )
-    return list(db.scalars(stmt).all())
+    return list(db.scalars(media_stmt).all())
 
 
 @core_decorators.handle_db_errors

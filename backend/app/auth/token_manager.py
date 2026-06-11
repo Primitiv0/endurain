@@ -9,10 +9,6 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 
-import auth.constants as auth_constants
-import core.config as core_config
-import core.logger as core_logger
-import users.users.schema as users_schema
 from fastapi import HTTPException, status
 from joserfc import jwt
 from joserfc.errors import (
@@ -26,6 +22,11 @@ from joserfc.errors import (
 )
 from joserfc.jwk import OctKey
 from joserfc.jwt import Token
+
+import auth.constants as auth_constants
+import core.config as core_config
+import core.logger as core_logger
+import users.users.schema as users_schema
 
 
 class TokenType(Enum):

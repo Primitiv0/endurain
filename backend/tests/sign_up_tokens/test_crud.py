@@ -3,9 +3,10 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy.sql import operators
+
 import sign_up_tokens.crud as sign_up_tokens_crud
 import sign_up_tokens.schema as sign_up_tokens_schema
-from sqlalchemy.sql import operators
 
 
 class TestGetSignUpTokenByHash:

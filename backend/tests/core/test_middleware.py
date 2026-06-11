@@ -12,9 +12,10 @@ Verifies:
 from unittest.mock import patch
 
 import pytest
-from core.middleware import CSRFMiddleware
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+from core.middleware import CSRFMiddleware
 
 
 @pytest.fixture
@@ -344,9 +345,10 @@ class TestSecurityHeadersMiddleware:
     """Tests for SecurityHeadersMiddleware in core.middleware."""
 
     def test_all_security_headers_present_in_development(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -370,9 +372,10 @@ class TestSecurityHeadersMiddleware:
         assert "Server" not in response.headers
 
     def test_hsts_header_present_in_production(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -390,9 +393,10 @@ class TestSecurityHeadersMiddleware:
         assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
 
     def test_hsts_header_present_in_demo(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -410,10 +414,11 @@ class TestSecurityHeadersMiddleware:
         assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
 
     def test_csp_header_present_for_html_response(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.responses import HTMLResponse
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -431,9 +436,10 @@ class TestSecurityHeadersMiddleware:
         assert "default-src 'self'" in csp
 
     def test_csp_header_absent_for_non_html_response(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -449,10 +455,11 @@ class TestSecurityHeadersMiddleware:
         assert "Content-Security-Policy" not in response.headers
 
     def test_server_header_removed_when_present(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.responses import Response
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -467,11 +474,12 @@ class TestSecurityHeadersMiddleware:
         assert "Server" not in response.headers
 
     def test_allowed_tile_domains_uses_default_when_not_set(self):
-        import server_settings.schema as server_settings_schema
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.responses import HTMLResponse
         from fastapi.testclient import TestClient
+
+        import server_settings.schema as server_settings_schema
+        from core.middleware import SecurityHeadersMiddleware
 
         app = FastAPI()
         app.add_middleware(SecurityHeadersMiddleware)
@@ -488,10 +496,11 @@ class TestSecurityHeadersMiddleware:
             assert domain in csp
 
     def test_allowed_tile_domains_uses_custom_when_set(self):
-        from core.middleware import SecurityHeadersMiddleware
         from fastapi import FastAPI
         from fastapi.responses import HTMLResponse
         from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
 
         custom_domains = ["https://*.custom-tiles.example.com"]
 

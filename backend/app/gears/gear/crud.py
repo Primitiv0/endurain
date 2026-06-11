@@ -1,4 +1,10 @@
+from typing import Any
 from urllib.parse import unquote
+
+from fastapi import HTTPException, status
+from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 import activities.activity.models as activity_models
 import core.decorators as core_decorators
@@ -7,10 +13,6 @@ import gears.gear.models as gears_models
 import gears.gear.schema as gears_schema
 import gears.gear.utils as gears_utils
 import gears.gear_components.models as gear_components_models
-from fastapi import HTTPException, status
-from sqlalchemy import delete, func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -103,7 +105,8 @@ def get_gear_components_total_cost(
         gear_components_models.GearComponents.gear_id == gear_id,
         gear_components_models.GearComponents.user_id == user_id,
     )
-    return float(db.execute(stmt).scalar_one())
+    result: CursorResult[Any] = db.execute(stmt).scalar_one()
+    return float(result or 0)
 
 
 @core_decorators.handle_db_errors
@@ -164,7 +167,7 @@ def get_gear_users_with_pagination(
             (page_number - 1) * num_records,
         ).limit(num_records)
 
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -185,7 +188,7 @@ def get_gear_user(user_id: int, db: Session) -> list[gears_models.Gear]:
     stmt = select(gears_models.Gear).where(
         gears_models.Gear.user_id == user_id,
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -212,7 +215,7 @@ def get_gear_user_contains_nickname(user_id: int, nickname: str, db: Session) ->
         ).like(f"%{parsed_nickname}%"),
         gears_models.Gear.user_id == user_id,
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -267,7 +270,7 @@ def get_gear_by_type_and_user(gear_type: int, user_id: int, db: Session) -> list
         )
         .order_by(gears_models.Gear.nickname)
     )
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors
@@ -535,7 +538,7 @@ def delete_gear(gear_id: int, db: Session) -> None:
     stmt = delete(gears_models.Gear).where(
         gears_models.Gear.id == gear_id,
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
 
     if result.rowcount == 0:
         raise HTTPException(
@@ -567,7 +570,7 @@ def delete_all_strava_gear_for_user(user_id: int, db: Session) -> None:
             None,
         ),
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
 
     if result.rowcount != 0:
         db.commit()
@@ -593,7 +596,7 @@ def delete_all_garminconnect_gear_for_user(user_id: int, db: Session) -> None:
         gears_models.Gear.user_id == user_id,
         gears_models.Gear.garminconnect_gear_id.isnot(None),
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
 
     if result.rowcount != 0:
         db.commit()

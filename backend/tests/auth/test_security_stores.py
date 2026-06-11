@@ -10,9 +10,10 @@ import hashlib
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 
-import auth.security_stores as security_stores
 import pytest
 from redis import RedisError
+
+import auth.security_stores as security_stores
 
 # ---------------------------------------------------------------------------
 # Redis test doubles

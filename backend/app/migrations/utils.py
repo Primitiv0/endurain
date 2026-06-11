@@ -3,6 +3,8 @@
 from collections.abc import Callable, Coroutine
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 import core.logger as core_logger
 import migrations.crud as migrations_crud
 import migrations.migration_1 as migrations_migration_1
@@ -11,7 +13,6 @@ import migrations.migration_3 as migrations_migration_3
 import migrations.migration_4 as migrations_migration_4
 import migrations.migration_5 as migrations_migration_5
 import migrations.migration_6 as migrations_migration_6
-from sqlalchemy.orm import Session
 
 # Synchronous migration handlers keyed by migration ID.
 _SYNC_MIGRATIONS: dict[int, Callable[[Session], None]] = {

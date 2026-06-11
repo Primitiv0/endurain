@@ -2,6 +2,9 @@
 
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
 import auth.api_keys.crud as api_keys_crud
 import auth.api_keys.schema as api_keys_schema
 import auth.api_keys.utils as api_keys_utils
@@ -10,8 +13,6 @@ import auth.security as auth_security
 import core.database as core_database
 import users.users.crud as users_crud
 import users.users.utils as users_utils
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

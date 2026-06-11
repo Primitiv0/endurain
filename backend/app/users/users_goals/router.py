@@ -2,14 +2,15 @@
 
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import users.users_goals.crud as user_goals_crud
 import users.users_goals.dependencies as user_goals_dependencies
 import users.users_goals.schema as user_goals_schema
 import users.users_goals.utils as user_goals_utils
-from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

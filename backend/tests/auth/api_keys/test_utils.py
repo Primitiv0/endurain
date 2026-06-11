@@ -7,8 +7,9 @@ and JSON serialisation round-trips.
 import hashlib
 import json
 
-import auth.api_keys.utils as api_keys_utils
 import pytest
+
+import auth.api_keys.utils as api_keys_utils
 
 
 class TestGenerateApiKey:

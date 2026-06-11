@@ -2,13 +2,14 @@
 
 from typing import Annotated
 
+from fastapi import Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import core.dependencies as core_dependencies
 import gears.gear.crud as gears_crud
 import gears.gear_components.schema as gc_schema
-from fastapi import Depends, HTTPException, status
-from sqlalchemy.orm import Session
 
 
 def validate_gear_component_id(

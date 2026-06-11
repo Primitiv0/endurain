@@ -9,6 +9,9 @@ from collections.abc import Callable
 from datetime import date
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import health.health_fasting.crud as health_fasting_crud
@@ -18,8 +21,6 @@ import health.health_steps.crud as health_steps_crud
 import health.health_water.crud as health_water_crud
 import health.health_weight.crud as health_weight_crud
 import health.schema as health_schema
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

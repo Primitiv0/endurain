@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from auth.identity_links import utils as identity_links_utils
 from auth.identity_links.schema import UsersIdentityProviderResponse
 
@@ -263,8 +264,9 @@ class TestIdentityServiceLinkDelegation:
         Asserts:
             - HTTPException with status 404 raised.
         """
-        from auth.identity_service import DefaultIdentityService
         from fastapi import HTTPException
+
+        from auth.identity_service import DefaultIdentityService
 
         mock_db = MagicMock()
         service = DefaultIdentityService(

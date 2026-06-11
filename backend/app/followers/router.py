@@ -3,14 +3,15 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import followers.crud as followers_crud
 import followers.schema as followers_schema
 import users.users.dependencies as users_dependencies
 import websocket.manager as websocket_manager
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

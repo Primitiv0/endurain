@@ -1,13 +1,14 @@
 """Activity workout steps CRUD operations."""
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
 import activities.activity_workout_steps.models as activity_workout_steps_models
 import activities.activity_workout_steps.schema as activity_workout_steps_schema
 import core.decorators as core_decorators
 import server_settings.utils as server_settings_utils
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -92,10 +93,10 @@ def get_activities_workout_steps(
     if not allowed_ids:
         return []
 
-    stmt = select(activity_workout_steps_models.ActivityWorkoutSteps).where(
+    steps_stmt = select(activity_workout_steps_models.ActivityWorkoutSteps).where(
         activity_workout_steps_models.ActivityWorkoutSteps.activity_id.in_(allowed_ids)
     )
-    workout_steps = db.scalars(stmt).all()
+    workout_steps = list(db.scalars(steps_stmt).all())
 
     if not workout_steps:
         return []
@@ -141,7 +142,7 @@ def get_public_activity_workout_steps(
     stmt = select(activity_workout_steps_models.ActivityWorkoutSteps).where(
         activity_workout_steps_models.ActivityWorkoutSteps.activity_id == activity_id,
     )
-    workout_steps = db.scalars(stmt).all()
+    workout_steps = list(db.scalars(stmt).all())
 
     if not workout_steps:
         return None

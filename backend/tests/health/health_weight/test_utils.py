@@ -1,9 +1,10 @@
 from datetime import date as datetime_date
 from unittest.mock import MagicMock, patch
 
+from sqlalchemy.orm import Session
+
 import health.health_weight.schema as health_weight_schema
 import health.health_weight.utils as health_weight_utils
-from sqlalchemy.orm import Session
 
 
 class TestCalculateBMI:

@@ -3,8 +3,9 @@
 from unittest.mock import patch
 
 import pytest
-import users.users_goals.dependencies as user_goals_dependencies
 from fastapi import HTTPException, status
+
+import users.users_goals.dependencies as user_goals_dependencies
 
 
 class TestValidateGoalId:

@@ -2,15 +2,16 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import auth.password_hasher as auth_password_hasher
-import core.apprise as core_apprise
-import core.database as core_database
 import pytest
-import sign_up_tokens.router as sign_up_tokens_router
-import websocket.manager as websocket_manager
 from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+
+import auth.password_hasher as auth_password_hasher
+import core.apprise as core_apprise
+import core.database as core_database
+import sign_up_tokens.router as sign_up_tokens_router
+import websocket.manager as websocket_manager
 
 # ---------------------------------------------------------------------------
 # Fixtures

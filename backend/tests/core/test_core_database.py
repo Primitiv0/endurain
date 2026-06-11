@@ -2,8 +2,9 @@
 
 from unittest.mock import MagicMock, patch
 
-import core.database as core_database
 import pytest
+
+import core.database as core_database
 
 
 class TestGetDb:

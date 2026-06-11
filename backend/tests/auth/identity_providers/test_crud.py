@@ -3,14 +3,15 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException
+from sqlalchemy.exc import SQLAlchemyError
+
 from auth.identity_providers import crud as idp_crud
 from auth.identity_providers.models import IdentityProvider
 from auth.identity_providers.schema import (
     IdentityProviderCreate,
     IdentityProviderUpdate,
 )
-from fastapi import HTTPException
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetIdentityProvider:

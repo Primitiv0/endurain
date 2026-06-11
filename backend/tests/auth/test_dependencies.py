@@ -6,8 +6,10 @@ Covers all public functions and async dependencies defined in the module.
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import auth.dependencies as auth_dependencies
 import pytest
+from fastapi import HTTPException, WebSocket, status
+
+import auth.dependencies as auth_dependencies
 from auth.dependencies import (
     AuthContext,
     check_auth_scopes,
@@ -20,7 +22,6 @@ from auth.dependencies import (
     validate_websocket_access_token,
 )
 from auth.principal import ApiKeyCred, PasswordCred, Principal
-from fastapi import HTTPException, WebSocket, status
 
 
 class TestGetAccessToken:

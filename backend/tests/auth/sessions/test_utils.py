@@ -3,14 +3,15 @@ import hmac
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+from fastapi import HTTPException
+
 import auth.sessions.models as users_session_models
 import auth.sessions.schema as users_session_schema
 import auth.sessions.utils as _auth_sessions_utils
 import auth.sessions.utils as users_session_utils
 import core.network as core_network
-import pytest
 import users.users.schema as users_schema
-from fastapi import HTTPException
 
 
 class TestDeviceTypeEnum:

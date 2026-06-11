@@ -1,6 +1,12 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+from stravalib.client import Client
+from stravalib.exc import AccessUnauthorized
+from timezonefinder import TimezoneFinder
+
 import activities.activity.crud as activities_crud
 import activities.activity.schema as activities_schema
 import activities.activity.utils as activities_utils
@@ -19,11 +25,6 @@ import users.users_privacy_settings.models as users_privacy_settings_models
 import users.users_privacy_settings.utils as users_privacy_settings_utils
 import websocket.manager as websocket_manager
 from core.database import SessionLocal
-from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-from stravalib.client import Client
-from stravalib.exc import AccessUnauthorized
-from timezonefinder import TimezoneFinder
 
 
 async def fetch_and_process_activities(

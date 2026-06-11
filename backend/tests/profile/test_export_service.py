@@ -14,10 +14,11 @@ from profile.exceptions import (
 )
 from unittest.mock import MagicMock, patch
 
-import core.config as core_config
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+
+import core.config as core_config
 
 
 class _FakeZipBytes:

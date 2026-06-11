@@ -1,6 +1,12 @@
 """CRUD operations for user sessions."""
 
 from datetime import UTC, datetime
+from typing import Any
+
+from fastapi import HTTPException, status
+from sqlalchemy import CursorResult, delete, select
+from sqlalchemy import update as sa_update
+from sqlalchemy.orm import Session
 
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.models as oauth_state_models
@@ -9,10 +15,6 @@ import auth.sessions.rotated_refresh_tokens.crud as users_session_rotated_tokens
 import auth.sessions.schema as users_session_schema
 import core.decorators as core_decorators
 import core.logger as core_logger
-from fastapi import HTTPException, status
-from sqlalchemy import delete, select
-from sqlalchemy import update as sa_update
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -297,7 +299,7 @@ def claim_session_for_token_exchange(
             refresh_token=hashed_refresh_token,
         )
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
 
     claimed = result.rowcount == 1
@@ -443,7 +445,7 @@ def delete_idle_sessions(
     stmt = delete(users_session_models.UsersSessions).where(
         users_session_models.UsersSessions.last_activity_at < cutoff_time
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
     return result.rowcount
 
@@ -472,7 +474,7 @@ def delete_sessions_by_family(
     stmt = delete(users_session_models.UsersSessions).where(
         users_session_models.UsersSessions.token_family_id == token_family_id
     )
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     db.commit()
     return result.rowcount
 
@@ -499,7 +501,7 @@ def delete_sessions_by_user(
         HTTPException: If database error occurs.
     """
     stmt = delete(users_session_models.UsersSessions).where(users_session_models.UsersSessions.user_id == user_id)
-    result = db.execute(stmt)
+    result: CursorResult[Any] = db.execute(stmt)
     if commit:
         db.commit()
     return result.rowcount

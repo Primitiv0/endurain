@@ -1,11 +1,12 @@
 """Utility functions for user identity provider links."""
 
+from sqlalchemy.orm import Session
+
 import auth.identity_links.crud as user_idp_crud
 import auth.identity_links.models as user_idp_models
 import auth.identity_links.schema as user_idp_schema
 import auth.identity_providers.crud as idp_crud
 import core.logger as core_logger
-from sqlalchemy.orm import Session
 
 
 def get_user_identity_provider_refresh_token_by_user_id_and_idp_id(

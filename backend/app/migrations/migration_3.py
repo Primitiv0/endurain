@@ -9,6 +9,9 @@ import asyncio
 import glob
 import os
 
+import fitdecode
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.models as activities_models
 import activities.activity_file_import.utils_fit as fit_utils
@@ -20,7 +23,6 @@ import activities.activity_workout_steps.crud as activity_workout_steps_crud
 import core.config as core_config
 import core.file_uploads as file_uploads
 import core.logger as core_logger
-import fitdecode
 import garmin.activity_utils as garmin_activity_utils
 import migrations.crud as migrations_crud
 import strava.activity_utils as strava_activity_utils
@@ -29,7 +31,6 @@ from activities.activity_exercise_titles import (
     crud as activity_exercise_titles_crud,
 )
 from migrations.schema import StreamType
-from sqlalchemy.orm import Session
 
 
 def process_migration_3(db: Session) -> None:

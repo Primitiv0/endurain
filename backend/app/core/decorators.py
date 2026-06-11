@@ -4,10 +4,11 @@ from collections.abc import Callable
 from functools import wraps
 from typing import cast
 
-import core.logger as core_logger
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+
+import core.logger as core_logger
 
 
 def handle_db_errors[T, **P](func: Callable[P, T]) -> Callable[P, T]:

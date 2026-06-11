@@ -190,15 +190,17 @@ class TestSettings:
         assert "*" in s.TRUSTED_PROXIES
 
     def test_trusted_proxies_invalid_cidr_rejected(self):
-        from core.config import Settings
         from pydantic import ValidationError
+
+        from core.config import Settings
 
         with pytest.raises(ValidationError):
             Settings(_env_file=None, TRUSTED_PROXIES="999.999.999.999/32")
 
     def test_trusted_proxies_invalid_hostname_rejected(self):
-        from core.config import Settings
         from pydantic import ValidationError
+
+        from core.config import Settings
 
         with pytest.raises(ValidationError):
             Settings(_env_file=None, TRUSTED_PROXIES="caddy:8080")

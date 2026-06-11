@@ -2,9 +2,10 @@
 
 from datetime import UTC, datetime, timedelta
 
-import auth.api_keys.schema as users_api_keys_schema
 import pytest
 from pydantic import ValidationError
+
+import auth.api_keys.schema as users_api_keys_schema
 
 
 class TestUsersApiKeyCreate:

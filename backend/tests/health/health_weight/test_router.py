@@ -1,9 +1,10 @@
 from datetime import date as datetime_date
 from unittest.mock import ANY, MagicMock, patch
 
+from fastapi import HTTPException, status
+
 import health.health_weight.models as health_weight_models
 import health.health_weight.schema as health_weight_schema
-from fastapi import HTTPException, status
 
 
 class TestReadHealthWeightAll:

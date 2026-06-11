@@ -2,11 +2,12 @@
 
 from typing import Annotated
 
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
 import activities.activity_exercise_titles.schema as activity_exercise_titles_schema
 import core.database as core_database
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
 router = APIRouter()
 

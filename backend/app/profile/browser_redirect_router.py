@@ -13,6 +13,10 @@ Key Features:
 
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+
 import auth.identity_links.crud as user_idp_crud
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.service as idp_service
@@ -22,9 +26,6 @@ import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.utils as oauth_state_utils
 import core.database as core_database
 import core.logger as core_logger
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

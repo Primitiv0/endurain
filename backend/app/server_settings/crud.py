@@ -1,10 +1,11 @@
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 import core.cryptography as core_cryptography
 import core.decorators as core_decorators
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors

@@ -10,8 +10,9 @@ base directory.
 
 import os
 
-import core.config as core_config
 from fastapi.responses import FileResponse
+
+import core.config as core_config
 
 
 def _safe_resolve(base_dir: str, untrusted_path: str) -> str | None:

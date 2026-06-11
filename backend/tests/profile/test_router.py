@@ -5,9 +5,10 @@ import profile.schema as profile_schema
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import core.config as core_config
 import pytest
 from fastapi import HTTPException
+
+import core.config as core_config
 
 PREFIX = core_config.ROOT_PATH + "/profile"  # /api/v1/profile
 

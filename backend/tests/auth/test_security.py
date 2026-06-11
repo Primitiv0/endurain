@@ -3,15 +3,16 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-import auth.security as auth_security
-import auth.token_manager as auth_token_manager
-import auth.utils as auth_utils
 import pytest
-from auth.identity_service import IdentityService
-from auth.principal import AccessTokenCred, ApiKeyCred, Principal
 from fastapi import HTTPException, Request, WebSocket, WebSocketException, status
 from fastapi.security import SecurityScopes
 from joserfc.errors import MissingClaimError
+
+import auth.security as auth_security
+import auth.token_manager as auth_token_manager
+import auth.utils as auth_utils
+from auth.identity_service import IdentityService
+from auth.principal import AccessTokenCred, ApiKeyCred, Principal
 
 
 def _make_principal(

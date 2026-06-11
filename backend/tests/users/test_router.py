@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 import users.users.router as users_router
 import users.users.schema as users_schema
 

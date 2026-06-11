@@ -1,8 +1,9 @@
 """Tests for core.dependencies module."""
 
-import core.dependencies as core_dependencies
 import pytest
 from fastapi import HTTPException
+
+import core.dependencies as core_dependencies
 
 
 class TestValidateId:

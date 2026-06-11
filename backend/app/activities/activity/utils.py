@@ -15,6 +15,14 @@ from statistics import mean
 from tempfile import NamedTemporaryFile
 from urllib.parse import urlencode
 
+import requests
+from fastapi import HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
+from geopy.distance import geodesic
+from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity.models as activities_models
 import activities.activity.schema as activities_schema
@@ -36,19 +44,12 @@ import core.file_uploads as core_file_uploads
 import core.logger as core_logger
 import core.sanitization as core_sanitization
 import core.timezone as core_timezone
-import requests
 import server_settings.crud as server_settings_crud
 import strava.bulk_import_utils as strava_bulk_import_utils
 import users.users.crud as users_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 import users.users_privacy_settings.models as users_privacy_settings_models
 import websocket.manager as websocket_manager
-from fastapi import HTTPException, UploadFile, status
-from fastapi.concurrency import run_in_threadpool
-from geopy.distance import geodesic
-from sqlalchemy import func, select
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 # Global Activity Type Mappings (ID to Name)
 ACTIVITY_ID_TO_NAME = {
@@ -606,6 +607,11 @@ async def parse_and_store_activity_from_file(
                 )
 
             user_privacy_settings = users_privacy_settings_crud.get_user_privacy_settings_by_user_id(user.id, db)
+            if user_privacy_settings is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User privacy settings not found",
+                )
 
             # Parse the file in a thread pool to avoid
             # blocking the event loop with CPU-bound and
@@ -927,6 +933,11 @@ async def parse_and_store_activity_from_uploaded_file(
             )
 
         user_privacy_settings = users_privacy_settings_crud.get_user_privacy_settings_by_user_id(user.id, db)
+        if user_privacy_settings is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User privacy settings not found",
+            )
 
         # Parse the file in a thread pool to avoid
         # blocking the event loop with CPU-bound and

@@ -3,11 +3,12 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
+
 import users.users_goals.crud as user_goals_crud
 import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
-from fastapi import HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 
 
 class TestGetUserGoalsByUserId:

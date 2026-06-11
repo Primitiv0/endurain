@@ -24,14 +24,15 @@ Architecture
 
 import hashlib
 
-import core.config as core_config
-import core.logger as core_logger
-import core.network as core_network
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from starlette.responses import Response
+
+import core.config as core_config
+import core.logger as core_logger
+import core.network as core_network
 
 #: Baseline applied globally via ``SlowAPIMiddleware``.
 DEFAULT: str = "120/minute"

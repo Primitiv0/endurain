@@ -5,15 +5,16 @@ import profile.mfa_store as profile_mfa_store
 import profile.router as profile_router
 from unittest.mock import MagicMock
 
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import auth.identity_service as auth_identity_service
 import core.config as core_config
 import core.database as core_database
-import pytest
 import websocket.manager as websocket_manager
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 
 class FakeMFASecretStore:

@@ -13,12 +13,13 @@ Covers:
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import auth.security as auth_security
 import pytest
-from auth.identity_service import IdentityService
-from auth.principal import AccessTokenCred, ApiKeyCred, Principal
 from fastapi import HTTPException, Request, status
 from fastapi.security import SecurityScopes
+
+import auth.security as auth_security
+from auth.identity_service import IdentityService
+from auth.principal import AccessTokenCred, ApiKeyCred, Principal
 
 # ---------------------------------------------------------------------------
 # Helpers

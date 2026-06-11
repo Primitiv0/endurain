@@ -5,8 +5,9 @@ This module tests the ServerSettings SQLAlchemy model,
 including field defaults and constraints.
 """
 
-import server_settings.models as server_settings_models
 from sqlalchemy import inspect
+
+import server_settings.models as server_settings_models
 
 
 class TestServerSettingsModel:

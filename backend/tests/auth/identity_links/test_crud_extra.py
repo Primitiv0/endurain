@@ -4,10 +4,11 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from auth.identity_links import crud as user_idp_crud
-from auth.identity_links.models import UsersIdentityProvider
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
+
+from auth.identity_links import crud as user_idp_crud
+from auth.identity_links.models import UsersIdentityProvider
 
 
 class TestCheckUserIdentityProvidersByIdpId:

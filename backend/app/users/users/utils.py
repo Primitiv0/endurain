@@ -1,5 +1,8 @@
 import os
 
+from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
 import auth.mfa.crud as auth_mfa_crud
 import core.config as core_config
 import core.file_uploads as core_file_uploads
@@ -12,8 +15,6 @@ import users.users.schema as users_schema
 import users.users_default_gear.crud as user_default_gear_crud
 import users.users_integrations.crud as user_integrations_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
-from fastapi import HTTPException, UploadFile, status
-from sqlalchemy.orm import Session
 
 
 def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:

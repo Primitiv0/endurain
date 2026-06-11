@@ -7,9 +7,10 @@ including read, update, and file upload operations.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from fastapi import HTTPException, status
+
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
-from fastapi import HTTPException, status
 
 
 class TestReadServerSettings:

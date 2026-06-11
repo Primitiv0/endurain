@@ -1,12 +1,13 @@
+from fastapi import HTTPException, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 import core.decorators as core_decorators
 import health.constants as health_constants
 import health.health_steps.models as health_steps_models
 import health.health_steps.schema as health_steps_schema
 import health.utils as health_utils
-from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
 
 @core_decorators.handle_db_errors
@@ -110,7 +111,7 @@ def get_health_steps_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return db.execute(stmt).scalars().all()
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors

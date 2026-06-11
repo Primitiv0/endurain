@@ -2,15 +2,16 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 import auth.dependencies as auth_dependencies
 import auth.identity_service as auth_identity_service
 import core.apprise as core_apprise
 import core.database as core_database
 import core.dependencies as core_dependencies
-import pytest
 import users.users.dependencies as users_dependencies
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture

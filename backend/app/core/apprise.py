@@ -12,6 +12,7 @@ from functools import lru_cache
 from urllib.parse import urlencode
 
 import apprise
+
 import core.config as core_config
 import core.logger as core_logger
 

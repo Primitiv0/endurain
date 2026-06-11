@@ -13,6 +13,9 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from fastapi import HTTPException, Request
+from sqlalchemy.exc import SQLAlchemyError
+
 from auth.identity_service import (
     DefaultIdentityService,
     IdentityService,
@@ -25,8 +28,6 @@ from auth.principal import (
     Principal,
     SessionCookieCred,
 )
-from fastapi import HTTPException, Request
-from sqlalchemy.exc import SQLAlchemyError
 
 # ---------------------------------------------------------------------------
 # Fixtures

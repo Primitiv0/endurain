@@ -27,6 +27,9 @@ from profile.exceptions import (
 )
 from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 import activities.activity.crud as activities_crud
 import activities.activity_exercise_titles.crud as activity_exercise_titles_crud
 import activities.activity_laps.crud as activity_laps_crud
@@ -46,8 +49,6 @@ import users.users_default_gear.crud as user_default_gear_crud
 import users.users_goals.crud as user_goals_crud
 import users.users_integrations.crud as user_integrations_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 
 class ExportPerformanceConfig(profile_utils.BasePerformanceConfig):

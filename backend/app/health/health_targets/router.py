@@ -1,12 +1,13 @@
 from collections.abc import Callable
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, Security, status
+from sqlalchemy.orm import Session
+
 import auth.dependencies as auth_dependencies
 import core.database as core_database
 import health.health_targets.crud as health_targets_crud
 import health.health_targets.schema as health_targets_schema
-from fastapi import APIRouter, Depends, Security, status
-from sqlalchemy.orm import Session
 
 # Define the API router
 router = APIRouter()

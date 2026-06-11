@@ -3,13 +3,6 @@
 from collections.abc import Callable
 from typing import Annotated
 
-import auth.dependencies as auth_dependencies
-import core.database as core_database
-import core.dependencies as core_dependencies
-import gears.gear.crud as gears_crud
-import gears.gear.dependencies as gears_dependencies
-import gears.gear.models as gear_models
-import gears.gear.schema as gears_schema
 from fastapi import (
     APIRouter,
     Depends,
@@ -19,6 +12,14 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
+
+import auth.dependencies as auth_dependencies
+import core.database as core_database
+import core.dependencies as core_dependencies
+import gears.gear.crud as gears_crud
+import gears.gear.dependencies as gears_dependencies
+import gears.gear.models as gear_models
+import gears.gear.schema as gears_schema
 
 # Define the API router
 router = APIRouter()

@@ -3,11 +3,12 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-import auth.idp_link_tokens.crud as idp_link_token_crud
-import auth.idp_link_tokens.schema as idp_link_token_schema
 import pytest
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
+
+import auth.idp_link_tokens.crud as idp_link_token_crud
+import auth.idp_link_tokens.schema as idp_link_token_schema
 
 
 class TestGetIdpLinkTokenByHash:

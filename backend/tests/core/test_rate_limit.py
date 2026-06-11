@@ -63,8 +63,9 @@ class TestRateLimitExceededHandler:
     """Tests for rate_limit_exceeded_handler."""
 
     def test_returns_json_429_response(self):
-        from core.rate_limit import rate_limit_exceeded_handler
         from starlette.responses import JSONResponse
+
+        from core.rate_limit import rate_limit_exceeded_handler
 
         request = MagicMock()
         request.method = "GET"
