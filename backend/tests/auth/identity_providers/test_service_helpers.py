@@ -110,24 +110,28 @@ class TestDecryptClientId:
         idp = MagicMock()
         idp.name = "TestIdP"
         idp.client_id = "encrypted-id"
-        with patch(
-            "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
-            return_value="",
+        with (
+            patch(
+                "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
+                return_value="",
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                service._decrypt_client_id(idp)
+            service._decrypt_client_id(idp)
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_decryption_exception_raises_500(self, service):
         idp = MagicMock()
         idp.name = "TestIdP"
         idp.client_id = "encrypted-id"
-        with patch(
-            "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
-            side_effect=ValueError("bad token"),
+        with (
+            patch(
+                "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
+                side_effect=ValueError("bad token"),
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                service._decrypt_client_id(idp)
+            service._decrypt_client_id(idp)
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
@@ -147,24 +151,28 @@ class TestDecryptClientSecret:
         idp = MagicMock()
         idp.name = "TestIdP"
         idp.client_secret = "encrypted-secret"
-        with patch(
-            "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
-            return_value="",
+        with (
+            patch(
+                "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
+                return_value="",
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                service._decrypt_client_secret(idp)
+            service._decrypt_client_secret(idp)
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
     def test_decryption_exception_raises_500(self, service):
         idp = MagicMock()
         idp.name = "TestIdP"
         idp.client_secret = "encrypted-secret"
-        with patch(
-            "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
-            side_effect=ValueError("bad token"),
+        with (
+            patch(
+                "auth.identity_providers.service.core_cryptography.decrypt_token_fernet",
+                side_effect=ValueError("bad token"),
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                service._decrypt_client_secret(idp)
+            service._decrypt_client_secret(idp)
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 

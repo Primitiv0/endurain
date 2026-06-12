@@ -187,16 +187,16 @@ class TestEnableMfa:
                 side_effect=HTTPException(status_code=401, detail="bad password"),
             ),
             patch("auth.services.mfa_workflow.mfa_service.enable_user_mfa") as mock_enable,
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.enable_mfa(
-                    self._request(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                    mfa_secret_store,
-                )
+            mfa_workflow.enable_mfa(
+                self._request(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+                mfa_secret_store,
+            )
 
         assert exc_info.value.status_code == 401
         mfa_secret_store.get_secret.assert_not_called()
@@ -207,16 +207,16 @@ class TestEnableMfa:
         with (
             patch("auth.services.mfa_workflow.step_up_service.verify_step_up_credentials"),
             patch("auth.services.mfa_workflow.mfa_service.enable_user_mfa") as mock_enable,
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.enable_mfa(
-                    self._request(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                    mfa_secret_store,
-                )
+            mfa_workflow.enable_mfa(
+                self._request(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+                mfa_secret_store,
+            )
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         mock_enable.assert_not_called()
@@ -233,16 +233,16 @@ class TestEnableMfa:
                 "auth.services.mfa_workflow.mfa_service.enable_user_mfa",
                 side_effect=HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code"),
             ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.enable_mfa(
-                    self._request(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                    mfa_secret_store,
-                )
+            mfa_workflow.enable_mfa(
+                self._request(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+                mfa_secret_store,
+            )
 
         assert exc_info.value.detail == "Invalid MFA code"
         mfa_secret_store.delete_secret.assert_not_called()
@@ -258,16 +258,16 @@ class TestEnableMfa:
                 "auth.services.mfa_workflow.mfa_service.enable_user_mfa",
                 side_effect=HTTPException(status_code=status.HTTP_409_CONFLICT, detail="MFA already enabled"),
             ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.enable_mfa(
-                    self._request(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                    mfa_secret_store,
-                )
+            mfa_workflow.enable_mfa(
+                self._request(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+                mfa_secret_store,
+            )
 
         assert exc_info.value.status_code == status.HTTP_409_CONFLICT
         mfa_secret_store.delete_secret.assert_called_once_with(7)
@@ -283,16 +283,16 @@ class TestEnableMfa:
                 "auth.services.mfa_workflow.mfa_service.enable_user_mfa",
                 side_effect=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA code"),
             ),
+            pytest.raises(HTTPException),
         ):
-            with pytest.raises(HTTPException):
-                mfa_workflow.enable_mfa(
-                    self._request(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                    mfa_secret_store,
-                )
+            mfa_workflow.enable_mfa(
+                self._request(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+                mfa_secret_store,
+            )
 
         mfa_secret_store.delete_secret.assert_called_once_with(7)
 
@@ -341,15 +341,15 @@ class TestDisableMfa:
                 side_effect=HTTPException(status_code=401, detail="bad"),
             ),
             patch("auth.services.mfa_workflow.mfa_service.disable_user_mfa") as mock_disable,
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.disable_mfa(
-                    self._request(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                )
+            mfa_workflow.disable_mfa(
+                self._request(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+            )
 
         assert exc_info.value.status_code == 401
         mock_disable.assert_not_called()
@@ -377,12 +377,14 @@ class TestVerifyMfa:
         assert result == {"message": "MFA code verified successfully"}
 
     def test_invalid_code_raises_400(self, mock_db, identity_service):
-        with patch(
-            "auth.services.mfa_workflow.mfa_service.verify_user_mfa",
-            return_value=False,
+        with (
+            patch(
+                "auth.services.mfa_workflow.mfa_service.verify_user_mfa",
+                return_value=False,
+            ),
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.verify_mfa(self._request(), 7, identity_service, mock_db)
+            mfa_workflow.verify_mfa(self._request(), 7, identity_service, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         assert exc_info.value.detail == "Invalid MFA code"
@@ -436,15 +438,15 @@ class TestGenerateBackupCodes:
         with (
             patch("auth.services.mfa_workflow.users_crud.get_user_by_id", return_value=None),
             patch("auth.services.mfa_workflow.step_up_service.verify_step_up_credentials") as mock_verify,
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.generate_backup_codes(
-                    self._step_up(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                )
+            mfa_workflow.generate_backup_codes(
+                self._step_up(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+            )
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         mock_verify.assert_not_called()
@@ -455,15 +457,15 @@ class TestGenerateBackupCodes:
         with (
             patch("auth.services.mfa_workflow.users_crud.get_user_by_id", return_value=user),
             patch("auth.services.mfa_workflow.step_up_service.verify_step_up_credentials") as mock_verify,
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.generate_backup_codes(
-                    self._step_up(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                )
+            mfa_workflow.generate_backup_codes(
+                self._step_up(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+            )
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
         mock_verify.assert_not_called()
@@ -479,15 +481,15 @@ class TestGenerateBackupCodes:
                 side_effect=HTTPException(status_code=401, detail="bad"),
             ),
             patch("auth.services.mfa_workflow.mfa_backup_codes_crud.create_backup_codes") as mock_create,
+            pytest.raises(HTTPException) as exc_info,
         ):
-            with pytest.raises(HTTPException) as exc_info:
-                mfa_workflow.generate_backup_codes(
-                    self._step_up(),
-                    7,
-                    identity_service,
-                    step_up_store,
-                    mock_db,
-                )
+            mfa_workflow.generate_backup_codes(
+                self._step_up(),
+                7,
+                identity_service,
+                step_up_store,
+                mock_db,
+            )
 
         assert exc_info.value.status_code == 401
         mock_create.assert_not_called()

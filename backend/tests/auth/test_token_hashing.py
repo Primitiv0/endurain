@@ -16,6 +16,7 @@ real hashing (no mocks of the crypto itself).
 
 import hashlib
 import hmac
+import re
 
 import pytest
 
@@ -37,8 +38,6 @@ class TestSha256Hex:
         assert token_hashing.sha256_hex(value) == token_hashing.sha256_hex(value)
 
     def test_output_is_lowercase_64_char_hex(self):
-        import re
-
         digest = token_hashing.sha256_hex("anything")
         assert re.match(_HEX_RE, digest), "must be 64-char lowercase hex"
 
@@ -53,55 +52,45 @@ class TestSha256Hex:
 class TestHmacSha256:
     """hmac_sha256: keyed HMAC-SHA256 using the server secret."""
 
-    def test_matches_hmac_reference_with_configured_key(self):
+    def test_matches_hmac_reference_with_configured_key(self, monkeypatch):
         key = "test-secret-key-for-testing-only-min-32-chars"
         value = "refresh-token-value"
         expected = hmac.new(key.encode(), value.encode(), hashlib.sha256).hexdigest()
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", key)
-            assert token_hashing.hmac_sha256(value) == expected
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", key)
+        assert token_hashing.hmac_sha256(value) == expected
 
-    def test_is_deterministic_for_same_key_and_value(self):
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "a-secret-key-1234567890-1234567890")
-            first = token_hashing.hmac_sha256("value")
-            second = token_hashing.hmac_sha256("value")
+    def test_is_deterministic_for_same_key_and_value(self, monkeypatch):
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "a-secret-key-1234567890-1234567890")
+        first = token_hashing.hmac_sha256("value")
+        second = token_hashing.hmac_sha256("value")
         assert first == second
 
-    def test_output_is_lowercase_64_char_hex(self):
-        import re
-
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "a-secret-key-1234567890-1234567890")
-            digest = token_hashing.hmac_sha256("value")
+    def test_output_is_lowercase_64_char_hex(self, monkeypatch):
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "a-secret-key-1234567890-1234567890")
+        digest = token_hashing.hmac_sha256("value")
         assert re.match(_HEX_RE, digest), "must be 64-char lowercase hex"
 
-    def test_different_keys_produce_different_digests(self):
+    def test_different_keys_produce_different_digests(self, monkeypatch):
         value = "same-value"
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "key-one-1234567890-1234567890-12")
-            with_key_one = token_hashing.hmac_sha256(value)
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "key-two-1234567890-1234567890-12")
-            with_key_two = token_hashing.hmac_sha256(value)
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "key-one-1234567890-1234567890-12")
+        with_key_one = token_hashing.hmac_sha256(value)
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "key-two-1234567890-1234567890-12")
+        with_key_two = token_hashing.hmac_sha256(value)
         assert with_key_one != with_key_two
 
-    def test_keyed_digest_differs_from_plain_sha256(self):
+    def test_keyed_digest_differs_from_plain_sha256(self, monkeypatch):
         """The HMAC of a value must not equal its plain SHA-256 digest."""
         value = "csrf-token"
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "a-secret-key-1234567890-1234567890")
-            keyed = token_hashing.hmac_sha256(value)
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "a-secret-key-1234567890-1234567890")
+        keyed = token_hashing.hmac_sha256(value)
         assert keyed != token_hashing.sha256_hex(value)
 
-    def test_missing_secret_key_raises_value_error(self):
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", None)
-            with pytest.raises(ValueError, match="JWT_SECRET_KEY is not configured"):
-                token_hashing.hmac_sha256("value")
+    def test_missing_secret_key_raises_value_error(self, monkeypatch):
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", None)
+        with pytest.raises(ValueError, match="JWT_SECRET_KEY is not configured"):
+            token_hashing.hmac_sha256("value")
 
-    def test_empty_secret_key_raises_value_error(self):
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "")
-            with pytest.raises(ValueError, match="JWT_SECRET_KEY is not configured"):
-                token_hashing.hmac_sha256("value")
+    def test_empty_secret_key_raises_value_error(self, monkeypatch):
+        monkeypatch.setattr(token_hashing.auth_constants, "JWT_SECRET_KEY", "")
+        with pytest.raises(ValueError, match="JWT_SECRET_KEY is not configured"):
+            token_hashing.hmac_sha256("value")
