@@ -240,9 +240,21 @@ export interface StreamWaypoint {
  * @property stream_type - Numeric identifier for the stream type (1=HR, 2=Power, 3=Cadence, 4=Elevation, 5=Velocity, 6=Pace).
  * @property stream_waypoints - Array of waypoint data for this stream.
  */
+export interface ActivityZoneBreakdownEntry {
+  percent: number
+  hr: string
+  time_seconds: number
+}
+
+export interface ActivityZonePercentages {
+  hr?: Record<string, ActivityZoneBreakdownEntry>
+  [key: string]: Record<string, ActivityZoneBreakdownEntry> | undefined
+}
+
 export interface ActivityStream {
   stream_type: number
   stream_waypoints: StreamWaypoint[]
+  zone_percentages?: ActivityZonePercentages | null
 }
 
 /**

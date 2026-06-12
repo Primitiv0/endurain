@@ -9,11 +9,24 @@ from tests._helpers.models import mock_model
 
 class TestCreateActivityStreams:
     @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
-    def test_success(self, mock_streams_model, mock_db):
+    @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
+    @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
+    @patch("activities.activity_streams.crud.activity_streams_utils.build_zone_percentages")
+    def test_success(
+        self,
+        mock_build_zone_percentages,
+        mock_get_activity_by_id,
+        mock_get_user_by_id,
+        mock_streams_model,
+        mock_db,
+    ):
         import activities.activity_streams.crud as crud
         from activities.activity_streams.schema import ActivityStreams
 
         mock_streams_model.return_value = MagicMock()
+        mock_get_activity_by_id.return_value = MagicMock(user_id=1)
+        mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
+        mock_build_zone_percentages.return_value = {"hr": {}}
         s = [
             ActivityStreams(
                 activity_id=1, stream_type=1, stream_waypoints=[{"hr": 145}], strava_activity_stream_id=None
@@ -29,11 +42,75 @@ class TestCreateActivityStreams:
         crud.create_activity_streams([], mock_db)
 
     @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
-    def test_db_error(self, mock_streams_model, mock_db):
+    @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
+    @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
+    @patch("activities.activity_streams.crud.activity_streams_utils.build_zone_percentages")
+    def test_create_activity_streams_populates_zone_percentages(
+        self,
+        mock_build_zone_percentages,
+        mock_get_activity_by_id,
+        mock_get_user_by_id,
+        mock_streams_model,
+        mock_db,
+    ):
+        import activities.activity_streams.crud as crud
+        from activities.activity_streams.schema import ActivityStreams
+
+        expected_zone_percentages = {
+            "hr": {
+                "zone_1": {"percent": 20.0, "hr": "< 120", "time_seconds": 20},
+                "zone_2": {"percent": 20.0, "hr": "120 - 139", "time_seconds": 20},
+                "zone_3": {"percent": 20.0, "hr": "140 - 159", "time_seconds": 20},
+                "zone_4": {"percent": 20.0, "hr": "160 - 179", "time_seconds": 20},
+                "zone_5": {"percent": 20.0, "hr": ">= 180", "time_seconds": 20},
+            }
+        }
+
+        mock_streams_model.side_effect = [MagicMock(), MagicMock()]
+        mock_get_activity_by_id.return_value = MagicMock(user_id=1)
+        mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
+        mock_build_zone_percentages.return_value = expected_zone_percentages
+
+        streams = [
+            ActivityStreams(
+                activity_id=1,
+                stream_type=1,
+                stream_waypoints=[{"hr": 100}],
+                strava_activity_stream_id=None,
+            ),
+            ActivityStreams(
+                activity_id=2,
+                stream_type=2,
+                stream_waypoints=[],
+                strava_activity_stream_id=None,
+            ),
+        ]
+
+        crud.create_activity_streams(streams, mock_db)
+
+        assert mock_build_zone_percentages.call_count == 1
+        assert mock_streams_model.call_args_list[0].kwargs["zone_percentages"] == expected_zone_percentages
+        assert mock_streams_model.call_args_list[1].kwargs["zone_percentages"] is None
+
+    @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
+    @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
+    @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
+    @patch("activities.activity_streams.crud.activity_streams_utils.build_zone_percentages")
+    def test_db_error(
+        self,
+        mock_build_zone_percentages,
+        mock_get_activity_by_id,
+        mock_get_user_by_id,
+        mock_streams_model,
+        mock_db,
+    ):
         import activities.activity_streams.crud as crud
         from activities.activity_streams.schema import ActivityStreams
 
         mock_streams_model.return_value = MagicMock()
+        mock_get_activity_by_id.return_value = MagicMock(user_id=1)
+        mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
+        mock_build_zone_percentages.return_value = {"hr": {}}
         mock_db.commit.side_effect = SQLAlchemyError("err")
         s = [ActivityStreams(activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None)]
         with pytest.raises(HTTPException) as e:

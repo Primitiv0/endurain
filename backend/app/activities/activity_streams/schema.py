@@ -17,7 +17,7 @@ class ActivityStreams(BaseModel):
         stream_type: Stream type code (1-7).
         stream_waypoints: Waypoint data points.
         strava_activity_stream_id: Strava stream ID.
-        hr_zone_percentages: HR zone breakdown.
+        zone_percentages: Zone breakdowns keyed by metric (e.g. 'hr').
     """
 
     model_config = ConfigDict(
@@ -29,4 +29,4 @@ class ActivityStreams(BaseModel):
     stream_type: StrictInt
     stream_waypoints: list[dict]
     strava_activity_stream_id: StrictInt | None = None
-    hr_zone_percentages: dict | None = None
+    zone_percentages: dict | None = None

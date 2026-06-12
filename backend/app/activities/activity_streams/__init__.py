@@ -14,7 +14,6 @@ Exports:
       get_public_activity_stream_by_type,
       create_activity_streams
     - Utils: transform_activity_streams,
-      transform_activity_streams_hr,
       is_stream_hidden, filter_visible_streams
     - Schemas: ActivityStreams
     - Models: ActivityStreams (ORM model)
@@ -51,7 +50,6 @@ from .utils import (
     filter_visible_streams,
     is_stream_hidden,
     transform_activity_streams,
-    transform_activity_streams_hr,
 )
 
 __all__ = [
@@ -78,5 +76,4 @@ __all__ = [
     "is_stream_hidden",
     # Utility functions
     "transform_activity_streams",
-    "transform_activity_streams_hr",
 ]
