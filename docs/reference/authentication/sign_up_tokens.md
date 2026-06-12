@@ -1,6 +1,6 @@
 # API Reference
 
-::: backend.app.password_reset_tokens
+::: backend.app.auth.sign_up_tokens
     handler: python
     options:
       docstring_style: google

@@ -61,6 +61,7 @@ nav:
   - Developer guide: 
     - Setup a development environment: developer-guide/setup-dev-env.md
     - Authentication: developer-guide/authentication.md
+    - Auth boundary: developer-guide/auth-boundary.md
     - Supported types: developer-guide/supported-types.md
     - Import development notes: developer-guide/import-dev-notes.md
   - Gallery: gallery.md
@@ -71,6 +72,9 @@ nav:
       - Activity summaries: reference/activities/activity_summaries.md
       - Activity workout steps: reference/activities/activity_workout_steps.md
       - Activity file import: reference/activities/activity_file_import.md
+    - Authentication:
+      - Password reset tokens: reference/authentication/password_reset_tokens.md
+      - Sign up tokens: reference/authentication/sign_up_tokens.md
     - Gears:
       - Gears: reference/gears/gears.md
       - Gear components: reference/gears/gear_components.md
@@ -83,14 +87,12 @@ nav:
       - Health weight: reference/health/health_weight.md
     - Migrations: reference/migrations.md
     - Notifications: reference/notifications.md
-    - Password reset tokens: reference/password_reset_tokens.md
-    - Profile: reference/profile.md
     - Server settings: reference/server_settings.md
-    - Sign up tokens: reference/sign_up_tokens.md
     - Users:
       - Users: reference/users/users.md
       - Users default gear: reference/users/users_default_gear.md
       - Users goals: reference/users/users_goals.md
       - Users integrations: reference/users/users_integrations.md
       - Users privacy settings: reference/users/users_privacy_settings.md
+      - Users profile: reference/users/users_profile.md
     - WebSocket: reference/websocket.md
