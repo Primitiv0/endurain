@@ -44,8 +44,14 @@ jobs:
 
           AUTH_HEADER=()
           if [ -n "$WEBHOOK_SECRET" ]; then
-            # Read HMAC key from env var name to avoid putting the secret in process args.
-            SIG=$(openssl dgst -sha256 -mac HMAC -macopt keyenv:WEBHOOK_SECRET "$FORGEJO_EVENT_PATH" | awk '{print $2}')
+            # Prefer Python HMAC so the secret is read from env and never
+            # appears in process arguments. Keep an OpenSSL fallback for
+            # images that do not ship python3.
+            if command -v python3 >/dev/null 2>&1; then
+              SIG=$(python3 -c 'import hashlib, hmac, os, pathlib; p = pathlib.Path(os.environ["FORGEJO_EVENT_PATH"]); k = os.environ["WEBHOOK_SECRET"].encode(); print(hmac.new(k, p.read_bytes(), hashlib.sha256).hexdigest())')
+            else
+              SIG=$(openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" "$FORGEJO_EVENT_PATH" | awk '{print $2}')
+            fi
             AUTH_HEADER=(-H "X-Forgejo-Signature: ${SIG}")
             echo "Computed signature: ${SIG:0:12}…"
           fi
