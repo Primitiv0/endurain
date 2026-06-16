@@ -44,7 +44,8 @@ jobs:
 
           AUTH_HEADER=()
           if [ -n "$WEBHOOK_SECRET" ]; then
-            SIG=$(openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" "$FORGEJO_EVENT_PATH" | awk '{print $2}')
+            # Read HMAC key from env var name to avoid putting the secret in process args.
+            SIG=$(openssl dgst -sha256 -mac HMAC -macopt keyenv:WEBHOOK_SECRET "$FORGEJO_EVENT_PATH" | awk '{print $2}')
             AUTH_HEADER=(-H "X-Forgejo-Signature: ${SIG}")
             echo "Computed signature: ${SIG:0:12}…"
           fi
