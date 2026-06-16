@@ -1,26 +1,28 @@
 """CRUD operations for activity stream data."""
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 import activities.activity.crud as activity_crud
 import activities.activity.models as activity_models
+import activities.activity.schema as activity_schema
 import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.models as activity_streams_models
 import activities.activity_streams.schema as activity_streams_schema
 import activities.activity_streams.utils as activity_streams_utils
+import core.decorators as core_decorators
 import core.logger as core_logger
 import server_settings.utils as server_settings_utils
 import users.users.crud as users_crud
+import users.users.models as users_models
 
 
+@core_decorators.handle_db_errors
 def get_activity_streams(
     activity_id: int,
     token_user_id: int,
     db: Session,
-) -> list[activity_streams_schema.ActivityStreams] | None:
+) -> list[activity_streams_schema.ActivityStreamsRead]:
     """
     Get all streams for an activity.
 
@@ -35,50 +37,40 @@ def get_activity_streams(
     Raises:
         HTTPException: On database errors.
     """
-    try:
-        activity = activity_crud.get_activity_by_id(activity_id, db)
+    activity: activity_schema.Activity | None = activity_crud.get_activity_by_id(activity_id, db)
 
-        if not activity:
-            return None
+    if not activity:
+        return []
 
-        stmt = select(activity_streams_models.ActivityStreams).where(
-            activity_streams_models.ActivityStreams.activity_id == activity_id,
-        )
-        activity_streams = db.scalars(stmt).all()
+    stmt = select(activity_streams_models.ActivityStreams).where(
+        activity_streams_models.ActivityStreams.activity_id == activity_id,
+    )
+    activity_streams: list[activity_streams_models.ActivityStreams] = list(db.scalars(stmt).all())
 
-        if not activity_streams:
-            return None
+    if not activity_streams:
+        return []
 
-        if token_user_id != activity.user_id:
-            activity_streams = activity_streams_utils.filter_visible_streams(activity_streams, activity)
+    if token_user_id != activity.user_id:
+        activity_streams = activity_streams_utils.filter_visible_streams(activity_streams, activity)
 
-        return [activity_streams_utils.transform_activity_streams(stream) for stream in activity_streams]
-    except SQLAlchemyError as err:
-        core_logger.print_to_log(
-            f"Error in get_activity_streams: {err}",
-            "error",
-            exc=err,
-        )
-        raise HTTPException(
-            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail="Internal Server Error",
-        ) from err
+    return activity_streams_utils.transform_activity_streams(activity_streams)
 
 
+@core_decorators.handle_db_errors
 def get_activities_streams(
     activity_ids: list[int],
-    token_user_id: int,
+    _user_id: int,
     db: Session,
-    activities: list[activity_models.Activity] | None = None,
-) -> list[activity_streams_schema.ActivityStreams]:
+    _activities: list[activity_models.Activity],
+) -> list[activity_streams_schema.ActivityStreamsRead]:
     """
     Get streams for multiple activities.
 
     Args:
         activity_ids: List of activity IDs.
-        token_user_id: Authenticated user ID.
+        _user_id: Authenticated user ID.
         db: Database session.
-        activities: Pre-fetched activity list.
+        _activities: Pre-fetched activity list.
 
     Returns:
         List of activity streams.
@@ -86,47 +78,22 @@ def get_activities_streams(
     Raises:
         HTTPException: On database errors.
     """
-    try:
-        if not activity_ids:
-            return []
+    stmt = select(activity_streams_models.ActivityStreams).where(
+        activity_streams_models.ActivityStreams.activity_id.in_(activity_ids)
+    )
+    all_streams: list[activity_streams_models.ActivityStreams] = list(db.scalars(stmt).all())
 
-        if not activities:
-            stmt = select(activity_models.Activity).where(activity_models.Activity.id.in_(activity_ids))
-            activities = db.scalars(stmt).all()
+    if not all_streams:
+        return []
 
-        if not activities:
-            return []
-
-        allowed_ids = [a.id for a in activities if a.user_id == token_user_id]
-
-        if not allowed_ids:
-            return []
-
-        stmt = select(activity_streams_models.ActivityStreams).where(
-            activity_streams_models.ActivityStreams.activity_id.in_(allowed_ids)
-        )
-        all_streams = db.scalars(stmt).all()
-
-        if not all_streams:
-            return []
-
-        return [activity_streams_utils.transform_activity_streams(stream) for stream in all_streams]
-    except SQLAlchemyError as err:
-        core_logger.print_to_log(
-            f"Error in get_activities_streams: {err}",
-            "error",
-            exc=err,
-        )
-        raise HTTPException(
-            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail="Internal Server Error",
-        ) from err
+    return activity_streams_utils.transform_activity_streams(all_streams)
 
 
+@core_decorators.handle_db_errors
 def get_public_activity_streams(
     activity_id: int,
     db: Session,
-) -> list[activity_streams_schema.ActivityStreams] | None:
+) -> list[activity_streams_schema.ActivityStreamsRead]:
     """
     Get public streams for an activity.
 
@@ -135,60 +102,50 @@ def get_public_activity_streams(
         db: Database session.
 
     Returns:
-        List of activity streams or None.
+        List of activity streams.
 
     Raises:
         HTTPException: On database errors.
     """
-    try:
-        server_settings = server_settings_utils.get_server_settings_or_404(db)
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
 
-        if not server_settings.public_shareable_links:
-            return None
+    if not server_settings.public_shareable_links:
+        return []
 
-        activity = activity_crud.get_activity_by_id_if_is_public(activity_id, db)
+    activity = activity_crud.get_activity_by_id_if_is_public(activity_id, db)
 
-        if not activity:
-            return None
+    if not activity:
+        return []
 
-        stmt = (
-            select(activity_streams_models.ActivityStreams)
-            .join(
-                activity_models.Activity,
-                activity_models.Activity.id == (activity_streams_models.ActivityStreams.activity_id),
-            )
-            .where(
-                activity_streams_models.ActivityStreams.activity_id == activity_id,
-                activity_models.Activity.visibility == 0,
-                activity_models.Activity.id == activity_id,
-            )
+    stmt = (
+        select(activity_streams_models.ActivityStreams)
+        .join(
+            activity_models.Activity,
+            activity_models.Activity.id == (activity_streams_models.ActivityStreams.activity_id),
         )
-        activity_streams = db.scalars(stmt).all()
-
-        if not activity_streams:
-            return None
-
-        activity_streams = activity_streams_utils.filter_visible_streams(activity_streams, activity)
-
-        return [activity_streams_utils.transform_activity_streams(stream) for stream in activity_streams]
-    except SQLAlchemyError as err:
-        core_logger.print_to_log(
-            f"Error in get_public_activity_streams: {err}",
-            "error",
-            exc=err,
+        .where(
+            activity_streams_models.ActivityStreams.activity_id == activity_id,
+            activity_models.Activity.visibility == 0,
+            activity_models.Activity.id == activity_id,
         )
-        raise HTTPException(
-            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail="Internal Server Error",
-        ) from err
+    )
+    activity_streams: list[activity_streams_models.ActivityStreams] = list(db.scalars(stmt).all())
+
+    if not activity_streams:
+        return []
+
+    activity_streams = activity_streams_utils.filter_visible_streams(activity_streams, activity)
+
+    return activity_streams_utils.transform_activity_streams(activity_streams)
 
 
+@core_decorators.handle_db_errors
 def get_activity_stream_by_type(
     activity_id: int,
     stream_type: int,
     token_user_id: int,
     db: Session,
-) -> activity_streams_schema.ActivityStreams | None:
+) -> activity_streams_schema.ActivityStreamsRead | None:
     """
     Get a specific stream type for an activity.
 
@@ -204,45 +161,35 @@ def get_activity_stream_by_type(
     Raises:
         HTTPException: On database errors.
     """
-    try:
-        activity = activity_crud.get_activity_by_id(activity_id, db)
+    activity: activity_schema.Activity | None = activity_crud.get_activity_by_id(activity_id, db)
 
-        if not activity:
-            return None
+    if not activity:
+        return None
 
-        stmt = select(activity_streams_models.ActivityStreams).where(
-            activity_streams_models.ActivityStreams.activity_id == activity_id,
-            activity_streams_models.ActivityStreams.stream_type == stream_type,
-        )
-        activity_stream = db.scalars(stmt).first()
+    stmt = select(activity_streams_models.ActivityStreams).where(
+        activity_streams_models.ActivityStreams.activity_id == activity_id,
+        activity_streams_models.ActivityStreams.stream_type == stream_type,
+    )
+    activity_stream: activity_streams_models.ActivityStreams | None = db.scalars(stmt).first()
 
-        if not activity_stream:
-            return None
+    if not activity_stream:
+        return None
 
-        if token_user_id != activity.user_id and activity_streams_utils.is_stream_hidden(
-            activity,
-            activity_stream.stream_type,
-        ):
-            return None
+    if token_user_id != activity.user_id and activity_streams_utils.is_stream_hidden(
+        activity,
+        activity_stream.stream_type,
+    ):
+        return None
 
-        return activity_streams_utils.transform_activity_streams(activity_stream)
-    except SQLAlchemyError as err:
-        core_logger.print_to_log(
-            f"Error in get_activity_stream_by_type: {err}",
-            "error",
-            exc=err,
-        )
-        raise HTTPException(
-            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail="Internal Server Error",
-        ) from err
+    return activity_streams_utils.transform_activity_streams(activity_stream)
 
 
+@core_decorators.handle_db_errors
 def get_public_activity_stream_by_type(
     activity_id: int,
     stream_type: int,
     db: Session,
-) -> activity_streams_schema.ActivityStreams | None:
+) -> activity_streams_schema.ActivityStreamsRead | None:
     """
     Get a public stream by type for an activity.
 
@@ -257,59 +204,49 @@ def get_public_activity_stream_by_type(
     Raises:
         HTTPException: On database errors.
     """
-    try:
-        server_settings = server_settings_utils.get_server_settings_or_404(db)
+    server_settings = server_settings_utils.get_server_settings_or_404(db)
 
-        if not server_settings.public_shareable_links:
-            return None
+    if not server_settings.public_shareable_links:
+        return None
 
-        activity = activity_crud.get_activity_by_id_if_is_public(activity_id, db)
+    activity: activity_schema.Activity | None = activity_crud.get_activity_by_id_if_is_public(activity_id, db)
 
-        if not activity:
-            return None
+    if not activity:
+        return None
 
-        stmt = (
-            select(activity_streams_models.ActivityStreams)
-            .join(
-                activity_models.Activity,
-                activity_models.Activity.id == (activity_streams_models.ActivityStreams.activity_id),
-            )
-            .where(
-                activity_streams_models.ActivityStreams.activity_id == activity_id,
-                activity_streams_models.ActivityStreams.stream_type == stream_type,
-                activity_models.Activity.visibility == 0,
-                activity_models.Activity.id == activity_id,
-            )
+    stmt = (
+        select(activity_streams_models.ActivityStreams)
+        .join(
+            activity_models.Activity,
+            activity_models.Activity.id == (activity_streams_models.ActivityStreams.activity_id),
         )
-        activity_stream = db.scalars(stmt).first()
-
-        if not activity_stream:
-            return None
-
-        if activity_streams_utils.is_stream_hidden(
-            activity,
-            activity_stream.stream_type,
-        ):
-            return None
-
-        return activity_streams_utils.transform_activity_streams(activity_stream)
-    except SQLAlchemyError as err:
-        core_logger.print_to_log(
-            f"Error in get_public_activity_stream_by_type: {err}",
-            "error",
-            exc=err,
+        .where(
+            activity_streams_models.ActivityStreams.activity_id == activity_id,
+            activity_streams_models.ActivityStreams.stream_type == stream_type,
+            activity_models.Activity.visibility == 0,
+            activity_models.Activity.id == activity_id,
         )
-        raise HTTPException(
-            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail="Internal Server Error",
-        ) from err
+    )
+    activity_stream = db.scalars(stmt).first()
+
+    if not activity_stream:
+        return None
+
+    if activity_streams_utils.is_stream_hidden(
+        activity,
+        activity_stream.stream_type,
+    ):
+        return None
+
+    return activity_streams_utils.transform_activity_streams(activity_stream)
 
 
+@core_decorators.handle_db_errors
 def get_hr_streams_without_zone_percentages(
     db: Session,
-    batch_size: int = 500,
     after_id: int = 0,
-) -> list[activity_streams_models.ActivityStreams]:
+    batch_size: int = 500,
+) -> list[activity_streams_schema.ActivityStreamsRead]:
     """Return HR streams lacking pre-computed zone_percentages in batches."""
     stmt = (
         select(activity_streams_models.ActivityStreams)
@@ -321,66 +258,35 @@ def get_hr_streams_without_zone_percentages(
         .order_by(activity_streams_models.ActivityStreams.id)
         .limit(batch_size)
     )
-    return db.scalars(stmt).all()
+    return activity_streams_utils.transform_activity_streams(list(db.scalars(stmt).all()))
 
 
 def backfill_zone_percentages_for_missing_hr_streams(
+    computed_streams: list[dict[str, int | dict]],
     db: Session,
-    batch_size: int = 500,
-) -> bool:
-    """Backfill zone_percentages for existing HR streams in batches."""
-    streams_processed_with_no_errors = True
-    last_id = 0
-
-    while True:
-        batch_streams = get_hr_streams_without_zone_percentages(db, batch_size=batch_size, after_id=last_id)
-        if not batch_streams:
-            break
-
-        activity_cache: dict[int, activity_models.Activity] = {}
-        user_cache: dict[int, object] = {}
-
-        for stream in batch_streams:
-            try:
-                activity = activity_cache.get(stream.activity_id)
-                if activity is None:
-                    activity = activity_crud.get_activity_by_id(stream.activity_id, db)
-                    if activity is None:
-                        continue
-                    activity_cache[stream.activity_id] = activity
-
-                user = user_cache.get(activity.user_id)
-                if user is None:
-                    user = users_crud.get_user_by_id(activity.user_id, db)
-                    if user is None:
-                        continue
-                    user_cache[activity.user_id] = user
-
-                payload = activity_streams_utils.build_zone_percentages(
-                    user,
-                    activity,
-                    stream.stream_waypoints,
-                )
-
-                if payload is not None:
-                    stream.zone_percentages = payload
-                    db.add(stream)
-            except Exception as err:
-                streams_processed_with_no_errors = False
-                core_logger.print_to_log_and_console(
-                    f"Backfill - Error processing stream {getattr(stream, 'id', 'unknown')}: {err}",
-                    "error",
-                    exc=err,
-                )
-
+) -> None:
+    """Backfill zone_percentages for existing HR streams with pre-computed values."""
+    for stream in computed_streams:
+        db.query(activity_streams_models.ActivityStreams).filter(
+            activity_streams_models.ActivityStreams.id == stream["stream_id"],
+        ).update(
+            {"zone_percentages": stream["zone_percentages"]},
+            synchronize_session=False,
+        )
+    try:
         db.commit()
-        last_id = batch_streams[-1].id
+    except Exception as err:
+        core_logger.print_to_log_and_console(
+            f"Failed to backfill zone_percentages for HR streams: {err}",
+            "error",
+            exc=err,
+        )
 
-    return streams_processed_with_no_errors
 
-
-def create_activity_streams(
-    activity_streams: list[activity_streams_schema.ActivityStreams],
+@core_decorators.handle_db_errors
+async def create_activity_streams(
+    activity_streams: list[activity_streams_schema.ActivityStreamsCreate],
+    activity: activity_schema.Activity,
     db: Session,
 ) -> None:
     """
@@ -388,66 +294,51 @@ def create_activity_streams(
 
     Args:
         activity_streams: List of stream schemas.
+        activity: Activity schema to associate streams with.
         db: Database session.
-
-    Raises:
-        HTTPException: On database errors.
     """
-    try:
-        activity_by_id = {}
-        user_by_activity_id = {}
 
-        hr_activity_ids = {
-            stream.activity_id
-            for stream in activity_streams
-            if stream.stream_type == activity_streams_constants.STREAM_TYPE_HR
-        }
+    if activity.user_id is None:
+        core_logger.print_to_log_and_console(
+            f"Failed to create activity streams: activity {activity.id} has no user_id",
+            "warning",
+        )
+        return
 
-        for activity_id in hr_activity_ids:
-            activity = activity_crud.get_activity_by_id(activity_id, db)
-            if not activity:
-                continue
+    user: users_models.Users | None = users_crud.get_user_by_id(activity.user_id, db)
+    if not user:
+        core_logger.print_to_log_and_console(
+            f"Failed to create activity streams: user {activity.user_id} not found",
+            "warning",
+        )
+        return
 
-            user = users_crud.get_user_by_id(activity.user_id, db)
-            if not user:
-                continue
-
-            activity_by_id[activity_id] = activity
-            user_by_activity_id[activity_id] = user
-
-        streams = []
-        for stream in activity_streams:
-            zone_percentages = None
-            if stream.stream_type == activity_streams_constants.STREAM_TYPE_HR:
-                activity = activity_by_id.get(stream.activity_id)
-                user = user_by_activity_id.get(stream.activity_id)
-                if activity and user:
-                    zone_percentages = activity_streams_utils.build_zone_percentages(
-                        user,
-                        activity,
-                        stream.stream_waypoints,
-                    )
-
-            streams.append(
-                activity_streams_models.ActivityStreams(
-                    activity_id=(stream.activity_id),
-                    stream_type=stream.stream_type,
-                    stream_waypoints=(stream.stream_waypoints),
-                    strava_activity_stream_id=(stream.strava_activity_stream_id),
-                    zone_percentages=zone_percentages,
+    streams: list[activity_streams_models.ActivityStreams] = []
+    for stream in activity_streams:
+        zone_percentages: dict | None = None
+        if stream.stream_type == activity_streams_constants.STREAM_TYPE_HR:
+            try:
+                zone_percentages = await activity_streams_utils.build_zone_percentages(
+                    user,
+                    activity,
+                    stream.stream_waypoints,
                 )
+            except Exception as err:
+                core_logger.print_to_log(
+                    f"Zone % computation failed for stream (activity {stream.activity_id}): {err}",
+                    "error",
+                    exc=err,
+                )
+        streams.append(
+            activity_streams_models.ActivityStreams(
+                activity_id=stream.activity_id,
+                stream_type=stream.stream_type,
+                stream_waypoints=stream.stream_waypoints,
+                strava_activity_stream_id=stream.strava_activity_stream_id,
+                zone_percentages=zone_percentages,
             )
+        )
 
+    if streams:
         db.add_all(streams)
         db.commit()
-    except SQLAlchemyError as err:
-        db.rollback()
-        core_logger.print_to_log_and_console(
-            f"Error in create_activity_streams: {err}",
-            "error",
-            exc=err,
-        )
-        raise HTTPException(
-            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-            detail="Internal Server Error",
-        ) from err

@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get(
     "/activity_id/{activity_id}/all",
-    response_model=(list[activity_streams_schema.ActivityStreams] | None),
+    response_model=(list[activity_streams_schema.ActivityStreamsRead]),
 )
 async def read_public_activities_streams_for_activity_all(
     activity_id: int,
@@ -39,14 +39,14 @@ async def read_public_activities_streams_for_activity_all(
         db: Database session.
 
     Returns:
-        List of activity streams or None.
+        List of activity streams.
     """
     return activity_streams_crud.get_public_activity_streams(activity_id, db)
 
 
 @router.get(
     "/activity_id/{activity_id}/stream_type/{stream_type}",
-    response_model=(activity_streams_schema.ActivityStreams | None),
+    response_model=(activity_streams_schema.ActivityStreamsRead | None),
 )
 async def read_public_activities_streams_for_activity_stream_type(
     activity_id: int,

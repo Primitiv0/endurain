@@ -318,6 +318,12 @@ class ExportService:
             activity_ids: List of activity IDs to process.
             user_activities: List of activity objects.
         """
+        if not activity_ids or not user_activities:
+            core_logger.print_to_log(
+                "No activity IDs or activities provided for component collection",
+                "warning",
+            )
+            return
         # Process activity IDs in smaller batches to reduce memory usage
         batch_size = self.performance_config.batch_size // 2  # Smaller batches for components
 

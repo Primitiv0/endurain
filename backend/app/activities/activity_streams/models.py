@@ -56,7 +56,7 @@ class ActivityStreams(Base):
         comment="Strava activity stream ID",
     )
     zone_percentages: Mapped[dict | None] = mapped_column(
-        JSON,
+        JSON(none_as_null=True),
         nullable=True,
         comment="Pre-computed zone breakdowns keyed by metric (e.g. 'hr')",
     )

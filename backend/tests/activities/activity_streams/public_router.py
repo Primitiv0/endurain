@@ -17,10 +17,10 @@ def _build_app(mock_db):
 class TestReadPublicActivityStreams:
     @patch("activities.activity_streams.public_router.activity_streams_crud.get_public_activity_streams")
     def test_all_success(self, mock_get, mock_db):
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsRead
 
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = [ActivityStreams(id=1, activity_id=1, stream_type=1, stream_waypoints=[{"x": 1}])]
+        mock_get.return_value = [ActivityStreamsRead(id=1, activity_id=1, stream_type=1, stream_waypoints=[{"x": 1}])]
 
         response = client.get("/public/activities_streams/activity_id/1/all")
         assert response.status_code == 200
@@ -36,10 +36,10 @@ class TestReadPublicActivityStreams:
 
     @patch("activities.activity_streams.public_router.activity_streams_crud.get_public_activity_stream_by_type")
     def test_by_type_success(self, mock_get, mock_db):
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsRead
 
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = ActivityStreams(id=1, activity_id=1, stream_type=1, stream_waypoints=[{"x": 1}])
+        mock_get.return_value = ActivityStreamsRead(id=1, activity_id=1, stream_type=1, stream_waypoints=[{"x": 1}])
 
         response = client.get("/public/activities_streams/activity_id/1/stream_type/1")
         assert response.status_code == 200

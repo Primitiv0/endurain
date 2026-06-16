@@ -398,7 +398,7 @@ async def save_activity_streams_laps(
         for is_set, stream_type, waypoints in stream_data:
             if is_set:
                 activity_streams.append(
-                    activity_streams_schema.ActivityStreams(
+                    activity_streams_schema.ActivityStreamsCreate(
                         activity_id=created_activity.id,
                         stream_type=stream_type,
                         stream_waypoints=waypoints,
@@ -407,7 +407,7 @@ async def save_activity_streams_laps(
                 )
 
         # Create the activity streams in the database
-        activity_streams_crud.create_activity_streams(activity_streams, db)
+        await activity_streams_crud.create_activity_streams(activity_streams, created_activity, db)
 
     # Append activity id to laps
     if laps is not None:

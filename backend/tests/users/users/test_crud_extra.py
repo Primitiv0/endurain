@@ -750,8 +750,9 @@ class TestEditUser:
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
-            with pytest.raises(SQLAlchemyError):
+            with pytest.raises(HTTPException) as e:
                 await edit_user(1, mock_user_schema, mock_db)
+            assert e.value.status_code == 500
 
 
 class TestEditProfileUser:
@@ -958,8 +959,9 @@ class TestEditProfileUser:
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
-            with pytest.raises(SQLAlchemyError):
+            with pytest.raises(HTTPException) as e:
                 await edit_profile_user(1, mock_profile, mock_db)
+            assert e.value.status_code == 500
 
 
 class TestApproveUser:
@@ -1110,8 +1112,9 @@ class TestUpdateUserPhoto:
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
-            with pytest.raises(SQLAlchemyError):
+            with pytest.raises(HTTPException) as e:
                 await update_user_photo(1, mock_db, photo_path="path")
+            assert e.value.status_code == 500
 
 
 class TestDeleteUser:
@@ -1147,5 +1150,6 @@ class TestDeleteUser:
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
-            with pytest.raises(SQLAlchemyError):
+            with pytest.raises(HTTPException) as e:
                 await delete_user(1, mock_db)
+            assert e.value.status_code == 500

@@ -718,6 +718,7 @@ class TestImportServiceActivityComponents:
             websocket_manager=mock_ws,
         )
 
+        mock_activity = MagicMock(id=10, user_id=1)
         with patch("users.users_profile.import_service.activity_laps_crud.create_activity_laps"):
             await service.collect_and_import_activity_components(
                 [{"activity_id": 1, "lap_index": 1}],
@@ -727,7 +728,7 @@ class TestImportServiceActivityComponents:
                 [],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_laps") == 1
@@ -741,6 +742,7 @@ class TestImportServiceActivityComponents:
             websocket_manager=mock_ws,
         )
 
+        mock_activity = MagicMock(id=10, user_id=1)
         with patch("users.users_profile.import_service.activity_sets_crud.create_activity_sets"):
             await service.collect_and_import_activity_components(
                 [],
@@ -750,7 +752,7 @@ class TestImportServiceActivityComponents:
                 [],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_sets") == 1
@@ -764,7 +766,10 @@ class TestImportServiceActivityComponents:
             websocket_manager=mock_ws,
         )
 
-        with patch("users.users_profile.import_service.activity_streams_crud.create_activity_streams"):
+        mock_activity = MagicMock(id=10, user_id=1)
+        with patch(
+            "users.users_profile.import_service.activity_streams_crud.create_activity_streams", new_callable=AsyncMock
+        ):
             await service.collect_and_import_activity_components(
                 [],
                 [],
@@ -773,7 +778,7 @@ class TestImportServiceActivityComponents:
                 [],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_streams") == 1
@@ -787,6 +792,7 @@ class TestImportServiceActivityComponents:
             websocket_manager=mock_ws,
         )
 
+        mock_activity = MagicMock(id=10, user_id=1)
         with patch("users.users_profile.import_service.activity_workout_steps_crud.create_activity_workout_steps"):
             await service.collect_and_import_activity_components(
                 [],
@@ -796,7 +802,7 @@ class TestImportServiceActivityComponents:
                 [],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_workout_steps") == 1
@@ -810,6 +816,7 @@ class TestImportServiceActivityComponents:
             websocket_manager=mock_ws,
         )
 
+        mock_activity = MagicMock(id=10, user_id=1)
         with patch("users.users_profile.import_service.activity_exercise_titles_crud.create_activity_exercise_titles"):
             await service.collect_and_import_activity_components(
                 [],
@@ -819,7 +826,7 @@ class TestImportServiceActivityComponents:
                 [],
                 [{"activity_id": 1, "exercise_category": 1, "exercise_name": 1, "wkt_step_name": "Running"}],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_exercise_titles") == 1
@@ -1145,6 +1152,7 @@ class TestImportServiceActivityComponentsMedia:
             ),
             patch("users.users_profile.import_service.activity_media_crud.create_activity_medias"),
         ):
+            mock_activity = MagicMock(id=10, user_id=1)
             await service.collect_and_import_activity_components(
                 [],
                 [],
@@ -1153,7 +1161,7 @@ class TestImportServiceActivityComponentsMedia:
                 [{"activity_id": 1, "media_path": "activity_media/1_photo.jpg", "media_type": 1}],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_media") == 1
@@ -1168,6 +1176,7 @@ class TestImportServiceActivityComponentsMedia:
         )
 
         with patch("users.users_profile.import_service.activity_media_crud.create_activity_medias") as mock_create:
+            mock_activity = MagicMock(id=10, user_id=1)
             await service.collect_and_import_activity_components(
                 [],
                 [],
@@ -1176,7 +1185,7 @@ class TestImportServiceActivityComponentsMedia:
                 [{"activity_id": 1, "media_path": "activity_media/nounderscore.jpg", "media_type": 1}],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         mock_create.assert_not_called()
@@ -1198,6 +1207,7 @@ class TestImportServiceActivityComponentsMedia:
             ),
             patch("users.users_profile.import_service.activity_media_crud.create_activity_medias") as mock_create,
         ):
+            mock_activity = MagicMock(id=10, user_id=1)
             await service.collect_and_import_activity_components(
                 [],
                 [],
@@ -1206,7 +1216,7 @@ class TestImportServiceActivityComponentsMedia:
                 [{"activity_id": 1, "media_path": "activity_media/1_unsafe.jpg", "media_type": 1}],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         mock_create.assert_not_called()
@@ -1228,6 +1238,7 @@ class TestImportServiceActivityComponentsMedia:
             ),
             patch("users.users_profile.import_service.activity_media_crud.create_activity_medias"),
         ):
+            mock_activity = MagicMock(id=10, user_id=1)
             await service.collect_and_import_activity_components(
                 [],
                 [],
@@ -1240,7 +1251,7 @@ class TestImportServiceActivityComponentsMedia:
                 ],
                 [],
                 1,
-                10,
+                mock_activity,
             )
 
         assert service.counts.get("activity_media") == 2

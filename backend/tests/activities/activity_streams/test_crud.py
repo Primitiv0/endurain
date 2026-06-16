@@ -10,51 +10,48 @@ from tests._helpers.models import mock_model
 class TestCreateActivityStreams:
     @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
     @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
-    @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
     @patch("activities.activity_streams.crud.activity_streams_utils.build_zone_percentages")
-    def test_success(
+    async def test_success(
         self,
         mock_build_zone_percentages,
-        mock_get_activity_by_id,
         mock_get_user_by_id,
         mock_streams_model,
         mock_db,
     ):
         import activities.activity_streams.crud as crud
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsCreate
 
+        mock_activity = MagicMock(user_id=1, id=1)
         mock_streams_model.return_value = MagicMock()
-        mock_get_activity_by_id.return_value = MagicMock(user_id=1)
         mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
         mock_build_zone_percentages.return_value = {"hr": {}}
         s = [
-            ActivityStreams(
+            ActivityStreamsCreate(
                 activity_id=1, stream_type=1, stream_waypoints=[{"hr": 145}], strava_activity_stream_id=None
             )
         ]
-        crud.create_activity_streams(s, mock_db)
+        await crud.create_activity_streams(s, mock_activity, mock_db)
         mock_db.add_all.assert_called_once()
         mock_db.commit.assert_called_once()
 
-    def test_empty(self, mock_db):
+    async def test_empty(self, mock_db):
         import activities.activity_streams.crud as crud
 
-        crud.create_activity_streams([], mock_db)
+        mock_activity = MagicMock(user_id=1, id=1)
+        await crud.create_activity_streams([], mock_activity, mock_db)
 
     @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
     @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
-    @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
     @patch("activities.activity_streams.crud.activity_streams_utils.build_zone_percentages")
-    def test_create_activity_streams_populates_zone_percentages(
+    async def test_create_activity_streams_populates_zone_percentages(
         self,
         mock_build_zone_percentages,
-        mock_get_activity_by_id,
         mock_get_user_by_id,
         mock_streams_model,
         mock_db,
     ):
         import activities.activity_streams.crud as crud
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsCreate
 
         expected_zone_percentages = {
             "hr": {
@@ -66,19 +63,19 @@ class TestCreateActivityStreams:
             }
         }
 
+        mock_activity = MagicMock(user_id=1, id=1)
         mock_streams_model.side_effect = [MagicMock(), MagicMock()]
-        mock_get_activity_by_id.return_value = MagicMock(user_id=1)
         mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
         mock_build_zone_percentages.return_value = expected_zone_percentages
 
         streams = [
-            ActivityStreams(
+            ActivityStreamsCreate(
                 activity_id=1,
                 stream_type=1,
                 stream_waypoints=[{"hr": 100}],
                 strava_activity_stream_id=None,
             ),
-            ActivityStreams(
+            ActivityStreamsCreate(
                 activity_id=2,
                 stream_type=2,
                 stream_waypoints=[],
@@ -86,7 +83,7 @@ class TestCreateActivityStreams:
             ),
         ]
 
-        crud.create_activity_streams(streams, mock_db)
+        await crud.create_activity_streams(streams, mock_activity, mock_db)
 
         assert mock_build_zone_percentages.call_count == 1
         assert mock_streams_model.call_args_list[0].kwargs["zone_percentages"] == expected_zone_percentages
@@ -94,27 +91,25 @@ class TestCreateActivityStreams:
 
     @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
     @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
-    @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
     @patch("activities.activity_streams.crud.activity_streams_utils.build_zone_percentages")
-    def test_db_error(
+    async def test_db_error(
         self,
         mock_build_zone_percentages,
-        mock_get_activity_by_id,
         mock_get_user_by_id,
         mock_streams_model,
         mock_db,
     ):
         import activities.activity_streams.crud as crud
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsCreate
 
+        mock_activity = MagicMock(user_id=1, id=1)
         mock_streams_model.return_value = MagicMock()
-        mock_get_activity_by_id.return_value = MagicMock(user_id=1)
         mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
         mock_build_zone_percentages.return_value = {"hr": {}}
         mock_db.commit.side_effect = SQLAlchemyError("err")
-        s = [ActivityStreams(activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None)]
+        s = [ActivityStreamsCreate(activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None)]
         with pytest.raises(HTTPException) as e:
-            crud.create_activity_streams(s, mock_db)
+            await crud.create_activity_streams(s, mock_activity, mock_db)
         assert e.value.status_code == 500
 
 
@@ -124,12 +119,12 @@ class TestGetActivityStreams:
     def test_success(self, mock_get_act, mock_transform, mock_db):
         import activities.activity_streams.crud as crud
         import activities.activity_streams.models as m
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsRead
 
         mock_get_act.return_value = MagicMock(user_id=1)
-        mock_transform.return_value = ActivityStreams(
-            activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None
-        )
+        mock_transform.return_value = [
+            ActivityStreamsRead(activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None)
+        ]
         setup_mock_execute(
             mock_db, return_scalars_all=[mock_model(m.ActivityStreams, id=1, activity_id=1, stream_type=1)]
         )
@@ -137,14 +132,14 @@ class TestGetActivityStreams:
         assert len(r) == 1
 
     @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
-    @patch("activities.activity_streams.crud.activity_streams_schema.ActivityStreams.model_validate")
+    @patch("activities.activity_streams.crud.activity_streams_schema.ActivityStreamsRead.model_validate")
     def test_by_type(self, mock_validate, mock_get_act, mock_db):
         import activities.activity_streams.crud as crud
         import activities.activity_streams.models as m
-        from activities.activity_streams.schema import ActivityStreams
+        from activities.activity_streams.schema import ActivityStreamsRead
 
         mock_get_act.return_value = MagicMock(user_id=1)
-        mock_validate.return_value = ActivityStreams(
+        mock_validate.return_value = ActivityStreamsRead(
             activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None
         )
         setup_mock_execute(
@@ -159,7 +154,7 @@ class TestGetActivityStreams:
 
         mock_get_act.return_value = None
         r = crud.get_activity_streams(activity_id=1, token_user_id=1, db=mock_db)
-        assert r is None
+        assert r == []
 
     @patch("activities.activity_streams.crud.activity_streams_utils.transform_activity_streams")
     @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id")
@@ -169,7 +164,7 @@ class TestGetActivityStreams:
         mock_get_act.return_value = MagicMock(user_id=1)
         mock_db.scalars.return_value.all.return_value = []
         r = crud.get_activity_streams(activity_id=1, token_user_id=1, db=mock_db)
-        assert r is None
+        assert r == []
 
     @patch("activities.activity_streams.crud.activity_streams_utils.filter_visible_streams")
     @patch("activities.activity_streams.crud.activity_streams_utils.transform_activity_streams")
@@ -180,7 +175,7 @@ class TestGetActivityStreams:
 
         mock_get_act.return_value = MagicMock(user_id=2)
         mock_filter.return_value = [MagicMock(spec=m.ActivityStreams)]
-        mock_transform.return_value = MagicMock()
+        mock_transform.return_value = [MagicMock()]
         mock_db.scalars.return_value.all.return_value = [MagicMock(spec=m.ActivityStreams, id=1, activity_id=1)]
         r = crud.get_activity_streams(activity_id=1, token_user_id=1, db=mock_db)
         assert len(r) == 1
@@ -203,27 +198,24 @@ class TestGetActivitiesStreams:
         import activities.activity_streams.crud as crud
         import activities.activity_streams.models as m
 
-        mock_transform.return_value = MagicMock()
+        mock_transform.return_value = [MagicMock()]
         mock_activity = MagicMock(spec=am.Activity, id=1, user_id=1)
         mock_stream = MagicMock(spec=m.ActivityStreams, id=1, activity_id=1)
-        mock_db.scalars.return_value.all.side_effect = [
-            [mock_activity],
-            [mock_stream],
-        ]
-        r = crud.get_activities_streams(activity_ids=[1], token_user_id=1, db=mock_db)
+        mock_db.scalars.return_value.all.return_value = [mock_stream]
+        r = crud.get_activities_streams(activity_ids=[1], _user_id=1, db=mock_db, _activities=[mock_activity])
         assert len(r) == 1
 
     def test_empty_ids(self, mock_db):
         import activities.activity_streams.crud as crud
 
-        r = crud.get_activities_streams(activity_ids=[], token_user_id=1, db=mock_db)
+        r = crud.get_activities_streams(activity_ids=[], _user_id=1, db=mock_db, _activities=[])
         assert r == []
 
     def test_no_activities(self, mock_db):
         import activities.activity_streams.crud as crud
 
         mock_db.scalars.return_value.all.return_value = []
-        r = crud.get_activities_streams(activity_ids=[1], token_user_id=1, db=mock_db)
+        r = crud.get_activities_streams(activity_ids=[1], _user_id=1, db=mock_db, _activities=[])
         assert r == []
 
     def test_no_allowed(self, mock_db):
@@ -231,8 +223,8 @@ class TestGetActivitiesStreams:
         import activities.activity_streams.crud as crud
 
         mock_activity = MagicMock(spec=am.Activity, id=1, user_id=2)
-        mock_db.scalars.return_value.all.return_value = [mock_activity]
-        r = crud.get_activities_streams(activity_ids=[1], token_user_id=1, db=mock_db)
+        mock_db.scalars.return_value.all.return_value = []
+        r = crud.get_activities_streams(activity_ids=[1], _user_id=1, db=mock_db, _activities=[mock_activity])
         assert r == []
 
     def test_no_streams(self, mock_db):
@@ -240,11 +232,8 @@ class TestGetActivitiesStreams:
         import activities.activity_streams.crud as crud
 
         mock_activity = MagicMock(spec=am.Activity, id=1, user_id=1)
-        mock_db.scalars.return_value.all.side_effect = [
-            [mock_activity],
-            [],
-        ]
-        r = crud.get_activities_streams(activity_ids=[1], token_user_id=1, db=mock_db)
+        mock_db.scalars.return_value.all.return_value = []
+        r = crud.get_activities_streams(activity_ids=[1], _user_id=1, db=mock_db, _activities=[mock_activity])
         assert r == []
 
     def test_db_error(self, mock_db):
@@ -252,7 +241,7 @@ class TestGetActivitiesStreams:
 
         mock_db.scalars.side_effect = SQLAlchemyError("err")
         with pytest.raises(HTTPException) as e:
-            crud.get_activities_streams(activity_ids=[1], token_user_id=1, db=mock_db)
+            crud.get_activities_streams(activity_ids=[1], _user_id=1, db=mock_db, _activities=[])
         assert e.value.status_code == 500
 
 
@@ -267,7 +256,7 @@ class TestGetPublicActivityStreams:
 
         mock_settings.return_value = MagicMock(public_shareable_links=True)
         mock_get_act.return_value = MagicMock()
-        mock_transform.return_value = MagicMock()
+        mock_transform.return_value = [MagicMock()]
         mock_filter.return_value = [MagicMock(spec=m.ActivityStreams)]
         mock_db.scalars.return_value.all.return_value = [MagicMock(spec=m.ActivityStreams, id=1)]
         r = crud.get_public_activity_streams(activity_id=1, db=mock_db)
@@ -279,7 +268,7 @@ class TestGetPublicActivityStreams:
 
         mock_settings.return_value = MagicMock(public_shareable_links=False)
         r = crud.get_public_activity_streams(activity_id=1, db=mock_db)
-        assert r is None
+        assert r == []
 
     @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id_if_is_public")
     @patch("activities.activity_streams.crud.server_settings_utils.get_server_settings_or_404")
@@ -289,7 +278,7 @@ class TestGetPublicActivityStreams:
         mock_settings.return_value = MagicMock(public_shareable_links=True)
         mock_get_act.return_value = None
         r = crud.get_public_activity_streams(activity_id=1, db=mock_db)
-        assert r is None
+        assert r == []
 
     @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id_if_is_public")
     @patch("activities.activity_streams.crud.server_settings_utils.get_server_settings_or_404")
@@ -300,7 +289,7 @@ class TestGetPublicActivityStreams:
         mock_get_act.return_value = MagicMock()
         mock_db.scalars.return_value.all.return_value = []
         r = crud.get_public_activity_streams(activity_id=1, db=mock_db)
-        assert r is None
+        assert r == []
 
     @patch("activities.activity_streams.crud.activity_crud.get_activity_by_id_if_is_public")
     @patch("activities.activity_streams.crud.server_settings_utils.get_server_settings_or_404")

@@ -635,7 +635,7 @@ class ImportService:
         activity_media_data: list[Any],
         activity_exercise_titles_data: list[Any],
         original_activity_id: int,
-        new_activity_id: int,
+        new_activity: activity_schema.Activity,
     ) -> None:
         """
         Import all components for a single activity.
@@ -648,7 +648,7 @@ class ImportService:
             activity_media_data: Media data for all activities.
             activity_exercise_titles_data: Exercise titles.
             original_activity_id: Old activity ID.
-            new_activity_id: New activity ID.
+            new_activity: New activity object.
         """
         # Import laps - filter for this activity
         if activity_laps_data:
@@ -656,11 +656,11 @@ class ImportService:
             laps_for_activity = [lap for lap in activity_laps_data if lap.get("activity_id") == original_activity_id]
             for lap_data in laps_for_activity:
                 lap_data.pop("id", None)
-                lap_data["activity_id"] = new_activity_id
+                lap_data["activity_id"] = new_activity.id
                 laps.append(lap_data)
 
             if laps:
-                activity_laps_crud.create_activity_laps(laps, new_activity_id, self.db)
+                activity_laps_crud.create_activity_laps(laps, new_activity.id, self.db)
                 self.counts["activity_laps"] += len(laps)
 
         # Import sets - filter for this activity
@@ -673,12 +673,12 @@ class ImportService:
             ]
             for activity_set in sets_for_activity:
                 activity_set.pop("id", None)
-                activity_set["activity_id"] = new_activity_id
+                activity_set["activity_id"] = new_activity.id
                 set_activity = activity_sets_schema.ActivitySetsCreate(**activity_set)
                 sets.append(set_activity)
 
             if sets:
-                activity_sets_crud.create_activity_sets(sets, new_activity_id, self.db)
+                activity_sets_crud.create_activity_sets(sets, new_activity.id, self.db)
                 self.counts["activity_sets"] += len(sets)
 
         # Import streams - filter for this activity
@@ -689,12 +689,12 @@ class ImportService:
             ]
             for stream_data in streams_for_activity:
                 stream_data.pop("id", None)
-                stream_data["activity_id"] = new_activity_id
-                stream = activity_streams_schema.ActivityStreams(**stream_data)
+                stream_data["activity_id"] = new_activity.id
+                stream = activity_streams_schema.ActivityStreamsCreate(**stream_data)
                 streams.append(stream)
 
             if streams:
-                activity_streams_crud.create_activity_streams(streams, self.db)
+                await activity_streams_crud.create_activity_streams(streams, new_activity, self.db)
                 self.counts["activity_streams"] += len(streams)
 
         # Import workout steps
@@ -705,12 +705,12 @@ class ImportService:
             ]
             for step_data in steps_for_activity:
                 step_data.pop("id", None)
-                step_data["activity_id"] = new_activity_id
+                step_data["activity_id"] = new_activity.id
                 step = activity_workout_steps_schema.ActivityWorkoutSteps(**step_data)
                 steps.append(step)
 
             if steps:
-                activity_workout_steps_crud.create_activity_workout_steps(steps, new_activity_id, self.db)
+                activity_workout_steps_crud.create_activity_workout_steps(steps, new_activity.id, self.db)
                 self.counts["activity_workout_steps"] += len(steps)
 
         # Import media
@@ -723,7 +723,7 @@ class ImportService:
             ]
             for media_data in media_for_activity:
                 media_data.pop("id", None)
-                media_data["activity_id"] = new_activity_id
+                media_data["activity_id"] = new_activity.id
 
                 # Update media path
                 old_path = media_data.get("media_path", None)
@@ -736,7 +736,7 @@ class ImportService:
                         )
                         continue
                     suffix = filename.split("_", 1)[1]
-                    new_file_name = f"{new_activity_id}_{suffix}"
+                    new_file_name = f"{new_activity.id}_{suffix}"
                     try:
                         media_data["media_path"] = str(
                             file_uploads.resolve_storage_path(
@@ -755,7 +755,7 @@ class ImportService:
                 media.append(media_item)
 
             if media:
-                activity_media_crud.create_activity_medias(media, new_activity_id, self.db)
+                activity_media_crud.create_activity_medias(media, new_activity.id, self.db)
                 self.counts["activity_media"] += len(media)
 
         # Import exercise titles
@@ -766,7 +766,7 @@ class ImportService:
             ]
             for title_data in exercise_titles_for_activity:
                 title_data.pop("id", None)
-                title_data["activity_id"] = new_activity_id
+                title_data["activity_id"] = new_activity.id
                 title = activity_exercise_titles_schema.ActivityExerciseTitles(**title_data)
                 titles.append(title)
 
@@ -878,7 +878,7 @@ class ImportService:
                         activity_media_data,
                         activity_exercise_titles_data,
                         original_activity_id,
-                        new_activity.id,
+                        new_activity,
                     )
 
                 self.counts["activities"] += 1

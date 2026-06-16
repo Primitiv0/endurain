@@ -44,7 +44,9 @@ from .models import (
     ActivityStreams as ActivityStreamsModel,
 )
 from .schema import (
-    ActivityStreams,
+    ActivityStreamsBase,
+    ActivityStreamsCreate,
+    ActivityStreamsRead,
 )
 from .utils import (
     filter_visible_streams,
@@ -55,25 +57,22 @@ from .utils import (
 __all__ = [
     "STREAM_TYPE_CADENCE",
     "STREAM_TYPE_ELEVATION",
-    # Constants
     "STREAM_TYPE_HR",
     "STREAM_TYPE_MAP",
     "STREAM_TYPE_PACE",
     "STREAM_TYPE_POWER",
     "STREAM_TYPE_SPEED",
-    # Pydantic schemas
-    "ActivityStreams",
-    # Database model
+    "ActivityStreamsBase",
+    "ActivityStreamsCreate",
     "ActivityStreamsModel",
+    "ActivityStreamsRead",
     "create_activity_streams",
     "filter_visible_streams",
     "get_activities_streams",
     "get_activity_stream_by_type",
-    # CRUD operations
     "get_activity_streams",
     "get_public_activity_stream_by_type",
     "get_public_activity_streams",
     "is_stream_hidden",
-    # Utility functions
     "transform_activity_streams",
 ]

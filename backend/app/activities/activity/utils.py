@@ -1138,7 +1138,7 @@ async def store_activity(
 
     if activity_streams is not None:
         # Create activity streams in the database
-        activity_streams_crud.create_activity_streams(activity_streams, db)
+        await activity_streams_crud.create_activity_streams(activity_streams, created_activity, db)
 
     if parsed_info.get("laps") is not None:
         # Create activity laps in the database
@@ -1206,7 +1206,7 @@ def parse_activity_streams_from_file(parsed_info: dict, activity_id: int):
 
     # Return activity streams as a list of ActivityStreams objects
     return [
-        activity_streams_schema.ActivityStreams(
+        activity_streams_schema.ActivityStreamsCreate(
             activity_id=activity_id,
             stream_type=stream_type,
             stream_waypoints=waypoints,

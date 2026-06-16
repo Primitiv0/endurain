@@ -794,6 +794,7 @@ class TestStoreActivityExtended:
 
         mock_crud.create_activity = AsyncMock(return_value=MagicMock(id=1))
         mock_parse_streams.return_value = [MagicMock()]
+        mock_streams_crud.create_activity_streams = AsyncMock()
 
         parsed_info = {
             "activity": {"name": "test"},
