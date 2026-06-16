@@ -7,7 +7,7 @@
 #   Secrets    → WEBHOOK_SECRET  (must match WEBHOOK_SECRET env var on the bot container)
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - labeled
 
