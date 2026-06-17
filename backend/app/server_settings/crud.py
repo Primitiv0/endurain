@@ -1,3 +1,6 @@
+from typing import overload
+
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -5,11 +8,41 @@ import core.cryptography as core_cryptography
 import core.decorators as core_decorators
 import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
-import server_settings.utils as server_settings_utils
+
+# Private internal helpers
+
+
+@overload
+def _transform_server_settings(
+    server_settings: server_settings_models.ServerSettings,
+) -> server_settings_schema.ServerSettingsRead: ...
+
+
+@overload
+def _transform_server_settings(
+    server_settings: list[server_settings_models.ServerSettings],
+) -> list[server_settings_schema.ServerSettingsRead]: ...
+
+
+def _transform_server_settings(
+    server_settings: server_settings_models.ServerSettings | list[server_settings_models.ServerSettings],
+) -> server_settings_schema.ServerSettingsRead | list[server_settings_schema.ServerSettingsRead]:
+    """
+    Transform a server settings or list of server settings to a Pydantic schema.
+
+     Args:
+        server_settings: The server settings ORM instance or list of instances.
+
+     Returns:
+        The server settings(s) as a schema.
+    """
+    if isinstance(server_settings, list):
+        return [server_settings_schema.ServerSettingsRead.model_validate(s) for s in server_settings]
+    return server_settings_schema.ServerSettingsRead.model_validate(server_settings)
 
 
 @core_decorators.handle_db_errors
-def get_server_settings(db: Session) -> server_settings_models.ServerSettings | None:
+def _get_server_settings_model_or_404(db: Session) -> server_settings_models.ServerSettings:
     """
     Retrieve singleton server settings from database.
 
@@ -17,20 +50,51 @@ def get_server_settings(db: Session) -> server_settings_models.ServerSettings | 
         db: Database session.
 
     Returns:
-        ServerSettings instance or None if not found.
+        ServerSettings ORM instance.
 
     Raises:
         HTTPException: If database error occurs.
     """
     # Get the server settings from the database
     stmt = select(server_settings_models.ServerSettings).where(server_settings_models.ServerSettings.id == 1)
-    return db.execute(stmt).scalar_one_or_none()
+    db_server_settings = db.execute(stmt).scalar_one_or_none()
+
+    if db_server_settings is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Server settings not found.",
+        )
+
+    return db_server_settings
+
+
+# Public CRUD functions
+
+
+@core_decorators.handle_db_errors
+def get_server_settings(db: Session) -> server_settings_schema.ServerSettingsRead | None:
+    """
+    Retrieve singleton server settings from database.
+
+    Args:
+        db: Database session.
+
+    Returns:
+        ServerSettingsRead schema or None if not found.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the server settings from the database
+    stmt = select(server_settings_models.ServerSettings).where(server_settings_models.ServerSettings.id == 1)
+    db_server_settings = db.execute(stmt).scalar_one_or_none()
+    return _transform_server_settings(db_server_settings) if db_server_settings else None
 
 
 @core_decorators.handle_db_errors
 def edit_server_settings(
     server_settings: server_settings_schema.ServerSettingsEdit, db: Session
-) -> server_settings_models.ServerSettings:
+) -> server_settings_schema.ServerSettingsRead:
     """
     Update server settings in database.
 
@@ -39,13 +103,13 @@ def edit_server_settings(
         db: Database session.
 
     Returns:
-        Updated ServerSettings instance.
+        Updated ServerSettingsRead schema.
 
     Raises:
         HTTPException: If settings not found or database error.
     """
     # Get the server_settings from the database
-    db_server_settings = server_settings_utils.get_server_settings_or_404(db)
+    db_server_settings = _get_server_settings_model_or_404(db)
 
     if server_settings.tileserver_api_key is not None:
         # Encrypt the tile server API key before storing
@@ -63,13 +127,13 @@ def edit_server_settings(
     # Refresh the object to ensure it reflects database state
     db.refresh(db_server_settings)
 
-    return db_server_settings
+    return _transform_server_settings(db_server_settings)
 
 
 @core_decorators.handle_db_errors
 def update_server_settings_login_photo_set(is_set: bool, db: Session) -> None:
     # Get the server_settings from the database
-    db_server_settings = server_settings_utils.get_server_settings_or_404(db)
+    db_server_settings = _get_server_settings_model_or_404(db)
 
     db_server_settings.login_photo_set = is_set
 

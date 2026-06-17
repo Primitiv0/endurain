@@ -137,6 +137,76 @@ def start_scheduler() -> None:
     )
 
 
+def schedule_thumbnail_regeneration() -> None:
+    """
+    Queue a one-shot full thumbnail regeneration job.
+
+    Runs the heavy delete-and-regenerate pass on the scheduler's
+    own executor instead of the request threadpool. Repeated calls
+    coalesce into a single pending run via a fixed job id.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    try:
+        scheduler.add_job(
+            activities_utils.delete_and_regenerate_all_activity_thumbnails,
+            "date",
+            id="endurain_regenerate_all_thumbnails",
+            replace_existing=True,
+            misfire_grace_time=None,
+        )
+        core_logger.print_to_log("Scheduled one-shot thumbnail regeneration job")
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Failed to schedule thumbnail regeneration job: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
+
+
+def schedule_missing_thumbnail_generation() -> None:
+    """
+    Queue a one-shot missing-thumbnail generation job.
+
+    Used at startup so the potentially heavy generation pass runs
+    on the scheduler's own executor after the app is ready, instead
+    of blocking the lifespan startup (which would delay uvicorn from
+    accepting connections). Repeated calls coalesce into a single
+    pending run via a fixed job id.
+
+    Args:
+        None.
+
+    Returns:
+        None.
+
+    Raises:
+        None.
+    """
+    try:
+        scheduler.add_job(
+            activities_utils.generate_missing_activity_thumbnails,
+            "date",
+            id="endurain_generate_missing_thumbnails_oneshot",
+            replace_existing=True,
+            misfire_grace_time=None,
+        )
+        core_logger.print_to_log("Scheduled one-shot missing thumbnail generation job")
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Failed to schedule missing thumbnail generation job: {type(err).__name__}",
+            "error",
+            exc=err,
+        )
+
+
 def _scheduler_job_id(description: str) -> str:
     """
     Build a stable scheduler job ID from its description.

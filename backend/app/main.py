@@ -19,7 +19,6 @@ from fastapi.staticfiles import StaticFiles
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-import activities.activity.utils as activities_utils
 import auth.identity_providers.link_tokens.utils as idp_link_token_utils
 import auth.oauth_state.utils as oauth_state_utils
 import auth.password_reset_tokens.utils as password_reset_tokens_utils
@@ -134,8 +133,14 @@ def _purge_expired_tokens() -> None:
 
 
 def _generate_missing_thumbnails() -> None:
-    """Generate map thumbnails for activities missing one."""
-    activities_utils.generate_missing_activity_thumbnails()
+    """Queue map-thumbnail generation for activities missing one.
+
+    Schedules a one-shot job on the background scheduler instead of
+    running the (potentially heavy) generation inline, so it cannot
+    block lifespan startup and delay the server from accepting
+    connections.
+    """
+    core_scheduler.schedule_missing_thumbnail_generation()
 
 
 def _init_allowed_tile_domains(fastapi_app: FastAPI) -> None:
@@ -216,7 +221,7 @@ async def startup_event(fastapi_app: FastAPI) -> None:
     core_logger.print_to_log_and_console("Purging expired tokens (password reset, sign-up, OAuth state, IdP link)")
     _safe_run("purge_expired_tokens", _purge_expired_tokens)
 
-    core_logger.print_to_log_and_console("Generating missing activity map thumbnails")
+    core_logger.print_to_log_and_console("Scheduling missing activity map thumbnail generation")
     _safe_run("generate_missing_thumbnails", _generate_missing_thumbnails)
 
     core_logger.print_to_log_and_console("Initializing allowed tile domains for Content Security Policy")

@@ -16,32 +16,32 @@ import server_settings.schema as server_settings_schema
 class TestReadServerSettings:
     """Test suite for read_server_settings endpoint."""
 
-    @patch("server_settings.router.server_settings_utils.get_server_settings_or_404")
+    @patch("server_settings.router.server_settings_utils.get_server_settings_for_admin")
     def test_read_server_settings_success(self, mock_get_settings, fast_api_client, fast_api_app):
         """Test successful retrieval of server settings."""
         # Arrange
-        mock_settings = MagicMock(spec=server_settings_models.ServerSettings)
-        mock_settings.id = 1
-        mock_settings.units = "metric"
-        mock_settings.public_shareable_links = False
-        mock_settings.public_shareable_links_user_info = False
-        mock_settings.login_photo_set = False
-        mock_settings.currency = "euro"
-        mock_settings.num_records_per_page = 25
-        mock_settings.signup_enabled = False
-        mock_settings.signup_require_admin_approval = True
-        mock_settings.signup_require_email_verification = True
-        mock_settings.sso_enabled = False
-        mock_settings.local_login_enabled = True
-        mock_settings.sso_auto_redirect = False
-        mock_settings.tileserver_url = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        mock_settings.tileserver_attribution = "&copy; OpenStreetMap"
-        mock_settings.map_background_color = "#dddddd"
-        mock_settings.password_type = "strict"
-        mock_settings.password_length_regular_users = 8
-        mock_settings.password_length_admin_users = 12
-        mock_settings.tileserver_api_key = None
-        mock_settings.tileserver_regenerate_thumbnails_on_change = False
+        mock_settings = server_settings_schema.ServerSettingsRead(
+            id=1,
+            units=server_settings_schema.Units.METRIC,
+            public_shareable_links=False,
+            public_shareable_links_user_info=False,
+            login_photo_set=False,
+            currency=server_settings_schema.Currency.EURO,
+            num_records_per_page=25,
+            signup_enabled=False,
+            signup_require_admin_approval=True,
+            signup_require_email_verification=True,
+            sso_enabled=False,
+            local_login_enabled=True,
+            sso_auto_redirect=False,
+            tileserver_url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            tileserver_attribution="&copy; OpenStreetMap",
+            map_background_color="#dddddd",
+            password_type="strict",
+            password_length_regular_users=8,
+            password_length_admin_users=12,
+            tileserver_api_key=None,
+        )
 
         mock_get_settings.return_value = mock_settings
 

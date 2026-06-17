@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 import core.cryptography as core_cryptography
 import core.logger as core_logger
 import server_settings.crud as server_settings_crud
-import server_settings.models as server_settings_models
 import server_settings.schema as server_settings_schema
 
 TILE_MAPS_TEMPLATES: dict[str, dict[str, Any]] = {
@@ -54,7 +53,7 @@ TILE_MAPS_TEMPLATES: dict[str, dict[str, Any]] = {
 }
 
 
-def get_server_settings_or_404(db: Session) -> server_settings_models.ServerSettings:
+def get_server_settings_or_404(db: Session) -> server_settings_schema.ServerSettingsRead:
     """
     Get server settings or raise 404.
 
@@ -76,6 +75,26 @@ def get_server_settings_or_404(db: Session) -> server_settings_models.ServerSett
         ) from None
 
     return server_settings
+
+
+def get_server_settings_for_public(db: Session) -> server_settings_schema.ServerSettingsReadPublic:
+    """
+    Get server settings for public access.
+
+    This function retrieves server settings and transforms them into a schema
+    that only includes fields safe for public exposure (e.g., no API keys).
+
+    Args:
+        db: Database session.
+
+    Returns:
+        ServerSettingsReadPublic schema.
+
+    Raises:
+        HTTPException: If server settings not found or database error.
+    """
+    server_settings = get_server_settings_or_404(db)
+    return server_settings_schema.ServerSettingsReadPublic.model_validate(server_settings)
 
 
 def get_server_settings_for_admin(
@@ -103,9 +122,7 @@ def get_server_settings_for_admin(
     if server_settings.tileserver_api_key:
         decrypted_api_key = core_cryptography.decrypt_token_fernet(server_settings.tileserver_api_key)
 
-    # Convert ORM model to schema and override the decrypted API key
-    settings_schema = server_settings_schema.ServerSettingsRead.model_validate(server_settings)
-    return settings_schema.model_copy(update={"tileserver_api_key": decrypted_api_key})
+    return server_settings.model_copy(update={"tileserver_api_key": decrypted_api_key})
 
 
 def get_tile_maps_templates() -> list[server_settings_schema.TileMapsTemplate]:

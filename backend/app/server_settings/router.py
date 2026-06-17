@@ -3,7 +3,6 @@ from typing import Annotated
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     Request,
     Security,
@@ -12,12 +11,12 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-import activities.activity.utils as activities_utils
 import auth.dependencies as auth_dependencies
 import core.config as core_config
 import core.database as core_database
 import core.file_uploads as core_file_uploads
 import core.logger as core_logger
+import core.scheduler as core_scheduler
 import server_settings.crud as server_settings_crud
 import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
@@ -86,7 +85,6 @@ async def list_tile_maps_templates(
 )
 async def edit_server_settings(
     request: Request,
-    background_tasks: BackgroundTasks,
     server_settings_attributes: server_settings_schema.ServerSettingsEdit,
     _check_scopes: Annotated[
         Callable,
@@ -109,7 +107,7 @@ async def edit_server_settings(
     Returns:
         Updated server settings configuration.
     """
-    result = server_settings_crud.edit_server_settings(server_settings_attributes, db)
+    server_settings_updated = server_settings_crud.edit_server_settings(server_settings_attributes, db)
 
     # Update allowed tile domains in app.state if tileserver_url changed
     if server_settings_attributes.tileserver_url is not None:
@@ -123,14 +121,14 @@ async def edit_server_settings(
     # and any map-related field was part of this update
     _map_fields = {"tileserver_url", "tileserver_api_key", "map_background_color"}
     changed_fields = set(server_settings_attributes.model_dump(exclude_unset=True).keys())
-    if result.tileserver_regenerate_thumbnails_on_change and (changed_fields & _map_fields):
+    if server_settings_updated.tileserver_regenerate_thumbnails_on_change and (changed_fields & _map_fields):
         core_logger.print_to_log(
             "Tile server settings changed with regeneration enabled — scheduling thumbnail regeneration",
             "info",
         )
-        background_tasks.add_task(activities_utils.delete_and_regenerate_all_activity_thumbnails)
+        core_scheduler.schedule_thumbnail_regeneration()
 
-    return result
+    return server_settings_updated
 
 
 @router.post(

@@ -19,7 +19,8 @@ import server_settings.schema as server_settings_schema
 class TestGetServerSettings:
     """Test suite for get_server_settings function."""
 
-    def test_get_server_settings_success(self, mock_db):
+    @patch("server_settings.crud._transform_server_settings")
+    def test_get_server_settings_success(self, mock_transform, mock_db):
         """Test successful retrieval of server settings."""
         # Arrange
         mock_settings = MagicMock(spec=server_settings_models.ServerSettings)
@@ -30,6 +31,7 @@ class TestGetServerSettings:
         mock_execute = MagicMock()
         mock_execute.scalar_one_or_none.return_value = mock_settings
         mock_db.execute.return_value = mock_execute
+        mock_transform.return_value = mock_settings
 
         # Act
         result = server_settings_crud.get_server_settings(mock_db)
@@ -37,6 +39,7 @@ class TestGetServerSettings:
         # Assert
         assert result == mock_settings
         mock_db.execute.assert_called_once()
+        mock_transform.assert_called_once_with(mock_settings)
 
     def test_get_server_settings_not_found(self, mock_db):
         """Test retrieval when settings don't exist."""
@@ -67,8 +70,9 @@ class TestGetServerSettings:
 class TestEditServerSettings:
     """Test suite for edit_server_settings function."""
 
-    @patch("server_settings.crud.get_server_settings")
-    def test_edit_server_settings_success(self, mock_get_settings, mock_db):
+    @patch("server_settings.crud._transform_server_settings")
+    @patch("server_settings.crud._get_server_settings_model_or_404")
+    def test_edit_server_settings_success(self, mock_get_model, mock_transform, mock_db):
         """Test successful update of server settings."""
         # Arrange
         mock_existing_settings = MagicMock(spec=server_settings_models.ServerSettings)
@@ -78,7 +82,8 @@ class TestEditServerSettings:
         mock_existing_settings.num_records_per_page = 25
         mock_existing_settings.signup_enabled = False
 
-        mock_get_settings.return_value = mock_existing_settings
+        mock_get_model.return_value = mock_existing_settings
+        mock_transform.return_value = mock_existing_settings
 
         update_data = server_settings_schema.ServerSettingsEdit(
             id=1,
@@ -110,11 +115,14 @@ class TestEditServerSettings:
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(mock_existing_settings)
 
-    @patch("server_settings.crud.get_server_settings")
-    def test_edit_server_settings_not_found(self, mock_get_settings, mock_db):
+    @patch("server_settings.crud._get_server_settings_model_or_404")
+    def test_edit_server_settings_not_found(self, mock_get_model, mock_db):
         """Test update when settings don't exist."""
         # Arrange
-        mock_get_settings.return_value = None
+        mock_get_model.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Server settings not found.",
+        )
 
         update_data = server_settings_schema.ServerSettingsEdit(
             id=1,
@@ -143,10 +151,11 @@ class TestEditServerSettings:
             server_settings_crud.edit_server_settings(update_data, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert exc_info.value.detail == "Server settings not found"
+        assert exc_info.value.detail == "Server settings not found."
 
-    @patch("server_settings.crud.get_server_settings")
-    def test_edit_server_settings_partial_update(self, mock_get_settings, mock_db):
+    @patch("server_settings.crud._transform_server_settings")
+    @patch("server_settings.crud._get_server_settings_model_or_404")
+    def test_edit_server_settings_partial_update(self, mock_get_model, mock_transform, mock_db):
         """Test partial update of server settings."""
         # Arrange
         mock_existing_settings = MagicMock(spec=server_settings_models.ServerSettings)
@@ -154,7 +163,8 @@ class TestEditServerSettings:
         mock_existing_settings.units = 1
         mock_existing_settings.num_records_per_page = 25
 
-        mock_get_settings.return_value = mock_existing_settings
+        mock_get_model.return_value = mock_existing_settings
+        mock_transform.return_value = mock_existing_settings
 
         # Create update with only some fields
         update_data = server_settings_schema.ServerSettingsEdit(
