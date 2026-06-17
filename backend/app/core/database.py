@@ -34,6 +34,15 @@ db_url = URL.create(
     database=os.environ.get("DB_DATABASE", "endurain"),
 )
 
+# Pin the database session timezone to UTC. The import
+# parsers emit naive UTC wall-clock timestamps, and the
+# datetime columns are TIMESTAMP WITH TIME ZONE. Without
+# this, PostgreSQL interprets naive values in the server's
+# session timezone (driven by the container TZ env var),
+# which shifts stored instants when TZ != UTC. Forcing UTC
+# makes storage deterministic regardless of deployment TZ.
+_connect_args: dict = {"options": "-c timezone=utc"}
+
 # Optional TLS for the database connection (OWASP A02 —
 # Cryptographic Failures). Opt-in via the DB_SSLMODE env
 # var so self-hosters running plain Postgres are not
@@ -41,7 +50,6 @@ db_url = URL.create(
 # disable | allow | prefer | require | verify-ca |
 # verify-full. Recommended for any deployed environment:
 # DB_SSLMODE=require (or stricter).
-_connect_args: dict = {}
 _db_sslmode = os.environ.get("DB_SSLMODE", "").strip().lower()
 if _db_sslmode:
     _connect_args["sslmode"] = _db_sslmode

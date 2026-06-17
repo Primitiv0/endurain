@@ -1,6 +1,6 @@
 """Tests for TCX activity file import utilities."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import activities.activity_file_import.utils_tcx as utils_tcx
@@ -114,3 +114,62 @@ class TestUtilsTcx:
         assert activity.end_time is None
         assert activity.total_elapsed_time is None
         assert activity.total_timer_time is None
+
+    def test_extract_waypoints_converts_offset_to_utc(self):
+        """Offset-bearing trackpoint times are normalized to UTC (issue #588)."""
+        # 08:19:19-07:00 is 15:19:19 UTC.
+        dt = datetime(2026, 3, 28, 8, 19, 19, tzinfo=timezone(timedelta(hours=-7)))
+
+        trackpoints = [
+            {
+                "time": dt,
+                "latitude": 10.0,
+                "longitude": 20.0,
+                "hr_value": 150,
+                "cadence": 85,
+                "elevation": 100,
+            },
+        ]
+        tcx_file = SimpleNamespace(trackpoints=[])
+
+        waypoints = utils_tcx._extract_waypoints(trackpoints, tcx_file)
+
+        assert waypoints["lat_lon_waypoints"][0]["time"] == "2026-03-28T15:19:19"
+        assert waypoints["hr_waypoints"][0]["time"] == "2026-03-28T15:19:19"
+
+    def test_build_activity_converts_offset_start_end_to_utc(self):
+        """Activity start/end with offset are stored as UTC (issue #588)."""
+        start = datetime(2026, 3, 28, 8, 19, 19, tzinfo=timezone(timedelta(hours=-7)))
+        end = datetime(2026, 3, 28, 9, 19, 19, tzinfo=timezone(timedelta(hours=-7)))
+        tcx_file = SimpleNamespace(
+            start_time=start,
+            end_time=end,
+            ascent=None,
+            descent=None,
+            hr_avg=None,
+            hr_max=None,
+            cadence_avg=None,
+            cadence_max=None,
+            calories=None,
+        )
+
+        activity = utils_tcx._build_activity(
+            tcx_file=tcx_file,
+            user_id=1,
+            activity_name="Ride",
+            activity_type=1,
+            distance=0,
+            timezone="America/Vancouver",
+            pace=None,
+            city=None,
+            town=None,
+            country=None,
+            avg_power=None,
+            max_power=None,
+            norm_power=None,
+            gear_id=None,
+            user_privacy_settings=_privacy_settings(),
+        )
+
+        assert activity.start_time == "2026-03-28T15:19:19"
+        assert activity.end_time == "2026-03-28T16:19:19"

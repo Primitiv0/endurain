@@ -143,6 +143,47 @@ class TestParseGpxFile:
         assert result["activity"].max_speed < 20
         assert all(lap["total_distance"] < 1000 for lap in result["laps"])
 
+    def test_parse_gpx_file_converts_offset_timestamps_to_utc(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        """Timestamps with a non-UTC offset are stored as UTC (issue #588)."""
+        _patch_parser_side_effects(monkeypatch)
+        gpx_path = _write_gpx(
+            tmp_path,
+            """
+            <gpx version="1.1" creator="pytest">
+              <trk>
+                <name>Offset run</name>
+                <type>Run</type>
+                <trkseg>
+                  <trkpt lat="0.0" lon="0.0">
+                    <time>2026-03-28T08:19:19-07:00</time>
+                  </trkpt>
+                  <trkpt lat="0.0" lon="0.001">
+                    <time>2026-03-28T08:19:29-07:00</time>
+                  </trkpt>
+                </trkseg>
+              </trk>
+            </gpx>
+            """.strip(),
+        )
+
+        result = utils_gpx.parse_gpx_file(
+            gpx_path,
+            user_id=1,
+            user_privacy_settings=_privacy_settings(),
+            db=MagicMock(),
+        )
+
+        # 08:19:19-07:00 == 15:19:19 UTC; the offset must be
+        # converted, not silently dropped.
+        assert result["activity"].start_time == "2026-03-28T15:19:19"
+        assert result["activity"].end_time == "2026-03-28T15:19:29"
+        assert result["lat_lon_waypoints"][0]["time"] == "2026-03-28T15:19:19"
+        assert result["laps"][0]["start_time"] == "2026-03-28T15:19:19"
+
     def test_parse_gpx_file_rejects_no_valid_segments(
         self,
         tmp_path,

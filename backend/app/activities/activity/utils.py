@@ -245,12 +245,9 @@ ACTIVITY_NAME_TO_ID.update(
 def transform_schema_activity_to_model_activity(
     activity: activities_schema.Activity,
 ) -> activities_models.Activity:
-    # Set the created date to now
-    created_date = func.now()
-
-    # If the created_at date is not None, set it to the created_date
-    if activity.created_at is not None:
-        created_date = activity.created_at
+    # Use an explicit UTC-aware created_at when provided,
+    # otherwise let the database stamp the row with now().
+    created_date = core_timezone.to_utc_aware(activity.created_at) if activity.created_at is not None else func.now()
 
     # Sanitize markdown fields to prevent XSS
     sanitized_description = core_sanitization.sanitize_markdown(activity.description)
@@ -264,8 +261,8 @@ def transform_schema_activity_to_model_activity(
         distance=activity.distance,
         name=activity.name,
         activity_type=activity.activity_type,
-        start_time=activity.start_time,
-        end_time=activity.end_time,
+        start_time=core_timezone.to_utc_aware(activity.start_time),
+        end_time=core_timezone.to_utc_aware(activity.end_time),
         timezone=activity.timezone,
         total_elapsed_time=activity.total_elapsed_time,
         total_timer_time=(

@@ -1111,11 +1111,14 @@ def calculate_pace(distance, total_timer_time, activity_type, split_summary, len
 def find_timezone_name(offset_seconds, reference_date):
     for tz_name in available_timezones():
         tz = ZoneInfo(tz_name)
-        if reference_date.utcoffset() is None:  # Skip invalid timezones
-            continue
 
-        # Get the UTC offset for the reference date
+        # Get the UTC offset of the candidate timezone for
+        # the reference date (DST-aware).
         utc_offset = reference_date.astimezone(tz).utcoffset()
+        if utc_offset is None:  # Skip invalid timezones
+            continue
 
         if utc_offset.total_seconds() == offset_seconds:
             return tz_name
+
+    return None

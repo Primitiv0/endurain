@@ -17,6 +17,7 @@ import activities.activity.utils as activities_utils
 import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
+import core.timezone as core_timezone
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
 
@@ -26,9 +27,6 @@ from activities.activity_file_import.utils import (
     LapMetrics,
     generate_activity_laps,
 )
-
-# ISO 8601 datetime format used throughout this module
-_DT_FMT = "%Y-%m-%dT%H:%M:%S"
 
 # Activity type IDs that do not use GPS-based timezone
 # detection (e.g. indoor/pool activities)
@@ -386,7 +384,7 @@ def _process_trackpoint(
         instant_pace = 1 / instant_speed
         state.is_velocity_set = True
 
-    timestamp = time.strftime(_DT_FMT)
+    timestamp = core_timezone.format_utc(time)
 
     if latitude is not None and longitude is not None:
         state.lat_lon_waypoints.append(
@@ -549,8 +547,8 @@ def _build_activity_schema(
         description=state.activity_description,
         distance=round(state.distance) if state.distance else 0,
         activity_type=int(state.activity_type),
-        start_time=state.first_waypoint_time.strftime(_DT_FMT),
-        end_time=state.last_waypoint_time.strftime(_DT_FMT),
+        start_time=core_timezone.format_utc(state.first_waypoint_time),
+        end_time=core_timezone.format_utc(state.last_waypoint_time),
         timezone=state.timezone,
         total_elapsed_time=elapsed,
         total_timer_time=elapsed,

@@ -11,6 +11,7 @@ import activities.activity.utils as activities_utils
 import activities.activity_file_import.utils as activity_file_import_utils
 import core.config as core_config
 import core.logger as core_logger
+import core.timezone as core_timezone
 import users.users_default_gear.utils as user_default_gear_utils
 import users.users_privacy_settings.models as users_privacy_settings_models
 
@@ -33,7 +34,7 @@ def _parse_lap_power(
         if hasattr(trackpoint, "tpx_ext") and "Watts" in trackpoint.tpx_ext and trackpoint.time is not None:
             power_waypoints.append(
                 {
-                    "time": trackpoint.time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "time": core_timezone.format_utc(trackpoint.time),
                     "power": trackpoint.tpx_ext["Watts"],
                 }
             )
@@ -68,7 +69,7 @@ def _parse_laps(
 
         laps.append(
             {
-                "start_time": lap.start_time,
+                "start_time": core_timezone.to_utc_aware(lap.start_time),
                 "start_position_lat": (lap.trackpoints[0].latitude),
                 "start_position_long": (lap.trackpoints[0].longitude),
                 "end_position_lat": (lap.trackpoints[-1].latitude),
@@ -116,11 +117,9 @@ def _extract_waypoints(
         Dict with lat_lon, hr, cad, ele, power,
         vel, and pace waypoint lists.
     """
-    fmt = "%Y-%m-%dT%H:%M:%S"
-
     lat_lon_waypoints = [
         {
-            "time": tp["time"].strftime(fmt),
+            "time": core_timezone.format_utc(tp["time"]),
             "lat": tp["latitude"],
             "lon": tp["longitude"],
         }
@@ -130,7 +129,7 @@ def _extract_waypoints(
 
     hr_waypoints = [
         {
-            "time": tp["time"].strftime(fmt),
+            "time": core_timezone.format_utc(tp["time"]),
             "hr": tp["hr_value"],
         }
         for tp in trackpoints
@@ -139,7 +138,7 @@ def _extract_waypoints(
 
     cad_waypoints = [
         {
-            "time": tp["time"].strftime(fmt),
+            "time": core_timezone.format_utc(tp["time"]),
             "cad": tp["cadence"],
         }
         for tp in trackpoints
@@ -148,7 +147,7 @@ def _extract_waypoints(
     if not cad_waypoints:
         cad_waypoints = [
             {
-                "time": tp.time.strftime(fmt),
+                "time": core_timezone.format_utc(tp.time),
                 "cad": tp.tpx_ext["RunCadence"],
             }
             for tp in tcx_file.trackpoints
@@ -157,7 +156,7 @@ def _extract_waypoints(
 
     ele_waypoints = [
         {
-            "time": tp["time"].strftime(fmt),
+            "time": core_timezone.format_utc(tp["time"]),
             "ele": tp["elevation"],
         }
         for tp in trackpoints
@@ -166,7 +165,7 @@ def _extract_waypoints(
 
     power_waypoints = [
         {
-            "time": tp.time.strftime(fmt),
+            "time": core_timezone.format_utc(tp.time),
             "power": tp.tpx_ext["Watts"],
         }
         for tp in tcx_file.trackpoints
@@ -187,7 +186,7 @@ def _extract_waypoints(
         if time_val is None:
             continue
 
-        timestamp = time_val.strftime(fmt)
+        timestamp = core_timezone.format_utc(time_val)
 
         instant_speed = activities_utils.calculate_instant_speed(
             last_time,
@@ -271,7 +270,6 @@ def _build_activity(
     Returns:
         Populated Activity Pydantic schema.
     """
-    fmt = "%Y-%m-%dT%H:%M:%S"
     elapsed = (
         (tcx_file.end_time - tcx_file.start_time).total_seconds() if tcx_file.start_time and tcx_file.end_time else None
     )
@@ -284,8 +282,8 @@ def _build_activity(
         distance=distance,
         activity_type=activity_type,
         timezone=timezone,
-        start_time=(tcx_file.start_time.strftime(fmt) if tcx_file.start_time else None),
-        end_time=(tcx_file.end_time.strftime(fmt) if tcx_file.end_time else None),
+        start_time=(core_timezone.format_utc(tcx_file.start_time) if tcx_file.start_time else None),
+        end_time=(core_timezone.format_utc(tcx_file.end_time) if tcx_file.end_time else None),
         total_elapsed_time=elapsed,
         total_timer_time=elapsed,
         city=city,
