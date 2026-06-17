@@ -11,6 +11,16 @@ import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
 
 
+@pytest.fixture(autouse=True)
+def _patch_transform():
+    """Patch _transform_users_goals to a passthrough for MagicMock compatibility."""
+    with patch(
+        "users.users_goals.crud._transform_users_goals",
+        side_effect=lambda x: x,
+    ):
+        yield
+
+
 class TestGetUserGoalsByUserId:
     """
     Test suite for get_user_goals_by_user_id function.
@@ -180,7 +190,7 @@ class TestUpdateUserGoal:
     Test suite for update_user_goal function.
     """
 
-    @patch("users.users_goals.crud.get_user_goal_by_user_and_goal_id")
+    @patch("users.users_goals.crud._get_user_goal_model_by_user_and_goal_id_or_404")
     def test_update_user_goal_success(self, mock_get_goal, mock_db):
         """Test successful goal update."""
         # Arrange
@@ -211,7 +221,7 @@ class TestUpdateUserGoal:
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(mock_db_goal)
 
-    @patch("users.users_goals.crud.get_user_goal_by_user_and_goal_id")
+    @patch("users.users_goals.crud._get_user_goal_model_by_user_and_goal_id_or_404")
     def test_update_user_goal_not_found(self, mock_get_goal, mock_db):
         """Test update fails when goal not found."""
         # Arrange
@@ -230,7 +240,10 @@ class TestUpdateUserGoal:
             goal_duration=None,
         )
 
-        mock_get_goal.return_value = None
+        mock_get_goal.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User goal not found",
+        )
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -273,7 +286,7 @@ class TestDeleteUserGoal:
     Test suite for delete_user_goal function.
     """
 
-    @patch("users.users_goals.crud.get_user_goal_by_user_and_goal_id")
+    @patch("users.users_goals.crud._get_user_goal_model_by_user_and_goal_id_or_404")
     def test_delete_user_goal_success(self, mock_get_goal, mock_db):
         """Test successful goal deletion."""
         # Arrange
@@ -289,13 +302,16 @@ class TestDeleteUserGoal:
         mock_db.delete.assert_called_once_with(mock_db_goal)
         mock_db.commit.assert_called_once()
 
-    @patch("users.users_goals.crud.get_user_goal_by_user_and_goal_id")
+    @patch("users.users_goals.crud._get_user_goal_model_by_user_and_goal_id_or_404")
     def test_delete_user_goal_not_found(self, mock_get_goal, mock_db):
         """Test deletion fails when goal not found."""
         # Arrange
         user_id = 1
         goal_id = 999
-        mock_get_goal.return_value = None
+        mock_get_goal.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User goal not found",
+        )
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:

@@ -73,7 +73,7 @@ async def strava_link(
         )
 
         # Update the user integrations with the tokens
-        user_integrations_crud.link_strava_account(user_integrations, tokens, db)
+        user_integrations_crud.link_strava_account(user_integrations.user_id, tokens, db)
 
         # Return success message
         return {"detail": f"Strava linked successfully for user {user_integrations.user_id}"}

@@ -17,7 +17,7 @@ import core.apprise as core_apprise
 import core.i18n as core_i18n
 import core.logger as core_logger
 import users.users.crud as users_crud
-import users.users.models as users_models
+import users.users.schema as users_schema
 import users.users.utils as users_utils
 from core.database import SessionLocal
 
@@ -55,7 +55,7 @@ def create_sign_up_token(user_id: int, db: Session) -> str:
 
 
 async def send_sign_up_email(
-    user: users_models.Users,
+    user: users_schema.UsersRead,
     email_service: core_apprise.AppriseService,
     db: Session,
 ) -> bool:
@@ -102,7 +102,7 @@ async def send_sign_up_email(
 
 
 async def send_sign_up_admin_approval_email(
-    user: users_models.Users,
+    user: users_schema.UsersRead,
     email_service: core_apprise.AppriseService,
     db: Session,
 ) -> None:

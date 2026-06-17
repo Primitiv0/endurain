@@ -34,10 +34,12 @@ class TestCreateActivityStreams:
         mock_db.add_all.assert_called_once()
         mock_db.commit.assert_called_once()
 
-    async def test_empty(self, mock_db):
+    @patch("activities.activity_streams.crud.users_crud.get_user_by_id")
+    async def test_empty(self, mock_get_user_by_id, mock_db):
         import activities.activity_streams.crud as crud
 
         mock_activity = MagicMock(user_id=1, id=1)
+        mock_get_user_by_id.return_value = MagicMock(max_heart_rate=200)
         await crud.create_activity_streams([], mock_activity, mock_db)
 
     @patch("activities.activity_streams.crud.activity_streams_models.ActivityStreams")
@@ -123,7 +125,7 @@ class TestGetActivityStreams:
 
         mock_get_act.return_value = MagicMock(user_id=1)
         mock_transform.return_value = [
-            ActivityStreamsRead(activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None)
+            ActivityStreamsRead(id=1, activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None)
         ]
         setup_mock_execute(
             mock_db, return_scalars_all=[mock_model(m.ActivityStreams, id=1, activity_id=1, stream_type=1)]
@@ -140,7 +142,7 @@ class TestGetActivityStreams:
 
         mock_get_act.return_value = MagicMock(user_id=1)
         mock_validate.return_value = ActivityStreamsRead(
-            activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None
+            id=1, activity_id=1, stream_type=1, stream_waypoints=[], strava_activity_stream_id=None
         )
         setup_mock_execute(
             mock_db, return_one_or_none=mock_model(m.ActivityStreams, id=1, activity_id=1, stream_type=1)

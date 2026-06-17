@@ -11,14 +11,13 @@ import core.config as core_config
 import core.file_uploads as core_file_uploads
 import health.health_targets.crud as health_targets_crud
 import users.users.crud as users_crud
-import users.users.models as users_models
 import users.users.schema as users_schema
 import users.users_default_gear.crud as user_default_gear_crud
 import users.users_integrations.crud as user_integrations_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
 
 
-def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
+def get_user_by_id_or_404(user_id: int, db: Session) -> users_schema.UsersRead:
     """
     Retrieve user by ID or raise 404 error.
 
@@ -27,13 +26,13 @@ def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
         db: SQLAlchemy database session.
 
     Returns:
-        Users model (guaranteed non-None).
+        Users schema (guaranteed non-None).
 
     Raises:
         HTTPException: 404 if user not found.
     """
     # Get the user from the database
-    db_user = users_crud.get_user_by_id(user_id, db)
+    db_user: users_schema.UsersRead | None = users_crud.get_user_by_id(user_id, db)
 
     if db_user is None:
         raise HTTPException(
@@ -45,7 +44,7 @@ def get_user_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
     return db_user
 
 
-def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
+def get_admin_users_or_404(db: Session) -> list[users_schema.UsersRead]:
     """
     Retrieve all admin users from database or raise 404 error.
 
@@ -53,12 +52,12 @@ def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
         db: SQLAlchemy database session.
 
     Returns:
-        List of all admin User models.
+        List of all admin User schemas.
 
     Raises:
         HTTPException: 404 if no admin users found.
     """
-    admins = users_crud.get_users_admin(db)
+    admins: list[users_schema.UsersRead] = users_crud.get_users_admin(db)
 
     if not admins:
         raise HTTPException(
@@ -70,13 +69,13 @@ def get_admin_users_or_404(db: Session) -> list[users_models.Users]:
 
 
 def check_user_is_active(
-    user: users_models.Users | users_schema.UsersRead,
+    user: users_schema.UsersRead,
 ) -> None:
     """
     Check if user is active and raise 403 if inactive.
 
     Args:
-        user: User object to check (User or UsersRead schema).
+        user: User object to check (UsersRead schema).
 
     Returns:
         None
@@ -147,6 +146,11 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
         HTTPException: 400 if filename or extension is invalid,
             413 if too large, 500 if upload fails.
     """
+    try:
+        get_user_by_id_or_404(user_id, db)
+    except HTTPException as err:
+        raise err
+
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -164,7 +168,7 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
             detail="Unsupported user image file type",
         )
 
-    filename = f"{user_id}{file_extension}"
+    filename: str = f"{user_id}{file_extension}"
 
     # Save file using centralized file upload handler
     await core_file_uploads.save_validated_upload(

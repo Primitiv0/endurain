@@ -168,8 +168,6 @@ class TestDeleteIdentityProviderLink:
 
     def test_unlinks_successfully(self, mock_db):
         step_up = MagicMock()
-        mock_user = MagicMock()
-        mock_user.password = "hashed"
         existing_links = [MagicMock(), MagicMock()]  # 2 links, so one can be removed
 
         with (
@@ -181,10 +179,6 @@ class TestDeleteIdentityProviderLink:
             patch(
                 "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id",
                 return_value=MagicMock(),
-            ),
-            patch(
-                "auth.services.identity_link_service.users_crud.get_user_by_id",
-                return_value=mock_user,
             ),
             patch(
                 "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_providers_by_user_id",
@@ -226,9 +220,8 @@ class TestDeleteIdentityProviderLink:
 
     def test_raises_400_when_last_auth_method(self, mock_db):
         """Cannot unlink the last IdP when the user has no password."""
-        mock_user = MagicMock()
-        mock_user.password = None  # SSO-only, no local password
-        mock_user.has_local_password = False
+        identity_service = MagicMock()
+        identity_service.has_local_password.return_value = False  # SSO-only
 
         with (
             patch("auth.services.identity_link_service.step_up_service.verify_step_up_credentials"),
@@ -241,16 +234,14 @@ class TestDeleteIdentityProviderLink:
                 return_value=MagicMock(),
             ),
             patch(
-                "auth.services.identity_link_service.users_crud.get_user_by_id",
-                return_value=mock_user,
-            ),
-            patch(
                 "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_providers_by_user_id",
                 return_value=[MagicMock()],  # exactly 1 link → remaining_idp_count == 0
             ),
             pytest.raises(HTTPException) as exc,
         ):
-            identity_link_service.delete_identity_provider_link(1, MagicMock(), 10, MagicMock(), MagicMock(), mock_db)
+            identity_link_service.delete_identity_provider_link(
+                1, MagicMock(), 10, identity_service, MagicMock(), mock_db
+            )
 
         assert exc.value.status_code == 400
         assert "Cannot unlink last authentication method" in exc.value.detail

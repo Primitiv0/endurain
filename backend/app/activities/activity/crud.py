@@ -580,7 +580,7 @@ def get_user_activities_per_timeframe_and_activity_types(
     user_is_owner: bool = False,
     requester_user_id: int | None = None,
     exclude_hidden: bool = False,
-) -> list[activities_schema.Activity] | None:
+) -> list[activities_schema.Activity]:
     """Get a user's activities within a date range by types.
 
     Args:
@@ -597,7 +597,7 @@ def get_user_activities_per_timeframe_and_activity_types(
             even for owner requests.
 
     Returns:
-        List of activity schemas or None when empty.
+        List of activity schemas.
 
     Raises:
         HTTPException: 500 on database error.
@@ -622,7 +622,7 @@ def get_user_activities_per_timeframe_and_activity_types(
         )
         activities = db.execute(stmt).scalars().all()
         if not activities:
-            return None
+            return []
         return _serialize_and_mask(
             list(activities),
             requester_user_id=user_id if user_is_owner else None,

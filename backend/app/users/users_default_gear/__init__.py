@@ -9,7 +9,6 @@ Exports:
       create_user_default_gear, edit_user_default_gear
     - Schemas: UsersDefaultGearBase, UsersDefaultGearUpdate,
       UsersDefaultGearRead
-    - Models: UsersDefaultGear (ORM model)
     - Utils: get_user_default_gear_by_activity_type
     - Constants: ACTIVITY_TYPE_TO_GEAR_ATTR
 """
@@ -19,7 +18,6 @@ from .crud import (
     edit_user_default_gear,
     get_user_default_gear_by_user_id,
 )
-from .models import UsersDefaultGear as UsersDefaultGearModel
 from .schema import (
     UsersDefaultGearBase,
     UsersDefaultGearRead,
@@ -31,18 +29,12 @@ from .utils import (
 )
 
 __all__ = [
-    # Constants
     "ACTIVITY_TYPE_TO_GEAR_ATTR",
-    # Pydantic schemas
     "UsersDefaultGearBase",
-    # Database model
-    "UsersDefaultGearModel",
     "UsersDefaultGearRead",
     "UsersDefaultGearUpdate",
     "create_user_default_gear",
     "edit_user_default_gear",
-    # Utility functions
     "get_user_default_gear_by_activity_type",
-    # CRUD operations
     "get_user_default_gear_by_user_id",
 ]

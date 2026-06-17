@@ -10,7 +10,7 @@ import activities.activity.schema as activity_schema
 import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.models as activity_streams_models
 import activities.activity_streams.schema as activity_streams_schema
-import users.users.models as users_models
+import users.users.schema as users_schema
 
 # Map stream type to activity hide attribute
 _STREAM_HIDE_MAP: dict[int, str] = {
@@ -94,7 +94,7 @@ def transform_activity_streams(
     return activity_streams_schema.ActivityStreamsRead.model_validate(activity_streams)
 
 
-def resolve_max_heart_rate(user: users_models.Users) -> int | None:
+def resolve_max_heart_rate(user: users_schema.UsersRead) -> int | None:
     """
     Resolve a user's max heart rate.
 
@@ -202,7 +202,7 @@ async def compute_hr_zone_breakdown(
 
 
 async def build_zone_percentages(
-    user: users_models.Users, activity: activity_schema.Activity, waypoints: list[dict]
+    user: users_schema.UsersRead, activity: activity_schema.Activity, waypoints: list[dict]
 ) -> dict[str, dict] | None:
     """
     Build the metric-keyed zone_percentages payload for a stream.

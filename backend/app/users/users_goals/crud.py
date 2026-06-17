@@ -1,5 +1,7 @@
 """CRUD operations for user goals."""
 
+from typing import overload
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,6 +9,70 @@ from sqlalchemy.orm import Session
 import core.decorators as core_decorators
 import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
+
+# Private internal helpers
+
+
+@overload
+def _transform_users_goals(users: user_goals_models.UsersGoal) -> user_goals_schema.UsersGoalRead: ...
+
+
+@overload
+def _transform_users_goals(users: list[user_goals_models.UsersGoal]) -> list[user_goals_schema.UsersGoalRead]: ...
+
+
+def _transform_users_goals(
+    users: user_goals_models.UsersGoal | list[user_goals_models.UsersGoal],
+) -> user_goals_schema.UsersGoalRead | list[user_goals_schema.UsersGoalRead]:
+    """
+    Transform a user goal or list of user goals to a Pydantic schema.
+
+    Args:
+        users: The user goal ORM instance or list of instances.
+
+    Returns:
+        The user goal(s) as a schema.
+    """
+    if isinstance(users, list):
+        return [user_goals_schema.UsersGoalRead.model_validate(user) for user in users]
+    return user_goals_schema.UsersGoalRead.model_validate(users)
+
+
+@core_decorators.handle_db_errors
+def _get_user_goal_model_by_user_and_goal_id_or_404(
+    user_id: int, goal_id: int, db: Session
+) -> user_goals_models.UsersGoal:
+    """
+    Retrieve a specific goal by user ID and goal ID.
+
+    Args:
+        user_id: The ID of the user.
+        goal_id: The ID of the goal.
+        db: SQLAlchemy database session.
+
+    Returns:
+        UsersGoal model if found.
+
+    Raises:
+        HTTPException: If user goal not found (404) or database error occurs (500).
+    """
+    stmt = select(user_goals_models.UsersGoal).where(
+        user_goals_models.UsersGoal.user_id == user_id,
+        user_goals_models.UsersGoal.id == goal_id,
+    )
+
+    db_users_goal = db.execute(stmt).scalar_one_or_none()
+
+    if not db_users_goal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User goal not found",
+        )
+
+    return db_users_goal
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
@@ -16,7 +82,7 @@ def get_user_goals_by_user_id(
     interval: user_goals_schema.Interval | None = None,
     activity_type: user_goals_schema.ActivityType | None = None,
     goal_type: user_goals_schema.GoalType | None = None,
-) -> list[user_goals_models.UsersGoal]:
+) -> list[user_goals_schema.UsersGoalRead]:
     """
     Retrieve goals for a specific user with optional filters.
 
@@ -28,7 +94,7 @@ def get_user_goals_by_user_id(
         goal_type: Optional filter by goal type.
 
     Returns:
-        List of UsersGoal models matching the filters.
+        List of UsersGoal schemas matching the filters.
 
     Raises:
         HTTPException: If database error occurs.
@@ -42,11 +108,13 @@ def get_user_goals_by_user_id(
     if goal_type is not None:
         stmt = stmt.where(user_goals_models.UsersGoal.goal_type == goal_type.value)
 
-    return list(db.execute(stmt).scalars().all())
+    return _transform_users_goals(list(db.execute(stmt).scalars().all()))
 
 
 @core_decorators.handle_db_errors
-def get_user_goal_by_user_and_goal_id(user_id: int, goal_id: int, db: Session) -> user_goals_models.UsersGoal | None:
+def get_user_goal_by_user_and_goal_id(
+    user_id: int, goal_id: int, db: Session
+) -> user_goals_schema.UsersGoalRead | None:
     """
     Retrieve a specific goal by user ID and goal ID.
 
@@ -56,7 +124,7 @@ def get_user_goal_by_user_and_goal_id(user_id: int, goal_id: int, db: Session) -
         db: SQLAlchemy database session.
 
     Returns:
-        UsersGoal model if found, None otherwise.
+        UsersGoal schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -65,7 +133,8 @@ def get_user_goal_by_user_and_goal_id(user_id: int, goal_id: int, db: Session) -
         user_goals_models.UsersGoal.user_id == user_id,
         user_goals_models.UsersGoal.id == goal_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    result = db.execute(stmt).scalar_one_or_none()
+    return _transform_users_goals(result) if result else None
 
 
 @core_decorators.handle_db_errors
@@ -73,7 +142,7 @@ def create_user_goal(
     user_id: int,
     user_goal: user_goals_schema.UsersGoalCreate,
     db: Session,
-) -> user_goals_models.UsersGoal:
+) -> user_goals_schema.UsersGoalRead:
     """
     Create a new user goal.
 
@@ -83,7 +152,7 @@ def create_user_goal(
         db: SQLAlchemy database session.
 
     Returns:
-        The created UsersGoal model.
+        The created UsersGoal schema.
 
     Raises:
         HTTPException: If goal already exists (409) or database
@@ -105,7 +174,7 @@ def create_user_goal(
                 detail=("User already has a goal for this activity type, interval, and goal type."),
             )
 
-        db_user_goal = user_goals_models.UsersGoal(
+        db_users_goal = user_goals_models.UsersGoal(
             user_id=user_id,
             interval=user_goal.interval,
             activity_type=user_goal.activity_type,
@@ -116,10 +185,10 @@ def create_user_goal(
             goal_elevation=user_goal.goal_elevation,
             goal_duration=user_goal.goal_duration,
         )
-        db.add(db_user_goal)
+        db.add(db_users_goal)
         db.commit()
-        db.refresh(db_user_goal)
-        return db_user_goal
+        db.refresh(db_users_goal)
+        return _transform_users_goals(db_users_goal)
     except HTTPException:
         raise
 
@@ -129,7 +198,7 @@ def update_user_goal(
     user_id: int,
     user_goal: user_goals_schema.UsersGoalUpdate,
     db: Session,
-) -> user_goals_models.UsersGoal:
+) -> user_goals_schema.UsersGoalRead:
     """
     Update a user's goal.
 
@@ -139,7 +208,7 @@ def update_user_goal(
         db: SQLAlchemy database session.
 
     Returns:
-        The updated UsersGoal model.
+        The updated UsersGoal schema.
 
     Raises:
         HTTPException: If goal not found (404) or database
@@ -151,22 +220,16 @@ def update_user_goal(
             detail="Cannot edit user goal for another user",
         )
 
-    db_user_goal = get_user_goal_by_user_and_goal_id(user_id, user_goal.id, db)
-
-    if not db_user_goal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User goal not found",
-        )
+    db_users_goal = _get_user_goal_model_by_user_and_goal_id_or_404(user_id, user_goal.id, db)
 
     # Update only provided fields
     update_data = user_goal.model_dump(exclude_unset=True, exclude={"user_id", "id"})
     for field, value in update_data.items():
-        setattr(db_user_goal, field, value)
+        setattr(db_users_goal, field, value)
 
     db.commit()
-    db.refresh(db_user_goal)
-    return db_user_goal
+    db.refresh(db_users_goal)
+    return _transform_users_goals(db_users_goal)
 
 
 @core_decorators.handle_db_errors
@@ -183,13 +246,7 @@ def delete_user_goal(user_id: int, goal_id: int, db: Session) -> None:
         HTTPException: If goal not found (404) or database
             error occurs (500).
     """
-    db_user_goal = get_user_goal_by_user_and_goal_id(user_id, goal_id, db)
+    db_users_goal = _get_user_goal_model_by_user_and_goal_id_or_404(user_id, goal_id, db)
 
-    if not db_user_goal:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User goal not found",
-        )
-
-    db.delete(db_user_goal)
+    db.delete(db_users_goal)
     db.commit()

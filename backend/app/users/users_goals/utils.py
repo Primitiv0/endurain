@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 import activities.activity.crud as activity_crud
 import core.logger as core_logger
 import users.users_goals.crud as user_goals_crud
-import users.users_goals.models as user_goals_models
 import users.users_goals.schema as user_goals_schema
 
 _ACTIVITY_TYPE_MAP: dict[str, list[int]] = {
@@ -44,7 +43,7 @@ def calculate_user_goals(
     if not date:
         date = datetime.now(UTC).strftime("%Y-%m-%d")
     try:
-        goals = user_goals_crud.get_user_goals_by_user_id(user_id, db)
+        goals: list[user_goals_schema.UsersGoalRead] = user_goals_crud.get_user_goals_by_user_id(user_id, db)
 
         if not goals:
             return None
@@ -79,7 +78,7 @@ def calculate_user_goals(
 
 
 def calculate_goal_progress_by_activity_type(
-    goal: user_goals_models.UsersGoal,
+    goal: user_goals_schema.UsersGoalRead,
     date: str,
     db: Session,
 ) -> user_goals_schema.UsersGoalProgress:
@@ -116,12 +115,12 @@ def calculate_goal_progress_by_activity_type(
         )
 
         # Calculate totals based on goal type
-        percentage_completed = 0
+        percentage_completed: float = 0
         total_calories = 0
         total_activities_number = 0
         total_distance = 0
         total_elevation = 0
-        total_duration = 0
+        total_duration: float = 0
 
         if activities:
             if goal.goal_type == user_goals_schema.GoalType.CALORIES:

@@ -28,7 +28,7 @@ async def read_user_default_gear(
         Session,
         Depends(core_database.get_db),
     ],
-) -> user_default_gear_schema.UsersDefaultGearRead:
+) -> user_default_gear_schema.UsersDefaultGearRead | None:
     """
     Retrieve default gear settings for authenticated user.
 

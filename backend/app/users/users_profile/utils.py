@@ -104,8 +104,8 @@ def sqlalchemy_obj_to_dict(obj: Any) -> dict[str, Any]:
 def write_json_to_zip(
     zipf: zipfile.ZipFile,
     filename: str,
-    data: dict,
-    counts: dict,
+    data: list[dict[str, Any]] | dict[str, Any] | list[Any] | None,
+    counts: dict[str, int],
     ensure_ascii: bool = False,
 ) -> None:
     """
@@ -210,7 +210,7 @@ def check_memory_usage(
     # Use a higher threshold for memory-intensive operations
     effective_limit = max_memory_mb
     if is_memory_intensive:
-        effective_limit = max_memory_mb * 1.5  # Allow 50% more for intensive ops
+        effective_limit = int(max_memory_mb * 1.5)  # Allow 50% more for intensive ops
 
     if current_memory > effective_limit:
         error_msg = (

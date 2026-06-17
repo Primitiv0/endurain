@@ -8,6 +8,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 
+@pytest.fixture(autouse=True)
+def _patch_transform_users():
+    """Patch _transform_users to a passthrough so tests can use MagicMock users."""
+    with patch("users.users.crud._transform_users", side_effect=lambda x: x):
+        yield
+
+
 class TestGetAllUsers:
     """get_all_users: retrieve all users."""
 
@@ -355,7 +362,11 @@ class TestCreateUser:
         mock_user_schema.email = "Test@Example.COM"
         mock_user_schema.password = "securePass123"
         mock_user_schema.access_type = "regular"
-        mock_user_schema.model_dump.return_value = {"name": "Test", "username": "testuser"}
+        mock_user_schema.model_dump.return_value = {
+            "name": "Test",
+            "username": "testuser",
+            "mfa_enabled": True,
+        }
 
         mock_identity = MagicMock()
         mock_settings = MagicMock()
@@ -373,6 +384,7 @@ class TestCreateUser:
             result = create_user(mock_user_schema, mock_identity, mock_db)
 
         assert result == mock_db_user
+        mock_user_schema.model_dump.assert_called_once_with(exclude={"password", "access_type", "mfa_enabled"})
         mock_db.add.assert_called_once_with(mock_db_user)
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(mock_db_user)
@@ -638,7 +650,7 @@ class TestEditUser:
         mock_user_schema.model_dump.return_value = {"username": "updateduser", "name": "Updated"}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             result = await edit_user(1, mock_user_schema, mock_db)
 
@@ -662,7 +674,7 @@ class TestEditUser:
         mock_user_schema.model_dump.return_value = {"username": "updateduser", "height": 185}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.health_weight_utils.calculate_bmi_all_user_entries") as mock_bmi,
         ):
             # Simulate that height changes during refresh
@@ -694,7 +706,7 @@ class TestEditUser:
         }
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.users_utils.delete_user_photo_filesystem", new_callable=AsyncMock) as mock_del,
         ):
             mock_db_user.photo_path = "new/path.jpg"
@@ -718,7 +730,7 @@ class TestEditUser:
         mock_user_schema.model_dump.return_value = {"username": "updateduser"}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             mock_db.commit.side_effect = __import__("sqlalchemy.exc", fromlist=["IntegrityError"]).IntegrityError(
                 "mock", None, None
@@ -746,7 +758,7 @@ class TestEditUser:
         mock_user_schema.model_dump.return_value = {"username": "updateduser"}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
@@ -772,7 +784,7 @@ class TestEditProfileUser:
         mock_profile.model_dump.return_value = {"name": "New Name", "username": "newname"}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             result = await edit_profile_user(1, mock_profile, mock_db)
 
@@ -797,7 +809,7 @@ class TestEditProfileUser:
         }
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             result = await edit_profile_user(1, mock_profile, mock_db)
 
@@ -823,7 +835,7 @@ class TestEditProfileUser:
         }
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             result = await edit_profile_user(1, mock_profile, mock_db)
 
@@ -845,7 +857,7 @@ class TestEditProfileUser:
         }
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             result = await edit_profile_user(1, mock_profile, mock_db)
 
@@ -867,7 +879,7 @@ class TestEditProfileUser:
         }
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             result = await edit_profile_user(1, mock_profile, mock_db)
 
@@ -887,7 +899,7 @@ class TestEditProfileUser:
         mock_profile.model_dump.return_value = {"height": 185}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.health_weight_utils.calculate_bmi_all_user_entries") as mock_bmi,
         ):
             mock_db.refresh.side_effect = lambda x: setattr(mock_db_user, "height", 185)
@@ -911,7 +923,7 @@ class TestEditProfileUser:
         mock_profile.model_dump.return_value = {"photo_path": None}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.users_utils.delete_user_photo_filesystem", new_callable=AsyncMock) as mock_del,
         ):
             result = await edit_profile_user(1, mock_profile, mock_db)
@@ -932,7 +944,7 @@ class TestEditProfileUser:
         mock_profile.model_dump.return_value = {"name": "Test"}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             mock_db.commit.side_effect = __import__("sqlalchemy.exc", fromlist=["IntegrityError"]).IntegrityError(
                 "mock", None, None
@@ -955,7 +967,7 @@ class TestEditProfileUser:
         mock_profile.model_dump.return_value = {"name": "Test"}
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
@@ -974,7 +986,7 @@ class TestApproveUser:
         mock_db_user = MagicMock()
         mock_db_user.email_verified = True
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             approve_user(1, mock_db)
 
         assert mock_db_user.active is True
@@ -989,7 +1001,7 @@ class TestApproveUser:
         mock_db_user = MagicMock()
         mock_db_user.email_verified = False
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             with pytest.raises(HTTPException) as exc:
                 approve_user(1, mock_db)
             assert exc.value.status_code == 400
@@ -1003,7 +1015,7 @@ class TestApproveUser:
         mock_db_user = MagicMock()
         mock_db_user.email_verified = True
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
             with pytest.raises(HTTPException) as exc:
@@ -1022,7 +1034,7 @@ class TestVerifyUserEmail:
         mock_settings = MagicMock()
         mock_settings.signup_require_admin_approval = False
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             verify_user_email(1, mock_settings, mock_db)
 
         assert mock_db_user.email_verified is True
@@ -1039,7 +1051,7 @@ class TestVerifyUserEmail:
         mock_settings = MagicMock()
         mock_settings.signup_require_admin_approval = True
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             verify_user_email(1, mock_settings, mock_db)
 
         assert mock_db_user.email_verified is True
@@ -1055,7 +1067,7 @@ class TestVerifyUserEmail:
         mock_settings = MagicMock()
         mock_settings.signup_require_admin_approval = False
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
             with pytest.raises(HTTPException) as exc:
@@ -1073,7 +1085,7 @@ class TestUpdateUserPhoto:
         mock_db = MagicMock(spec=Session)
         mock_db_user = MagicMock()
 
-        with patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user):
+        with patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user):
             result = await update_user_photo(1, mock_db, photo_path="data/user_images/1.jpg")
 
         assert result == "data/user_images/1.jpg"
@@ -1089,7 +1101,7 @@ class TestUpdateUserPhoto:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.users_utils.delete_user_photo_filesystem", new_callable=AsyncMock) as mock_del,
         ):
             result = await update_user_photo(1, mock_db, photo_path=None)
@@ -1108,7 +1120,7 @@ class TestUpdateUserPhoto:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")
 
@@ -1128,7 +1140,7 @@ class TestDeleteUser:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.users_utils.delete_user_photo_filesystem", new_callable=AsyncMock) as mock_del,
         ):
             await delete_user(1, mock_db)
@@ -1145,7 +1157,7 @@ class TestDeleteUser:
         mock_db_user = MagicMock()
 
         with (
-            patch("users.users.crud.users_utils.get_user_by_id_or_404", return_value=mock_db_user),
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=mock_db_user),
             patch("users.users.crud.users_utils.delete_user_photo_filesystem", new_callable=AsyncMock),
         ):
             mock_db.commit.side_effect = SQLAlchemyError("DB error")

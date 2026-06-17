@@ -696,7 +696,7 @@ class TestGetUserActivitiesPerTimeframeAndTypes:
                 end=datetime(2024, 1, 31, tzinfo=UTC),
                 db=mock_db,
             )
-            is None
+            == []
         )
 
     def test_db_error(self, mock_db):

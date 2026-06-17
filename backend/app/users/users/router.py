@@ -86,8 +86,8 @@ async def read_users_all_pagination(
     Returns:
         Paginated list of users with total count.
     """
-    total = users_crud.get_users_number(db)
-    users = users_crud.get_users_with_pagination(
+    total: int = users_crud.get_users_number(db)
+    users: list[users_schema.UsersRead] = users_crud.get_users_with_pagination(
         db,
         page_number,
         num_records,
@@ -97,15 +97,14 @@ async def read_users_all_pagination(
     )
 
     # Batch fetch IdP link counts for all users in a single grouped query
-    user_ids = [user.id for user in users]
-    idp_counts = identity_service.get_identity_link_counts_for_users(user_ids)
+    user_ids: list[int] = [user.id for user in users]
+    idp_counts: dict[int, int] = identity_service.get_identity_link_counts_for_users(user_ids)
 
     # Enrich with IDP count before serializing
-    enriched_users = []
+    enriched_users: list[users_schema.UsersRead] = []
     for user in users:
-        idp_count = idp_counts.get(user.id, 0)
-        user_read = users_schema.UsersRead.model_validate(user)
-        user_read.external_auth_count = idp_count
+        idp_count: int = idp_counts.get(user.id, 0)
+        user.external_auth_count = idp_count
 
         # Apply external/local auth filters
         if idp_count > 0 and show_external_auth is False:
@@ -113,7 +112,7 @@ async def read_users_all_pagination(
         if idp_count == 0 and show_local_auth is False:
             continue
 
-        enriched_users.append(user_read)
+        enriched_users.append(user)
 
     return users_schema.UsersListResponse(
         total=total,
@@ -135,7 +134,7 @@ async def read_users_contain_username(
         Session,
         Depends(core_database.get_db),
     ],
-) -> list[users_schema.UsersRead] | None:
+) -> list[users_schema.UsersRead] | users_schema.UsersRead | None:
     """
     Search users by partial username match.
 
@@ -258,7 +257,7 @@ async def create_user(
     Returns:
         Created user data.
     """
-    created_user = users_crud.create_user(user, identity_service, db)
+    created_user: users_schema.UsersRead = users_crud.create_user(user, identity_service, db)
 
     # Create default data for the user
     users_utils.create_user_default_data(created_user.id, identity_service, db)
@@ -281,7 +280,7 @@ async def upload_user_image(
         Session,
         Depends(core_database.get_db),
     ],
-) -> str:
+) -> str | None:
     """
     Upload user profile image.
 
@@ -296,8 +295,8 @@ async def upload_user_image(
         Path to uploaded image.
     """
     await users_utils.save_user_image_file(user_id, file, db)
-    user = users_crud.get_user_by_id(user_id, db)
-    return user.photo_path if user and user.photo_path else ""
+    user: users_schema.UsersRead | None = users_crud.get_user_by_id(user_id, db)
+    return user.photo_path if user and user.photo_path else None
 
 
 @router.put("/{user_id}", status_code=status.HTTP_200_OK, response_model=users_schema.UsersRead)
@@ -328,15 +327,14 @@ async def edit_user(
     Returns:
         Updated user data.
     """
-    db_user = await users_crud.edit_user(user_id, user_attributtes, db)
+    db_user: users_schema.UsersRead = await users_crud.edit_user(user_id, user_attributtes, db)
 
     # Enrich with IDP count before serializing
-    idp_counts = identity_service.get_identity_link_counts_for_users([db_user.id])
-    idp_count = idp_counts.get(db_user.id, 0)
-    user_read = users_schema.UsersRead.model_validate(db_user)
-    user_read.external_auth_count = idp_count
+    idp_counts: dict[int, int] = identity_service.get_identity_link_counts_for_users([db_user.id])
+    idp_count: int = idp_counts.get(db_user.id, 0)
+    db_user.external_auth_count = idp_count
 
-    return user_read
+    return db_user
 
 
 @router.put("/{user_id}/approve", status_code=status.HTTP_200_OK, response_model=dict[str, str])
@@ -432,8 +430,6 @@ async def delete_user_photo(
     """
     await users_crud.update_user_photo(user_id, db)
 
-    return None
-
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 async def delete_user(
@@ -458,5 +454,3 @@ async def delete_user(
         None
     """
     await users_crud.delete_user(user_id, db)
-
-    return None

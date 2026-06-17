@@ -317,13 +317,3 @@ class Users(Base):
         any caller that checks MFA status on the profile row.
         """
         return bool(self.auth_mfa and self.auth_mfa.mfa_enabled)
-
-    @property
-    def has_local_password(self) -> bool:
-        """
-        Return whether this user has a local (non-SSO) password set.
-
-        A user has a local password when a row exists in the auth-owned
-        ``users_local_credentials`` table. SSO-only accounts have no row.
-        """
-        return self.local_credential is not None

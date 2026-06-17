@@ -10,7 +10,7 @@ This module provides FastAPI endpoints for:
 - Profile data export and import
 """
 
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 from fastapi import (
     APIRouter,
@@ -54,15 +54,12 @@ router = APIRouter()
 
 def _raise_mfa_secret_store_unavailable(
     err: auth_mfa_setup_store.MFASecretStoreUnavailableError,
-) -> None:
+) -> NoReturn:
     """
     Return a controlled response when MFA setup storage is down.
 
     Args:
         err: MFA setup secret storage outage.
-
-    Returns:
-        None.
 
     Raises:
         HTTPException: Always raised with a 503 status.
@@ -84,6 +81,10 @@ async def read_users_me(
         int,
         Depends(auth_dependencies.get_sub_from_access_token),
     ],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
+    ],
     db: Annotated[
         Session,
         Depends(core_database.get_db),
@@ -103,7 +104,7 @@ async def read_users_me(
         HTTPException: If user or settings not found.
     """
     # Get the user from the database
-    user = users_crud.get_user_by_id(token_user_id, db)
+    user: users_schema.UsersRead | None = users_crud.get_user_by_id(token_user_id, db)
 
     # If the user does not exist raise the exception
     if user is None:
@@ -131,7 +132,7 @@ async def read_users_me(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Build UsersMe schema from model using model_validate
+    # Convert UsersRead schema to UsersMe schema for response
     user_me = users_schema.UsersMe.model_validate(user)
 
     # Update with integration and privacy settings
@@ -155,8 +156,9 @@ async def read_users_me(
             # Derived flag for the frontend: distinguishes
             # SSO-only accounts from accounts with a local
             # password so step-up modals can hide the password
-            # field. The hash itself is never exposed.
-            "has_local_password": user.has_local_password,
+            # field. Fetched via the auth boundary
+            # (IdentityService) so the hash never leaves it.
+            "has_local_password": identity_service.has_local_password(token_user_id),
         }
     )
 

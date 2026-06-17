@@ -116,7 +116,10 @@ class TestSaveUserImageFile:
         mock_file.filename = None
         mock_db = MagicMock(spec=Session)
 
-        with pytest.raises(HTTPException) as exc:
+        with (
+            patch("users.users.utils.get_user_by_id_or_404", return_value=MagicMock()),
+            pytest.raises(HTTPException) as exc,
+        ):
             await save_user_image_file(1, mock_file, mock_db)
 
         assert exc.value.status_code == 400
@@ -129,7 +132,10 @@ class TestSaveUserImageFile:
         mock_file.filename = ""
         mock_db = MagicMock(spec=Session)
 
-        with pytest.raises(HTTPException) as exc:
+        with (
+            patch("users.users.utils.get_user_by_id_or_404", return_value=MagicMock()),
+            pytest.raises(HTTPException) as exc,
+        ):
             await save_user_image_file(1, mock_file, mock_db)
 
         assert exc.value.status_code == 400
@@ -142,7 +148,10 @@ class TestSaveUserImageFile:
         mock_file.filename = "avatar.txt"
         mock_db = MagicMock(spec=Session)
 
-        with pytest.raises(HTTPException) as exc:
+        with (
+            patch("users.users.utils.get_user_by_id_or_404", return_value=MagicMock()),
+            pytest.raises(HTTPException) as exc,
+        ):
             await save_user_image_file(1, mock_file, mock_db)
 
         assert exc.value.status_code == 415
@@ -156,6 +165,7 @@ class TestSaveUserImageFile:
         mock_db = MagicMock(spec=Session)
 
         with (
+            patch("users.users.utils.get_user_by_id_or_404", return_value=MagicMock()),
             patch("core.file_uploads.save_validated_upload", new_callable=AsyncMock),
             patch(
                 "users.users.crud.update_user_photo",

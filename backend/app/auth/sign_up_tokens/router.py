@@ -77,7 +77,7 @@ async def signup(
         )
 
     # Create the user in the database
-    created_user = users_crud.create_signup_user(user, server_settings, identity_service, db)
+    created_user: users_schema.UsersRead = users_crud.create_signup_user(user, server_settings, identity_service, db)
 
     # Create default data for the user
     users_utils.create_user_default_data(created_user.id, identity_service, db)
@@ -157,7 +157,12 @@ async def verify_email(
     users_crud.verify_user_email(user_id, server_settings, db)
 
     if email_service.is_configured():
-        user = users_crud.get_user_by_id(user_id, db)
+        user: users_schema.UsersRead | None = users_crud.get_user_by_id(user_id, db)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
         await sign_up_tokens_utils.send_sign_up_admin_approval_email(user, email_service, db)
         notif_coro = notifications_utils.create_admin_new_sign_up_approval_request_notification(
             user, websocket_manager, db

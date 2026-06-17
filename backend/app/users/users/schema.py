@@ -320,6 +320,8 @@ class UsersMe(UsersRead):
         hide_activity_workout_sets_steps: Hide workout
             sets/steps.
         hide_activity_gear: Hide gear setting.
+        has_local_password: Whether the account has a local
+            password (False for SSO-only accounts).
     """
 
     is_strava_linked: StrictInt | None = Field(default=None, description="Whether Strava is linked")

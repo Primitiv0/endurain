@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 import core.logger as core_logger
 import users.users_default_gear.crud as user_default_gear_crud
+import users.users_default_gear.schema as users_default_gear_schema
 
 # Activity type to gear attribute mapping
 ACTIVITY_TYPE_TO_GEAR_ATTR: dict[int, str] = {
@@ -23,7 +24,7 @@ ACTIVITY_TYPE_TO_GEAR_ATTR: dict[int, str] = {
     17: "snowboard_gear_id",
     21: "tennis_gear_id",
     30: "windsurf_gear_id",
-    31: "walk_gear_id",  # Alias for walk
+    31: "walk_gear_id",
 }
 
 
@@ -49,9 +50,11 @@ def get_user_default_gear_by_activity_type(
             database error occurs.
     """
     try:
-        user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(user_id, db)
+        user_default_gear: users_default_gear_schema.UsersDefaultGearRead | None = (
+            user_default_gear_crud.get_user_default_gear_by_user_id(user_id, db)
+        )
 
-        if user_default_gear is None:
+        if not user_default_gear:
             return None
 
         attr_name = ACTIVITY_TYPE_TO_GEAR_ATTR.get(activity_type)

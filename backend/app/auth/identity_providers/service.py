@@ -38,7 +38,6 @@ import core.network as core_network
 import server_settings.schema as server_settings_schema
 import server_settings.utils as server_settings_utils
 import users.users.crud as users_crud
-import users.users.models as users_models
 import users.users.schema as users_schema
 import users.users.utils as users_utils
 
@@ -1530,7 +1529,7 @@ class IdentityProviderService:
         userinfo: dict[str, Any],
         password_hasher: auth_password_hasher.PasswordHasher,
         db: Session,
-    ) -> users_models.Users:
+    ) -> users_schema.UsersRead:
         """
         Finds an existing user linked to the given identity provider and subject, or creates a new user if allowed.
 
@@ -1549,7 +1548,7 @@ class IdentityProviderService:
             db (Session): Database session.
 
         Returns:
-            users_models.Users: The found or newly created user instance.
+            users_schema.UsersRead: The found or newly created user instance.
 
         Raises:
             HTTPException: If an existing account matches the email but the IdP
@@ -1560,7 +1559,15 @@ class IdentityProviderService:
         link = auth_identity_links_crud.get_user_identity_provider_by_subject_and_idp_id(idp.id, subject, db)
 
         if link:
-            user = link.users
+            # Fetch the linked user through the CRUD layer so we work with
+            # the UsersRead schema rather than reaching into the ORM
+            # relationship (link.users) and crossing the module boundary.
+            user = users_crud.get_user_by_id(link.user_id, db)
+            if user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found",
+                )
             # Update last login timestamp
             auth_identity_links_crud.update_user_identity_provider_last_login(link.user_id, idp.id, db)
 
@@ -1628,7 +1635,7 @@ class IdentityProviderService:
         mapped_data: dict[str, Any],
         password_hasher: auth_password_hasher.PasswordHasher,
         db: Session,
-    ) -> users_models.Users:
+    ) -> users_schema.UsersRead:
         """
         Creates a new user in the database based on identity provider (IdP) information.
 
@@ -1647,7 +1654,7 @@ class IdentityProviderService:
             db (Session): The database session.
 
         Returns:
-            users_models.Users: The newly created user instance.
+            users_schema.UsersRead: The newly created user instance.
 
         Raises:
             HTTPException: If user creation fails (e.g., duplicate username/email).
@@ -1713,11 +1720,11 @@ class IdentityProviderService:
 
     async def _update_user_from_idp(
         self,
-        user: users_models.Users,
+        user: users_schema.UsersRead,
         idp: idp_models.IdentityProvider,
         userinfo: dict[str, Any],
         db: Session,
-    ) -> users_models.Users:
+    ) -> users_schema.UsersRead:
         """
         Updates the user's information based on claims received from an identity provider (IdP).
 
@@ -1726,17 +1733,17 @@ class IdentityProviderService:
         1. Maps claims from IdP userinfo to standard user fields (email, name)
         2. Validates email changes - checks if new email is already in use by another user
         3. Skips email updates if conflict detected and logs the issue
-        4. Converts user ORM model to Pydantic schema
-        5. Applies updates and delegates persistence to the CRUD layer
+        4. Builds an updated copy of the user schema with the changed fields
+        5. Delegates persistence to the CRUD layer (edit_user)
 
         Args:
-            user (users_models.Users): The user ORM instance to update.
+            user (users_schema.UsersRead): The user schema instance to update.
             idp (idp_models.IdentityProvider): The identity provider instance with user_mapping config.
             userinfo (Dict[str, Any]): The user information claims received from the IdP.
             db (Session): The SQLAlchemy database session.
 
         Returns:
-            users_models.Users: The updated user ORM instance from database.
+            users_schema.UsersRead: The updated user schema instance from database.
         """
         mapped_data = self._map_user_claims(idp, userinfo)
 
@@ -1770,11 +1777,8 @@ class IdentityProviderService:
         # Only call CRUD if there are updates
         if updates:
             core_logger.print_to_log_and_console(f"Applying updates to user {user.username}: {updates}", "info")
-            user_read = users_schema.UsersRead.model_validate(user)
-            for field, value in updates.items():
-                setattr(user_read, field, value)
-
-            user = await users_crud.edit_user(user.id, user_read, db)
+            updated_user = user.model_copy(update=updates)
+            user = await users_crud.edit_user(user.id, updated_user, db)
 
         return user
 

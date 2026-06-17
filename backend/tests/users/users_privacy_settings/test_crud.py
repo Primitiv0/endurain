@@ -9,6 +9,16 @@ import users.users_privacy_settings.models as users_privacy_settings_models
 import users.users_privacy_settings.schema as users_privacy_settings_schema
 
 
+@pytest.fixture(autouse=True)
+def _patch_transform():
+    """Patch _transform_users_privacy_settings to a passthrough for MagicMock compatibility."""
+    with patch(
+        "users.users_privacy_settings.crud._transform_users_privacy_settings",
+        side_effect=lambda x: x,
+    ):
+        yield
+
+
 class TestGetUserPrivacySettingsByUserId:
     """
     Test suite for get_user_privacy_settings_by_user_id function.

@@ -10,7 +10,7 @@ import activities.activity_streams.utils as activity_streams_utils
 import core.logger as core_logger
 import migrations.crud as migrations_crud
 import users.users.crud as users_crud
-import users.users.models as users_models
+import users.users.schema as users_schema
 
 
 async def process_migration_7(db: Session) -> None:
@@ -37,7 +37,7 @@ async def process_migration_7(db: Session) -> None:
                 break
 
             activity_cache: dict[int, activity_schema.Activity] = {}
-            user_cache: dict[int, users_models.Users] = {}
+            user_cache: dict[int, users_schema.UsersRead] = {}
 
             computed_streams: list[dict[str, int | dict[str, dict]]] = []
 
@@ -54,7 +54,7 @@ async def process_migration_7(db: Session) -> None:
                 if activity.user_id is None:
                     continue
 
-                user: users_models.Users | None = user_cache.get(activity.user_id)
+                user: users_schema.UsersRead | None = user_cache.get(activity.user_id)
                 if user is None:
                     user = users_crud.get_user_by_id(activity.user_id, db)
                     if user is None:

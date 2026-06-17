@@ -18,7 +18,7 @@ PREFIX = core_config.ROOT_PATH + "/profile"  # /api/v1/profile
 # ---------------------------------------------------------------------------
 
 
-def _make_user_mock(pw_hash: str | None = "hashed_pw") -> MagicMock:
+def _make_user_mock() -> MagicMock:
     user = MagicMock()
     user.id = 1
     user.name = "Test User"
@@ -55,7 +55,10 @@ def _make_user_mock(pw_hash: str | None = "hashed_pw") -> MagicMock:
     user.hide_activity_laps = False
     user.hide_activity_workout_sets_steps = False
     user.hide_activity_gear = False
-    user.has_local_password = pw_hash is not None
+    # Mirror the ORM: no has_local_password attribute, so
+    # UsersMe.model_validate falls back to the default (None)
+    # before the router overrides it via IdentityService.
+    user.has_local_password = None
     return user
 
 
@@ -128,11 +131,13 @@ class TestReadUsersMe:
         mock_get_integrations,
         mock_get_privacy,
         profile_client,
+        mock_identity_service,
     ):
         """Happy path: all data found."""
         mock_get_user.return_value = _make_user_mock()
         mock_get_integrations.return_value = _make_integration_mock()
         mock_get_privacy.return_value = _make_privacy_mock()
+        mock_identity_service.has_local_password.return_value = True
 
         response = profile_client.get(PREFIX)
 

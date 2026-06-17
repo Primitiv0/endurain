@@ -1,7 +1,13 @@
-"""CRUD operations for user management."""
+"""CRUD operations for user management.
+
+WARNING: Functions prefixed with `_` (underscore) are private and must not
+be imported outside this module. They are internal implementation details.
+Use only the public functions exported by users.users.__init__ for external
+consumption.
+"""
 
 import posixpath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 from urllib.parse import unquote
 
 if TYPE_CHECKING:
@@ -21,9 +27,70 @@ import users.users.models as users_models
 import users.users.schema as users_schema
 import users.users.utils as users_utils
 
+# Private internal helpers
+
+
+@overload
+def _transform_users(users: users_models.Users) -> users_schema.UsersRead: ...
+
+
+@overload
+def _transform_users(users: list[users_models.Users]) -> list[users_schema.UsersRead]: ...
+
+
+def _transform_users(
+    users: users_models.Users | list[users_models.Users],
+) -> users_schema.UsersRead | list[users_schema.UsersRead]:
+    """
+    Transform a user or list of users to a Pydantic schema.
+
+    Args:
+        users: The user ORM instance or list of instances.
+
+    Returns:
+        The user(s) as a schema.
+    """
+    if isinstance(users, list):
+        return [users_schema.UsersRead.model_validate(user) for user in users]
+    return users_schema.UsersRead.model_validate(users)
+
+
+def _get_user_model_by_id_or_404(user_id: int, db: Session) -> users_models.Users:
+    """
+    Retrieve a mapped Users ORM row by ID or raise 404.
+
+    This is a **private internal helper**. Do not import or call from
+    outside this module. Use public CRUD functions instead (e.g.,
+    ``get_user_by_id()``, ``edit_user()``, etc.).
+
+    Args:
+        user_id: User ID to search for.
+        db: SQLAlchemy database session.
+
+    Returns:
+        Mapped ``Users`` ORM instance.
+
+    Raises:
+        HTTPException: 404 if user not found.
+    """
+    stmt = select(users_models.Users).where(users_models.Users.id == user_id)
+    db_userss = db.execute(stmt).scalar_one_or_none()
+
+    if db_userss is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_userss
+
+
+# Public CRUD functions
+
 
 @core_decorators.handle_db_errors
-def get_all_users(db: Session) -> list[users_models.Users]:
+def get_all_users(db: Session) -> list[users_schema.UsersRead]:
     """
     Retrieve all users from the database.
 
@@ -31,13 +98,15 @@ def get_all_users(db: Session) -> list[users_models.Users]:
         db: SQLAlchemy database session.
 
     Returns:
-        List of all User models.
+        List of all user schemas.
 
     Raises:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(users_models.Users)
-    return list(db.execute(stmt).scalars().all())
+    users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
+
+    return _transform_users(users)
 
 
 @core_decorators.handle_db_errors
@@ -66,7 +135,7 @@ def get_users_with_pagination(
     show_inactive: bool | None = True,
     show_email_unverified: bool | None = True,
     show_pending_approval: bool | None = True,
-) -> list[users_models.Users]:
+) -> list[users_schema.UsersRead]:
     """
     Retrieve a paginated list of users with optional filtering.
 
@@ -85,7 +154,7 @@ def get_users_with_pagination(
             admin approval. Defaults to True (includes pending approval users).
 
     Returns:
-        list[users_models.Users]: A list of User objects matching the specified
+        list[users_schema.UsersRead]: A list of User schemas matching the specified
             criteria, ordered by username. Returns an empty list if no users
             match the filters.
     """
@@ -103,13 +172,30 @@ def get_users_with_pagination(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
+    return _transform_users(users)
+
+
+@overload
+def get_user_by_username(
+    username: str,
+    db: Session,
+    contains: Literal[False] = False,
+) -> users_schema.UsersRead | None: ...
+
+
+@overload
+def get_user_by_username(
+    username: str,
+    db: Session,
+    contains: Literal[True],
+) -> list[users_schema.UsersRead]: ...
 
 
 @core_decorators.handle_db_errors
 def get_user_by_username(
     username: str, db: Session, contains: bool = False
-) -> list[users_models.Users] | users_models.Users | None:
+) -> list[users_schema.UsersRead] | users_schema.UsersRead | None:
     """
     Retrieve user by username.
 
@@ -121,8 +207,8 @@ def get_user_by_username(
                   match and returns single user or None.
 
     Returns:
-        If contains=False: Users model if found, None otherwise.
-        If contains=True: List of User models matching the search.
+        If contains=False: User schema if found, None otherwise.
+        If contains=True: List of user schemas matching the search.
 
     Raises:
         HTTPException: 500 error if database query fails.
@@ -138,15 +224,17 @@ def get_user_by_username(
         stmt = select(users_models.Users).where(
             func.lower(users_models.Users.username).like(f"%{escaped_username}%", escape="\\")
         )
-        return list(db.execute(stmt).scalars().all())
+        users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
+        return _transform_users(users)
     else:
         # Exact match - no LIKE escaping needed
         stmt = select(users_models.Users).where(users_models.Users.username == normalized_username)
-        return db.execute(stmt).scalar_one_or_none()
+        user = db.execute(stmt).scalar_one_or_none()
+        return _transform_users(user) if user else None
 
 
 @core_decorators.handle_db_errors
-def get_user_by_email(email: str, db: Session) -> users_models.Users | None:
+def get_user_by_email(email: str, db: Session) -> users_schema.UsersRead | None:
     """
     Retrieve user by email address.
 
@@ -155,17 +243,18 @@ def get_user_by_email(email: str, db: Session) -> users_models.Users | None:
         db: SQLAlchemy database session.
 
     Returns:
-        Users model if found, None otherwise.
+        User schema if found, None otherwise.
 
     Raises:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(users_models.Users).where(users_models.Users.email == email.lower())
-    return db.execute(stmt).scalar_one_or_none()
+    user = db.execute(stmt).scalar_one_or_none()
+    return _transform_users(user) if user else None
 
 
 @core_decorators.handle_db_errors
-def get_user_by_id(user_id: int, db: Session, public_check: bool = False) -> users_models.Users | None:
+def get_user_by_id(user_id: int, db: Session, public_check: bool = False) -> users_schema.UsersRead | None:
     """
     Retrieve user by ID.
 
@@ -176,7 +265,7 @@ def get_user_by_id(user_id: int, db: Session, public_check: bool = False) -> use
                       is enabled in server settings.
 
     Returns:
-        Users model if found (and public sharing enabled if
+        User schema if found (and public sharing enabled if
         public_check=True), None otherwise.
 
     Raises:
@@ -191,11 +280,12 @@ def get_user_by_id(user_id: int, db: Session, public_check: bool = False) -> use
             return None
 
     stmt = select(users_models.Users).where(users_models.Users.id == user_id)
-    return db.execute(stmt).scalar_one_or_none()
+    user = db.execute(stmt).scalar_one_or_none()
+    return _transform_users(user) if user else None
 
 
 @core_decorators.handle_db_errors
-def get_users_admin(db: Session) -> list[users_models.Users]:
+def get_users_admin(db: Session) -> list[users_schema.UsersRead]:
     """
     Retrieve all admin users from the database.
 
@@ -203,13 +293,14 @@ def get_users_admin(db: Session) -> list[users_models.Users]:
         db: SQLAlchemy database session.
 
     Returns:
-        List of User models with admin access.
+        List of admin user schemas.
 
     Raises:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(users_models.Users).where(users_models.Users.access_type == users_schema.UserAccessType.ADMIN.value)
-    return list(db.execute(stmt).scalars().all())
+    users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
+    return _transform_users(users)
 
 
 @core_decorators.handle_db_errors
@@ -217,7 +308,7 @@ def create_user(
     user: users_schema.UsersCreate,
     identity_service: "auth_identity_service.IdentityService",
     db: Session,
-) -> users_models.Users:
+) -> users_schema.UsersRead:
     """
     Create a new user with hashed password.
 
@@ -227,7 +318,7 @@ def create_user(
         db: SQLAlchemy database session.
 
     Returns:
-        Created Users model with hashed password.
+        Created user schema with hashed password.
 
     Raises:
         HTTPException: 409 if email/username already exists.
@@ -252,21 +343,21 @@ def create_user(
         )
 
         # Create a new user
-        db_user = users_models.Users(
-            **user.model_dump(exclude={"password", "access_type"}),
+        db_users = users_models.Users(
+            **user.model_dump(exclude={"password", "access_type", "mfa_enabled"}),
             access_type=access_type_value,
         )
 
         # Add the user to the database
-        db.add(db_user)
+        db.add(db_users)
         db.commit()
-        db.refresh(db_user)
+        db.refresh(db_users)
 
         # Persist the password hash in the auth-owned credential table.
-        identity_service.set_local_password_hash(db_user.id, hashed_password)
+        identity_service.set_local_password_hash(db_users.id, hashed_password)
 
         # Return user
-        return db_user
+        return _transform_users(db_users)
     except HTTPException:
         # Rollback the transaction
         db.rollback()
@@ -289,7 +380,7 @@ def create_signup_user(
     identity_service: "auth_identity_service.IdentityService",
     db: Session,
     persist_credential: bool = True,
-) -> users_models.Users:
+) -> users_schema.UsersRead:
     """
     Create a new user during signup process.
 
@@ -305,7 +396,7 @@ def create_signup_user(
             correctly reports ``False``).
 
     Returns:
-        Created Users model.
+        Created user schema.
 
     Raises:
         HTTPException: 409 if email/username already exists. Abstract message
@@ -332,7 +423,7 @@ def create_signup_user(
             email_verified = True
 
         # Create a new user
-        db_user = users_models.Users(
+        db_users = users_models.Users(
             **user.model_dump(
                 exclude={
                     "username",
@@ -365,18 +456,18 @@ def create_signup_user(
             )
 
         # Add the user to the database
-        db.add(db_user)
+        db.add(db_users)
         db.commit()
-        db.refresh(db_user)
+        db.refresh(db_users)
 
         # Persist the password hash in the auth-owned credential table. Skipped
         # for SSO-only accounts so that ``has_local_password`` stays a true row
         # existence check.
         if hashed_password is not None:
-            identity_service.set_local_password_hash(db_user.id, hashed_password)
+            identity_service.set_local_password_hash(db_users.id, hashed_password)
 
         # Return user
-        return db_user
+        return _transform_users(db_users)
     except IntegrityError as integrity_error:
         # Rollback the transaction
         db.rollback()
@@ -389,7 +480,7 @@ def create_signup_user(
 
 
 @core_decorators.handle_db_errors
-async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> users_models.Users:
+async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> users_schema.UsersRead:
     """
     Update an existing user's information.
 
@@ -408,7 +499,7 @@ async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> 
         db: SQLAlchemy database session.
 
     Returns:
-        users_models.Users
+        users_schema.UsersRead
 
     Raises:
         HTTPException: 404 if user not found.
@@ -417,36 +508,36 @@ async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> 
     """
     try:
         # Get the user from the database
-        db_user = users_utils.get_user_by_id_or_404(user_id, db)
+        db_users = _get_user_model_by_id_or_404(user_id, db)
 
-        height_before = db_user.height
+        height_before = db_users.height
 
         # Check if the photo_path is being updated
         if user.photo_path:
             # Delete the user photo in the filesystem
-            await users_utils.delete_user_photo_filesystem(db_user.id)
+            await users_utils.delete_user_photo_filesystem(db_users.id)
 
         user.username = user.username.lower()
 
         # Dictionary of the fields to update if they are not None
         user_data = user.model_dump(exclude_unset=True)
-        # Iterate over the fields and update the db_user dynamically
+        # Iterate over the fields and update the db_users dynamically
         for key, value in user_data.items():
-            setattr(db_user, key, value)
+            setattr(db_users, key, value)
 
         # Commit the transaction
         db.commit()
-        db.refresh(db_user)
+        db.refresh(db_users)
 
-        if height_before != db_user.height:
+        if height_before != db_users.height:
             # Update the user's health data
-            health_weight_utils.calculate_bmi_all_user_entries(db_user.id, db)
+            health_weight_utils.calculate_bmi_all_user_entries(db_users.id, db)
 
-        if db_user.photo_path is None:
+        if db_users.photo_path is None:
             # Delete the user photo in the filesystem
-            await users_utils.delete_user_photo_filesystem(db_user.id)
+            await users_utils.delete_user_photo_filesystem(db_users.id)
 
-        return db_user
+        return _transform_users(db_users)
     except HTTPException:
         raise
     except IntegrityError as integrity_error:
@@ -489,7 +580,7 @@ async def edit_profile_user(
     user_id: int,
     profile: users_schema.ProfileUpdate,
     db: Session,
-) -> users_models.Users:
+) -> users_schema.UsersRead:
     """
     Apply a self-service profile update with strict allow-listing.
 
@@ -506,17 +597,17 @@ async def edit_profile_user(
         db: SQLAlchemy database session.
 
     Returns:
-        The updated SQLAlchemy ``Users`` row.
+        The updated user schema (``users_schema.UsersRead``).
 
     Raises:
         HTTPException: 404 if the user does not exist, 409 on
             email/username uniqueness conflict, 500 on DB errors.
     """
     try:
-        db_user = users_utils.get_user_by_id_or_404(user_id, db)
+        db_users = _get_user_model_by_id_or_404(user_id, db)
 
-        height_before = db_user.height
-        previous_photo_path = db_user.photo_path
+        height_before = db_users.height
+        previous_photo_path = db_users.photo_path
 
         # exclude_unset means only fields the caller actually sent
         # are considered. The intersection with the allow-list is
@@ -564,18 +655,18 @@ async def edit_profile_user(
         # the on-disk file (matches legacy edit_user behaviour).
         photo_changed = "photo_path" in updates and updates["photo_path"] != previous_photo_path
         if photo_changed and previous_photo_path:
-            await users_utils.delete_user_photo_filesystem(db_user.id)
+            await users_utils.delete_user_photo_filesystem(db_users.id)
 
         for key, value in updates.items():
-            setattr(db_user, key, value)
+            setattr(db_users, key, value)
 
         db.commit()
-        db.refresh(db_user)
+        db.refresh(db_users)
 
-        if "height" in updates and height_before != db_user.height:
-            health_weight_utils.calculate_bmi_all_user_entries(db_user.id, db)
+        if "height" in updates and height_before != db_users.height:
+            health_weight_utils.calculate_bmi_all_user_entries(db_users.id, db)
 
-        return db_user
+        return _transform_users(db_users)
     except HTTPException:
         raise
     except IntegrityError as integrity_error:
@@ -604,20 +695,20 @@ def approve_user(user_id: int, db: Session) -> None:
         HTTPException: 500 if database error occurs.
     """
     # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
+    db_users = _get_user_model_by_id_or_404(user_id, db)
 
-    if not db_user.email_verified:
+    if not db_users.email_verified:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User email is not verified",
         )
 
-    db_user.pending_admin_approval = False
-    db_user.active = True
+    db_users.pending_admin_approval = False
+    db_users.active = True
 
     # Commit the transaction
     db.commit()
-    db.refresh(db_user)
+    db.refresh(db_users)
 
 
 @core_decorators.handle_db_errors
@@ -642,16 +733,16 @@ def verify_user_email(
         HTTPException: 500 if database error occurs.
     """
     # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
+    db_users = _get_user_model_by_id_or_404(user_id, db)
 
-    db_user.email_verified = True
+    db_users.email_verified = True
     if not server_settings.signup_require_admin_approval:
-        db_user.pending_admin_approval = False
-        db_user.active = True
+        db_users.pending_admin_approval = False
+        db_users.active = True
 
     # Commit the transaction
     db.commit()
-    db.refresh(db_user)
+    db.refresh(db_users)
 
 
 @core_decorators.handle_db_errors
@@ -672,14 +763,14 @@ async def update_user_photo(user_id: int, db: Session, photo_path: str | None = 
         HTTPException: 500 if database error occurs.
     """
     # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
+    db_users = _get_user_model_by_id_or_404(user_id, db)
 
     # Update the user
-    db_user.photo_path = photo_path
+    db_users.photo_path = photo_path
 
     # Commit the transaction
     db.commit()
-    db.refresh(db_user)
+    db.refresh(db_users)
 
     if photo_path:
         # Return the photo path
@@ -708,10 +799,10 @@ async def delete_user(user_id: int, db: Session) -> None:
         HTTPException: 500 if database error occurs.
     """
     # Get the user from the database
-    db_user = users_utils.get_user_by_id_or_404(user_id, db)
+    db_users = _get_user_model_by_id_or_404(user_id, db)
 
     # Delete the user
-    db.delete(db_user)
+    db.delete(db_users)
 
     # Commit the transaction
     db.commit()

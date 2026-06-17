@@ -13,7 +13,6 @@ Exports:
       set_user_garminconnect_sync_gear, get_user_integrations_by_strava_state
     - Schemas: UsersIntegrationsBase, UsersIntegrationsCreate,
       UsersIntegrationsRead, UsersIntegrationsUpdate
-    - Models: UsersIntegrations (ORM model)
 """
 
 from .crud import (
@@ -30,7 +29,6 @@ from .crud import (
     unlink_garminconnect_account,
     unlink_strava_account,
 )
-from .models import UsersIntegrations as UsersIntegrationsModel
 from .schema import (
     UsersIntegrationsBase,
     UsersIntegrationsCreate,
@@ -39,17 +37,13 @@ from .schema import (
 )
 
 __all__ = [
-    # Pydantic schemas
     "UsersIntegrationsBase",
     "UsersIntegrationsCreate",
-    # Database model
-    "UsersIntegrationsModel",
     "UsersIntegrationsRead",
     "UsersIntegrationsUpdate",
     "create_user_integrations",
     "edit_user_integrations",
     "get_user_integrations_by_strava_state",
-    # CRUD operations
     "get_user_integrations_by_user_id",
     "link_garminconnect_account",
     "link_strava_account",

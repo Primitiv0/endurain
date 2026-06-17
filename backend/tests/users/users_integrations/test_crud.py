@@ -10,6 +10,16 @@ from users.users_integrations import crud as user_integrations_crud
 from users.users_integrations.models import UsersIntegrations
 
 
+@pytest.fixture(autouse=True)
+def _patch_transform():
+    """Patch _transform_users_integrations to a passthrough for MagicMock compatibility."""
+    with patch(
+        "users.users_integrations.crud._transform_users_integrations",
+        side_effect=lambda x: x,
+    ):
+        yield
+
+
 class TestGetUserIntegrationsByUserId:
     """Test suite for get_user_integrations_by_user_id function."""
 
@@ -229,13 +239,17 @@ class TestLinkStravaAccount:
             "expires_at": 1234567890,
         }
 
-        with patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt:
+        with (
+            patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get,
+            patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt,
+        ):
+            mock_get.return_value = mock_integrations
             mock_encrypt.side_effect = lambda x: f"encrypted_{x}"
             mock_db.commit = MagicMock()
             mock_db.refresh = MagicMock()
 
             # Act
-            user_integrations_crud.link_strava_account(mock_integrations, tokens, mock_db)
+            user_integrations_crud.link_strava_account(1, tokens, mock_db)
 
         # Assert
         assert mock_integrations.strava_token == "encrypted_access_token_123"
@@ -275,19 +289,13 @@ class TestUnlinkStravaAccount:
     """Test suite for unlink_strava_account function."""
 
     def test_unlink_strava_account_success(self, mock_db):
-        """Test unlinking a Strava account.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - All Strava data is cleared
-            - Database operations are called
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
             mock_db.refresh = MagicMock()
@@ -306,17 +314,10 @@ class TestUnlinkStravaAccount:
         mock_db.commit.assert_called_once()
 
     def test_unlink_strava_account_not_found(self, mock_db):
-        """Test unlinking when integrations not found.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - HTTPException with 404 status when not found
-        """
+        """Test unlinking when integrations not found."""
         # Arrange
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
-            mock_get.return_value = None
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
+            mock_get.side_effect = HTTPException(status_code=404, detail="not found")
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
@@ -329,19 +330,14 @@ class TestSetUserStravaClient:
     """Test suite for set_user_strava_client function."""
 
     def test_set_user_strava_client_success(self, mock_db):
-        """Test setting Strava client credentials.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - Client ID and secret are encrypted and stored
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
         with (
-            patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get,
+            patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get,
             patch("users.users_integrations.crud.core_cryptography.encrypt_token_fernet") as mock_encrypt,
         ):
             mock_get.return_value = mock_integrations
@@ -358,17 +354,10 @@ class TestSetUserStravaClient:
         mock_db.commit.assert_called_once()
 
     def test_set_user_strava_client_not_found(self, mock_db):
-        """Test setting client when integrations not found.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - HTTPException with 404 status
-        """
+        """Test setting client when integrations not found."""
         # Arrange
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
-            mock_get.return_value = None
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
+            mock_get.side_effect = HTTPException(status_code=404, detail="not found")
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
@@ -381,18 +370,13 @@ class TestSetUserStravaState:
     """Test suite for set_user_strava_state function."""
 
     def test_set_user_strava_state_success(self, mock_db):
-        """Test setting Strava OAuth state.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - State is set correctly
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -403,18 +387,13 @@ class TestSetUserStravaState:
         assert mock_integrations.strava_state == "state123"
 
     def test_set_user_strava_state_clear(self, mock_db):
-        """Test clearing Strava OAuth state.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - State is set to None when passed None
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -425,18 +404,13 @@ class TestSetUserStravaState:
         assert mock_integrations.strava_state is None
 
     def test_set_user_strava_state_clear_null_string(self, mock_db):
-        """Test clearing state with "null" string.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - State is set to None when passed "null"
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -451,18 +425,13 @@ class TestSetUserStravaSyncGear:
     """Test suite for set_user_strava_sync_gear function."""
 
     def test_set_user_strava_sync_gear_true(self, mock_db):
-        """Test enabling Strava gear sync.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - Sync gear flag is set to True
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -473,18 +442,13 @@ class TestSetUserStravaSyncGear:
         assert mock_integrations.strava_sync_gear is True
 
     def test_set_user_strava_sync_gear_false(self, mock_db):
-        """Test disabling Strava gear sync.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - Sync gear flag is set to False
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -499,19 +463,14 @@ class TestLinkGarminConnectAccount:
     """Test suite for link_garminconnect_account function."""
 
     def test_link_garminconnect_account_success(self, mock_db):
-        """Test linking a Garmin Connect account.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - OAuth tokens are stored
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
         token = {"token": "garmin_token"}
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -523,17 +482,10 @@ class TestLinkGarminConnectAccount:
         mock_db.commit.assert_called_once()
 
     def test_link_garminconnect_account_not_found(self, mock_db):
-        """Test linking when integrations not found.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - HTTPException with 404 status
-        """
+        """Test linking when integrations not found."""
         # Arrange
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
-            mock_get.return_value = None
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
+            mock_get.side_effect = HTTPException(status_code=404, detail="not found")
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
@@ -546,18 +498,13 @@ class TestSetUserGarminConnectSyncGear:
     """Test suite for set_user_garminconnect_sync_gear function."""
 
     def test_set_user_garminconnect_sync_gear_true(self, mock_db):
-        """Test enabling Garmin Connect gear sync.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - Sync gear flag is set to True
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -568,18 +515,13 @@ class TestSetUserGarminConnectSyncGear:
         assert mock_integrations.garminconnect_sync_gear is True
 
     def test_set_user_garminconnect_sync_gear_false(self, mock_db):
-        """Test disabling Garmin Connect gear sync.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - Sync gear flag is set to False
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -594,18 +536,13 @@ class TestUnlinkGarminConnectAccount:
     """Test suite for unlink_garminconnect_account function."""
 
     def test_unlink_garminconnect_account_success(self, mock_db):
-        """Test unlinking a Garmin Connect account.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - All Garmin data is cleared
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
 
@@ -618,17 +555,10 @@ class TestUnlinkGarminConnectAccount:
         mock_db.commit.assert_called_once()
 
     def test_unlink_garminconnect_account_not_found(self, mock_db):
-        """Test unlinking when integrations not found.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - HTTPException with 404 status
-        """
+        """Test unlinking when integrations not found."""
         # Arrange
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
-            mock_get.return_value = None
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
+            mock_get.side_effect = HTTPException(status_code=404, detail="not found")
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:
@@ -641,20 +571,15 @@ class TestEditUserIntegrations:
     """Test suite for edit_user_integrations function."""
 
     def test_edit_user_integrations_success(self, mock_db):
-        """Test editing user integrations.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - Integrations are updated correctly
+        """
+        ...
         """
         # Arrange
         mock_integrations = MagicMock(spec=UsersIntegrations)
         mock_update = MagicMock()
         mock_update.model_dump.return_value = {"strava_sync_gear": True}
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
             mock_get.return_value = mock_integrations
             mock_db.commit = MagicMock()
             mock_db.refresh = MagicMock()
@@ -668,19 +593,12 @@ class TestEditUserIntegrations:
         mock_db.commit.assert_called_once()
 
     def test_edit_user_integrations_not_found(self, mock_db):
-        """Test editing when integrations not found.
-
-        Args:
-            mock_db: Mocked database session
-
-        Asserts:
-            - HTTPException with 404 status
-        """
+        """Test editing when integrations not found."""
         # Arrange
         mock_update = MagicMock()
 
-        with patch("users.users_integrations.crud.get_user_integrations_by_user_id") as mock_get:
-            mock_get.return_value = None
+        with patch("users.users_integrations.crud._get_user_integrations_model_by_user_id_or_404") as mock_get:
+            mock_get.side_effect = HTTPException(status_code=404, detail="not found")
 
             # Act & Assert
             with pytest.raises(HTTPException) as exc_info:

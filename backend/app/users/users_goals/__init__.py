@@ -10,7 +10,6 @@ Exports:
       create_user_goal, update_user_goal, delete_user_goal
     - Schemas: UsersGoalBase, UsersGoalCreate, UsersGoalUpdate,
       UsersGoalRead, UsersGoalProgress
-    - Models: UsersGoal (ORM model)
     - Enums: Interval, ActivityType, GoalType
     - Utils: calculate_user_goals
 """
@@ -22,7 +21,6 @@ from .crud import (
     get_user_goals_by_user_id,
     update_user_goal,
 )
-from .models import UsersGoal as UserGoalModel
 from .schema import (
     ActivityType,
     GoalType,
@@ -40,8 +38,6 @@ __all__ = [
     "GoalType",
     # Enums
     "Interval",
-    # Database model
-    "UserGoalModel",
     # Pydantic schemas
     "UsersGoalBase",
     "UsersGoalCreate",

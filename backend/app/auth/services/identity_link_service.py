@@ -17,7 +17,6 @@ import auth.identity_providers.links.utils as auth_identity_links_utils
 import auth.security_stores as auth_security_stores
 import auth.services.step_up_service as step_up_service
 import core.logger as core_logger
-import users.users.crud as users_crud
 import users.users.schema as users_schema
 
 if TYPE_CHECKING:
@@ -113,14 +112,13 @@ def delete_identity_provider_link(
             detail=f"Identity provider {idp.name} is not linked to your account",
         )
 
-    user = users_crud.get_user_by_id(token_user_id, db)
     all_idp_links = auth_identity_links_crud.get_user_identity_providers_by_user_id(
         token_user_id,
         db,
     )
     remaining_idp_count = len(all_idp_links) - 1
 
-    if not user.has_local_password and remaining_idp_count == 0:
+    if not identity_service.has_local_password(token_user_id) and remaining_idp_count == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot unlink last authentication method. Please set a password first.",

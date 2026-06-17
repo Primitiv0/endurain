@@ -36,10 +36,11 @@ import health.health_targets.crud as health_targets_crud
 import health.health_weight.crud as health_weight_crud
 import notifications.crud as notifications_crud
 import users.users_default_gear.crud as user_default_gear_crud
+import users.users_default_gear.schema as user_default_gear_schema
 import users.users_goals.crud as user_goals_crud
 import users.users_integrations.crud as user_integrations_crud
 import users.users_privacy_settings.crud as users_privacy_settings_crud
-import users.users_profile.utils as profile_utils
+import users.users_profile.utils as users_profile_utils
 from users.users_profile.exceptions import (
     DatabaseConnectionError,
     DataCollectionError,
@@ -50,7 +51,7 @@ from users.users_profile.exceptions import (
 )
 
 
-class ExportPerformanceConfig(profile_utils.BasePerformanceConfig):
+class ExportPerformanceConfig(users_profile_utils.BasePerformanceConfig):
     """
     Performance configuration for export operations.
 
@@ -128,7 +129,7 @@ class ExportService:
     ):
         self.user_id = user_id
         self.db = db
-        self.counts = profile_utils.initialize_operation_counts(include_user_count=True)
+        self.counts = users_profile_utils.initialize_operation_counts(include_user_count=True)
         self.performance_config: ExportPerformanceConfig = (
             performance_config or ExportPerformanceConfig.get_auto_config()
         )
@@ -158,7 +159,7 @@ class ExportService:
             DataCollectionError: If collection fails.
         """
         try:
-            profile_utils.check_memory_usage(
+            users_profile_utils.check_memory_usage(
                 "activity collection start",
                 self.performance_config.max_memory_mb,
                 self.performance_config.enable_memory_monitoring,
@@ -198,7 +199,7 @@ class ExportService:
                 offset += batch_size
 
                 # Check memory usage after each batch
-                profile_utils.check_memory_usage(
+                users_profile_utils.check_memory_usage(
                     f"activity batch {offset // batch_size}",
                     self.performance_config.max_memory_mb,
                     self.performance_config.enable_memory_monitoring,
@@ -212,12 +213,12 @@ class ExportService:
             if not all_activities:
                 core_logger.print_to_log(f"No activities found for user {self.user_id}", "info")
                 # Write empty activities file
-                profile_utils.write_json_to_zip(zipf, "data/activities.json", [], self.counts)
+                users_profile_utils.write_json_to_zip(zipf, "data/activities.json", [], self.counts)
                 return []
 
             # Write activities to ZIP immediately
-            activities_dicts = [profile_utils.sqlalchemy_obj_to_dict(a) for a in all_activities]
-            profile_utils.write_json_to_zip(zipf, "data/activities.json", activities_dicts, self.counts)
+            activities_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(a) for a in all_activities]
+            users_profile_utils.write_json_to_zip(zipf, "data/activities.json", activities_dicts, self.counts)
 
             core_logger.print_to_log(
                 f"Written {len(activities_dicts)} activities to ZIP",
@@ -238,8 +239,8 @@ class ExportService:
             try:
                 exercise_titles = activity_exercise_titles_crud.get_activity_exercise_titles(self.db)
                 if exercise_titles:
-                    exercise_titles_dicts = [profile_utils.sqlalchemy_obj_to_dict(e) for e in exercise_titles]
-                    profile_utils.write_json_to_zip(
+                    exercise_titles_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(e) for e in exercise_titles]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/activity_exercise_titles.json",
                         exercise_titles_dicts,
@@ -417,7 +418,7 @@ class ExportService:
             batch_ids = activity_ids[i : i + batch_size]
             batch_activities = user_activities[i : i + batch_size]
 
-            profile_utils.check_memory_usage(
+            users_profile_utils.check_memory_usage(
                 f"{component_key} batch {i // batch_size + 1}",
                 self.performance_config.max_memory_mb,
                 self.performance_config.enable_memory_monitoring,
@@ -427,7 +428,7 @@ class ExportService:
                 data = crud_func(batch_ids, self.user_id, self.db, batch_activities)
                 if data:
                     # Convert to dicts and add to chunk buffer
-                    batch_dicts = [profile_utils.sqlalchemy_obj_to_dict(item) for item in data]
+                    batch_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(item) for item in data]
                     chunk_buffer.extend(batch_dicts)
                     total_items += len(batch_dicts)
 
@@ -441,7 +442,7 @@ class ExportService:
                         extension = base_filename.rsplit(".", 1)[1] if "." in base_filename else "json"
                         chunk_filename = f"{base_name}_{file_counter:03d}.{extension}"
 
-                        profile_utils.write_json_to_zip(zipf, chunk_filename, chunk_to_write, self.counts)
+                        users_profile_utils.write_json_to_zip(zipf, chunk_filename, chunk_to_write, self.counts)
                         file_counter += 1
 
                         core_logger.print_to_log(
@@ -466,7 +467,7 @@ class ExportService:
         if chunk_buffer:
             if file_counter == 0:
                 # Only one chunk, use original filename
-                profile_utils.write_json_to_zip(zipf, base_filename, chunk_buffer, self.counts)
+                users_profile_utils.write_json_to_zip(zipf, base_filename, chunk_buffer, self.counts)
                 core_logger.print_to_log(
                     f"Written {len(chunk_buffer)} {component_key} items to single file",
                     "info",
@@ -477,7 +478,7 @@ class ExportService:
                 extension = base_filename.rsplit(".", 1)[1] if "." in base_filename else "json"
                 chunk_filename = f"{base_name}_{file_counter:03d}.{extension}"
 
-                profile_utils.write_json_to_zip(zipf, chunk_filename, chunk_buffer, self.counts)
+                users_profile_utils.write_json_to_zip(zipf, chunk_filename, chunk_buffer, self.counts)
                 file_counter += 1
                 core_logger.print_to_log(
                     f"Written final chunk for {component_key} ({len(chunk_buffer)} items)",
@@ -486,7 +487,7 @@ class ExportService:
 
         if total_items == 0:
             # Write empty file for component type
-            profile_utils.write_json_to_zip(zipf, base_filename, [], self.counts)
+            users_profile_utils.write_json_to_zip(zipf, base_filename, [], self.counts)
             core_logger.print_to_log(
                 f"No {component_key} data found, written empty file",
                 "info",
@@ -526,7 +527,7 @@ class ExportService:
             batch_ids = activity_ids[i : i + batch_size]
             batch_activities = user_activities[i : i + batch_size]
 
-            profile_utils.check_memory_usage(
+            users_profile_utils.check_memory_usage(
                 f"{component_key} batch {i // batch_size + 1}",
                 self.performance_config.max_memory_mb,
                 self.performance_config.enable_memory_monitoring,
@@ -551,8 +552,8 @@ class ExportService:
 
         # Write all component data to ZIP
         if all_component_data:
-            component_dicts = [profile_utils.sqlalchemy_obj_to_dict(item) for item in all_component_data]
-            profile_utils.write_json_to_zip(zipf, base_filename, component_dicts, self.counts)
+            component_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(item) for item in all_component_data]
+            users_profile_utils.write_json_to_zip(zipf, base_filename, component_dicts, self.counts)
             core_logger.print_to_log(
                 f"Written {len(component_dicts)} {component_key} items to ZIP",
                 "info",
@@ -562,7 +563,7 @@ class ExportService:
             component_dicts.clear()
         else:
             # Write empty file for component type
-            profile_utils.write_json_to_zip(zipf, base_filename, [], self.counts)
+            users_profile_utils.write_json_to_zip(zipf, base_filename, [], self.counts)
             core_logger.print_to_log(
                 f"No {component_key} data found, written empty file",
                 "info",
@@ -583,10 +584,10 @@ class ExportService:
             try:
                 gears = gear_crud.get_gear_user(self.user_id, self.db)
                 if gears:
-                    gears_dicts = [profile_utils.sqlalchemy_obj_to_dict(g) for g in gears]
-                    profile_utils.write_json_to_zip(zipf, "data/gears.json", gears_dicts, self.counts)
+                    gears_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(g) for g in gears]
+                    users_profile_utils.write_json_to_zip(zipf, "data/gears.json", gears_dicts, self.counts)
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/gears.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/gears.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect gears: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect gears: {err}") from err
@@ -595,15 +596,15 @@ class ExportService:
             try:
                 gear_components = gear_components_crud.get_gear_components_user(self.user_id, self.db)
                 if gear_components:
-                    gear_components_dicts = [profile_utils.sqlalchemy_obj_to_dict(gc) for gc in gear_components]
-                    profile_utils.write_json_to_zip(
+                    gear_components_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(gc) for gc in gear_components]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/gear_components.json",
                         gear_components_dicts,
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/gear_components.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/gear_components.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect gear components: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect gear components: {err}") from err
@@ -627,15 +628,15 @@ class ExportService:
             try:
                 health_weight = health_weight_crud.get_all_health_weight_by_user_id(self.user_id, self.db)
                 if health_weight:
-                    health_weight_dicts = [profile_utils.sqlalchemy_obj_to_dict(hd) for hd in health_weight]
-                    profile_utils.write_json_to_zip(
+                    health_weight_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(hd) for hd in health_weight]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/health_weight.json",
                         health_weight_dicts,
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/health_weight.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/health_weight.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect health data: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect health data: {err}") from err
@@ -645,15 +646,15 @@ class ExportService:
                 health_targets = health_targets_crud.get_health_targets_by_user_id(self.user_id, self.db)
                 if health_targets:
                     # health_targets is a single object, not a list
-                    health_targets_dict = profile_utils.sqlalchemy_obj_to_dict(health_targets)
-                    profile_utils.write_json_to_zip(
+                    health_targets_dict = users_profile_utils.sqlalchemy_obj_to_dict(health_targets)
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/health_targets.json",
                         [health_targets_dict],
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/health_targets.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/health_targets.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect health targets: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect health targets: {err}") from err
@@ -667,15 +668,15 @@ class ExportService:
             try:
                 notifications = notifications_crud.get_user_notifications(self.user_id, self.db)
                 if notifications:
-                    notifications_dicts = [profile_utils.sqlalchemy_obj_to_dict(n) for n in notifications]
-                    profile_utils.write_json_to_zip(
+                    notifications_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(n) for n in notifications]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/notifications.json",
                         notifications_dicts,
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/notifications.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/notifications.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect user notifications: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect user notifications: {err}") from err
@@ -696,17 +697,19 @@ class ExportService:
         try:
             # Collect and write user default gear
             try:
-                user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(self.user_id, self.db)
+                user_default_gear: user_default_gear_schema.UsersDefaultGearRead | None = (
+                    user_default_gear_crud.get_user_default_gear_by_user_id(self.user_id, self.db)
+                )
                 if user_default_gear:
-                    default_gear_dict = [profile_utils.sqlalchemy_obj_to_dict(user_default_gear)]
-                    profile_utils.write_json_to_zip(
+                    default_gear_dict = [user_default_gear.model_dump(mode="json")]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/user_default_gear.json",
                         default_gear_dict,
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/user_default_gear.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/user_default_gear.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect user default gear: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect user default gear: {err}") from err
@@ -715,10 +718,10 @@ class ExportService:
             try:
                 user_goals = user_goals_crud.get_user_goals_by_user_id(self.user_id, self.db)
                 if user_goals:
-                    user_goals_dicts = [profile_utils.sqlalchemy_obj_to_dict(ug) for ug in user_goals]
-                    profile_utils.write_json_to_zip(zipf, "data/user_goals.json", user_goals_dicts, self.counts)
+                    user_goals_dicts = [ug.model_dump() for ug in user_goals]
+                    users_profile_utils.write_json_to_zip(zipf, "data/user_goals.json", user_goals_dicts, self.counts)
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/user_goals.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/user_goals.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect user goals: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect user goals: {err}") from err
@@ -727,15 +730,15 @@ class ExportService:
             try:
                 user_integrations = user_integrations_crud.get_user_integrations_by_user_id(self.user_id, self.db)
                 if user_integrations:
-                    integrations_dict = [profile_utils.sqlalchemy_obj_to_dict(user_integrations)]
-                    profile_utils.write_json_to_zip(
+                    integrations_dict = [users_profile_utils.sqlalchemy_obj_to_dict(user_integrations)]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/user_integrations.json",
                         integrations_dict,
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/user_integrations.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/user_integrations.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(f"Failed to collect user integrations: {err}", "error", exc=err)
                 raise DataCollectionError(f"Failed to collect user integrations: {err}") from err
@@ -746,15 +749,15 @@ class ExportService:
                     self.user_id, self.db
                 )
                 if user_privacy_settings:
-                    privacy_dict = [profile_utils.sqlalchemy_obj_to_dict(user_privacy_settings)]
-                    profile_utils.write_json_to_zip(
+                    privacy_dict = [users_profile_utils.sqlalchemy_obj_to_dict(user_privacy_settings)]
+                    users_profile_utils.write_json_to_zip(
                         zipf,
                         "data/user_privacy_settings.json",
                         privacy_dict,
                         self.counts,
                     )
                 else:
-                    profile_utils.write_json_to_zip(zipf, "data/user_privacy_settings.json", [], self.counts)
+                    users_profile_utils.write_json_to_zip(zipf, "data/user_privacy_settings.json", [], self.counts)
             except Exception as err:
                 core_logger.print_to_log(
                     f"Failed to collect user privacy settings: {err}",
@@ -964,7 +967,7 @@ class ExportService:
 
                 # Check memory usage before adding large files
                 if file_size > 5 * 1024 * 1024:  # 5MB threshold for images
-                    profile_utils.check_memory_usage(
+                    users_profile_utils.check_memory_usage(
                         f"before image {entry.name}",
                         self.performance_config.max_memory_mb,
                         self.performance_config.enable_memory_monitoring,
@@ -1025,55 +1028,55 @@ class ExportService:
                         core_logger.print_to_log(f"Starting export for user {self.user_id}", "info")
 
                         # Collect and write activities data progressively
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Collecting and writing activities data...", "info")
                         user_activities = self.collect_user_activities_data(zipf)
 
                         # Collect and write gear data progressively
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Collecting and writing gear data...", "info")
                         self.collect_gear_data(zipf)
 
                         # Collect and write health data progressively
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Collecting and writing health data...", "info")
                         self.collect_health_weight(zipf)
 
                         # Collect and write notifications progressively
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Collecting and writing notifications data...", "info")
                         self.collect_notifications_data(zipf)
 
                         # Collect and write settings data progressively
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Collecting and writing settings data...", "info")
                         self.collect_user_settings_data(zipf)
 
                         # Write user data
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Writing user data...", "info")
                         user_dict_list = [user_dict]
-                        profile_utils.write_json_to_zip(zipf, "data/user.json", user_dict_list, self.counts)
+                        users_profile_utils.write_json_to_zip(zipf, "data/user.json", user_dict_list, self.counts)
 
                         # Add files to ZIP with timeout checks
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Adding activity files to archive...", "info")
                         self.add_activity_files_to_zip(zipf, user_activities)
 
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Adding activity media to archive...", "info")
                         self.add_activity_media_to_zip(zipf, user_activities)
 
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Adding user images to archive...", "info")
                         self.add_user_images_to_zip(zipf)
 
                         # Write counts file
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Writing counts file...", "info")
-                        profile_utils.write_json_to_zip(zipf, "counts.json", [self.counts], self.counts)
+                        users_profile_utils.write_json_to_zip(zipf, "counts.json", [self.counts], self.counts)
 
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log(
                             f"Export completed successfully. Counts: {self.counts}",
                             "info",
@@ -1103,7 +1106,7 @@ class ExportService:
                 chunk_count = 0
                 while True:
                     try:
-                        profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
+                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         chunk = tmp.read(8192)
                         if not chunk:
                             break

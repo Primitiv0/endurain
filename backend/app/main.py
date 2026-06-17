@@ -1,6 +1,7 @@
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from typing import cast
 
 from alembic.config import Config
 
@@ -298,7 +299,7 @@ def create_app() -> FastAPI:
     # Add session middleware for OAuth state management
     fastapi_app.add_middleware(
         SessionMiddleware,
-        secret_key=core_config.read_secret("SECRET_KEY"),
+        secret_key=cast(str, core_config.read_secret("SECRET_KEY")),
         session_cookie="endurain_session",
         max_age=3600,  # 1 hour session timeout
         same_site="lax",
@@ -345,7 +346,7 @@ def create_app() -> FastAPI:
     )
     fastapi_app.add_exception_handler(
         auth_utils.ClearRefreshTokenCookieHTTPException,
-        auth_utils.clear_refresh_token_cookie_exception_handler,
+        auth_utils.clear_refresh_token_cookie_exception_handler,  # type: ignore[arg-type]
     )
     fastapi_app.add_middleware(SlowAPIMiddleware)
 

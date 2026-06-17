@@ -530,8 +530,7 @@ class ImportService:
 
         if current_user_default_gear is None:
             core_logger.print_to_log("No existing user default gear, creating new record", "info")
-            user_default_gear_crud.create_user_default_gear(self.user_id, self.db)
-            current_user_default_gear = user_default_gear_crud.get_user_default_gear_by_user_id(self.user_id, self.db)
+            current_user_default_gear = user_default_gear_crud.create_user_default_gear(self.user_id, self.db)
 
         gear_data = user_default_gear_data[0]
         gear_data["id"] = current_user_default_gear.id
@@ -678,7 +677,7 @@ class ImportService:
                 sets.append(set_activity)
 
             if sets:
-                activity_sets_crud.create_activity_sets(sets, new_activity.id, self.db)
+                activity_sets_crud.create_activity_sets(list(sets), new_activity.id, self.db)
                 self.counts["activity_sets"] += len(sets)
 
         # Import streams - filter for this activity

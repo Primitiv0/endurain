@@ -316,16 +316,15 @@ class TestImportServiceUserData:
             db=mock_db,
             websocket_manager=mock_ws,
         )
-        mock_new_gear = MagicMock()
-        mock_new_gear.id = 99
         with (
             patch(
                 "users.users_profile.import_service.user_default_gear_crud.get_user_default_gear_by_user_id",
-                side_effect=[None, mock_new_gear],
+                return_value=None,
             ),
             patch("users.users_profile.import_service.user_default_gear_crud.create_user_default_gear") as mock_create,
             patch("users.users_profile.import_service.user_default_gear_crud.edit_user_default_gear"),
         ):
+            mock_create.return_value.id = 99
             await service.collect_and_import_user_default_gear([{"run_gear_id": 5}], {5: 10})
         assert service.counts["user_default_gear"] == 1
         mock_create.assert_called_once_with(1, mock_db)

@@ -47,4 +47,4 @@ class ActivityStreamsRead(ActivityStreamsBase):
         id: Unique stream identifier.
     """
 
-    id: StrictInt | None = None
+    id: StrictInt

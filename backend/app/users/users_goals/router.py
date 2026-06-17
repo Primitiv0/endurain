@@ -50,14 +50,13 @@ async def get_user_goals(
     Returns:
         List of user goal objects matching the filters.
     """
-    # Pydantic will convert ORM models to HealthWeightRead via from_attributes=True
     return user_goals_crud.get_user_goals_by_user_id(
         user_id=token_user_id,
         db=db,
         interval=interval,
         activity_type=activity_type,
         goal_type=goal_type,
-    )  # type: ignore[arg-type]
+    )
 
 
 @router.get(

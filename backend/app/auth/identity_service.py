@@ -295,6 +295,21 @@ class IdentityService(Protocol):
         """
         ...
 
+    def has_local_password(self, user_id: int) -> bool:
+        """Return whether a user has a local password credential.
+
+        ``False`` means the account is SSO-only (no row in
+        ``users_local_credentials``). The password hash itself is never
+        exposed; only this derived boolean is returned.
+
+        Args:
+            user_id: ID of the user to check the credential for.
+
+        Returns:
+            True if a local credential row exists, False otherwise.
+        """
+        ...
+
     def set_local_password_hash(self, user_id: int, password_hash: str) -> None:
         """Insert or update a user's local password hash.
 
@@ -1038,6 +1053,21 @@ class DefaultIdentityService:
         """
         credential = auth_credentials_crud.get_credential(user_id, self._db)
         return credential.password_hash if credential is not None else None
+
+    def has_local_password(self, user_id: int) -> bool:
+        """Return whether a user has a local password credential.
+
+        ``False`` means the account is SSO-only (no row in
+        ``users_local_credentials``). The password hash itself is never
+        exposed; only this derived boolean is returned.
+
+        Args:
+            user_id: ID of the user to check the credential for.
+
+        Returns:
+            True if a local credential row exists, False otherwise.
+        """
+        return auth_credentials_crud.get_credential(user_id, self._db) is not None
 
     def set_local_password_hash(self, user_id: int, password_hash: str) -> None:
         """Insert or update a user's local password hash.

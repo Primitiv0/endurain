@@ -12,9 +12,28 @@ import core.decorators as core_decorators
 import users.users_integrations.models as user_integrations_models
 import users.users_integrations.schema as user_integrations_schema
 
+# Private internal helpers
+
+
+def _transform_users_integrations(
+    users: user_integrations_models.UsersIntegrations,
+) -> user_integrations_schema.UsersIntegrationsRead:
+    """
+    Transform a user integrations instance to a Pydantic schema.
+
+    Args:
+        users: The user integrations ORM instance.
+
+    Returns:
+        The user integrations as a schema.
+    """
+    return user_integrations_schema.UsersIntegrationsRead.model_validate(users)
+
 
 @core_decorators.handle_db_errors
-def get_user_integrations_by_user_id(user_id: int, db: Session) -> user_integrations_models.UsersIntegrations | None:
+def _get_user_integrations_model_by_user_id_or_404(
+    user_id: int, db: Session
+) -> user_integrations_models.UsersIntegrations:
     """
     Retrieve integrations for a specific user.
 
@@ -23,7 +42,7 @@ def get_user_integrations_by_user_id(user_id: int, db: Session) -> user_integrat
         db: SQLAlchemy database session.
 
     Returns:
-        The UsersIntegrations model for the user.
+        The UsersIntegrations ORM model for the user.
 
     Raises:
         HTTPException: 404 error if integrations not found.
@@ -33,13 +52,50 @@ def get_user_integrations_by_user_id(user_id: int, db: Session) -> user_integrat
     stmt = select(user_integrations_models.UsersIntegrations).where(
         user_integrations_models.UsersIntegrations.user_id == user_id
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_user_integrations = db.execute(stmt).scalar_one_or_none()
+
+    if not db_user_integrations:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User integrations not found",
+        )
+
+    return db_user_integrations
+
+
+# Public CRUD functions
+
+
+@core_decorators.handle_db_errors
+def get_user_integrations_by_user_id(
+    user_id: int, db: Session
+) -> user_integrations_schema.UsersIntegrationsRead | None:
+    """
+    Retrieve integrations for a specific user.
+
+    Args:
+        user_id: The ID of the user to fetch integrations for.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The UsersIntegrationsRead schema for the user.
+
+    Raises:
+        HTTPException: 404 error if integrations not found.
+        HTTPException: 500 error if database query fails.
+    """
+    # Get the user integrations by the user id
+    stmt = select(user_integrations_models.UsersIntegrations).where(
+        user_integrations_models.UsersIntegrations.user_id == user_id
+    )
+    user_integrations = db.execute(stmt).scalar_one_or_none()
+    return _transform_users_integrations(user_integrations) if user_integrations else None
 
 
 @core_decorators.handle_db_errors
 def get_user_integrations_by_strava_state(
     strava_state: str, db: Session
-) -> user_integrations_models.UsersIntegrations | None:
+) -> user_integrations_schema.UsersIntegrationsRead | None:
     """
     Retrieve integrations by Strava OAuth state token.
 
@@ -48,7 +104,7 @@ def get_user_integrations_by_strava_state(
         db: SQLAlchemy database session.
 
     Returns:
-        The UsersIntegrations model if found, None otherwise.
+        The UsersIntegrationsRead schema if found, None otherwise.
 
     Raises:
         HTTPException: 500 error if database query fails.
@@ -57,11 +113,12 @@ def get_user_integrations_by_strava_state(
     stmt = select(user_integrations_models.UsersIntegrations).where(
         user_integrations_models.UsersIntegrations.strava_state == strava_state
     )
-    return db.execute(stmt).scalar_one_or_none()
+    user_integrations = db.execute(stmt).scalar_one_or_none()
+    return _transform_users_integrations(user_integrations) if user_integrations else None
 
 
 @core_decorators.handle_db_errors
-def create_user_integrations(user_id: int, db: Session) -> user_integrations_models.UsersIntegrations:
+def create_user_integrations(user_id: int, db: Session) -> user_integrations_schema.UsersIntegrationsRead:
     """
     Create integration settings for a user.
 
@@ -70,7 +127,7 @@ def create_user_integrations(user_id: int, db: Session) -> user_integrations_mod
         db: SQLAlchemy database session.
 
     Returns:
-        The created UsersIntegrations model.
+        The created UsersIntegrationsRead schema.
 
     Raises:
         HTTPException: 409 error if integrations already exist.
@@ -88,7 +145,7 @@ def create_user_integrations(user_id: int, db: Session) -> user_integrations_mod
         db.refresh(user_integrations)
 
         # Return the user integrations
-        return user_integrations
+        return _transform_users_integrations(user_integrations)
     except IntegrityError as integrity_error:
         # Rollback the transaction
         db.rollback()
@@ -102,7 +159,7 @@ def create_user_integrations(user_id: int, db: Session) -> user_integrations_mod
 
 @core_decorators.handle_db_errors
 def link_strava_account(
-    user_integrations: user_integrations_models.UsersIntegrations,
+    user_id: int,
     tokens: dict,
     db: Session,
 ) -> None:
@@ -110,8 +167,7 @@ def link_strava_account(
     Link a Strava account by storing OAuth tokens.
 
     Args:
-        user_integrations: The UsersIntegrations ORM model to
-            update.
+        user_id: The ID of the user to update.
         tokens: Dictionary containing access_token,
             refresh_token, and expires_at.
         db: SQLAlchemy database session.
@@ -122,17 +178,20 @@ def link_strava_account(
     Raises:
         HTTPException: 500 error if database operation fails.
     """
+    # Get the user integrations by the user id
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
+
     # Update the user integrations with the tokens
-    user_integrations.strava_token = core_cryptography.encrypt_token_fernet(tokens["access_token"])
-    user_integrations.strava_refresh_token = core_cryptography.encrypt_token_fernet(tokens["refresh_token"])
-    user_integrations.strava_token_expires_at = datetime.fromtimestamp(tokens["expires_at"], tz=UTC)
+    db_user_integrations.strava_token = core_cryptography.encrypt_token_fernet(tokens["access_token"])
+    db_user_integrations.strava_refresh_token = core_cryptography.encrypt_token_fernet(tokens["refresh_token"])
+    db_user_integrations.strava_token_expires_at = datetime.fromtimestamp(tokens["expires_at"], tz=UTC)
 
     # Set the strava state to None
-    user_integrations.strava_state = None
+    db_user_integrations.strava_state = None
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -152,26 +211,20 @@ def unlink_strava_account(user_id: int, db: Session) -> None:
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Clear all Strava integration data
-    user_integrations.strava_state = None
-    user_integrations.strava_token = None
-    user_integrations.strava_refresh_token = None
-    user_integrations.strava_token_expires_at = None
-    user_integrations.strava_sync_gear = False
-    user_integrations.strava_client_id = None
-    user_integrations.strava_client_secret = None
+    db_user_integrations.strava_state = None
+    db_user_integrations.strava_token = None
+    db_user_integrations.strava_refresh_token = None
+    db_user_integrations.strava_token_expires_at = None
+    db_user_integrations.strava_sync_gear = False
+    db_user_integrations.strava_client_id = None
+    db_user_integrations.strava_client_secret = None
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -193,21 +246,15 @@ def set_user_strava_client(user_id: int, client_id: str, client_secret: str, db:
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Encrypt and store Strava client credentials
-    user_integrations.strava_client_id = core_cryptography.encrypt_token_fernet(client_id)
-    user_integrations.strava_client_secret = core_cryptography.encrypt_token_fernet(client_secret)
+    db_user_integrations.strava_client_id = core_cryptography.encrypt_token_fernet(client_id)
+    db_user_integrations.strava_client_secret = core_cryptography.encrypt_token_fernet(client_secret)
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -228,20 +275,14 @@ def set_user_strava_state(user_id: int, state: str | None, db: Session) -> None:
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Set the user Strava state
-    user_integrations.strava_state = None if state in ("null", None) else state
+    db_user_integrations.strava_state = None if state in ("null", None) else state
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -262,20 +303,14 @@ def set_user_strava_sync_gear(user_id: int, strava_sync_gear: bool, db: Session)
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Set the Strava gear sync preference
-    user_integrations.strava_sync_gear = strava_sync_gear
+    db_user_integrations.strava_sync_gear = strava_sync_gear
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -300,20 +335,14 @@ def link_garminconnect_account(
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Store Garmin Connect token
-    user_integrations.garminconnect_token = token
+    db_user_integrations.garminconnect_token = token
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -335,20 +364,14 @@ def set_user_garminconnect_sync_gear(user_id: int, garminconnect_sync_gear: bool
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Set the Garmin Connect gear sync preference
-    user_integrations.garminconnect_sync_gear = garminconnect_sync_gear
+    db_user_integrations.garminconnect_sync_gear = garminconnect_sync_gear
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -368,21 +391,15 @@ def unlink_garminconnect_account(user_id: int, db: Session) -> None:
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations by the user id
-    user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Clear all Garmin Connect integration data
-    user_integrations.garminconnect_token = None
-    user_integrations.garminconnect_sync_gear = False
+    db_user_integrations.garminconnect_token = None
+    db_user_integrations.garminconnect_sync_gear = False
 
     # Commit the changes to the database
     db.commit()
-    db.refresh(user_integrations)
+    db.refresh(db_user_integrations)
 
 
 @core_decorators.handle_db_errors
@@ -390,7 +407,7 @@ def edit_user_integrations(
     user_integrations: user_integrations_schema.UsersIntegrationsUpdate,
     user_id: int,
     db: Session,
-) -> user_integrations_models.UsersIntegrations:
+) -> user_integrations_schema.UsersIntegrationsRead:
     """
     Update user integration settings.
 
@@ -407,13 +424,7 @@ def edit_user_integrations(
         HTTPException: 500 error if database operation fails.
     """
     # Get the user integrations from the database
-    db_user_integrations = get_user_integrations_by_user_id(user_id, db)
-
-    if db_user_integrations is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User integrations not found",
-        )
+    db_user_integrations = _get_user_integrations_model_by_user_id_or_404(user_id, db)
 
     # Get fields to update
     user_integrations_data = user_integrations.model_dump(exclude_unset=True, exclude={"user_id", "id"})
@@ -424,4 +435,4 @@ def edit_user_integrations(
     # Commit the transaction
     db.commit()
     db.refresh(db_user_integrations)
-    return db_user_integrations
+    return _transform_users_integrations(db_user_integrations)

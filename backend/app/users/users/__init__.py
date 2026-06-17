@@ -14,7 +14,6 @@ Exports:
       delete_user
     - Schemas: UsersBase, Users, UsersRead, UsersMe, UsersSignup,
       UsersCreate, UsersEditPassword, UsersListResponse
-    - Models: Users (ORM model)
     - Enums: Gender, Language, WeekDay, UserAccessType
     - Utils: get_user_by_id_or_404, get_admin_users_or_404,
       check_user_is_active,
@@ -38,7 +37,6 @@ from .crud import (
     update_user_photo,
     verify_user_email,
 )
-from .models import Users as UsersModel
 from .schema import (
     Gender,
     Language,
@@ -63,19 +61,15 @@ from .utils import (
 )
 
 __all__ = [
-    # Enums
     "Gender",
     "Language",
     "UserAccessType",
     "Users",
-    # Pydantic schemas
     "UsersBase",
     "UsersCreate",
     "UsersEditPassword",
     "UsersListResponse",
     "UsersMe",
-    # Database model
-    "UsersModel",
     "UsersRead",
     "UsersSignup",
     "WeekDay",
@@ -88,11 +82,9 @@ __all__ = [
     "delete_user_photo_filesystem",
     "edit_user",
     "get_admin_users_or_404",
-    # CRUD operations
     "get_all_users",
     "get_user_by_email",
     "get_user_by_id",
-    # Utility functions
     "get_user_by_id_or_404",
     "get_user_by_username",
     "get_users_admin",

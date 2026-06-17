@@ -635,13 +635,8 @@ class TestVerifyEmailEndpoint:
         mock_email_service,
     ) -> None:
         """
-        Documents current behavior: returns 500 when email service
-        is configured but get_user_by_id returns None, causing
-        send_sign_up_admin_approval_email to fail with an
-        AttributeError accessing attributes on a None user.
-
-        Tested with raise_server_exceptions=False so the response
-        status code is asserted rather than a Python exception.
+        When get_user_by_id returns None the router now raises an explicit
+        404 instead of letting AttributeError propagate as a 500.
         """
         mock_settings.return_value = MagicMock(
             signup_require_email_verification=True,
@@ -659,7 +654,7 @@ class TestVerifyEmailEndpoint:
             json={"token": "valid-token"},
         )
 
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.status_code == status.HTTP_404_NOT_FOUND
 
     @patch(
         "auth.sign_up_tokens.router.notifications_utils.create_admin_new_sign_up_approval_request_notification",

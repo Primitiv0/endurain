@@ -22,6 +22,16 @@ def mock_db():
     return MagicMock(spec=Session)
 
 
+@pytest.fixture(autouse=True)
+def _patch_transform():
+    """Patch _transform_users_default_gear to a passthrough for MagicMock compatibility."""
+    with patch(
+        "users.users_default_gear.crud._transform_users_default_gear",
+        side_effect=lambda x: x,
+    ):
+        yield
+
+
 class TestGetUserDefaultGearByUserId:
     """Test suite for get_user_default_gear_by_user_id function."""
 
@@ -127,7 +137,7 @@ class TestCreateUserDefaultGear:
 class TestEditUserDefaultGear:
     """Test suite for edit_user_default_gear function."""
 
-    @patch("users.users_default_gear.crud.get_user_default_gear_by_user_id")
+    @patch("users.users_default_gear.crud._get_user_default_gear_model_by_user_id_or_404")
     def test_edit_user_default_gear_success(self, mock_get_gear, mock_db):
         """Test successful update of user default gear."""
         # Arrange
@@ -150,7 +160,7 @@ class TestEditUserDefaultGear:
         assert result == mock_db_gear
         mock_db.commit.assert_called_once()
 
-    @patch("users.users_default_gear.crud.get_user_default_gear_by_user_id")
+    @patch("users.users_default_gear.crud._get_user_default_gear_model_by_user_id_or_404")
     def test_edit_user_default_gear_not_found(self, mock_get_gear, mock_db):
         """Test update fails when gear settings not found."""
         # Arrange
@@ -160,7 +170,10 @@ class TestEditUserDefaultGear:
             user_id=user_id,
             run_gear_id=10,
         )
-        mock_get_gear.return_value = None
+        mock_get_gear.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User default gear not found",
+        )
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:

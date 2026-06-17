@@ -172,7 +172,7 @@ def refresh_user_strava_token(user_id: int, db: Session, is_startup: bool = Fals
                 )
 
                 # Update the user integrations with the tokens
-                user_integrations_crud.link_strava_account(user_integrations, tokens, db)
+                user_integrations_crud.link_strava_account(user_integrations.user_id, tokens, db)
 
                 core_logger.print_to_log(f"User {user_id}: Strava tokens refreshed")
             except Exception as err:
