@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock
+from datetime import datetime
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -10,10 +11,14 @@ class TestGetUserNotificationById:
         import notifications.crud as crud
         import notifications.models as m
 
-        n = MagicMock(spec=m.Notification, id=1, user_id=1)
+        n = MagicMock(
+            spec=m.Notification, id=1, user_id=1, type=1, read=False, options=None, created_at=datetime(2024, 1, 1)
+        )
         mock_db.execute.return_value.scalars.return_value.first.return_value = n
         r = crud.get_user_notification_by_id(notification_id=1, user_id=1, db=mock_db)
-        assert r is n
+        assert r is not None
+        assert r.id == 1
+        assert r.user_id == 1
 
     def test_not_found(self, mock_db):
         import notifications.crud as crud
@@ -36,10 +41,14 @@ class TestGetUserNotifications:
         import notifications.crud as crud
         import notifications.models as m
 
-        n = MagicMock(spec=m.Notification, id=1, user_id=1)
+        n = MagicMock(
+            spec=m.Notification, id=1, user_id=1, type=1, read=False, options=None, created_at=datetime(2024, 1, 1)
+        )
         mock_db.execute.return_value.scalars.return_value.all.return_value = [n]
         r = crud.get_user_notifications(user_id=1, db=mock_db)
-        assert r == [n]
+        assert len(r) == 1
+        assert r[0].id == 1
+        assert r[0].user_id == 1
 
     def test_empty(self, mock_db):
         import notifications.crud as crud
@@ -86,10 +95,14 @@ class TestGetUserNotificationsWithPagination:
         import notifications.crud as crud
         import notifications.models as m
 
-        n = MagicMock(spec=m.Notification, id=1, user_id=1)
+        n = MagicMock(
+            spec=m.Notification, id=1, user_id=1, type=1, read=False, options=None, created_at=datetime(2024, 1, 1)
+        )
         mock_db.execute.return_value.scalars.return_value.all.return_value = [n]
         r = crud.get_user_notifications_with_pagination(user_id=1, db=mock_db, page_number=1, num_records=5)
-        assert r == [n]
+        assert len(r) == 1
+        assert r[0].id == 1
+        assert r[0].user_id == 1
 
     def test_page_two(self, mock_db):
         import notifications.crud as crud
@@ -116,16 +129,21 @@ class TestGetUserNotificationsWithPagination:
 
 class TestCreateNotification:
     def test_success(self, mock_db):
-        from pydantic import BaseModel
-
         import notifications.crud as crud
+        import notifications.schema as schema
 
-        class NC(BaseModel):
-            user_id: int = 1
-            type: str = "follow_request"
-            options: dict = {}
+        notification_data = schema.NotificationCreate(user_id=1, type=1, options={})
 
-        n = crud.create_notification(notification=NC(), db=mock_db)
+        mock_notification = MagicMock()
+        mock_notification.id = 1
+        mock_notification.user_id = 1
+        mock_notification.type = 1
+        mock_notification.read = False
+        mock_notification.options = None
+        mock_notification.created_at = datetime(2024, 1, 1)
+
+        with patch("notifications.crud.notifications_models.Notification", return_value=mock_notification):
+            n = crud.create_notification(notification=notification_data, db=mock_db)
         assert n is not None
         mock_db.add.assert_called_once()
         mock_db.commit.assert_called_once()
@@ -153,12 +171,16 @@ class TestMarkNotificationAsRead:
         import notifications.crud as crud
         import notifications.models as m
 
-        n = MagicMock(spec=m.Notification, id=1, user_id=1, read=False)
+        n = MagicMock(
+            spec=m.Notification, id=1, user_id=1, type=1, read=False, options=None, created_at=datetime(2024, 1, 1)
+        )
         mock_db.execute.return_value.scalars.return_value.first.return_value = n
 
         r = crud.mark_notification_as_read(notification_id=1, user_id=1, db=mock_db)
         assert n.read is True
-        assert r is n
+        assert r is not None
+        assert r.id == 1
+        assert r.user_id == 1
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(n)
 

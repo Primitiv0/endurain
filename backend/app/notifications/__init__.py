@@ -10,7 +10,6 @@ Exports:
         get_user_notifications_count, get_user_notifications_with_pagination,
         create_notification, mark_notification_as_read
     - Schemas: NotificationBase, NotificationCreate, NotificationRead
-    - Models: Notification (ORM model)
     - Constants: NotificationType
     - Utils: create_new_activity_notification,
         create_new_duplicate_start_time_activity_notification,
@@ -28,7 +27,6 @@ from .crud import (
     get_user_notifications_with_pagination,
     mark_notification_as_read,
 )
-from .models import Notification as NotificationModel
 from .schema import (
     NotificationBase,
     NotificationCreate,
@@ -43,22 +41,16 @@ from .utils import (
 )
 
 __all__ = [
-    # Pydantic schemas
     "NotificationBase",
     "NotificationCreate",
-    # Database model
-    "NotificationModel",
     "NotificationRead",
-    # Constants
     "NotificationType",
     "create_accepted_follower_request_notification",
     "create_admin_new_sign_up_approval_request_notification",
-    # Utility functions
     "create_new_activity_notification",
     "create_new_duplicate_start_time_activity_notification",
     "create_new_follower_request_notification",
     "create_notification",
-    # CRUD operations
     "get_user_notification_by_id",
     "get_user_notifications",
     "get_user_notifications_count",

@@ -21,7 +21,7 @@ router = APIRouter()
     response_model=int,
     status_code=status.HTTP_200_OK,
 )
-async def read_notifications_number(
+def read_notifications_number(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:read"])],
     token_user_id: Annotated[
         int,
@@ -52,7 +52,7 @@ async def read_notifications_number(
     response_model=(notifications_schema.NotificationRead | None),
     status_code=status.HTTP_200_OK,
 )
-async def read_notifications_by_id(
+def read_notifications_by_id(
     notification_id: int,
     validate_notification_id: Annotated[
         Callable,
@@ -90,7 +90,7 @@ async def read_notifications_by_id(
     response_model=(list[notifications_schema.NotificationRead] | None),
     status_code=status.HTTP_200_OK,
 )
-async def read_notifications_user_pagination(
+def read_notifications_user_pagination(
     page_number: int,
     num_records: int,
     validate_pagination_values: Annotated[
@@ -135,7 +135,7 @@ async def read_notifications_user_pagination(
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def mark_notification_as_read(
+def mark_notification_as_read(
     notification_id: int,
     validate_notification_id: Annotated[
         Callable,

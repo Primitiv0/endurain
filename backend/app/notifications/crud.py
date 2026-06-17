@@ -1,5 +1,7 @@
 """CRUD operations for notifications."""
 
+from typing import overload
+
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -7,13 +9,47 @@ import core.decorators as core_decorators
 import notifications.models as notifications_models
 import notifications.schema as notifications_schema
 
+# Private internal helpers
+
+
+@overload
+def _transform_notifications(
+    notifications: notifications_models.Notification,
+) -> notifications_schema.NotificationRead: ...
+
+
+@overload
+def _transform_notifications(
+    notifications: list[notifications_models.Notification],
+) -> list[notifications_schema.NotificationRead]: ...
+
+
+def _transform_notifications(
+    notifications: notifications_models.Notification | list[notifications_models.Notification],
+) -> notifications_schema.NotificationRead | list[notifications_schema.NotificationRead]:
+    """
+    Transform a notification or list of notifications to a Pydantic schema.
+
+      Args:
+        notifications: The notification ORM instance or list of instances.
+
+      Returns:
+        The notification(s) as a schema.
+    """
+    if isinstance(notifications, list):
+        return [notifications_schema.NotificationRead.model_validate(n) for n in notifications]
+    return notifications_schema.NotificationRead.model_validate(notifications)
+
+
+# Public CRUD functions
+
 
 @core_decorators.handle_db_errors
 def get_user_notification_by_id(
     notification_id: int,
     user_id: int,
     db: Session,
-) -> notifications_models.Notification | None:
+) -> notifications_schema.NotificationRead | None:
     """
     Retrieve a notification by ID for a user.
 
@@ -32,14 +68,16 @@ def get_user_notification_by_id(
         notifications_models.Notification.user_id == user_id,
         notifications_models.Notification.id == notification_id,
     )
-    return db.execute(stmt).scalars().first()
+    db_notifications = db.execute(stmt).scalars().first()
+
+    return _transform_notifications(db_notifications) if db_notifications else None
 
 
 @core_decorators.handle_db_errors
 def get_user_notifications(
     user_id: int,
     db: Session,
-) -> list[notifications_models.Notification]:
+) -> list[notifications_schema.NotificationRead]:
     """
     Retrieve all notifications for a user.
 
@@ -48,13 +86,14 @@ def get_user_notifications(
         db: Database session.
 
     Returns:
-        List of Notification models for the user.
+        List of NotificationRead schemas for the user.
 
     Raises:
         HTTPException: If a database error occurs.
     """
     stmt = select(notifications_models.Notification).where(notifications_models.Notification.user_id == user_id)
-    return list(db.execute(stmt).scalars().all())
+    db_notifications = db.execute(stmt).scalars().all()
+    return _transform_notifications(list(db_notifications))
 
 
 @core_decorators.handle_db_errors
@@ -89,7 +128,7 @@ def get_user_notifications_with_pagination(
     db: Session,
     page_number: int = 1,
     num_records: int = 5,
-) -> list[notifications_models.Notification]:
+) -> list[notifications_schema.NotificationRead]:
     """
     Retrieve paginated notifications for a user.
 
@@ -100,7 +139,7 @@ def get_user_notifications_with_pagination(
         num_records: Records per page (default 5).
 
     Returns:
-        List of Notification models for the page.
+        List of NotificationRead schemas for the page.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -112,14 +151,15 @@ def get_user_notifications_with_pagination(
         .offset((page_number - 1) * num_records)
         .limit(num_records)
     )
-    return list(db.execute(stmt).scalars().all())
+    db_notifications = db.execute(stmt).scalars().all()
+    return _transform_notifications(list(db_notifications))
 
 
 @core_decorators.handle_db_errors
 def create_notification(
     notification: notifications_schema.NotificationCreate,
     db: Session,
-) -> notifications_models.Notification:
+) -> notifications_schema.NotificationRead:
     """
     Create a new notification record.
 
@@ -128,7 +168,7 @@ def create_notification(
         db: Database session.
 
     Returns:
-        The newly created Notification model.
+        The newly created NotificationRead schema.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -143,7 +183,7 @@ def create_notification(
     db.add(new_notification)
     db.commit()
     db.refresh(new_notification)
-    return new_notification
+    return _transform_notifications(new_notification)
 
 
 @core_decorators.handle_db_errors
@@ -151,7 +191,7 @@ def mark_notification_as_read(
     notification_id: int,
     user_id: int,
     db: Session,
-) -> notifications_models.Notification | None:
+) -> notifications_schema.NotificationRead | None:
     """
     Mark a notification as read for a user.
 
@@ -161,7 +201,7 @@ def mark_notification_as_read(
         db: Database session.
 
     Returns:
-        Updated Notification model, or None if not found.
+        Updated NotificationRead schema, or None if not found.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -176,4 +216,4 @@ def mark_notification_as_read(
     notification.read = True
     db.commit()
     db.refresh(notification)
-    return notification
+    return _transform_notifications(notification)

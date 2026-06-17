@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 import core.logger as core_logger
 import notifications.constants as notifications_constants
 import notifications.crud as notifications_crud
-import notifications.models as notifications_models
 import notifications.schema as notifications_schema
 import users.users.crud as users_crud
 import users.users.schema as users_schema
@@ -22,7 +21,7 @@ async def _create_and_notify(
     notify_user_id: int,
     ws_manager: websocket_manager.WebSocketManager,
     db: Session,
-) -> notifications_models.Notification:
+) -> notifications_schema.NotificationRead:
     """
     Create notification and send WebSocket message.
 
@@ -34,7 +33,7 @@ async def _create_and_notify(
         db: Database session.
 
     Returns:
-        The created Notification model.
+        The created NotificationRead schema.
     """
     notification = notifications_crud.create_notification(notification_data, db)
     json_data = {
@@ -49,7 +48,7 @@ async def create_new_activity_notification(
     user_id: int,
     activity_id: int,
     websocket_manager: websocket_manager.WebSocketManager,
-) -> notifications_models.Notification:
+) -> notifications_schema.NotificationRead:
     """
     Create a new activity notification.
 
@@ -59,7 +58,7 @@ async def create_new_activity_notification(
         websocket_manager: WebSocket manager instance.
 
     Returns:
-        The created Notification model.
+        The created NotificationRead schema.
 
     Raises:
         HTTPException: If creation or notify fails.
@@ -97,7 +96,7 @@ async def create_new_duplicate_start_time_activity_notification(
     user_id: int,
     activity_id: int,
     websocket_manager: websocket_manager.WebSocketManager,
-) -> notifications_models.Notification:
+) -> notifications_schema.NotificationRead:
     """
     Create a duplicate start time notification.
 
@@ -107,7 +106,7 @@ async def create_new_duplicate_start_time_activity_notification(
         websocket_manager: WebSocket manager instance.
 
     Returns:
-        The created Notification model.
+        The created NotificationRead schema.
 
     Raises:
         HTTPException: If creation or notify fails.
@@ -146,7 +145,7 @@ async def create_new_follower_request_notification(
     target_user_id: int,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-) -> notifications_models.Notification:
+) -> notifications_schema.NotificationRead:
     """
     Create a new follower request notification.
 
@@ -157,7 +156,7 @@ async def create_new_follower_request_notification(
         db: Database session.
 
     Returns:
-        The created Notification model.
+        The created NotificationRead schema.
 
     Raises:
         HTTPException: If user not found or error.
@@ -203,7 +202,7 @@ async def create_accepted_follower_request_notification(
     target_user_id: int,
     websocket_manager: websocket_manager.WebSocketManager,
     db: Session,
-) -> notifications_models.Notification:
+) -> notifications_schema.NotificationRead:
     """
     Create an accepted follower request notification.
 
@@ -214,7 +213,7 @@ async def create_accepted_follower_request_notification(
         db: Database session.
 
     Returns:
-        The created Notification model.
+        The created NotificationRead schema.
 
     Raises:
         HTTPException: If user not found or error.
