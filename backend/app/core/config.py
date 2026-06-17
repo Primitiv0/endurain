@@ -91,6 +91,16 @@ class Settings(BaseSettings):
     # are rejected at startup to prevent accidental
     # neutering of the SSRF guard.
     SSRF_ALLOWED_HOSTS: Annotated[list[str], NoDecode] = []
+    # Extra origins appended to the Content-Security-Policy
+    # ``connect-src`` directive. Needed when Endurain runs
+    # behind a forward-auth reverse proxy (e.g. Pangolin)
+    # that redirects API calls to its own domain for session
+    # validation; without its origin here the browser blocks
+    # the redirect. Comma-separated CSP source expressions
+    # (e.g. "https://auth.example.com"). Overly broad values
+    # (bare "*", scheme-only "https:") are dropped at startup
+    # because they would defeat the connect-src protection.
+    CSP_ADDITIONAL_CONNECT_SRC: Annotated[list[str], NoDecode] = []
 
     # --- Internal caches (populated at startup) ---
     # Hostnames from TRUSTED_PROXIES, resolved to IPs at startup and cached.
@@ -233,6 +243,56 @@ class Settings(BaseSettings):
                     raise ValueError(f"Invalid TRUSTED_PROXIES entry '{entry}': not a valid hostname.")
 
         return v
+
+    @field_validator("CSP_ADDITIONAL_CONNECT_SRC", mode="before")
+    @classmethod
+    def _parse_csp_additional_connect_src(cls, v):
+        """Parse the extra CSP ``connect-src`` origins.
+
+        Accepts a comma-separated env value or an already
+        parsed iterable. Entries are dropped with a warning
+        (rather than failing startup) when they are unsafe:
+
+        - Containing whitespace or ``;`` would let a value
+          break out of the directive (header injection).
+        - The bare wildcard ``*`` would allow connections to
+          any origin and defeats the connect-src control. Host
+          wildcards like ``https://*.example.com`` are kept.
+        - Scheme-only sources (``https:``, ``ws:``, ...) allow
+          any host on that scheme and are similarly too broad.
+        """
+        if v is None or v == "":
+            return []
+        raw_entries = [e.strip() for e in v.split(",")] if isinstance(v, str) else [str(e).strip() for e in v]
+
+        cleaned: list[str] = []
+        for entry in raw_entries:
+            if not entry:
+                continue
+            if ";" in entry or any(c.isspace() for c in entry):
+                core_logger.print_to_log_and_console(
+                    f"Ignoring invalid CSP_ADDITIONAL_CONNECT_SRC entry '{entry}': must not contain whitespace or ';'.",
+                    "warning",
+                )
+                continue
+            if entry == "*":
+                core_logger.print_to_log_and_console(
+                    "Ignoring wildcard '*' in CSP_ADDITIONAL_CONNECT_SRC: it would allow "
+                    "connections to any origin and defeats the connect-src protection.",
+                    "warning",
+                )
+                continue
+            # Scheme-only sources (e.g. "https:", "ws:") end in ':' with no host
+            # and allow any host on that scheme — too broad for an allowlist.
+            if entry.endswith(":") and "/" not in entry:
+                core_logger.print_to_log_and_console(
+                    f"Ignoring scheme-only CSP_ADDITIONAL_CONNECT_SRC entry '{entry}': "
+                    "it allows any host on that scheme and is too broad for connect-src.",
+                    "warning",
+                )
+                continue
+            cleaned.append(entry)
+        return cleaned
 
     @field_validator("SSRF_ALLOWED_HOSTS", mode="before")
     @classmethod

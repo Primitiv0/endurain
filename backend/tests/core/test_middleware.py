@@ -517,3 +517,48 @@ class TestSecurityHeadersMiddleware:
 
         csp = response.headers["Content-Security-Policy"]
         assert "https://*.custom-tiles.example.com" in csp
+
+    def test_connect_src_default_when_not_set(self):
+        from fastapi import FastAPI
+        from fastapi.responses import HTMLResponse
+        from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/html")
+        async def html_endpoint():
+            return HTMLResponse("<html><body>Hello</body></html>")
+
+        client = TestClient(app)
+
+        with patch("core.middleware.core_config.settings.CSP_ADDITIONAL_CONNECT_SRC", []):
+            response = client.get("/html")
+
+        csp = response.headers["Content-Security-Policy"]
+        assert "connect-src 'self' https://cdn.jsdelivr.net;" in csp
+
+    def test_connect_src_includes_additional_origins_when_set(self):
+        from fastapi import FastAPI
+        from fastapi.responses import HTMLResponse
+        from fastapi.testclient import TestClient
+
+        from core.middleware import SecurityHeadersMiddleware
+
+        app = FastAPI()
+        app.add_middleware(SecurityHeadersMiddleware)
+
+        @app.get("/html")
+        async def html_endpoint():
+            return HTMLResponse("<html><body>Hello</body></html>")
+
+        client = TestClient(app)
+
+        extra = ["https://auth.example.com", "https://proxy.example.com"]
+        with patch("core.middleware.core_config.settings.CSP_ADDITIONAL_CONNECT_SRC", extra):
+            response = client.get("/html")
+
+        csp = response.headers["Content-Security-Policy"]
+        assert "connect-src 'self' https://cdn.jsdelivr.net https://auth.example.com https://proxy.example.com;" in csp

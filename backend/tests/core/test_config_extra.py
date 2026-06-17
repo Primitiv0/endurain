@@ -215,6 +215,72 @@ class TestSettings:
         # Cache should be initialized as empty set
         assert s._resolved_trusted_proxy_ips == set()
 
+    def test_csp_additional_connect_src_default_empty(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None)
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == []
+
+    def test_csp_additional_connect_src_comma_separated(self):
+        from core.config import Settings
+
+        s = Settings(
+            _env_file=None,
+            CSP_ADDITIONAL_CONNECT_SRC="https://auth.example.com,https://proxy.example.com",
+        )
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == [
+            "https://auth.example.com",
+            "https://proxy.example.com",
+        ]
+
+    def test_csp_additional_connect_src_empty_string(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, CSP_ADDITIONAL_CONNECT_SRC="")
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == []
+
+    def test_csp_additional_connect_src_none(self):
+        from core.config import Settings
+
+        s = Settings(_env_file=None, CSP_ADDITIONAL_CONNECT_SRC=None)
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == []
+
+    def test_csp_additional_connect_src_rejects_injection_entries(self):
+        from core.config import Settings
+
+        with patch("core.config.core_logger.print_to_log_and_console"):
+            s = Settings(
+                _env_file=None,
+                CSP_ADDITIONAL_CONNECT_SRC="https://ok.example.com,bad; script-src *,has space",
+            )
+        # Entries with ';' or whitespace are dropped; the valid one survives.
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == ["https://ok.example.com"]
+
+    def test_csp_additional_connect_src_drops_bare_wildcard_keeps_host_wildcard(self):
+        from core.config import Settings
+
+        with patch("core.config.core_logger.print_to_log_and_console"):
+            s = Settings(
+                _env_file=None,
+                CSP_ADDITIONAL_CONNECT_SRC="*,https://*.example.com,https://auth.example.com",
+            )
+        # Bare '*' is dropped; host wildcards and exact origins are preserved.
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == [
+            "https://*.example.com",
+            "https://auth.example.com",
+        ]
+
+    def test_csp_additional_connect_src_drops_scheme_only_sources(self):
+        from core.config import Settings
+
+        with patch("core.config.core_logger.print_to_log_and_console"):
+            s = Settings(
+                _env_file=None,
+                CSP_ADDITIONAL_CONNECT_SRC="https:,ws:,https://auth.example.com",
+            )
+        # Scheme-only sources are dropped; the exact origin survives.
+        assert s.CSP_ADDITIONAL_CONNECT_SRC == ["https://auth.example.com"]
+
     def test_reverse_geo_rate_limit_float(self):
         from core.config import Settings
 
