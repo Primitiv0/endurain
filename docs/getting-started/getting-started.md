@@ -190,11 +190,15 @@ sudo journalctl -u caddy
 
 ###  Configure Nginx Proxy Manager as reverse proxy and get SSL cert from letsencrypt
 
-Bellow is an example config file for Endurain:
+Below is an example config file for Endurain. This is the content of the **Advanced**
+tab of the proxy host in Nginx Proxy Manager. The section labels shown in the NPM UI
+(`Let's Encrypt SSL`, `Asset Caching`, etc.) are comments and **must** be prefixed with
+`#`, otherwise Nginx will fail to start with an `unknown directive` error.
+
 ```conf
-------------------------------------------------------------
-endurain.yourdomain.com
-------------------------------------------------------------
+# ------------------------------------------------------------
+# endurain.yourdomain.com
+# ------------------------------------------------------------
 
 map $scheme $hsts_header {
     https "max-age=63072000; preload";
@@ -214,23 +218,23 @@ server {
     server_name endurain.yourdomain.com;
 
     http2 on;
-    Let's Encrypt SSL
+    # Let's Encrypt SSL
 
     include conf.d/include/letsencrypt-acme-challenge.conf;
     include conf.d/include/ssl-cache.conf;
     include conf.d/include/ssl-ciphers.conf;
     ssl_certificate /etc/letsencrypt/live/npm-21/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/npm-21/privkey.pem;
-    Asset Caching
+    # Asset Caching
 
     include conf.d/include/assets.conf;
-    Block Exploits
+    # Block Exploits
 
     include conf.d/include/block-exploits.conf;
-    HSTS (ngx_http_headers_module is required) (63072000 seconds = 2 years)
+    # HSTS (ngx_http_headers_module is required) (63072000 seconds = 2 years)
 
     add_header Strict-Transport-Security $hsts_header always;
-    Force SSL
+    # Force SSL
 
     include conf.d/include/force-ssl.conf;
 
@@ -242,20 +246,20 @@ server {
     error_log /data/logs/proxy-host-18_error.log warn;
 
     location / {
-        HSTS (ngx_http_headers_module is required) (63072000 seconds = 2 years)
+        # HSTS (ngx_http_headers_module is required) (63072000 seconds = 2 years)
 
         add_header Strict-Transport-Security $hsts_header always;
 
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $http_connection;
         proxy_http_version 1.1;
-        Proxy!
+        # Proxy!
 
         include conf.d/include/proxy.conf;
     }
-    Custom
+    # Custom
 
-    include /data/nginx/custom/server_proxy[.]conf;
+    include /data/nginx/custom/server_proxy.conf;
 }
 ```
 

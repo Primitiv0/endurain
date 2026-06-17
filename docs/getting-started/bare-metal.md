@@ -160,7 +160,58 @@ systemctl enable endurain
 systemctl start endurain
 ```
 
-## 9. Update to a new version of Endurain.
+## 9. (Optional) Reverse Proxy with Nginx
+
+If you want to serve Endurain over HTTPS on a standard domain, you can put Nginx in
+front of the service. Endurain serves **both** the frontend and the API from the same
+origin (the uvicorn process on port `8080`), so a single `location /` is enough — you
+do **not** need a separate `location` block for the backend or for static assets.
+
+```conf
+# Redirect plain HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name endurain.yourdomain.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    server_name endurain.yourdomain.com;
+
+    # Adjust to your certificate paths
+    ssl_certificate     /etc/letsencrypt/live/endurain.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/endurain.yourdomain.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+
+    # Endurain accepts large uploads (activity files, bulk imports, media).
+    # Nginx defaults to 1m, which causes 413 errors — raise it generously.
+    client_max_body_size 2000m;
+
+    location / {
+        include            proxy_params;
+        proxy_http_version 1.1;
+        proxy_set_header   Upgrade $http_upgrade;
+        proxy_set_header   Connection "upgrade";
+        proxy_pass         http://127.0.0.1:8080;
+    }
+}
+```
+
+When running behind a reverse proxy, make sure `ENDURAIN_HOST` in `env.js` (step 5) and
+in your `.env` match the public URL (e.g. `https://endurain.yourdomain.com`). So that
+uvicorn trusts the forwarded protocol headers, add `--proxy-headers` to the `ExecStart`
+command in the systemd unit (step 8):
+
+```ini
+ExecStart=/path/to/endurain/backend/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080 --proxy-headers
+```
+
+## 10. Update to a new version of Endurain.
 
 Remove old version and get the latest.
 
