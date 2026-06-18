@@ -8,6 +8,25 @@ import core.decorators as core_decorators
 
 
 @core_decorators.handle_db_errors
+def get_user_mfa_row(user_id: int, db: Session) -> auth_mfa_models.UsersMFA | None:
+    """
+    Retrieve the ``users_mfa`` row for a user.
+
+    Args:
+        user_id: ID of the user to fetch the MFA row for.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The user's ``UsersMFA`` row, or None if no row exists.
+
+    Raises:
+        HTTPException: 500 if a database error occurs.
+    """
+    stmt = select(auth_mfa_models.UsersMFA).where(auth_mfa_models.UsersMFA.user_id == user_id)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+@core_decorators.handle_db_errors
 def update_user_mfa(user_id: int, db: Session, encrypted_secret: str | None = None) -> None:
     """
     Update a user's MFA settings in the ``users_mfa`` table.

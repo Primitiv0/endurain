@@ -244,7 +244,7 @@ def verify_user_mfa(
     """
     user = users_utils.get_user_by_id_or_404(user_id, db)
 
-    mfa_row = user.auth_mfa
+    mfa_row = auth_mfa_crud.get_user_mfa_row(user.id, db)
     if not mfa_row or not mfa_row.mfa_enabled or not mfa_row.mfa_secret:
         return False
 
@@ -308,5 +308,5 @@ def is_mfa_enabled_for_user(user_id: int, db: Session) -> bool:
 
     if not user:
         return False
-    mfa_row = user.auth_mfa
+    mfa_row = auth_mfa_crud.get_user_mfa_row(user.id, db)
     return bool(mfa_row and mfa_row.mfa_enabled and mfa_row.mfa_secret is not None)

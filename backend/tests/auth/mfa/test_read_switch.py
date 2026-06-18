@@ -169,6 +169,22 @@ class TestDisableUserMFAReadSwitch:
 class TestVerifyUserMFAReadSwitch:
     """verify_user_mfa reads both fields from auth_mfa."""
 
+    @pytest.fixture(autouse=True)
+    def _wire_mfa_row(self):
+        """Mirror auth_mfa_crud.get_user_mfa_row to the mocked user's auth_mfa.
+
+        Production reads the ``users_mfa`` row via
+        ``auth_mfa_crud.get_user_mfa_row``; resolve it from the patched
+        user mock so the read still derives from ``auth_mfa``.
+        """
+
+        def _row(_user_id, _db):
+            user = mfa_service.users_utils.get_user_by_id_or_404.return_value
+            return getattr(user, "auth_mfa", None)
+
+        with patch("auth.mfa.service.auth_mfa_crud.get_user_mfa_row", side_effect=_row):
+            yield
+
     def test_returns_false_when_auth_mfa_disabled(self, mock_db):
         """
         Returns False when auth_mfa.mfa_enabled is False,
@@ -221,6 +237,22 @@ class TestVerifyUserMFAReadSwitch:
 
 class TestIsMFAEnabledForUserReadSwitch:
     """is_mfa_enabled_for_user reads from auth_mfa."""
+
+    @pytest.fixture(autouse=True)
+    def _wire_mfa_row(self):
+        """Mirror auth_mfa_crud.get_user_mfa_row to the mocked user's auth_mfa.
+
+        Production reads the ``users_mfa`` row via
+        ``auth_mfa_crud.get_user_mfa_row``; resolve it from the patched
+        user mock so the read still derives from ``auth_mfa``.
+        """
+
+        def _row(_user_id, _db):
+            user = mfa_service.users_utils.get_user_by_id_or_404.return_value
+            return getattr(user, "auth_mfa", None)
+
+        with patch("auth.mfa.service.auth_mfa_crud.get_user_mfa_row", side_effect=_row):
+            yield
 
     def test_returns_true_when_auth_mfa_enabled_with_secret(self, mock_db):
         """

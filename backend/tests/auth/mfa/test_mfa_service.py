@@ -273,6 +273,23 @@ class TestDisableUserMFA:
 class TestVerifyUserMFA:
     """Test suite for verify_user_mfa function."""
 
+    @pytest.fixture(autouse=True)
+    def _wire_mfa_row(self):
+        """Mirror auth_mfa_crud.get_user_mfa_row to the mocked user's auth_mfa.
+
+        Production reads the ``users_mfa`` row via
+        ``auth_mfa_crud.get_user_mfa_row`` rather than a
+        ``UsersRead.auth_mfa`` relationship (which the API schema does not
+        expose), so resolve the row from the patched user mock.
+        """
+
+        def _row(_user_id, _db):
+            user = mfa_service.users_utils.get_user_by_id_or_404.return_value
+            return getattr(user, "auth_mfa", None)
+
+        with patch("auth.mfa.service.auth_mfa_crud.get_user_mfa_row", side_effect=_row):
+            yield
+
     @patch("auth.mfa.service.verify_totp")
     @patch("auth.mfa.service.core_cryptography.decrypt_token_fernet")
     @patch("auth.mfa.service.users_utils.get_user_by_id_or_404")
@@ -445,6 +462,23 @@ class TestVerifyUserMFA:
 
 class TestIsMFAEnabledForUser:
     """Test suite for is_mfa_enabled_for_user function."""
+
+    @pytest.fixture(autouse=True)
+    def _wire_mfa_row(self):
+        """Mirror auth_mfa_crud.get_user_mfa_row to the mocked user's auth_mfa.
+
+        Production reads the ``users_mfa`` row via
+        ``auth_mfa_crud.get_user_mfa_row`` rather than a
+        ``UsersRead.auth_mfa`` relationship (which the API schema does not
+        expose), so resolve the row from the patched user mock.
+        """
+
+        def _row(_user_id, _db):
+            user = mfa_service.users_utils.get_user_by_id_or_404.return_value
+            return getattr(user, "auth_mfa", None)
+
+        with patch("auth.mfa.service.auth_mfa_crud.get_user_mfa_row", side_effect=_row):
+            yield
 
     @patch("auth.mfa.service.users_utils.get_user_by_id_or_404")
     def test_mfa_enabled(self, mock_get_user):
