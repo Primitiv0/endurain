@@ -32,6 +32,15 @@ export function formatTime(dateString) {
   return date.toLocaleString(DateTime.TIME_SIMPLE)
 }
 
+export function formatTimeLocal(dateString) {
+  // Convert the timestamp to the browser's local time zone before formatting,
+  // so labels match locally rendered chart axes instead of showing UTC.
+  const date = DateTime.fromISO(dateString).toLocal()
+
+  // Return the formatted time string, respecting the browser's locale
+  return date.toLocaleString(DateTime.TIME_SIMPLE)
+}
+
 export function formatDateTimeForLocalInput(dateValue) {
   if (!dateValue) {
     return ''

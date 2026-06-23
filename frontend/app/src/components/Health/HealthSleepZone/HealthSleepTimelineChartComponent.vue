@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n'
 
 import { Chart, registerables } from 'chart.js'
 import 'chartjs-adapter-date-fns'
-import { formatTime, formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
+import { formatTimeLocal, formatSecondsToHoursMinutes } from '@/utils/dateTimeUtils'
 
 Chart.register(...registerables)
 
@@ -59,8 +59,8 @@ const chartData = computed(() => {
       x: [startTime, endTime],
       y: stageInfo.yPos,
       stage: stageInfo.name,
-      startTimeStr: formatTime(stage.start_time_gmt),
-      endTimeStr: formatTime(stage.end_time_gmt),
+      startTimeStr: formatTimeLocal(stage.start_time_gmt),
+      endTimeStr: formatTimeLocal(stage.end_time_gmt),
       duration: stage.duration_seconds,
       backgroundColor: stageInfo.color,
       stageType: stage.stage_type
