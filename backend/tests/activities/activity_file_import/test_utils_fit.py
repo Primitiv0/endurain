@@ -30,12 +30,13 @@ def _privacy_settings() -> SimpleNamespace:
     )
 
 
-def _session_record(manufacturer) -> dict:
+def _session_record(manufacturer, product=None) -> dict:
     """
     Build a minimal FIT session record for create_activity_objects.
 
     Args:
         manufacturer: Value placed in file_id["manufacturer"].
+        product: Value placed in file_id["product"].
 
     Returns:
         Session record dict with the keys the builder reads.
@@ -60,7 +61,7 @@ def _session_record(manufacturer) -> dict:
         "workout_steps": [],
         "split_summary": [],
         "lengths": [],
-        "file_id": {"manufacturer": manufacturer, "product": None},
+        "file_id": {"manufacturer": manufacturer, "product": product},
         "session": {
             "activity_type": None,
             "first_waypoint_time": start,
@@ -114,3 +115,23 @@ class TestUtilsFit:
         )
 
         assert activities[0]["activity"].tracker_manufacturer is None
+
+    def test_create_activity_objects_stringifies_numeric_model(self):
+        """Numeric FIT product ids are coerced to strings."""
+        activities = utils_fit.create_activity_objects(
+            [_session_record(None, product=4567)],
+            user_id=1,
+            user_privacy_settings=_privacy_settings(),
+        )
+
+        assert activities[0]["activity"].tracker_model == "4567"
+
+    def test_create_activity_objects_keeps_none_model(self):
+        """A missing product stays None instead of the string 'None'."""
+        activities = utils_fit.create_activity_objects(
+            [_session_record(None, product=None)],
+            user_id=1,
+            user_privacy_settings=_privacy_settings(),
+        )
+
+        assert activities[0]["activity"].tracker_model is None
