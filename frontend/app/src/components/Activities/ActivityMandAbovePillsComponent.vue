@@ -142,6 +142,158 @@
               :title="$t('activityMandAbovePillsComponent.labelHRZones')"
             />
           </div>
+
+          <!-- Selected graph summary stats (same data shown on small screens) -->
+          <div class="mt-3" v-if="graphSelection === 'pace' && pacePresent">
+            <div class="d-flex justify-content-between" v-if="formattedPace">
+              <span>{{ $t('activityBellowMPillsComponent.labelAvgPace') }}</span>
+              <span>
+                <b>{{ formattedPace }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.total_elapsed_time">
+              <span>{{ $t('activityBellowMPillsComponent.labelElapsedTime') }}</span>
+              <span>
+                <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.total_timer_time">
+              <span>{{ $t('activityBellowMPillsComponent.labelMovingTime') }}</span>
+              <span>
+                <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_timer_time) }}</b>
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-3" v-if="graphSelection === 'vel' && velPresent">
+            <div class="d-flex justify-content-between" v-if="activity.average_speed">
+              <span>{{ $t('activityBellowMPillsComponent.labelAvgSpeed') }}</span>
+              <span>
+                <b>{{ formatSpeed(t, activity.average_speed, activity, units) }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.max_speed">
+              <span>{{ $t('activityBellowMPillsComponent.labelMaxSpeed') }}</span>
+              <span>
+                <b>{{ formatSpeed(t, activity.max_speed, activity, units) }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.total_elapsed_time">
+              <span>{{ $t('activityBellowMPillsComponent.labelElapsedTime') }}</span>
+              <span>
+                <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.total_timer_time">
+              <span>{{ $t('activityBellowMPillsComponent.labelMovingTime') }}</span>
+              <span>
+                <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_timer_time) }}</b>
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-3" v-if="graphSelection === 'hr' && hrPresent">
+            <div class="d-flex justify-content-between" v-if="activity.average_hr">
+              <span>{{ $t('activityBellowMPillsComponent.labelAvgHeartRate') }}</span>
+              <span>
+                <b>{{ activity.average_hr }}{{ ' ' + $t('generalItems.unitsBpm') }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.max_hr">
+              <span>{{ $t('activityBellowMPillsComponent.labelMaxHeartRate') }}</span>
+              <span>
+                <b>{{ activity.max_hr }}{{ ' ' + $t('generalItems.unitsBpm') }}</b>
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-3" v-if="graphSelection === 'power' && powerPresent">
+            <div class="d-flex justify-content-between" v-if="activity.average_power">
+              <span>{{ $t('activityBellowMPillsComponent.labelAvgPower') }}</span>
+              <span>
+                <b>{{ activity.average_power }}{{ ' ' + $t('generalItems.unitsWattsShort') }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.max_power">
+              <span>{{ $t('activityBellowMPillsComponent.labelMaxPower') }}</span>
+              <span>
+                <b>{{ activity.max_power }}{{ ' ' + $t('generalItems.unitsWattsShort') }}</b>
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.normalized_power">
+              <span>{{ $t('activityBellowMPillsComponent.labelNormalizedPower') }}</span>
+              <span>
+                <b>{{ activity.normalized_power }}{{ ' ' + $t('generalItems.unitsWattsShort') }}</b>
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-3" v-if="graphSelection === 'cad' && cadPresent">
+            <div class="d-flex justify-content-between" v-if="activity.average_cad">
+              <span v-if="!activityTypeIsSwimming(activity)">
+                {{ $t('activityBellowMPillsComponent.labelAvgCadence') }}
+              </span>
+              <span v-else>{{ $t('activityBellowMPillsComponent.labelAvgStrokeRate') }}</span>
+              <span>
+                <b
+                  >{{ activity.average_cad
+                  }}{{
+                    ' ' +
+                    (activityTypeIsCycling(activity)
+                      ? $t('generalItems.unitsRpm')
+                      : $t('generalItems.unitsSpm'))
+                  }}</b
+                >
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.max_cad">
+              <span v-if="!activityTypeIsSwimming(activity)">
+                {{ $t('activityBellowMPillsComponent.labelMaxCadence') }}
+              </span>
+              <span v-else>{{ $t('activityBellowMPillsComponent.labelMaxStrokeRate') }}</span>
+              <span>
+                <b
+                  >{{ activity.max_cad
+                  }}{{
+                    ' ' +
+                    (activityTypeIsCycling(activity)
+                      ? $t('generalItems.unitsRpm')
+                      : $t('generalItems.unitsSpm'))
+                  }}</b
+                >
+              </span>
+            </div>
+          </div>
+
+          <div
+            class="mt-3"
+            v-if="graphSelection === 'ele' && elePresent && !activityTypeIsSwimming(activity)"
+          >
+            <div class="d-flex justify-content-between" v-if="activity.elevation_gain">
+              <span>{{ $t('activityBellowMPillsComponent.labelElevationGain') }}</span>
+              <span v-if="units === 'metric'">
+                <b>{{ activity.elevation_gain }}{{ ' ' + $t('generalItems.unitsM') }}</b>
+              </span>
+              <span v-else>
+                <b
+                  >{{ metersToFeet(activity.elevation_gain)
+                  }}{{ ' ' + $t('generalItems.unitsFeetShort') }}</b
+                >
+              </span>
+            </div>
+            <div class="d-flex justify-content-between mt-2" v-if="activity.elevation_loss">
+              <span>{{ $t('activityBellowMPillsComponent.labelElevationLoss') }}</span>
+              <span v-if="units === 'metric'">
+                <b>{{ activity.elevation_loss }}{{ ' ' + $t('generalItems.unitsM') }}</b>
+              </span>
+              <span v-else>
+                <b
+                  >{{ metersToFeet(activity.elevation_loss)
+                  }}{{ ' ' + $t('generalItems.unitsFeetShort') }}</b
+                >
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -197,12 +349,16 @@ import {
   activityTypeIsSailing,
   activityTypeNotSailing,
   activityTypeIsWindsurf,
-  activityTypeNotWindsurf
+  activityTypeNotWindsurf,
+  formatPace,
+  formatSpeed
 } from '@/utils/activityUtils'
 // Import Notivue push
 import { push } from 'notivue'
 // Import the utils
 import { getHrBarChartData, formatHrZoneLabel } from '@/utils/chartUtils'
+import { formatSecondsToHoursMinutesSeconds } from '@/utils/dateTimeUtils'
+import { metersToFeet } from '@/utils/unitsUtils'
 
 // Props
 const props = defineProps({
@@ -253,6 +409,7 @@ const hrZones = ref({})
 
 // Computed properties
 const hrChartData = computed(() => getHrBarChartData(hrZones.value, t))
+const formattedPace = computed(() => formatPace(t, props.activity, props.units))
 
 // Methods
 function selectGraph(type) {
