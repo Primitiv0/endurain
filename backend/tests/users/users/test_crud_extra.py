@@ -716,6 +716,52 @@ class TestEditUser:
         mock_del.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_skips_read_only_computed_property(self):
+        """Regression: a fully populated UsersRead (e.g. from IdP sync)
+        includes ``mfa_enabled``, a read-only computed property on the
+        Users model. edit_user must skip it instead of raising
+        AttributeError via setattr (see PR #727 / issue #726)."""
+        from users.users.crud import edit_user
+
+        class _FakeUser:
+            def __init__(self):
+                self.id = 1
+                self.height = 180
+                self.photo_path = "data/user_images/1.jpg"
+                self.name = "Old"
+                self._mfa = False
+
+            @property
+            def mfa_enabled(self) -> bool:
+                # No setter: setattr(self, "mfa_enabled", ...) raises.
+                return self._mfa
+
+        fake_user = _FakeUser()
+
+        mock_db = MagicMock(spec=Session)
+        mock_user_schema = MagicMock()
+        mock_user_schema.username = "updateduser"
+        mock_user_schema.photo_path = None
+        mock_user_schema.model_dump.return_value = {
+            "username": "updateduser",
+            "name": "Updated",
+            "mfa_enabled": True,
+        }
+
+        with (
+            patch("users.users.crud._get_user_model_by_id_or_404", return_value=fake_user),
+            patch("users.users.crud.users_utils.delete_user_photo_filesystem", new_callable=AsyncMock),
+        ):
+            result = await edit_user(1, mock_user_schema, mock_db)
+
+        assert result is fake_user
+        # Writable field was applied.
+        assert fake_user.name == "Updated"
+        # Read-only computed property was skipped, not mass-assigned.
+        assert fake_user.mfa_enabled is False
+        mock_db.commit.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_integrity_error(self):
         from users.users.crud import edit_user
 
