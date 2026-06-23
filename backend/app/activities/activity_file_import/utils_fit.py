@@ -134,7 +134,11 @@ def create_activity_objects(
                 strava_activity_id=None,
                 garminconnect_activity_id=garmin_activity_id,
                 garminconnect_gear_id=(garminconnect_gear[0]["uuid"] if garminconnect_gear else None),
-                tracker_manufacturer=session_record["file_id"].get("manufacturer", None),
+                tracker_manufacturer=(
+                    str(manufacturer)
+                    if (manufacturer := session_record["file_id"].get("manufacturer")) is not None
+                    else None
+                ),
                 tracker_model=str(session_record["file_id"].get("product", None)),
                 **privacy_kwargs,
             )
