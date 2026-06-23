@@ -110,6 +110,20 @@ jobs:
             "${IMAGE_NAME}:${RELEASE_TAG}-amd64" \
             "${IMAGE_NAME}:${RELEASE_TAG}-arm64"
 
+      - name: Publish major.minor version manifest
+        if: ${{ forgejo.event_name == 'release' }}
+        env:
+          RELEASE_TAG: ${{ forgejo.ref_name }}
+        run: |
+          set -eu
+          if [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            TAG=$(echo "${RELEASE_TAG}" | sed -n 's/^\(v[0-9]\+\.[0-9]\+\).*/\1/p')
+            docker buildx imagetools create \
+              --tag "${IMAGE_NAME}:${TAG}" \
+              "${IMAGE_NAME}:${RELEASE_TAG}-amd64" \
+              "${IMAGE_NAME}:${RELEASE_TAG}-arm64"
+          fi
+
       - name: Publish development manifest
         if: ${{ forgejo.event_name == 'workflow_dispatch' }}
         env:

@@ -8,6 +8,7 @@
 Endurain provides a Docker image for simplified deployment. To get started, check out the `docker-compose.yml.example` file in the project repository and adjust it according to your setup. Supported tags are:
 
 - **latest:** contains the latest released version;
+- **major.minor version, example "v0.18":** latest patch release within the v0.18.x train;
 - **version, example "v0.3.0":** contains the app state available at the time of the version specified;
 - **development version, example "dev_06092024":** contains a development version of the app at the date specified. This is not a stable released and may contain issues and bugs. Please do not open issues if using a version like this unless asked by me.
 
