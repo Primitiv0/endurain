@@ -151,13 +151,13 @@
                 <b>{{ formattedPace }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.total_elapsed_time">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.total_elapsed_time">
               <span>{{ $t('activityBellowMPillsComponent.labelElapsedTime') }}</span>
               <span>
                 <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.total_timer_time">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.total_timer_time">
               <span>{{ $t('activityBellowMPillsComponent.labelMovingTime') }}</span>
               <span>
                 <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_timer_time) }}</b>
@@ -172,19 +172,19 @@
                 <b>{{ formatSpeed(t, activity.average_speed, activity, units) }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.max_speed">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.max_speed">
               <span>{{ $t('activityBellowMPillsComponent.labelMaxSpeed') }}</span>
               <span>
                 <b>{{ formatSpeed(t, activity.max_speed, activity, units) }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.total_elapsed_time">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.total_elapsed_time">
               <span>{{ $t('activityBellowMPillsComponent.labelElapsedTime') }}</span>
               <span>
                 <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_elapsed_time) }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.total_timer_time">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.total_timer_time">
               <span>{{ $t('activityBellowMPillsComponent.labelMovingTime') }}</span>
               <span>
                 <b>{{ formatSecondsToHoursMinutesSeconds(activity.total_timer_time) }}</b>
@@ -199,7 +199,7 @@
                 <b>{{ activity.average_hr }}{{ ' ' + $t('generalItems.unitsBpm') }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.max_hr">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.max_hr">
               <span>{{ $t('activityBellowMPillsComponent.labelMaxHeartRate') }}</span>
               <span>
                 <b>{{ activity.max_hr }}{{ ' ' + $t('generalItems.unitsBpm') }}</b>
@@ -214,13 +214,13 @@
                 <b>{{ activity.average_power }}{{ ' ' + $t('generalItems.unitsWattsShort') }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.max_power">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.max_power">
               <span>{{ $t('activityBellowMPillsComponent.labelMaxPower') }}</span>
               <span>
                 <b>{{ activity.max_power }}{{ ' ' + $t('generalItems.unitsWattsShort') }}</b>
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.normalized_power">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.normalized_power">
               <span>{{ $t('activityBellowMPillsComponent.labelNormalizedPower') }}</span>
               <span>
                 <b>{{ activity.normalized_power }}{{ ' ' + $t('generalItems.unitsWattsShort') }}</b>
@@ -246,7 +246,7 @@
                 >
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.max_cad">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.max_cad">
               <span v-if="!activityTypeIsSwimming(activity)">
                 {{ $t('activityBellowMPillsComponent.labelMaxCadence') }}
               </span>
@@ -281,7 +281,7 @@
                 >
               </span>
             </div>
-            <div class="d-flex justify-content-between mt-2" v-if="activity.elevation_loss">
+            <div class="d-flex justify-content-between mt-3" v-if="activity.elevation_loss">
               <span>{{ $t('activityBellowMPillsComponent.labelElevationLoss') }}</span>
               <span v-if="units === 'metric'">
                 <b>{{ activity.elevation_loss }}{{ ' ' + $t('generalItems.unitsM') }}</b>
