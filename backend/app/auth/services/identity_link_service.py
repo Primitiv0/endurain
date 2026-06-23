@@ -141,6 +141,60 @@ def delete_identity_provider_link(
     )
 
 
+def admin_delete_identity_provider_link(
+    user_id: int,
+    idp_id: int,
+    db: Session,
+) -> None:
+    """Unlink an IdP from a user as an administrator.
+
+    Unlike :func:`delete_identity_provider_link`, this is an
+    administrative action against another user's account: it does not
+    require step-up verification from the caller (authorization is
+    enforced by the ``users:write`` scope on the route).
+
+    Args:
+        user_id: ID of the user to unlink the IdP from.
+        idp_id: ID of the identity provider to unlink.
+        db: Database session.
+
+    Returns:
+        None.
+
+    Raises:
+        HTTPException: 404 if the IdP or the user-IdP link does not
+            exist, 500 if the deletion fails at the database level.
+    """
+    idp = idp_crud.get_identity_provider(idp_id, db)
+    if idp is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Identity provider with id {idp_id} not found",
+        )
+
+    link = auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id(
+        user_id,
+        idp_id,
+        db,
+    )
+    if not link:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Identity provider {idp.name} is not linked to this user",
+        )
+
+    success = auth_identity_links_crud.delete_user_identity_provider(user_id, idp_id, db)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to unlink identity provider",
+        )
+
+    core_logger.print_to_log(
+        f"Admin unlinked IdP for user {user_id}: idp_id={idp_id} ({idp.name})",
+    )
+
+
 def get_user_identity_provider_links(
     user_id: int,
     db: Session,

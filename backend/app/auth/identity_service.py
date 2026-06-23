@@ -608,6 +608,25 @@ class IdentityService(Protocol):
         """
         ...
 
+    def admin_delete_identity_provider_link(
+        self,
+        user_id: int,
+        idp_id: int,
+    ) -> None:
+        """Unlink an IdP from a user as an administrator (no step-up).
+
+        Args:
+            user_id: ID of the user to unlink the IdP from.
+            idp_id: ID of the identity provider to unlink.
+
+        Returns:
+            None.
+
+        Raises:
+            HTTPException: If the IdP or the link is missing.
+        """
+        ...
+
     def validate_and_claim_browser_link_token(
         self,
         link_token: str,
@@ -1247,6 +1266,18 @@ class DefaultIdentityService:
     ) -> list[auth_identity_links_schema.UsersIdentityProviderResponse]:
         """Return enriched identity-provider links for the user."""
         return auth_identity_link_service.get_user_identity_provider_links(user_id, self._db)
+
+    def admin_delete_identity_provider_link(
+        self,
+        user_id: int,
+        idp_id: int,
+    ) -> None:
+        """Unlink an IdP from a user as an administrator (no step-up)."""
+        auth_identity_link_service.admin_delete_identity_provider_link(
+            user_id,
+            idp_id,
+            self._db,
+        )
 
     def validate_and_claim_browser_link_token(
         self,

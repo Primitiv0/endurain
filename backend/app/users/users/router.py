@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query, Security, UploadFile, status
 from sqlalchemy.orm import Session
 
 import auth.dependencies as auth_dependencies
+import auth.identity_providers.links.schema as auth_identity_links_schema
 import auth.identity_service as auth_identity_service
 import auth.sign_up_tokens.utils as sign_up_tokens_utils
 import core.apprise as core_apprise
@@ -454,3 +455,63 @@ async def delete_user(
         None
     """
     await users_crud.delete_user(user_id, db)
+
+
+@router.get(
+    "/{user_id}/identity-providers",
+    status_code=status.HTTP_200_OK,
+    response_model=list[auth_identity_links_schema.UsersIdentityProviderResponse],
+)
+async def get_user_identity_providers(
+    user_id: int,
+    _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
+    ],
+) -> list[auth_identity_links_schema.UsersIdentityProviderResponse]:
+    """
+    List the identity provider links of a specific user (admin).
+
+    Args:
+        user_id: ID of the user whose identity provider links to retrieve.
+        _validate_id: User ID validation dependency.
+        _check_scopes: Authorization check (users:read scope).
+        identity_service: Identity service dependency.
+
+    Returns:
+        The user's enriched identity provider links (empty list if none).
+    """
+    return identity_service.get_user_identity_provider_links(user_id)
+
+
+@router.delete(
+    "/{user_id}/identity-providers/{idp_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def delete_user_identity_provider(
+    user_id: int,
+    idp_id: int,
+    _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
+    ],
+) -> None:
+    """
+    Unlink an identity provider from a specific user (admin).
+
+    Args:
+        user_id: ID of the user to unlink the identity provider from.
+        idp_id: ID of the identity provider to unlink.
+        _validate_id: User ID validation dependency.
+        _check_scopes: Authorization check (users:write scope).
+        identity_service: Identity service dependency.
+
+    Returns:
+        None
+    """
+    identity_service.admin_delete_identity_provider_link(user_id, idp_id)
