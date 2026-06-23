@@ -63,7 +63,7 @@
             :style="{ height: source === 'home' ? '300px' : '500px' }"
           >
             <img
-              :src="`${endurainHost}${mediaItem.media_path.split('/data').pop()}`"
+              :src="`${endurainHost}${mediaItem.media_path.split('/data/').pop()}`"
               class="d-block w-100 rounded"
               alt="Activity media"
               :style="{ height: source === 'home' ? '300px' : '500px', objectFit: 'contain' }"
@@ -195,7 +195,7 @@ const thumbnailUrl = computed(() => {
   // Strip the first 4 components (e.g. /app/backend/data) to
   // produce a URL-relative path served by the StaticFiles mount,
   // matching the same convention used for activity media paths.
-  const relative = props.activity.map_thumbnail_path.split('/data').pop()
+  const relative = props.activity.map_thumbnail_path.split('/data/').pop()
   return `${endurainHost}${relative}`
 })
 

@@ -52,7 +52,7 @@ const avatarSrc = computed(() => {
 
 function defineUrl() {
   if (props.user?.photo_path) {
-    const pathWithoutConfig = props.user.photo_path.split('/data').pop()
+    const pathWithoutConfig = props.user.photo_path.split('/data/').pop()
     userPhotoUrl.value = props.user.photo_path
       ? `${window.env.ENDURAIN_HOST}/${pathWithoutConfig}`
       : null
