@@ -75,7 +75,7 @@
                 :class="{ 'active text-white': graphSelection === item.type }"
                 @click="selectGraph(item.type)"
               >
-                {{ item.label }}
+                {{ $t(item.labelKey) }}
               </a>
             </li>
           </ul>
@@ -426,7 +426,7 @@ onMounted(async () => {
           hrPresent.value = true
           graphItems.value.push({
             type: 'hr',
-            label: `${t('activityMandAbovePillsComponent.labelGraphHR')}`
+            labelKey: 'activityMandAbovePillsComponent.labelGraphHR'
           })
           // If HR zones are present, add them to the hrZones object
           const hrStream = props.activityActivityStreams.find(
@@ -437,7 +437,7 @@ onMounted(async () => {
             hrPresent.value = true
             graphItems.value.push({
               type: 'hrZones',
-              label: `${t('activityMandAbovePillsComponent.labelHRZones')}`
+              labelKey: 'activityMandAbovePillsComponent.labelHRZones'
             })
           }
         }
@@ -445,7 +445,7 @@ onMounted(async () => {
           powerPresent.value = true
           graphItems.value.push({
             type: 'power',
-            label: `${t('activityMandAbovePillsComponent.labelGraphPower')}`
+            labelKey: 'activityMandAbovePillsComponent.labelGraphPower'
           })
         }
         if (element.stream_type === 3) {
@@ -454,12 +454,12 @@ onMounted(async () => {
           if (activityTypeIsSwimming(props.activity)) {
             graphItems.value.push({
               type: 'cad',
-              label: `${t('activityMandAbovePillsComponent.labelGraphStrokeRate')}`
+              labelKey: 'activityMandAbovePillsComponent.labelGraphStrokeRate'
             })
           } else {
             graphItems.value.push({
               type: 'cad',
-              label: `${t('activityMandAbovePillsComponent.labelGraphCadence')}`
+              labelKey: 'activityMandAbovePillsComponent.labelGraphCadence'
             })
           }
         }
@@ -469,7 +469,7 @@ onMounted(async () => {
             elePresent.value = true
             graphItems.value.push({
               type: 'ele',
-              label: `${t('activityMandAbovePillsComponent.labelGraphElevation')}`
+              labelKey: 'activityMandAbovePillsComponent.labelGraphElevation'
             })
           }
         }
@@ -482,7 +482,7 @@ onMounted(async () => {
           ) {
             graphItems.value.push({
               type: 'vel',
-              label: `${t('activityMandAbovePillsComponent.labelGraphVelocity')}`
+              labelKey: 'activityMandAbovePillsComponent.labelGraphVelocity'
             })
           }
         }
@@ -495,7 +495,7 @@ onMounted(async () => {
           ) {
             graphItems.value.push({
               type: 'pace',
-              label: `${t('activityMandAbovePillsComponent.labelGraphPace')}`
+              labelKey: 'activityMandAbovePillsComponent.labelGraphPace'
             })
           }
         }
@@ -503,7 +503,7 @@ onMounted(async () => {
           tempPresent.value = true
           graphItems.value.push({
             type: 'temp',
-            label: t('generalItems.labelTemperature')
+            labelKey: 'generalItems.labelTemperature'
           })
         }
       }
