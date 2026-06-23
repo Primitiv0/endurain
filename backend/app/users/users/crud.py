@@ -523,6 +523,13 @@ async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> 
         user_data = user.model_dump(exclude_unset=True)
         # Iterate over the fields and update the db_users dynamically
         for key, value in user_data.items():
+            # Skip read-only computed properties exposed by the read schema
+            # (e.g. mfa_enabled, derived from the users_mfa table with no
+            # setter). They appear in UsersRead for output but must never be
+            # mass-assigned, otherwise setattr raises AttributeError.
+            class_attr = getattr(type(db_users), key, None)
+            if isinstance(class_attr, property) and class_attr.fset is None:
+                continue
             setattr(db_users, key, value)
 
         # Commit the transaction
