@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+import auth.credentials.crud as auth_credentials_crud
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.link_tokens.crud as idp_link_token_crud
 import auth.identity_providers.link_tokens.schema as idp_link_token_schema
@@ -163,7 +164,9 @@ def admin_delete_identity_provider_link(
 
     Raises:
         HTTPException: 404 if the IdP or the user-IdP link does not
-            exist, 500 if the deletion fails at the database level.
+            exist, 400 if unlinking would remove the user's last
+            authentication method, 500 if the deletion fails at the
+            database level.
     """
     idp = idp_crud.get_identity_provider(idp_id, db)
     if idp is None:
@@ -181,6 +184,19 @@ def admin_delete_identity_provider_link(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Identity provider {idp.name} is not linked to this user",
+        )
+
+    all_idp_links = auth_identity_links_crud.get_user_identity_providers_by_user_id(
+        user_id,
+        db,
+    )
+    remaining_idp_count = len(all_idp_links) - 1
+
+    has_local_password = auth_credentials_crud.get_credential(user_id, db) is not None
+    if not has_local_password and remaining_idp_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot unlink last authentication method. User has no password set.",
         )
 
     success = auth_identity_links_crud.delete_user_identity_provider(user_id, idp_id, db)

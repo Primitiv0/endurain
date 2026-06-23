@@ -247,6 +247,150 @@ class TestDeleteIdentityProviderLink:
         assert "Cannot unlink last authentication method" in exc.value.detail
 
 
+class TestAdminDeleteIdentityProviderLink:
+    """admin_delete_identity_provider_link: admin unlink with anti-lockout check."""
+
+    def test_unlinks_successfully(self, mock_db):
+        existing_links = [MagicMock(), MagicMock()]  # 2 links, so one can be removed
+
+        with (
+            patch(
+                "auth.services.identity_link_service.idp_crud.get_identity_provider",
+                return_value=MagicMock(name="TestIDP"),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_providers_by_user_id",
+                return_value=existing_links,
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_credentials_crud.get_credential",
+                return_value=None,  # no password, but more than one link remains
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.delete_user_identity_provider",
+                return_value=True,
+            ) as mock_delete,
+        ):
+            identity_link_service.admin_delete_identity_provider_link(5, 1, mock_db)
+
+        mock_delete.assert_called_once_with(5, 1, mock_db)
+
+    def test_raises_404_when_idp_not_found(self, mock_db):
+        with (
+            patch("auth.services.identity_link_service.idp_crud.get_identity_provider", return_value=None),
+            pytest.raises(HTTPException) as exc,
+        ):
+            identity_link_service.admin_delete_identity_provider_link(5, 1, mock_db)
+
+        assert exc.value.status_code == 404
+
+    def test_raises_404_when_link_not_found(self, mock_db):
+        with (
+            patch(
+                "auth.services.identity_link_service.idp_crud.get_identity_provider",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id",
+                return_value=None,
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            identity_link_service.admin_delete_identity_provider_link(5, 1, mock_db)
+
+        assert exc.value.status_code == 404
+
+    def test_raises_400_when_last_auth_method(self, mock_db):
+        """Admin cannot unlink the last IdP when the user has no password."""
+        with (
+            patch(
+                "auth.services.identity_link_service.idp_crud.get_identity_provider",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_providers_by_user_id",
+                return_value=[MagicMock()],  # exactly 1 link → remaining_idp_count == 0
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_credentials_crud.get_credential",
+                return_value=None,  # SSO-only, no local password
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.delete_user_identity_provider",
+            ) as mock_delete,
+            pytest.raises(HTTPException) as exc,
+        ):
+            identity_link_service.admin_delete_identity_provider_link(5, 1, mock_db)
+
+        assert exc.value.status_code == 400
+        assert "Cannot unlink last authentication method" in exc.value.detail
+        mock_delete.assert_not_called()
+
+    def test_unlinks_last_idp_when_user_has_password(self, mock_db):
+        """Removing the last IdP is allowed when a local password exists."""
+        with (
+            patch(
+                "auth.services.identity_link_service.idp_crud.get_identity_provider",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_providers_by_user_id",
+                return_value=[MagicMock()],  # only 1 link → remaining_idp_count == 0
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_credentials_crud.get_credential",
+                return_value=MagicMock(),  # has local password
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.delete_user_identity_provider",
+                return_value=True,
+            ) as mock_delete,
+        ):
+            identity_link_service.admin_delete_identity_provider_link(5, 1, mock_db)
+
+        mock_delete.assert_called_once_with(5, 1, mock_db)
+
+    def test_raises_500_when_delete_fails(self, mock_db):
+        with (
+            patch(
+                "auth.services.identity_link_service.idp_crud.get_identity_provider",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_provider_by_user_id_and_idp_id",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.get_user_identity_providers_by_user_id",
+                return_value=[MagicMock(), MagicMock()],
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_credentials_crud.get_credential",
+                return_value=MagicMock(),
+            ),
+            patch(
+                "auth.services.identity_link_service.auth_identity_links_crud.delete_user_identity_provider",
+                return_value=False,
+            ),
+            pytest.raises(HTTPException) as exc,
+        ):
+            identity_link_service.admin_delete_identity_provider_link(5, 1, mock_db)
+
+        assert exc.value.status_code == 500
+
+
 class TestValidateAndClaimBrowserLinkToken:
     """validate_and_claim_browser_link_token: token validation and atomic claim."""
 
