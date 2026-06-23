@@ -139,11 +139,7 @@ def create_activity_objects(
                     if (manufacturer := session_record["file_id"].get("manufacturer")) is not None
                     else None
                 ),
-                tracker_model=(
-                    str(model)
-                    if (model := session_record["file_id"].get("product")) is not None
-                    else None
-                ),
+                tracker_model=(str(model) if (model := session_record["file_id"].get("product")) is not None else None),
                 **privacy_kwargs,
             )
 
