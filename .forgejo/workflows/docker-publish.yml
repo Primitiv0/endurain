@@ -99,19 +99,8 @@ jobs:
             "${IMAGE_NAME}:${RELEASE_TAG}-amd64" \
             "${IMAGE_NAME}:${RELEASE_TAG}-arm64"
 
-      - name: Publish latest manifest
-        if: ${{ forgejo.event_name == 'release' }}
-        env:
-          RELEASE_TAG: ${{ forgejo.ref_name }}
-        run: |
-          set -eu
-          docker buildx imagetools create \
-            --tag "${IMAGE_NAME}:latest" \
-            "${IMAGE_NAME}:${RELEASE_TAG}-amd64" \
-            "${IMAGE_NAME}:${RELEASE_TAG}-arm64"
-
       - name: Publish major.minor version manifest
-        if: ${{ forgejo.event_name == 'release' }}
+        if: ${{ forgejo.event_name == 'release' && !forgejo.event.release.prerelease }}
         env:
           RELEASE_TAG: ${{ forgejo.ref_name }}
         run: |
@@ -123,6 +112,17 @@ jobs:
               "${IMAGE_NAME}:${RELEASE_TAG}-amd64" \
               "${IMAGE_NAME}:${RELEASE_TAG}-arm64"
           fi
+
+      - name: Publish latest manifest
+        if: ${{ forgejo.event_name == 'release' && !forgejo.event.release.prerelease }}
+        env:
+          RELEASE_TAG: ${{ forgejo.ref_name }}
+        run: |
+          set -eu
+          docker buildx imagetools create \
+            --tag "${IMAGE_NAME}:latest" \
+            "${IMAGE_NAME}:${RELEASE_TAG}-amd64" \
+            "${IMAGE_NAME}:${RELEASE_TAG}-arm64"
 
       - name: Publish development manifest
         if: ${{ forgejo.event_name == 'workflow_dispatch' }}
