@@ -18,6 +18,7 @@ import activities.activity_file_import.utils_fit as fit_utils
 import activities.activity_file_import.utils_gpx as gpx_utils
 import activities.activity_laps.crud as activity_laps_crud
 import activities.activity_sets.crud as activity_sets_crud
+import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.crud as activity_streams_crud
 import activities.activity_workout_steps.crud as activity_workout_steps_crud
 import core.config as core_config
@@ -30,7 +31,6 @@ import strava.utils as strava_utils
 from activities.activity_exercise_titles import (
     crud as activity_exercise_titles_crud,
 )
-from migrations.schema import StreamType
 
 
 def process_migration_3(db: Session) -> None:
@@ -386,12 +386,12 @@ def process_activity_using_streams(
         stream_map = {stream.stream_type: stream.stream_waypoints for stream in (streams or [])}
 
         laps = gpx_utils.generate_activity_laps(
-            stream_map.get(StreamType.LATLONG.value) or [],
-            stream_map.get(StreamType.ELEVATION.value) or [],
-            stream_map.get(StreamType.POWER.value) or [],
-            stream_map.get(StreamType.HEART_RATE.value) or [],
-            stream_map.get(StreamType.CADENCE.value) or [],
-            stream_map.get(StreamType.SPEED.value) or [],
+            stream_map.get(activity_streams_constants.STREAM_TYPE_MAP) or [],
+            stream_map.get(activity_streams_constants.STREAM_TYPE_ELEVATION) or [],
+            stream_map.get(activity_streams_constants.STREAM_TYPE_POWER) or [],
+            stream_map.get(activity_streams_constants.STREAM_TYPE_HR) or [],
+            stream_map.get(activity_streams_constants.STREAM_TYPE_CADENCE) or [],
+            stream_map.get(activity_streams_constants.STREAM_TYPE_SPEED) or [],
         )
 
         store_data_in_db(activity, [], laps, [], [], [], db)
@@ -438,36 +438,45 @@ def process_strava_activity(
     stream_map = {stream.stream_type: stream.stream_waypoints for stream in (activity_streams or [])}
 
     # Create flags for which streams are available
-    is_heart_rate_set = StreamType.HEART_RATE.value in stream_map
-    is_power_set = StreamType.POWER.value in stream_map
-    is_cadence_set = StreamType.CADENCE.value in stream_map
-    is_elevation_set = StreamType.ELEVATION.value in stream_map
-    is_velocity_set = StreamType.SPEED.value in stream_map
-    is_pace_set = StreamType.PACE.value in stream_map
-    is_lat_lon_set = StreamType.LATLONG.value in stream_map  # Or: detailedActivity.start_latlng is not None
+    is_heart_rate_set = activity_streams_constants.STREAM_TYPE_HR in stream_map
+    is_power_set = activity_streams_constants.STREAM_TYPE_POWER in stream_map
+    is_cadence_set = activity_streams_constants.STREAM_TYPE_CADENCE in stream_map
+    is_elevation_set = activity_streams_constants.STREAM_TYPE_ELEVATION in stream_map
+    is_velocity_set = activity_streams_constants.STREAM_TYPE_SPEED in stream_map
+    is_pace_set = activity_streams_constants.STREAM_TYPE_PACE in stream_map
+    is_lat_lon_set = (
+        activity_streams_constants.STREAM_TYPE_MAP in stream_map
+    )  # Or: detailedActivity.start_latlng is not None
 
     # Extract waypoints (empty list if not set)
-    hr_waypoints = stream_map.get(StreamType.HEART_RATE.value, [])
-    power_waypoints = stream_map.get(StreamType.POWER.value, [])
-    cad_waypoints = stream_map.get(StreamType.CADENCE.value, [])
-    ele_waypoints = stream_map.get(StreamType.ELEVATION.value, [])
-    vel_waypoints = stream_map.get(StreamType.SPEED.value, [])
-    pace_waypoints = stream_map.get(StreamType.PACE.value, [])
-    lat_lon_waypoints = stream_map.get(StreamType.LATLONG.value, [])
+    hr_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_HR, [])
+    power_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_POWER, [])
+    cad_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_CADENCE, [])
+    ele_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_ELEVATION, [])
+    vel_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_SPEED, [])
+    pace_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_PACE, [])
+    lat_lon_waypoints = stream_map.get(activity_streams_constants.STREAM_TYPE_MAP, [])
 
     # Assemble final stream data list
     stream_data = [
-        (is_heart_rate_set, StreamType.HEART_RATE, hr_waypoints),
-        (is_power_set, StreamType.POWER, power_waypoints),
-        (is_cadence_set, StreamType.CADENCE, cad_waypoints),
-        (is_elevation_set, StreamType.ELEVATION, ele_waypoints),
-        (is_velocity_set, StreamType.SPEED, vel_waypoints),
-        (is_pace_set, StreamType.PACE, pace_waypoints),
-        (is_lat_lon_set, StreamType.LATLONG, lat_lon_waypoints),
+        (is_heart_rate_set, activity_streams_constants.STREAM_TYPE_HR, hr_waypoints),
+        (is_power_set, activity_streams_constants.STREAM_TYPE_POWER, power_waypoints),
+        (is_cadence_set, activity_streams_constants.STREAM_TYPE_CADENCE, cad_waypoints),
+        (is_elevation_set, activity_streams_constants.STREAM_TYPE_ELEVATION, ele_waypoints),
+        (is_velocity_set, activity_streams_constants.STREAM_TYPE_SPEED, vel_waypoints),
+        (is_pace_set, activity_streams_constants.STREAM_TYPE_PACE, pace_waypoints),
+        (is_lat_lon_set, activity_streams_constants.STREAM_TYPE_MAP, lat_lon_waypoints),
     ]
 
     # Create a Strava client with the user's access token
     strava_client = strava_utils.create_strava_client(user_integrations)
+
+    if not activity.strava_activity_id:
+        core_logger.print_to_log_and_console(
+            f"Migration 3 - Activity {activity.id} does not have a Strava activity ID. Skipping.",
+            "info",
+        )
+        return False
 
     # Get laps from Strava
     laps = strava_activity_utils.fetch_and_process_activity_laps(

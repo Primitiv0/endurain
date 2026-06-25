@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 from timezonefinder import TimezoneFinder
 
 import activities.activity.crud as activities_crud
+import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.crud as activity_streams_crud
 import core.config as core_config
 import core.logger as core_logger
 import health.health_weight.crud as health_weight_crud
+import health.health_weight.schema as health_weight_schema
 import migrations.crud as migrations_crud
 
 
@@ -48,6 +50,12 @@ def process_migration_2(db: Session) -> None:
     if activities:
         # Process each activity and add timezone
         for activity in activities:
+            if not activity.user_id or not activity.id:
+                core_logger.print_to_log_and_console(
+                    f"Migration 2 - Skipping activity with missing user_id or id: {activity}",
+                    "warning",
+                )
+                continue
             try:
                 # Skip if activity already has timezone
                 if activity.timezone:
@@ -57,12 +65,12 @@ def process_migration_2(db: Session) -> None:
                     )
                     continue
 
-                timezone = core_config.settings.TZ
+                timezone: str = core_config.settings.TZ
 
                 # Get activity stream
                 try:
                     activity_stream_coord = activity_streams_crud.get_activity_stream_by_type(
-                        activity.id, 7, activity.user_id, db
+                        activity.id, activity_streams_constants.STREAM_TYPE_MAP, activity.user_id, db
                     )
                 except Exception as err:
                     core_logger.print_to_log_and_console(
@@ -74,10 +82,12 @@ def process_migration_2(db: Session) -> None:
                     continue
 
                 if activity_stream_coord:
-                    timezone = tf.timezone_at(
+                    detected_timezone = tf.timezone_at(
                         lat=activity_stream_coord.stream_waypoints[0]["lat"],
                         lng=activity_stream_coord.stream_waypoints[0]["lon"],
                     )
+                    if detected_timezone is not None:
+                        timezone = detected_timezone
 
                 activity.timezone = timezone
 
@@ -109,7 +119,8 @@ def process_migration_2(db: Session) -> None:
                     continue
 
                 # Update the weight in the database
-                health_weight_crud.edit_health_weight(data.user_id, data, db)
+                data_to_update = health_weight_schema.HealthWeightUpdate.model_validate(data)
+                health_weight_crud.edit_health_weight(data.user_id, data_to_update, db)
 
                 core_logger.print_to_log_and_console(f"Migration 2 - Processed BMI: {data.id}")
 

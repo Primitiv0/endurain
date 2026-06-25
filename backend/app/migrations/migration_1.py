@@ -6,10 +6,17 @@ from sqlalchemy.orm import Session
 
 import activities.activity.crud as activities_crud
 import activities.activity.utils as activities_utils
+import activities.activity_streams.constants as activity_streams_constants
 import activities.activity_streams.crud as activity_streams_crud
 import core.logger as core_logger
 import migrations.crud as migrations_crud
-from migrations.schema import StreamType
+
+
+def _optional_float_to_int(value: float | None) -> int | None:
+    """Convert optional float metrics to optional integers for int-typed model fields."""
+    if value is None:
+        return None
+    return round(value)
 
 
 def process_migration_1(db: Session) -> None:
@@ -37,6 +44,12 @@ def process_migration_1(db: Session) -> None:
 
     if activities:
         for activity in activities:
+            if not activity.user_id or not activity.id or not activity.start_time or not activity.end_time:
+                core_logger.print_to_log_and_console(
+                    f"Migration 1 - Skipping activity with missing user_id, id, start_time, or end_time: {activity}",
+                    "warning",
+                )
+                continue
             try:
                 # Ensure start_time and end_time are datetime objects
                 if isinstance(activity.start_time, str):
@@ -78,17 +91,17 @@ def process_migration_1(db: Session) -> None:
 
                 # Map stream processing functions
                 stream_processing = {
-                    StreamType.HEART_RATE: ("avg_hr", "max_hr", "hr"),
-                    StreamType.POWER: ("avg_power", "max_power", "power", "np"),
-                    StreamType.CADENCE: ("avg_cadence", "max_cadence", "cad"),
-                    StreamType.ELEVATION: None,
-                    StreamType.SPEED: ("avg_speed", "max_speed", "vel"),
-                    StreamType.PACE: None,
-                    StreamType.LATLONG: None,
+                    activity_streams_constants.STREAM_TYPE_HR: ("avg_hr", "max_hr", "hr"),
+                    activity_streams_constants.STREAM_TYPE_POWER: ("avg_power", "max_power", "power", "np"),
+                    activity_streams_constants.STREAM_TYPE_CADENCE: ("avg_cadence", "max_cadence", "cad"),
+                    activity_streams_constants.STREAM_TYPE_ELEVATION: None,
+                    activity_streams_constants.STREAM_TYPE_SPEED: ("avg_speed", "max_speed", "vel"),
+                    activity_streams_constants.STREAM_TYPE_PACE: None,
+                    activity_streams_constants.STREAM_TYPE_MAP: None,
                 }
 
                 for stream in activity_streams:
-                    stream_type = StreamType(stream.stream_type)
+                    stream_type = stream.stream_type
                     proc = stream_processing.get(stream_type)
                     if proc is not None:
                         attr_avg, attr_max, stream_key = proc[:3]
@@ -97,22 +110,22 @@ def process_migration_1(db: Session) -> None:
                             stream_key,
                         )
                         # Special handling for normalized power
-                        if stream_type == StreamType.POWER:
+                        if stream_type == activity_streams_constants.STREAM_TYPE_POWER:
                             metrics["np"] = activities_utils.calculate_np(stream.stream_waypoints)
 
                 # Calculate elapsed time once
-                elapsed_time_seconds = (activity.end_time - activity.start_time).total_seconds()
+                elapsed_time_seconds = round((activity.end_time - activity.start_time).total_seconds())
 
                 # Set fields on the activity object
                 activity.total_elapsed_time = elapsed_time_seconds
                 activity.total_timer_time = elapsed_time_seconds
                 activity.max_speed = metrics["max_speed"]
-                activity.max_power = metrics["max_power"]
-                activity.normalized_power = metrics["np"]
-                activity.average_hr = metrics["avg_hr"]
-                activity.max_hr = metrics["max_hr"]
-                activity.average_cad = metrics["avg_cadence"]
-                activity.max_cad = metrics["max_cadence"]
+                activity.max_power = _optional_float_to_int(metrics["max_power"])
+                activity.normalized_power = _optional_float_to_int(metrics["np"])
+                activity.average_hr = _optional_float_to_int(metrics["avg_hr"])
+                activity.max_hr = _optional_float_to_int(metrics["max_hr"])
+                activity.average_cad = _optional_float_to_int(metrics["avg_cadence"])
+                activity.max_cad = _optional_float_to_int(metrics["max_cadence"])
 
                 # Update the activity in the database
                 activities_crud.edit_activity(activity.user_id, activity, db)

@@ -1,31 +1,56 @@
 """
 Migration schema definitions.
-
-Note: StreamType is defined here for historical reasons and is used by
-migration scripts. It describes activity stream data types.
 """
 
-from enum import Enum
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StrictStr,
+)
 
 
-class StreamType(Enum):
+class Migration(BaseModel):
     """
-    Activity data stream type enumeration.
+    Base schema for migration data.
 
     Attributes:
-        HEART_RATE: Heart rate data stream.
-        POWER: Power output data stream.
-        CADENCE: Cadence data stream.
-        ELEVATION: Elevation data stream.
-        SPEED: Speed data stream.
-        PACE: Pace data stream.
-        LATLONG: Latitude/longitude data stream.
+        name: Name of the migration.
+        description: Description of the migration.
+        executed: Whether the migration has been executed.
     """
 
-    HEART_RATE = 1
-    POWER = 2
-    CADENCE = 3
-    ELEVATION = 4
-    SPEED = 5
-    PACE = 6
-    LATLONG = 7
+    name: StrictStr = Field(
+        ...,
+        description="Migration name",
+    )
+    description: StrictStr = Field(
+        ...,
+        description="Migration description",
+    )
+    executed: StrictBool = Field(
+        default=False,
+        description="Whether the migration was executed",
+    )
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+    )
+
+
+class MigrationRead(Migration):
+    """
+    Schema for reading a migration record.
+
+    Attributes:
+        id: Unique migration identifier.
+    """
+
+    id: StrictInt = Field(
+        ...,
+        description="Unique migration ID",
+    )
