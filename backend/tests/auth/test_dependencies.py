@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import HTTPException, WebSocket, status
+from fastapi import HTTPException
 
 import auth.dependencies as auth_dependencies
 from auth.dependencies import (
@@ -19,7 +19,6 @@ from auth.dependencies import (
     get_user_id_from_auth,
     validate_access_token,
     validate_access_token_or_api_key,
-    validate_websocket_access_token,
 )
 from auth.principal import ApiKeyCred, PasswordCred, Principal
 
@@ -255,42 +254,6 @@ class TestCheckAuthScopes:
         with pytest.raises(HTTPException) as exc_info:
             check_auth_scopes(auth, security_scopes)
         assert exc_info.value.status_code == 403
-
-
-class TestValidateWebsocketAccessToken:
-    """Tests for validate_websocket_access_token."""
-
-    async def test_valid_token_returns_user_id(self):
-        identity_service = MagicMock()
-        identity_service.resolve_from_access_token.return_value = Principal(
-            user_id=42,
-            username="wsuser",
-            email="ws@e.com",
-            is_active=True,
-            is_superuser=False,
-            scopes=frozenset(),
-            credential=PasswordCred(username="wsuser"),
-        )
-        websocket = MagicMock(spec=WebSocket)
-        result = await validate_websocket_access_token(websocket, "valid-token", identity_service)
-        assert result == 42
-
-    @patch("auth.dependencies.core_logger.print_to_log")
-    async def test_http_exception_logs_warning_and_raises_websocket_exception(self, mock_log):
-        identity_service = MagicMock()
-        identity_service.resolve_from_access_token.side_effect = HTTPException(
-            status_code=401,
-            detail="Token expired",
-        )
-        websocket = MagicMock(spec=WebSocket)
-        with pytest.raises(Exception) as exc_info:
-            await validate_websocket_access_token(websocket, "bad-token", identity_service)
-
-        from fastapi import WebSocketException
-
-        assert isinstance(exc_info.value, WebSocketException)
-        assert exc_info.value.code == status.WS_1008_POLICY_VIOLATION
-        mock_log.assert_called_once()
 
 
 class TestResolveAndCachePrincipal:

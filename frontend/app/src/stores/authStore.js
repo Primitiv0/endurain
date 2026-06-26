@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { API_URL } from '@/utils/serviceUtils'
 // Importing the services for the login
 import { session } from '@/services/sessionService'
+import { websocket as websocketService } from '@/services/websocketService'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -132,7 +133,11 @@ export const useAuthStore = defineStore('auth', {
         hide_activity_workout_sets_steps: false,
         hide_activity_gear: false
       }
-      if (this.user_websocket && this.user_websocket.readyState === WebSocket.OPEN) {
+      if (
+        this.user_websocket &&
+        (this.user_websocket.readyState === WebSocket.OPEN ||
+          this.user_websocket.readyState === WebSocket.CONNECTING)
+      ) {
         this.user_websocket.close()
       }
       this.user_websocket = null
@@ -166,11 +171,17 @@ export const useAuthStore = defineStore('auth', {
       }
       localStorage.setItem('lang', language)
     },
-    setUserWebsocket() {
+    async setUserWebsocket() {
       const urlSplit = API_URL.split('://')
       const protocol = urlSplit[0] === 'http' ? 'ws' : 'wss'
-      const websocketURL = `${protocol}://${urlSplit[1]}ws?access_token=${this.accessToken}`
       try {
+        const response = await websocketService.fetchTicket()
+        // Guard: user may have logged out while the ticket request was in flight
+        if (!this.isAuthenticated) {
+          return
+        }
+        const ticket = response.ticket
+        const websocketURL = `${protocol}://${urlSplit[1]}ws?ticket=${encodeURIComponent(ticket)}`
         this.user_websocket = new WebSocket(websocketURL)
         this.user_websocket.onopen = () => {
           console.log(`WebSocket connection established for user ID ${this.user.id}`)

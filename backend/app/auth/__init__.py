@@ -20,8 +20,7 @@ Exports:
       ``validate_access_token_or_api_key``,
       ``header_client_type_scheme``, ``header_csrf_token_scheme``
 
-      Scope enforcement (``check_scopes``) and WebSocket validation
-      (``validate_websocket_access_token``) are provided by
+      Scope enforcement (``check_scopes``) is provided by
       :mod:`auth.dependencies`, which resolves the full principal.
     - Schemas: ``LoginRequest``, ``MFALoginRequest``,
       ``MFARequiredResponse``, ``MobileSessionResponse``,

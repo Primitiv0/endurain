@@ -18,12 +18,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Query, Request, WebSocket, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import SecurityScopes
 
 import auth.identity_service as auth_identity_service
 import auth.security_stores as auth_security_stores
-import core.logger as core_logger
 from auth.internal_dependencies import (
     AuthContext,
     _resolve_and_cache_principal,
@@ -111,42 +110,6 @@ def check_auth_scopes(
         )
 
 
-async def validate_websocket_access_token(
-    websocket: WebSocket,
-    access_token: str = Query(..., alias="access_token"),
-    identity_service: auth_identity_service.IdentityService = Depends(auth_identity_service.get_identity_service),
-) -> int:
-    """Validate a WebSocket access token through IdentityService.
-
-    Args:
-        websocket: WebSocket connection instance.
-        access_token: Access token from query parameter.
-        identity_service: Per-connection IdentityService.
-
-    Returns:
-        Authenticated user's ID.
-
-    Raises:
-        WebSocketException: If the token is invalid or expired.
-    """
-    del websocket
-    try:
-        principal = identity_service.resolve_from_access_token(access_token)
-        return principal.user_id
-    except HTTPException as err:
-        core_logger.print_to_log(
-            f"WebSocket token validation failed: {err.detail}",
-            "warning",
-            exc=err,
-        )
-        from fastapi import WebSocketException
-
-        raise WebSocketException(
-            code=status.WS_1008_POLICY_VIOLATION,
-            reason="Invalid or expired token",
-        ) from err
-
-
 __all__ = [
     "AuthContext",
     "StepUpStore",
@@ -159,7 +122,6 @@ __all__ = [
     "get_user_id_from_auth",
     "validate_access_token",
     "validate_access_token_or_api_key",
-    "validate_websocket_access_token",
 ]
 
 # Re-export step-up store type and dep getter for non-auth modules

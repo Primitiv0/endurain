@@ -10,11 +10,10 @@ tokens (cookie or Authorization header) and accept API keys as an alternative
 credential. Defines :class:`AuthContext`, the unified credential representation
 passed to endpoints that accept either auth method.
 
-Scope enforcement and WebSocket access-token validation are intentionally not
-provided here: the canonical, principal-resolving ``check_scopes`` and
-``validate_websocket_access_token`` live in :mod:`auth.dependencies` (they go
+Scope enforcement is intentionally not provided here: the canonical,
+principal-resolving ``check_scopes`` lives in :mod:`auth.dependencies` (it goes
 through :class:`~auth.identity_service.IdentityService`, which also asserts the
-user exists and is active). Use those instead.
+user exists and is active). Use that instead.
 """
 
 from dataclasses import dataclass
