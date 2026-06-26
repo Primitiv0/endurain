@@ -10,5 +10,6 @@
   "garminConnectAuthModalLoginButton": "Iniciar sesión",
   "processingMessageLinkGarminConnect": "Vinculando cuenta Garmin Connect...",
   "successMessageLinkGarminConnect": "Cuenta de Garmin Connect vinculada",
-  "errorMessageUnableToLinkGarminConnect": "No se pudo vincular la cuenta de Garmin Connect"
+  "errorMessageUnableToLinkGarminConnect": "No se pudo vincular la cuenta de Garmin Connect",
+  "isCnLabel": "Usar cuenta de Garmin Connect China (connect.garmin.cn)"
 }

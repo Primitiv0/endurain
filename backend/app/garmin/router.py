@@ -47,6 +47,7 @@ async def garminconnect_link(
         db,
         mfa_codes,
         websocket_manager,
+        garmin_user.is_cn,
     )
 
     # Return success message

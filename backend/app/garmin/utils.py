@@ -50,6 +50,7 @@ async def link_garminconnect(
     db: Session,
     mfa_codes: garmin_mfa_code_store.GarminMFACodeStoreBackend,
     websocket_manager: websocket_manager.WebSocketManager,
+    is_cn: bool = False,
 ):
     # Capture the running event loop so the thread can schedule async work on it
     loop = asyncio.get_running_loop()
@@ -65,6 +66,7 @@ async def link_garminconnect(
         garmin = garminconnect.Garmin(
             email=email,
             password=password,
+            is_cn=is_cn,
             prompt_mfa=sync_mfa_callback,
         )
         garmin.login()
@@ -84,7 +86,7 @@ async def link_garminconnect(
 
         user_integrations_crud.link_garminconnect_account(
             user_id,
-            serialize_garmin_token(garmin.client),
+            serialize_garmin_token(garmin.client, is_cn),
             db,
         )
     except HTTPException as http_err:
@@ -130,8 +132,12 @@ async def link_garminconnect(
 
 def login_garminconnect_using_tokens(token):
     try:
+        # Retrieve the China flag stored at link time (default to False for
+        # tokens created before this feature was introduced)
+        is_cn = token.get("is_cn", False) if isinstance(token, dict) else False
+
         # Create a new Garmin object
-        garmin = garminconnect.Garmin()
+        garmin = garminconnect.Garmin(is_cn=is_cn)
 
         # Restore session from stored DI tokens
         garmin.client.loads(deserialize_garmin_token(token))
@@ -150,7 +156,7 @@ def login_garminconnect_using_tokens(token):
         return None
 
 
-def serialize_garmin_token(client) -> dict:
+def serialize_garmin_token(client, is_cn: bool = False) -> dict:
     try:
         return {
             "di_token": (core_cryptography.encrypt_token_fernet(client.di_token) if client.di_token else None),
@@ -158,6 +164,7 @@ def serialize_garmin_token(client) -> dict:
                 core_cryptography.encrypt_token_fernet(client.di_refresh_token) if client.di_refresh_token else None
             ),
             "di_client_id": client.di_client_id,
+            "is_cn": is_cn,
         }
     except Exception as err:
         core_logger.print_to_log_and_console(f"Error in serialize_garmin_token: {err}", "error", err)

@@ -10,5 +10,6 @@
   "garminConnectAuthModalLoginButton": "Prijava",
   "processingMessageLinkGarminConnect": "Povezovanje računa Garmin Connect...",
   "successMessageLinkGarminConnect": "Račun Garmin Connect je povezan",
-  "errorMessageUnableToLinkGarminConnect": "Povezava računa Garmin Connect ni uspela"
+  "errorMessageUnableToLinkGarminConnect": "Povezava računa Garmin Connect ni uspela",
+  "isCnLabel": "Uporabi račun Garmin Connect Kitajska (connect.garmin.cn)"
 }

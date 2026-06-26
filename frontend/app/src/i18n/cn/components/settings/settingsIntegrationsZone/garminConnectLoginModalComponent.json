@@ -10,5 +10,6 @@
   "garminConnectAuthModalLoginButton": "登录",
   "processingMessageLinkGarminConnect": "正在连接 Garmin Connect 账户……",
   "successMessageLinkGarminConnect": "Garmin Connect 账户已连接",
-  "errorMessageUnableToLinkGarminConnect": "无法连接 Garmin Connect 账户"
+  "errorMessageUnableToLinkGarminConnect": "无法连接 Garmin Connect 账户",
+  "isCnLabel": "使用 Garmin Connect 中国账户（connect.garmin.cn）"
 }

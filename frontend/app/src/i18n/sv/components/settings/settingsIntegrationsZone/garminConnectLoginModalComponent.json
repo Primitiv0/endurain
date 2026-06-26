@@ -10,5 +10,6 @@
   "garminConnectAuthModalLoginButton": "Logga in",
   "processingMessageLinkGarminConnect": "Länkar Garmin Connect-konto...",
   "successMessageLinkGarminConnect": "Garmin Connect-konto kopplat",
-  "errorMessageUnableToLinkGarminConnect": "Kunde inte att koppla Garmin Connect-konto"
+  "errorMessageUnableToLinkGarminConnect": "Kunde inte att koppla Garmin Connect-konto",
+  "isCnLabel": "Använd Garmin Connect Kina-konto (connect.garmin.cn)"
 }

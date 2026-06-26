@@ -10,5 +10,6 @@
   "garminConnectAuthModalLoginButton": "Anmelden",
   "processingMessageLinkGarminConnect": "Verknüpfe Garmin Connect Konto...",
   "successMessageLinkGarminConnect": "Garmin Connect Konto verknüpft",
-  "errorMessageUnableToLinkGarminConnect": "Die Verbindung zum Garmin Connect Konto konnte nicht getrennt werden"
+  "errorMessageUnableToLinkGarminConnect": "Die Verbindung zum Garmin Connect Konto konnte nicht getrennt werden",
+  "isCnLabel": "Garmin Connect China-Konto verwenden (connect.garmin.cn)"
 }

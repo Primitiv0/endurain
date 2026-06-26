@@ -10,5 +10,6 @@
   "garminConnectAuthModalLoginButton": "Connexion",
   "processingMessageLinkGarminConnect": "Connexion du compte Garmin Connect...",
   "successMessageLinkGarminConnect": "Compte Garmin Connect associé",
-  "errorMessageUnableToLinkGarminConnect": "Impossible de relier le compte Garmin Connect"
+  "errorMessageUnableToLinkGarminConnect": "Impossible de relier le compte Garmin Connect",
+  "isCnLabel": "Utiliser un compte Garmin Connect Chine (connect.garmin.cn)"
 }

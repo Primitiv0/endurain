@@ -74,6 +74,20 @@
               />
             </div>
 
+            <!-- China account (connect.garmin.cn) toggle -->
+            <div class="mb-3 form-check">
+              <input
+                id="garminConnectIsCn"
+                v-model="isCn"
+                class="form-check-input"
+                type="checkbox"
+                name="garminConnectIsCn"
+              />
+              <label for="garminConnectIsCn" class="form-check-label">
+                {{ $t('garminConnectLoginModalComponent.isCnLabel') }}
+              </label>
+            </div>
+
             <!-- MFA code field -->
             <div v-if="mfaRequired" class="row g-3 align-items-end">
               <div class="col">
@@ -193,6 +207,7 @@ const { initializeModal, hideModal, disposeModal } = useBootstrapModal()
 const modalRef = ref<HTMLDivElement | null>(null)
 const garminConnectUsername = ref('')
 const garminConnectPassword = ref('')
+const isCn = ref(false)
 const mfaRequired = ref(false)
 const mfaCode = ref('')
 const loadingLogin = ref(false)
@@ -234,7 +249,8 @@ const submitConnectGarminConnect = async (): Promise<void> => {
   try {
     const data = {
       username: garminConnectUsername.value,
-      password: garminConnectPassword.value
+      password: garminConnectPassword.value,
+      is_cn: isCn.value
     }
 
     await garminConnect.linkGarminConnect(data)
@@ -286,6 +302,7 @@ const submitMfaCode = async (): Promise<void> => {
 const resetForm = (): void => {
   garminConnectUsername.value = ''
   garminConnectPassword.value = ''
+  isCn.value = false
   mfaRequired.value = false
   mfaCode.value = ''
   loadingLogin.value = false
