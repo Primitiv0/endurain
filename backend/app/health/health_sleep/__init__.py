@@ -7,7 +7,6 @@ heart rate, SpO2, and sleep scoring.
 
 Exports:
     - CRUD: get_health_sleep_number_by_user_id,
-      get_health_sleep_by_id_and_user_id,
       get_health_sleep_by_user_id, get_health_sleep_by_date_and_user_id,
       create_health_sleep, edit_health_sleep, delete_health_sleep
     - Schemas: HealthSleepBase, HealthSleepCreate, HealthSleepUpdate,
@@ -21,11 +20,9 @@ from .crud import (
     delete_health_sleep,
     edit_health_sleep,
     get_health_sleep_by_date_and_user_id,
-    get_health_sleep_by_id_and_user_id,
     get_health_sleep_by_user_id,
     get_health_sleep_number_by_user_id,
 )
-from .models import HealthSleep as HealthSleepModel
 from .schema import (
     HealthSleepBase,
     HealthSleepCreate,
@@ -41,25 +38,19 @@ from .schema import (
 
 __all__ = [
     "HRVStatus",
-    # Pydantic schemas
     "HealthSleepBase",
     "HealthSleepCreate",
     "HealthSleepListResponse",
-    # Database model
-    "HealthSleepModel",
     "HealthSleepRead",
     "HealthSleepStage",
     "HealthSleepUpdate",
     "SleepScore",
     "SleepStageType",
-    # Enums
     "Source",
     "create_health_sleep",
     "delete_health_sleep",
     "edit_health_sleep",
     "get_health_sleep_by_date_and_user_id",
-    "get_health_sleep_by_id_and_user_id",
     "get_health_sleep_by_user_id",
-    # CRUD operations
     "get_health_sleep_number_by_user_id",
 ]

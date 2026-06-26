@@ -356,11 +356,11 @@ def calculate_sleep_stress_score(
     if stress_value <= 25:  # Rest state
         base_score = 100
     elif stress_value <= 50:  # Low stress
-        base_score = 90 - ((stress_value - 25) / 25 * 20)
+        base_score = 90 - int((stress_value - 25) / 25 * 20)
     elif stress_value <= 75:  # Medium stress
-        base_score = 70 - ((stress_value - 50) / 25 * 20)
+        base_score = 70 - int((stress_value - 50) / 25 * 20)
     else:  # High stress
-        base_score = 50 - ((stress_value - 75) / 25 * 50)
+        base_score = 50 - int((stress_value - 75) / 25 * 50)
 
     # Penalty for restless moments
     restless_penalty = 0

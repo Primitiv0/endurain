@@ -10,6 +10,17 @@ import health.health_steps.models as health_steps_models
 import health.health_steps.schema as health_steps_schema
 
 
+def _make_steps_mock(record_id=1, user_id=1, **kwargs):
+    """Create a HealthSteps mock with all required schema attributes set."""
+    mock = MagicMock(spec=health_steps_models.HealthSteps)
+    mock.id = record_id
+    mock.user_id = user_id
+    mock.date = kwargs.get("date")
+    mock.steps = kwargs.get("steps")
+    mock.source = kwargs.get("source")
+    return mock
+
+
 class TestGetHealthStepsNumber:
     """
     Test suite for get_health_steps_number_by_user_id function.
@@ -74,8 +85,8 @@ class TestGetHealthStepsWithPagination:
         user_id = 1
         page_number = 2
         num_records = 5
-        mock_steps1 = MagicMock(spec=health_steps_models.HealthSteps)
-        mock_steps2 = MagicMock(spec=health_steps_models.HealthSteps)
+        mock_steps1 = _make_steps_mock(id=1)
+        mock_steps2 = _make_steps_mock(id=2)
 
         mock_scalars = MagicMock()
         mock_scalars.all.return_value = [mock_steps1, mock_steps2]
@@ -87,7 +98,7 @@ class TestGetHealthStepsWithPagination:
         result = health_steps_crud.get_health_steps_by_user_id(user_id, mock_db, page_number, num_records)
 
         # Assert
-        assert result == [mock_steps1, mock_steps2]
+        assert len(result) == 2
         mock_db.execute.assert_called_once()
 
     def test_get_health_steps_with_pagination_defaults(self, mock_db):
@@ -137,14 +148,14 @@ class TestGetHealthStepsByDate:
         # Arrange
         user_id = 1
         test_date = "2024-01-15"
-        mock_steps = MagicMock(spec=health_steps_models.HealthSteps)
+        mock_steps = _make_steps_mock()
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_steps
 
         # Act
         result = health_steps_crud.get_health_steps_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
-        assert result == mock_steps
+        assert result.id == 1
         mock_db.execute.assert_called_once()
 
     def test_get_health_steps_by_date_not_found(self, mock_db):
@@ -198,7 +209,10 @@ class TestCreateHealthSteps:
 
         mock_db_steps = MagicMock()
         mock_db_steps.id = 1
+        mock_db_steps.user_id = 1
         mock_db_steps.steps = 10000
+        mock_db_steps.date = None
+        mock_db_steps.source = None
         mock_db.add.return_value = None
         mock_db.commit.return_value = None
         mock_db.refresh.return_value = None
@@ -229,6 +243,10 @@ class TestCreateHealthSteps:
 
         mock_db_steps = MagicMock()
         mock_db_steps.id = 1
+        mock_db_steps.user_id = 1
+        mock_db_steps.date = None
+        mock_db_steps.steps = None
+        mock_db_steps.source = None
         mock_db.add.return_value = None
         mock_db.commit.return_value = None
         mock_db.refresh.return_value = None
@@ -306,20 +324,16 @@ class TestEditHealthSteps:
             id=1, user_id=1, date=datetime_date(2024, 1, 15), steps=12000
         )
 
-        mock_db_steps = MagicMock(spec=health_steps_models.HealthSteps)
-        mock_db_steps.steps = 12000
+        mock_db_steps = _make_steps_mock(steps=12000)
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            return_value=mock_db_steps,
-        ):
-            # Act
-            result = health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_db_steps
 
-            # Assert
-            assert result.steps == 12000
-            mock_db.commit.assert_called_once()
+        # Act
+        result = health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+
+        # Assert
+        assert result.steps == 12000
+        mock_db.commit.assert_called_once()
 
     def test_edit_health_steps_not_found(self, mock_db):
         """
@@ -331,17 +345,14 @@ class TestEditHealthSteps:
             id=999, user_id=1, date=datetime_date(2024, 1, 15), steps=12000
         )
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            return_value=None,
-        ):
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
-            assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-            assert exc_info.value.detail == "Health steps not found"
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+        assert exc_info.value.detail == "Health steps not found"
 
     def test_edit_health_steps_update_multiple_fields(self, mock_db):
         """
@@ -357,18 +368,15 @@ class TestEditHealthSteps:
             source="garmin",
         )
 
-        mock_db_steps = MagicMock(spec=health_steps_models.HealthSteps)
+        mock_db_steps = _make_steps_mock()
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            return_value=mock_db_steps,
-        ):
-            # Act
-            health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_db_steps
 
-            # Assert
-            mock_db.commit.assert_called_once()
+        # Act
+        health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+
+        # Assert
+        mock_db.commit.assert_called_once()
 
     def test_edit_health_steps_exception(self, mock_db):
         """
@@ -380,17 +388,14 @@ class TestEditHealthSteps:
             id=1, user_id=1, steps=12000, date=datetime_date(2024, 1, 15)
         )
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            side_effect=SQLAlchemyError("Database error"),
-        ):
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
-            assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-            mock_db.rollback.assert_called_once()
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            health_steps_crud.edit_health_steps(user_id, health_steps, mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        mock_db.rollback.assert_called_once()
 
 
 class TestDeleteHealthSteps:
@@ -406,19 +411,15 @@ class TestDeleteHealthSteps:
         user_id = 1
         health_steps_id = 1
 
-        mock_db_steps = MagicMock(spec=health_steps_models.HealthSteps)
+        mock_db_steps = _make_steps_mock()
+        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_db_steps
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            return_value=mock_db_steps,
-        ):
-            # Act
-            health_steps_crud.delete_health_steps(user_id, health_steps_id, mock_db)
+        # Act
+        health_steps_crud.delete_health_steps(user_id, health_steps_id, mock_db)
 
-            # Assert
-            mock_db.delete.assert_called_once_with(mock_db_steps)
-            mock_db.commit.assert_called_once()
+        # Assert
+        mock_db.delete.assert_called_once_with(mock_db_steps)
+        mock_db.commit.assert_called_once()
 
     def test_delete_health_steps_not_found(self, mock_db):
         """
@@ -428,17 +429,14 @@ class TestDeleteHealthSteps:
         user_id = 1
         health_steps_id = 999
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            return_value=None,
-        ):
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                health_steps_crud.delete_health_steps(user_id, health_steps_id, mock_db)
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
 
-            assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-            assert "Health steps not found" in exc_info.value.detail
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            health_steps_crud.delete_health_steps(user_id, health_steps_id, mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+        assert "Health steps not found" in exc_info.value.detail
 
     def test_delete_health_steps_exception(self, mock_db):
         """
@@ -448,14 +446,11 @@ class TestDeleteHealthSteps:
         user_id = 1
         health_steps_id = 1
 
-        with patch.object(
-            health_steps_crud,
-            "get_health_steps_by_id_and_user_id",
-            side_effect=SQLAlchemyError("Database error"),
-        ):
-            # Act & Assert
-            with pytest.raises(HTTPException) as exc_info:
-                health_steps_crud.delete_health_steps(user_id, health_steps_id, mock_db)
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
 
-            assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-            mock_db.rollback.assert_called_once()
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            health_steps_crud.delete_health_steps(user_id, health_steps_id, mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        mock_db.rollback.assert_called_once()

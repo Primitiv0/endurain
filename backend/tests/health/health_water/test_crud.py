@@ -19,9 +19,14 @@ class TestGetHealthWaterNumber:
 class TestGetHealthWaterByID:
     def test_found(self, mock_db):
         mock_water = MagicMock(spec=health_water_models.HealthWater)
+        mock_water.id = 1
+        mock_water.user_id = 1
+        mock_water.date = None
+        mock_water.amount_ml = None
+        mock_water.source = None
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_water
         result = health_water_crud.get_health_water_by_id_and_user_id(1, 1, mock_db)
-        assert result == mock_water
+        assert result.id == 1
 
     def test_not_found(self, mock_db):
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
@@ -32,12 +37,22 @@ class TestGetHealthWaterByID:
 class TestGetHealthWaterByUserID:
     def test_with_pagination(self, mock_db):
         mock_water = MagicMock(spec=health_water_models.HealthWater)
+        mock_water.id = 1
+        mock_water.user_id = 1
+        mock_water.date = None
+        mock_water.amount_ml = None
+        mock_water.source = None
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_water]
         result = health_water_crud.get_health_water_by_user_id(1, mock_db, page_number=1, num_records=10)
         assert len(result) == 1
 
     def test_no_pagination(self, mock_db):
         mock_water = MagicMock(spec=health_water_models.HealthWater)
+        mock_water.id = 1
+        mock_water.user_id = 1
+        mock_water.date = None
+        mock_water.amount_ml = None
+        mock_water.source = None
         mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_water]
         result = health_water_crud.get_health_water_by_user_id(1, mock_db)
         assert len(result) == 1
@@ -46,9 +61,14 @@ class TestGetHealthWaterByUserID:
 class TestGetHealthWaterByDate:
     def test_found(self, mock_db):
         mock_water = MagicMock(spec=health_water_models.HealthWater)
+        mock_water.id = 1
+        mock_water.user_id = 1
+        mock_water.date = None
+        mock_water.amount_ml = None
+        mock_water.source = None
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_water
         result = health_water_crud.get_health_water_by_date_and_user_id(1, "2024-01-15", mock_db)
-        assert result == mock_water
+        assert result.id == 1
 
     def test_not_found(self, mock_db):
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
@@ -61,6 +81,10 @@ class TestCreateHealthWater:
         water_data = health_water_schema.HealthWaterCreate(amount_ml=500.0)
         mock_db_water = MagicMock(spec=health_water_models.HealthWater)
         mock_db_water.id = 1
+        mock_db_water.user_id = 1
+        mock_db_water.date = None
+        mock_db_water.amount_ml = None
+        mock_db_water.source = None
 
         with patch.object(health_water_models, "HealthWater", return_value=mock_db_water):
             result = health_water_crud.create_health_water(1, water_data, mock_db)
@@ -86,8 +110,12 @@ class TestEditHealthWater:
             date=date(2024, 1, 15),
         )
         mock_db_water = MagicMock(spec=health_water_models.HealthWater)
+        mock_db_water.amount_ml = None
+        mock_db_water.source = None
 
-        with patch.object(health_water_crud, "get_health_water_by_id_and_user_id", return_value=mock_db_water):
+        with patch.object(
+            health_water_crud, "_get_health_water_model_by_id_and_user_id_or_404", return_value=mock_db_water
+        ):
             result = health_water_crud.edit_health_water(1, update_data, mock_db)
             assert result is not None
             mock_db.commit.assert_called_once()
@@ -100,10 +128,10 @@ class TestEditHealthWater:
             user_id=1,
             date=date(2024, 1, 15),
         )
-        with patch.object(health_water_crud, "get_health_water_by_id_and_user_id", return_value=None):
-            with pytest.raises(HTTPException) as e:
-                health_water_crud.edit_health_water(1, update_data, mock_db)
-            assert e.value.status_code == 404
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
+        with pytest.raises(HTTPException) as e:
+            health_water_crud.edit_health_water(1, update_data, mock_db)
+        assert e.value.status_code == 404
 
     def test_wrong_user(self, mock_db):
         from datetime import date
@@ -121,13 +149,15 @@ class TestEditHealthWater:
 class TestDeleteHealthWater:
     def test_success(self, mock_db):
         mock_db_water = MagicMock(spec=health_water_models.HealthWater)
-        with patch.object(health_water_crud, "get_health_water_by_id_and_user_id", return_value=mock_db_water):
+        with patch.object(
+            health_water_crud, "_get_health_water_model_by_id_and_user_id_or_404", return_value=mock_db_water
+        ):
             health_water_crud.delete_health_water(1, 1, mock_db)
             mock_db.delete.assert_called_once_with(mock_db_water)
             mock_db.commit.assert_called_once()
 
     def test_not_found(self, mock_db):
-        with patch.object(health_water_crud, "get_health_water_by_id_and_user_id", return_value=None):
-            with pytest.raises(HTTPException) as e:
-                health_water_crud.delete_health_water(1, 999, mock_db)
-            assert e.value.status_code == 404
+        mock_db.execute.return_value.scalar_one_or_none.return_value = None
+        with pytest.raises(HTTPException) as e:
+            health_water_crud.delete_health_water(1, 999, mock_db)
+        assert e.value.status_code == 404

@@ -1,5 +1,4 @@
-from datetime import date as date_class
-from datetime import timedelta
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 
@@ -24,13 +23,13 @@ class TestCalculateStreaks:
             m.return_value = [MagicMock(fast_start_time=None)]
             current, longest = calculate_streaks(1, mock_db)
             assert current == 0
-            assert longest == 1
+            assert longest == 0
 
     def test_single_day(self, mock_db):
         from health.health_fasting.utils import calculate_streaks
 
         fast = MagicMock()
-        fast.fast_start_time = date_class(2024, 1, 15)
+        fast.fast_start_time = datetime(2024, 1, 15)
 
         with patch(
             "health.health_fasting.utils.health_fasting_crud.get_completed_fasting_ordered_by_date_and_user_id"
@@ -43,7 +42,7 @@ class TestCalculateStreaks:
     def test_consecutive_days(self, mock_db):
         from health.health_fasting.utils import calculate_streaks
 
-        today = date_class.today()
+        today = datetime.today()
         fasts = [
             MagicMock(fast_start_time=today - timedelta(days=2)),
             MagicMock(fast_start_time=today - timedelta(days=1)),
@@ -61,7 +60,7 @@ class TestCalculateStreaks:
     def test_current_streak_active_yesterday(self, mock_db):
         from health.health_fasting.utils import calculate_streaks
 
-        today = date_class.today()
+        today = datetime.today()
         fasts = [
             MagicMock(fast_start_time=today - timedelta(days=3)),
             MagicMock(fast_start_time=today - timedelta(days=2)),
@@ -79,7 +78,7 @@ class TestCalculateStreaks:
     def test_broken_streak(self, mock_db):
         from health.health_fasting.utils import calculate_streaks
 
-        today = date_class.today()
+        today = datetime.today()
         fasts = [
             MagicMock(fast_start_time=today - timedelta(days=5)),
             MagicMock(fast_start_time=today - timedelta(days=4)),
@@ -98,7 +97,7 @@ class TestCalculateStreaks:
     def test_not_current_streak(self, mock_db):
         from health.health_fasting.utils import calculate_streaks
 
-        today = date_class.today()
+        today = datetime.today()
         fasts = [
             MagicMock(fast_start_time=today - timedelta(days=4)),
             MagicMock(fast_start_time=today - timedelta(days=3)),

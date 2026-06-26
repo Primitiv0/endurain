@@ -159,7 +159,7 @@ async def create_health_water(
     water_for_date = health_water_crud.get_health_water_by_date_and_user_id(token_user_id, date_str, db)
 
     if water_for_date:
-        accumulated_ml = float(water_for_date.amount_ml) + (health_water.amount_ml or 0)
+        accumulated_ml = (water_for_date.amount_ml or 0) + (health_water.amount_ml or 0)
         health_water_update = health_water_schema.HealthWaterUpdate(
             id=water_for_date.id,
             user_id=token_user_id,

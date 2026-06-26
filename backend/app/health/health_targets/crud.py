@@ -7,9 +7,60 @@ import core.decorators as core_decorators
 import health.health_targets.models as health_targets_models
 import health.health_targets.schema as health_targets_schema
 
+# Private internal helpers
+
+
+def _transform_health_targets(
+    health_targets: health_targets_models.HealthTargets,
+) -> health_targets_schema.HealthTargetsRead:
+    """
+    Transform a health targets ORM instance to a Pydantic schema.
+
+    Args:
+        health_targets: The health targets ORM instance.
+
+    Returns:
+        The health targets as a schema.
+    """
+    return health_targets_schema.HealthTargetsRead.model_validate(health_targets)
+
 
 @core_decorators.handle_db_errors
-def get_health_targets_by_user_id(user_id: int, db: Session) -> health_targets_models.HealthTargets | None:
+def _get_health_targets_model_by_user_id_or_404(user_id: int, db: Session) -> health_targets_models.HealthTargets:
+    """
+    Retrieve health targets record model by user ID.
+
+    Args:
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthTargets`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_targets from the database
+    stmt = select(health_targets_models.HealthTargets).where(
+        health_targets_models.HealthTargets.user_id == user_id,
+    )
+    db_health_targets = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_targets is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health targets not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_targets
+
+
+# Public CRUD functions
+
+
+@core_decorators.handle_db_errors
+def get_health_targets_by_user_id(user_id: int, db: Session) -> health_targets_schema.HealthTargetsRead | None:
     """
     Retrieve health targets for a specific user.
 
@@ -18,18 +69,20 @@ def get_health_targets_by_user_id(user_id: int, db: Session) -> health_targets_m
         db: SQLAlchemy database session.
 
     Returns:
-        The HealthTargets model if found, None otherwise.
+        The HealthTargetsRead schema if found, None otherwise.
 
     Raises:
         HTTPException: 500 error if database query fails.
     """
     # Get the health_targets from the database
     stmt = select(health_targets_models.HealthTargets).where(health_targets_models.HealthTargets.user_id == user_id)
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_targets = db.execute(stmt).scalar_one_or_none()
+
+    return _transform_health_targets(db_health_targets) if db_health_targets else None
 
 
 @core_decorators.handle_db_errors
-def create_health_targets(user_id: int, db: Session) -> health_targets_models.HealthTargets:
+def create_health_targets(user_id: int, db: Session) -> health_targets_schema.HealthTargetsRead:
     """
     Create new health targets for a user.
 
@@ -56,7 +109,7 @@ def create_health_targets(user_id: int, db: Session) -> health_targets_models.He
         db.refresh(db_health_targets)
 
         # Return the health_targets
-        return db_health_targets
+        return _transform_health_targets(db_health_targets)
     except IntegrityError as integrity_error:
         # Rollback the transaction
         db.rollback()
@@ -73,7 +126,7 @@ def edit_health_target(
     health_target: health_targets_schema.HealthTargetsUpdate,
     user_id: int,
     db: Session,
-) -> health_targets_models.HealthTargets:
+) -> health_targets_schema.HealthTargetsRead:
     """
     Update health targets for a specific user.
 
@@ -83,21 +136,14 @@ def edit_health_target(
         db: SQLAlchemy database session.
 
     Returns:
-        The updated HealthTargets model.
+        The updated HealthTargetsRead schema.
 
     Raises:
         HTTPException: 404 error if targets not found.
         HTTPException: 500 error if database operation fails.
     """
     # Get the user health target from the database
-    db_health_target = get_health_targets_by_user_id(user_id, db)
-
-    if db_health_target is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User health target not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    db_health_target = _get_health_targets_model_by_user_id_or_404(user_id=user_id, db=db)
 
     # Dictionary of the fields to update if they are not None
     health_target_data = health_target.model_dump(exclude_unset=True)
@@ -109,4 +155,4 @@ def edit_health_target(
     db.commit()
     db.refresh(db_health_target)
 
-    return db_health_target
+    return _transform_health_targets(db_health_target)

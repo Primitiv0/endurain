@@ -9,7 +9,6 @@ Exports:
       edit_health_target
     - Schemas: HealthTargetsBase, HealthTargetsUpdate,
       HealthTargetsRead
-    - Models: HealthTargets (ORM model)
 """
 
 from .crud import (
@@ -17,7 +16,6 @@ from .crud import (
     edit_health_target,
     get_health_targets_by_user_id,
 )
-from .models import HealthTargets as HealthTargetsModel
 from .schema import (
     HealthTargetsBase,
     HealthTargetsRead,
@@ -25,14 +23,10 @@ from .schema import (
 )
 
 __all__ = [
-    # Pydantic schemas
     "HealthTargetsBase",
-    # Database model
-    "HealthTargetsModel",
     "HealthTargetsRead",
     "HealthTargetsUpdate",
     "create_health_targets",
     "edit_health_target",
-    # CRUD operations
     "get_health_targets_by_user_id",
 ]

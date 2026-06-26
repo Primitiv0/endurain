@@ -5,10 +5,11 @@ This module provides database operations for creating, reading, updating,
 and deleting fasting session records.
 """
 
-from typing import Any
+from decimal import Decimal
+from typing import overload
 
 from fastapi import HTTPException, status
-from sqlalchemy import CursorResult, desc, func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,75 @@ import health.constants as health_constants
 import health.health_fasting.models as health_fasting_models
 import health.health_fasting.schema as health_fasting_schema
 import health.utils as health_utils
+
+# Private internal helpers
+
+
+@overload
+def _transform_health_fasting(
+    health_fasting: health_fasting_models.HealthFasting,
+) -> health_fasting_schema.HealthFastingRead: ...
+
+
+@overload
+def _transform_health_fasting(
+    health_fasting: list[health_fasting_models.HealthFasting],
+) -> list[health_fasting_schema.HealthFastingRead]: ...
+
+
+def _transform_health_fasting(
+    health_fasting: health_fasting_models.HealthFasting | list[health_fasting_models.HealthFasting],
+) -> health_fasting_schema.HealthFastingRead | list[health_fasting_schema.HealthFastingRead]:
+    """
+    Transform a health fasting or list of health fasting to a Pydantic schema.
+
+    Args:
+        health_poop: The health poop ORM instance or list of instances.
+
+    Returns:
+        The health fasting(s) as a schema.
+    """
+    if isinstance(health_fasting, list):
+        return [health_fasting_schema.HealthFastingRead.model_validate(hw) for hw in health_fasting]
+    return health_fasting_schema.HealthFastingRead.model_validate(health_fasting)
+
+
+@core_decorators.handle_db_errors
+def _get_health_fasting_model_by_id_and_user_id_or_404(
+    health_fasting_id: int, user_id: int, db: Session
+) -> health_fasting_models.HealthFasting:
+    """
+    Retrieve health fasting record model by ID and user ID.
+
+    Args:
+        health_fasting_id: Health fasting record ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthFasting`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_fasting from the database
+    stmt = select(health_fasting_models.HealthFasting).where(
+        health_fasting_models.HealthFasting.id == health_fasting_id,
+        health_fasting_models.HealthFasting.user_id == user_id,
+    )
+    db_health_fasting = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_fasting is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health fasting not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_fasting
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
@@ -56,7 +126,7 @@ def get_health_fasting_number_by_user_id(
 @core_decorators.handle_db_errors
 def get_health_fasting_by_id_and_user_id(
     health_fasting_id: int, user_id: int, db: Session
-) -> health_fasting_models.HealthFasting | None:
+) -> health_fasting_schema.HealthFastingRead | None:
     """
     Retrieve fasting record by ID and user ID.
 
@@ -66,7 +136,7 @@ def get_health_fasting_by_id_and_user_id(
         db: Database session.
 
     Returns:
-        HealthFasting model if found, None otherwise.
+        HealthFasting schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -75,7 +145,8 @@ def get_health_fasting_by_id_and_user_id(
         health_fasting_models.HealthFasting.id == health_fasting_id,
         health_fasting_models.HealthFasting.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_fasting = db.execute(stmt).scalar_one_or_none()
+    return _transform_health_fasting(db_health_fasting) if db_health_fasting else None
 
 
 @core_decorators.handle_db_errors
@@ -85,7 +156,7 @@ def get_health_fasting_by_user_id(
     page_number: int | None = None,
     num_records: int | None = None,
     interval: health_constants.Interval | None = None,
-) -> list[health_fasting_models.HealthFasting]:
+) -> list[health_fasting_schema.HealthFastingRead]:
     """
     Retrieve health fasting records for a specific user with optional
         pagination and filtering.
@@ -105,7 +176,7 @@ def get_health_fasting_by_user_id(
             are returned. Defaults to None.
 
     Returns:
-        list[health_fasting_models.HealthFasting]: A list of health fasting
+        list[health_fasting_schema.HealthFastingRead]: A list of health fasting
             records sorted by fast_start_time in descending order, optionally
             paginated.
     """
@@ -122,11 +193,12 @@ def get_health_fasting_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_health_fastings = db.execute(stmt).scalars().all()
+    return _transform_health_fasting(list(db_health_fastings))
 
 
 @core_decorators.handle_db_errors
-def get_active_fasting_by_user_id(user_id: int, db: Session) -> health_fasting_models.HealthFasting | None:
+def get_active_fasting_by_user_id(user_id: int, db: Session) -> health_fasting_schema.HealthFastingRead | None:
     """
     Retrieve the active (in_progress) fasting session for a user.
 
@@ -135,7 +207,7 @@ def get_active_fasting_by_user_id(user_id: int, db: Session) -> health_fasting_m
         db: Database session.
 
     Returns:
-        HealthFasting model if active fast exists, None otherwise.
+        HealthFastingRead schema if active fast exists, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -148,7 +220,8 @@ def get_active_fasting_by_user_id(user_id: int, db: Session) -> health_fasting_m
         )
         .order_by(desc(health_fasting_models.HealthFasting.fast_start_time))
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_fasting = db.execute(stmt).scalar_one_or_none()
+    return _transform_health_fasting(db_health_fasting) if db_health_fasting else None
 
 
 @core_decorators.handle_db_errors
@@ -226,14 +299,14 @@ def get_avg_fasting_duration(user_id: int, db: Session) -> int | None:
             health_fasting_models.HealthFasting.status == "completed",
         )
     )
-    result: CursorResult[Any] = db.execute(stmt).scalar_one()
+    result: Decimal | None = db.execute(stmt).scalar_one()
     return int(result) if result else None
 
 
 @core_decorators.handle_db_errors
 def get_completed_fasting_ordered_by_date_and_user_id(
     user_id: int, db: Session
-) -> list[health_fasting_models.HealthFasting]:
+) -> list[health_fasting_schema.HealthFastingRead]:
     """
     Get all completed fasting sessions ordered by fast_start_time ascending.
 
@@ -242,7 +315,7 @@ def get_completed_fasting_ordered_by_date_and_user_id(
         db: Database session.
 
     Returns:
-        List of completed HealthFasting models ordered by fast_start_time.
+        List of completed HealthFastingRead schemas`  ordered by fast_start_time.
 
     Raises:
         HTTPException: If database error occurs.
@@ -255,7 +328,8 @@ def get_completed_fasting_ordered_by_date_and_user_id(
         )
         .order_by(health_fasting_models.HealthFasting.fast_start_time)
     )
-    return list(db.execute(stmt).scalars().all())
+    db_health_fastings = db.execute(stmt).scalars().all()
+    return _transform_health_fasting(list(db_health_fastings))
 
 
 @core_decorators.handle_db_errors
@@ -263,7 +337,7 @@ def create_health_fasting(
     user_id: int,
     health_fasting: health_fasting_schema.HealthFastingCreate,
     db: Session,
-) -> health_fasting_models.HealthFasting:
+) -> health_fasting_schema.HealthFastingRead:
     """
     Create a new fasting session for a user.
 
@@ -273,7 +347,7 @@ def create_health_fasting(
         db: Database session.
 
     Returns:
-        Created HealthFasting model.
+        Created HealthFastingRead schema.
 
     Raises:
         HTTPException: If database error or duplicate entry.
@@ -288,7 +362,7 @@ def create_health_fasting(
         db.commit()
         db.refresh(db_health_fasting)
 
-        return db_health_fasting
+        return _transform_health_fasting(db_health_fasting)
     except IntegrityError as integrity_error:
         db.rollback()
         raise HTTPException(
@@ -302,7 +376,7 @@ def edit_health_fasting(
     user_id: int,
     health_fasting: health_fasting_schema.HealthFastingUpdate,
     db: Session,
-) -> health_fasting_models.HealthFasting:
+) -> health_fasting_schema.HealthFastingRead:
     """
     Edit an existing fasting record for a user.
 
@@ -323,14 +397,7 @@ def edit_health_fasting(
             detail="Cannot edit fasting record for another user.",
         )
 
-    db_health_fasting = get_health_fasting_by_id_and_user_id(health_fasting.id, user_id, db)
-
-    if db_health_fasting is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Fasting record not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    db_health_fasting = _get_health_fasting_model_by_id_and_user_id_or_404(health_fasting.id, user_id, db)
 
     health_fasting_data = health_fasting.model_dump(exclude_unset=True)
     for key, value in health_fasting_data.items():
@@ -339,7 +406,7 @@ def edit_health_fasting(
     db.commit()
     db.refresh(db_health_fasting)
 
-    return db_health_fasting
+    return _transform_health_fasting(db_health_fasting)
 
 
 @core_decorators.handle_db_errors
@@ -348,7 +415,7 @@ def complete_health_fasting(
     health_fasting_id: int,
     complete_data: health_fasting_schema.HealthFastingComplete,
     db: Session,
-) -> health_fasting_models.HealthFasting:
+) -> health_fasting_schema.HealthFastingRead:
     """
     Complete or end a fasting session.
 
@@ -364,13 +431,7 @@ def complete_health_fasting(
     Raises:
         HTTPException: If record not found or not in progress.
     """
-    db_health_fasting = get_health_fasting_by_id_and_user_id(health_fasting_id, user_id, db)
-
-    if db_health_fasting is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Fasting record not found",
-        )
+    db_health_fasting = _get_health_fasting_model_by_id_and_user_id_or_404(health_fasting_id, user_id, db)
 
     if db_health_fasting.status != "in_progress":
         raise HTTPException(
@@ -387,7 +448,7 @@ def complete_health_fasting(
 
     # Update the record
     db_health_fasting.fast_end_time = complete_data.fast_end_time
-    db_health_fasting.status = complete_data.status
+    db_health_fasting.status = complete_data.status.value
     db_health_fasting.actual_duration_seconds = actual_duration
     if complete_data.notes:
         db_health_fasting.notes = complete_data.notes
@@ -395,7 +456,7 @@ def complete_health_fasting(
     db.commit()
     db.refresh(db_health_fasting)
 
-    return db_health_fasting
+    return _transform_health_fasting(db_health_fasting)
 
 
 @core_decorators.handle_db_errors
@@ -414,13 +475,7 @@ def delete_health_fasting(user_id: int, health_fasting_id: int, db: Session) -> 
     Raises:
         HTTPException: If record not found.
     """
-    db_health_fasting = get_health_fasting_by_id_and_user_id(health_fasting_id, user_id, db)
-
-    if db_health_fasting is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Fasting record with id {health_fasting_id} for user {user_id} not found"),
-        )
+    db_health_fasting = _get_health_fasting_model_by_id_and_user_id_or_404(health_fasting_id, user_id, db)
 
     db.delete(db_health_fasting)
     db.commit()

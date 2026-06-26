@@ -86,11 +86,11 @@ async def read_health_daily_stats(
 
     # Build dashboard response with only necessary fields
     sleep_data = None
-    if today_sleep:
+    if today_sleep and today_sleep.hrv_status is not None:
         sleep_data = health_schema.HealthSleepDashboard(
             total_sleep_seconds=today_sleep.total_sleep_seconds,
             resting_heart_rate=today_sleep.resting_heart_rate,
-            hrv_status=today_sleep.hrv_status,
+            hrv_status=str(today_sleep.hrv_status),
             avg_skin_temp_deviation=today_sleep.avg_skin_temp_deviation,
         )
 
@@ -108,17 +108,17 @@ async def read_health_daily_stats(
         )
 
     fasting_data = None
-    if active_fasting:
+    if active_fasting and active_fasting.fast_start_time is not None and active_fasting.status is not None:
         fasting_data = health_schema.HealthFastingDashboard(
             id=active_fasting.id,
             fast_start_time=active_fasting.fast_start_time,
             fast_end_time=active_fasting.fast_end_time,
-            status=active_fasting.status,
+            status=str(active_fasting.status),
             actual_duration_seconds=active_fasting.actual_duration_seconds,
         )
 
     water_data = None
-    if today_water:
+    if today_water and today_water.amount_ml is not None:
         water_data = health_schema.HealthWaterDashboard(
             amount_ml=float(today_water.amount_ml),
         )

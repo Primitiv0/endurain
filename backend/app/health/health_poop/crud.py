@@ -5,6 +5,8 @@ This module provides database operations for creating, reading,
 updating, and deleting bowel movement records.
 """
 
+from typing import overload
+
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +17,73 @@ import health.constants as health_constants
 import health.health_poop.models as health_poop_models
 import health.health_poop.schema as health_poop_schema
 import health.utils as health_utils
+
+# Private internal helpers
+
+
+@overload
+def _transform_health_poop(health_poop: health_poop_models.HealthPoop) -> health_poop_schema.HealthPoopRead: ...
+
+
+@overload
+def _transform_health_poop(
+    health_poop: list[health_poop_models.HealthPoop],
+) -> list[health_poop_schema.HealthPoopRead]: ...
+
+
+def _transform_health_poop(
+    health_poop: health_poop_models.HealthPoop | list[health_poop_models.HealthPoop],
+) -> health_poop_schema.HealthPoopRead | list[health_poop_schema.HealthPoopRead]:
+    """
+    Transform a health poop or list of health poop to a Pydantic schema.
+
+    Args:
+        health_poop: The health poop ORM instance or list of instances.
+
+    Returns:
+        The health poop(s) as a schema.
+    """
+    if isinstance(health_poop, list):
+        return [health_poop_schema.HealthPoopRead.model_validate(hw) for hw in health_poop]
+    return health_poop_schema.HealthPoopRead.model_validate(health_poop)
+
+
+@core_decorators.handle_db_errors
+def _get_health_poop_model_by_id_and_user_id_or_404(
+    health_poop_id: int, user_id: int, db: Session
+) -> health_poop_models.HealthPoop:
+    """
+    Retrieve health poop record model by ID and user ID.
+
+    Args:
+        health_poop_id: Health poop record ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthPoop`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_poop from the database
+    stmt = select(health_poop_models.HealthPoop).where(
+        health_poop_models.HealthPoop.id == health_poop_id,
+        health_poop_models.HealthPoop.user_id == user_id,
+    )
+    db_health_poop = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_poop is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health poop not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_poop
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
@@ -57,7 +126,7 @@ def get_health_poop_number_by_user_id(
 @core_decorators.handle_db_errors
 def get_health_poop_by_id_and_user_id(
     health_poop_id: int, user_id: int, db: Session
-) -> health_poop_models.HealthPoop | None:
+) -> health_poop_schema.HealthPoopRead | None:
     """
     Retrieve poop record by ID and user ID.
 
@@ -67,7 +136,7 @@ def get_health_poop_by_id_and_user_id(
         db: Database session.
 
     Returns:
-        HealthPoop model if found, None otherwise.
+        HealthPoopRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -76,7 +145,9 @@ def get_health_poop_by_id_and_user_id(
         health_poop_models.HealthPoop.id == health_poop_id,
         health_poop_models.HealthPoop.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_poop = db.execute(stmt).scalar_one_or_none()
+
+    return _transform_health_poop(db_health_poop) if db_health_poop else None
 
 
 @core_decorators.handle_db_errors
@@ -86,7 +157,7 @@ def get_health_poop_by_user_id(
     page_number: int | None = None,
     num_records: int | None = None,
     interval: health_constants.Interval | None = None,
-) -> list[health_poop_models.HealthPoop]:
+) -> list[health_poop_schema.HealthPoopRead]:
     """
     Retrieve poop records for a user with optional pagination
     and filtering.
@@ -99,7 +170,7 @@ def get_health_poop_by_user_id(
         interval: Time interval to filter records.
 
     Returns:
-        List of HealthPoop records sorted by date_time
+        List of HealthPoopRead records sorted by date_time
             descending.
     """
     stmt = select(health_poop_models.HealthPoop).where(health_poop_models.HealthPoop.user_id == user_id)
@@ -114,11 +185,15 @@ def get_health_poop_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_health_poops = db.execute(stmt).scalars().all()
+
+    return _transform_health_poop(list(db_health_poops))
 
 
 @core_decorators.handle_db_errors
-def get_health_poop_by_date_and_user_id(user_id: int, date: str, db: Session) -> list[health_poop_models.HealthPoop]:
+def get_health_poop_by_date_and_user_id(
+    user_id: int, date: str, db: Session
+) -> list[health_poop_schema.HealthPoopRead]:
     """
     Retrieve poop records for a user on a specific date.
 
@@ -131,7 +206,7 @@ def get_health_poop_by_date_and_user_id(user_id: int, date: str, db: Session) ->
         db: Database session.
 
     Returns:
-        List of HealthPoop models for the given date.
+        List of HealthPoopRead schemas for the given date.
 
     Raises:
         HTTPException: If database error occurs.
@@ -144,7 +219,8 @@ def get_health_poop_by_date_and_user_id(user_id: int, date: str, db: Session) ->
         )
         .order_by(desc(health_poop_models.HealthPoop.date_time))
     )
-    return list(db.execute(stmt).scalars().all())
+    db_health_poops = db.execute(stmt).scalars().all()
+    return _transform_health_poop(list(db_health_poops))
 
 
 @core_decorators.handle_db_errors
@@ -152,7 +228,7 @@ def create_health_poop(
     user_id: int,
     health_poop: health_poop_schema.HealthPoopCreate,
     db: Session,
-) -> health_poop_models.HealthPoop:
+) -> health_poop_schema.HealthPoopRead:
     """
     Create a new poop record for a user.
 
@@ -177,7 +253,7 @@ def create_health_poop(
         db.commit()
         db.refresh(db_health_poop)
 
-        return db_health_poop
+        return _transform_health_poop(db_health_poop)
     except IntegrityError as integrity_error:
         db.rollback()
 
@@ -192,7 +268,7 @@ def edit_health_poop(
     user_id: int,
     health_poop: health_poop_schema.HealthPoopUpdate,
     db: Session,
-) -> health_poop_models.HealthPoop:
+) -> health_poop_schema.HealthPoopRead:
     """
     Edit poop record for a user.
 
@@ -202,7 +278,7 @@ def edit_health_poop(
         db: Database session.
 
     Returns:
-        Updated HealthPoop model.
+        Updated HealthPoopRead schema.
 
     Raises:
         HTTPException: 403 if editing another user's record,
@@ -214,13 +290,7 @@ def edit_health_poop(
             detail=("Cannot edit health poop record for another user."),
         )
 
-    db_health_poop = get_health_poop_by_id_and_user_id(health_poop.id, user_id, db)
-
-    if db_health_poop is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health poop record not found",
-        ) from None
+    db_health_poop = _get_health_poop_model_by_id_and_user_id_or_404(health_poop.id, user_id, db)
 
     health_poop_data = health_poop.model_dump(exclude_unset=True)
     for key, value in health_poop_data.items():
@@ -229,7 +299,7 @@ def edit_health_poop(
     db.commit()
     db.refresh(db_health_poop)
 
-    return db_health_poop
+    return _transform_health_poop(db_health_poop)
 
 
 @core_decorators.handle_db_errors
@@ -248,13 +318,7 @@ def delete_health_poop(user_id: int, health_poop_id: int, db: Session) -> None:
     Raises:
         HTTPException: If record not found or database error.
     """
-    db_health_poop = get_health_poop_by_id_and_user_id(health_poop_id, user_id, db)
-
-    if db_health_poop is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health poop record not found",
-        ) from None
+    db_health_poop = _get_health_poop_model_by_id_and_user_id_or_404(health_poop_id, user_id, db)
 
     db.delete(db_health_poop)
     db.commit()

@@ -21,7 +21,33 @@ class TestGetAllHealthWeight:
         """
         # Arrange
         mock_weight1 = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight1.id = 1
+        mock_weight1.user_id = 1
+        mock_weight1.date = None
+        mock_weight1.weight = None
+        mock_weight1.bmi = None
+        mock_weight1.body_fat = None
+        mock_weight1.body_water = None
+        mock_weight1.bone_mass = None
+        mock_weight1.muscle_mass = None
+        mock_weight1.physique_rating = None
+        mock_weight1.visceral_fat = None
+        mock_weight1.metabolic_age = None
+        mock_weight1.source = None
         mock_weight2 = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight2.id = 2
+        mock_weight2.user_id = 1
+        mock_weight2.date = None
+        mock_weight2.weight = None
+        mock_weight2.bmi = None
+        mock_weight2.body_fat = None
+        mock_weight2.body_water = None
+        mock_weight2.bone_mass = None
+        mock_weight2.muscle_mass = None
+        mock_weight2.physique_rating = None
+        mock_weight2.visceral_fat = None
+        mock_weight2.metabolic_age = None
+        mock_weight2.source = None
 
         mock_scalars = MagicMock()
         mock_scalars.all.return_value = [mock_weight1, mock_weight2]
@@ -33,7 +59,7 @@ class TestGetAllHealthWeight:
         result = health_weight_crud.get_all_health_weight(mock_db)
 
         # Assert
-        assert result == [mock_weight1, mock_weight2]
+        assert len(result) == 2
         mock_db.execute.assert_called_once()
 
     def test_get_all_health_weight_exception(self, mock_db):
@@ -114,7 +140,33 @@ class TestGetAllHealthWeightByUserId:
         # Arrange
         user_id = 1
         mock_weight1 = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight1.id = 1
+        mock_weight1.user_id = user_id
+        mock_weight1.date = None
+        mock_weight1.weight = None
+        mock_weight1.bmi = None
+        mock_weight1.body_fat = None
+        mock_weight1.body_water = None
+        mock_weight1.bone_mass = None
+        mock_weight1.muscle_mass = None
+        mock_weight1.physique_rating = None
+        mock_weight1.visceral_fat = None
+        mock_weight1.metabolic_age = None
+        mock_weight1.source = None
         mock_weight2 = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight2.id = 2
+        mock_weight2.user_id = user_id
+        mock_weight2.date = None
+        mock_weight2.weight = None
+        mock_weight2.bmi = None
+        mock_weight2.body_fat = None
+        mock_weight2.body_water = None
+        mock_weight2.bone_mass = None
+        mock_weight2.muscle_mass = None
+        mock_weight2.physique_rating = None
+        mock_weight2.visceral_fat = None
+        mock_weight2.metabolic_age = None
+        mock_weight2.source = None
 
         mock_scalars = MagicMock()
         mock_scalars.all.return_value = [mock_weight1, mock_weight2]
@@ -126,7 +178,7 @@ class TestGetAllHealthWeightByUserId:
         result = health_weight_crud.get_all_health_weight_by_user_id(user_id, mock_db)
 
         # Assert
-        assert result == [mock_weight1, mock_weight2]
+        assert len(result) == 2
         mock_db.execute.assert_called_once()
 
     def test_get_all_health_weight_by_user_id_empty(self, mock_db):
@@ -177,7 +229,33 @@ class TestGetHealthWeightWithPagination:
         page_number = 2
         num_records = 5
         mock_weight1 = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight1.id = 1
+        mock_weight1.user_id = user_id
+        mock_weight1.date = None
+        mock_weight1.weight = None
+        mock_weight1.bmi = None
+        mock_weight1.body_fat = None
+        mock_weight1.body_water = None
+        mock_weight1.bone_mass = None
+        mock_weight1.muscle_mass = None
+        mock_weight1.physique_rating = None
+        mock_weight1.visceral_fat = None
+        mock_weight1.metabolic_age = None
+        mock_weight1.source = None
         mock_weight2 = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight2.id = 2
+        mock_weight2.user_id = user_id
+        mock_weight2.date = None
+        mock_weight2.weight = None
+        mock_weight2.bmi = None
+        mock_weight2.body_fat = None
+        mock_weight2.body_water = None
+        mock_weight2.bone_mass = None
+        mock_weight2.muscle_mass = None
+        mock_weight2.physique_rating = None
+        mock_weight2.visceral_fat = None
+        mock_weight2.metabolic_age = None
+        mock_weight2.source = None
 
         mock_scalars = MagicMock()
         mock_scalars.all.return_value = [mock_weight1, mock_weight2]
@@ -189,7 +267,7 @@ class TestGetHealthWeightWithPagination:
         result = health_weight_crud.get_health_weight_by_user_id(user_id, mock_db, page_number, num_records)
 
         # Assert
-        assert result == [mock_weight1, mock_weight2]
+        assert len(result) == 2
         mock_db.execute.assert_called_once()
 
     def test_get_health_weight_with_pagination_defaults(self, mock_db):
@@ -240,13 +318,26 @@ class TestGetHealthWeightByDate:
         user_id = 1
         test_date = "2024-01-15"
         mock_weight = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_weight.id = 1
+        mock_weight.user_id = user_id
+        mock_weight.date = None
+        mock_weight.weight = None
+        mock_weight.bmi = None
+        mock_weight.body_fat = None
+        mock_weight.body_water = None
+        mock_weight.bone_mass = None
+        mock_weight.muscle_mass = None
+        mock_weight.physique_rating = None
+        mock_weight.visceral_fat = None
+        mock_weight.metabolic_age = None
+        mock_weight.source = None
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_weight
 
         # Act
         result = health_weight_crud.get_health_weight_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
-        assert result == mock_weight
+        assert result.id == 1
         mock_db.execute.assert_called_once()
 
     def test_get_health_weight_by_date_not_found(self, mock_db):
@@ -307,7 +398,18 @@ class TestCreateHealthWeight:
 
         mock_db_weight = MagicMock()
         mock_db_weight.id = 1
+        mock_db_weight.user_id = user_id
         mock_db_weight.bmi = 24.5
+        mock_db_weight.date = None
+        mock_db_weight.weight = None
+        mock_db_weight.body_fat = None
+        mock_db_weight.body_water = None
+        mock_db_weight.bone_mass = None
+        mock_db_weight.muscle_mass = None
+        mock_db_weight.physique_rating = None
+        mock_db_weight.visceral_fat = None
+        mock_db_weight.metabolic_age = None
+        mock_db_weight.source = None
         mock_db.add.return_value = None
         mock_db.commit.return_value = None
         mock_db.refresh.return_value = None
@@ -340,6 +442,18 @@ class TestCreateHealthWeight:
 
         mock_db_weight = MagicMock()
         mock_db_weight.id = 1
+        mock_db_weight.user_id = user_id
+        mock_db_weight.bmi = 24.5
+        mock_db_weight.date = None
+        mock_db_weight.weight = None
+        mock_db_weight.body_fat = None
+        mock_db_weight.body_water = None
+        mock_db_weight.bone_mass = None
+        mock_db_weight.muscle_mass = None
+        mock_db_weight.physique_rating = None
+        mock_db_weight.visceral_fat = None
+        mock_db_weight.metabolic_age = None
+        mock_db_weight.source = None
         mock_db.add.return_value = None
         mock_db.commit.return_value = None
         mock_db.refresh.return_value = None
@@ -406,7 +520,7 @@ class TestEditHealthWeight:
     Test suite for edit_health_weight function.
     """
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     @patch("health.health_weight.crud.health_weight_utils.calculate_bmi")
     def test_edit_health_weight_success(self, mock_calculate_bmi, mock_get_by_id, mock_db):
         """
@@ -431,6 +545,14 @@ class TestEditHealthWeight:
         mock_calculate_bmi.return_value = updated_weight
 
         mock_db_weight = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_db_weight.body_fat = None
+        mock_db_weight.body_water = None
+        mock_db_weight.bone_mass = None
+        mock_db_weight.muscle_mass = None
+        mock_db_weight.physique_rating = None
+        mock_db_weight.visceral_fat = None
+        mock_db_weight.metabolic_age = None
+        mock_db_weight.source = None
         mock_get_by_id.return_value = mock_db_weight
 
         # Act
@@ -440,7 +562,7 @@ class TestEditHealthWeight:
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once()
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     def test_edit_health_weight_not_found(self, mock_get_by_id, mock_db):
         """
         Test edit when health weight record not found.
@@ -453,7 +575,10 @@ class TestEditHealthWeight:
             date=datetime_date(2024, 1, 15),
             weight=76.0,
         )
-        mock_get_by_id.return_value = None
+        mock_get_by_id.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health weight not found",
+        )
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
@@ -481,7 +606,7 @@ class TestEditHealthWeight:
 
         assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     def test_edit_health_weight_with_bmi_provided(self, mock_get_by_id, mock_db):
         """
         Test edit without BMI calculation when BMI provided.
@@ -497,6 +622,14 @@ class TestEditHealthWeight:
         )
 
         mock_db_weight = MagicMock(spec=health_weight_models.HealthWeight)
+        mock_db_weight.body_fat = None
+        mock_db_weight.body_water = None
+        mock_db_weight.bone_mass = None
+        mock_db_weight.muscle_mass = None
+        mock_db_weight.physique_rating = None
+        mock_db_weight.visceral_fat = None
+        mock_db_weight.metabolic_age = None
+        mock_db_weight.source = None
         mock_get_by_id.return_value = mock_db_weight
 
         # Act
@@ -505,7 +638,7 @@ class TestEditHealthWeight:
         # Assert
         mock_db.commit.assert_called_once()
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     def test_edit_health_weight_exception(self, mock_get_by_id, mock_db):
         """
         Test exception handling in edit_health_weight.
@@ -530,7 +663,7 @@ class TestDeleteHealthWeight:
     Test suite for delete_health_weight function.
     """
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     def test_delete_health_weight_success(self, mock_get_by_id, mock_db):
         """
         Test successful deletion of health weight entry.
@@ -549,7 +682,7 @@ class TestDeleteHealthWeight:
         mock_db.delete.assert_called_once_with(mock_db_weight)
         mock_db.commit.assert_called_once()
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     def test_delete_health_weight_not_found(self, mock_get_by_id, mock_db):
         """
         Test deletion when health weight record not found.
@@ -557,16 +690,19 @@ class TestDeleteHealthWeight:
         # Arrange
         user_id = 1
         health_weight_id = 999
-        mock_get_by_id.return_value = None
+        mock_get_by_id.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health weight not found",
+        )
 
         # Act & Assert
         with pytest.raises(HTTPException) as exc_info:
             health_weight_crud.delete_health_weight(user_id, health_weight_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert f"Health weight with id {health_weight_id}" in exc_info.value.detail
+        assert exc_info.value.detail == "Health weight not found"
 
-    @patch("health.health_weight.crud.get_health_weight_by_id_and_user_id")
+    @patch("health.health_weight.crud._get_health_weight_model_by_id_and_user_id_or_404")
     def test_delete_health_weight_exception(self, mock_get_by_id, mock_db):
         """
         Test exception handling in delete_health_weight.

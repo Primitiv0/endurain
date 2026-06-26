@@ -5,6 +5,8 @@ This module provides database operations for creating, reading,
 updating, and deleting water intake records.
 """
 
+from typing import overload
+
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -15,6 +17,73 @@ import health.constants as health_constants
 import health.health_water.models as health_water_models
 import health.health_water.schema as health_water_schema
 import health.utils as health_utils
+
+# Private internal helpers
+
+
+@overload
+def _transform_health_water(health_water: health_water_models.HealthWater) -> health_water_schema.HealthWaterRead: ...
+
+
+@overload
+def _transform_health_water(
+    health_water: list[health_water_models.HealthWater],
+) -> list[health_water_schema.HealthWaterRead]: ...
+
+
+def _transform_health_water(
+    health_water: health_water_models.HealthWater | list[health_water_models.HealthWater],
+) -> health_water_schema.HealthWaterRead | list[health_water_schema.HealthWaterRead]:
+    """
+    Transform a health water or list of health waters to a Pydantic schema.
+
+    Args:
+        health_water: The health water ORM instance or list of instances.
+
+    Returns:
+        The health water(s) as a schema.
+    """
+    if isinstance(health_water, list):
+        return [health_water_schema.HealthWaterRead.model_validate(hw) for hw in health_water]
+    return health_water_schema.HealthWaterRead.model_validate(health_water)
+
+
+@core_decorators.handle_db_errors
+def _get_health_water_model_by_id_and_user_id_or_404(
+    health_water_id: int, user_id: int, db: Session
+) -> health_water_models.HealthWater:
+    """
+    Retrieve health water record model by ID and user ID.
+
+    Args:
+        health_water_id: Health water record ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthWater`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_water from the database
+    stmt = select(health_water_models.HealthWater).where(
+        health_water_models.HealthWater.id == health_water_id,
+        health_water_models.HealthWater.user_id == user_id,
+    )
+    db_health_water = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_water is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health water not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_water
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
@@ -57,7 +126,7 @@ def get_health_water_number_by_user_id(
 @core_decorators.handle_db_errors
 def get_health_water_by_id_and_user_id(
     health_water_id: int, user_id: int, db: Session
-) -> health_water_models.HealthWater | None:
+) -> health_water_schema.HealthWaterRead | None:
     """
     Retrieve water intake record by ID and user ID.
 
@@ -67,7 +136,7 @@ def get_health_water_by_id_and_user_id(
         db: Database session.
 
     Returns:
-        HealthWater model if found, None otherwise.
+        HealthWaterRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -76,7 +145,8 @@ def get_health_water_by_id_and_user_id(
         health_water_models.HealthWater.id == health_water_id,
         health_water_models.HealthWater.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_water = db.execute(stmt).scalar_one_or_none()
+    return _transform_health_water(db_health_water) if db_health_water else None
 
 
 @core_decorators.handle_db_errors
@@ -86,7 +156,7 @@ def get_health_water_by_user_id(
     page_number: int | None = None,
     num_records: int | None = None,
     interval: health_constants.Interval | None = None,
-) -> list[health_water_models.HealthWater]:
+) -> list[health_water_schema.HealthWaterRead]:
     """
     Retrieve water intake records for a user with optional
     pagination and filtering.
@@ -99,7 +169,7 @@ def get_health_water_by_user_id(
         interval: Time interval to filter records.
 
     Returns:
-        List of HealthWater records sorted by date descending.
+        List of HealthWaterRead schema records sorted by date descending.
     """
     stmt = select(health_water_models.HealthWater).where(health_water_models.HealthWater.user_id == user_id)
 
@@ -113,13 +183,15 @@ def get_health_water_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_health_water = db.execute(stmt).scalars().all()
+
+    return _transform_health_water(list(db_health_water))
 
 
 @core_decorators.handle_db_errors
 def get_health_water_by_date_and_user_id(
     user_id: int, date: str, db: Session
-) -> health_water_models.HealthWater | None:
+) -> health_water_schema.HealthWaterRead | None:
     """
     Retrieve water intake record for a user on a specific date.
 
@@ -129,7 +201,7 @@ def get_health_water_by_date_and_user_id(
         db: Database session.
 
     Returns:
-        HealthWater model if found, None otherwise.
+        HealthWaterRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -138,7 +210,9 @@ def get_health_water_by_date_and_user_id(
         health_water_models.HealthWater.date == func.date(date),
         health_water_models.HealthWater.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_water = db.execute(stmt).scalar_one_or_none()
+
+    return _transform_health_water(db_health_water) if db_health_water else None
 
 
 @core_decorators.handle_db_errors
@@ -146,7 +220,7 @@ def create_health_water(
     user_id: int,
     health_water: health_water_schema.HealthWaterCreate,
     db: Session,
-) -> health_water_models.HealthWater:
+) -> health_water_schema.HealthWaterRead:
     """
     Create a new water intake record for a user.
 
@@ -171,7 +245,7 @@ def create_health_water(
         db.commit()
         db.refresh(db_health_water)
 
-        return db_health_water
+        return _transform_health_water(db_health_water)
     except IntegrityError as integrity_error:
         db.rollback()
 
@@ -186,7 +260,7 @@ def edit_health_water(
     user_id: int,
     health_water: health_water_schema.HealthWaterUpdate,
     db: Session,
-) -> health_water_models.HealthWater:
+) -> health_water_schema.HealthWaterRead:
     """
     Edit water intake record for a user.
 
@@ -196,7 +270,7 @@ def edit_health_water(
         db: Database session.
 
     Returns:
-        Updated HealthWater model.
+        Updated HealthWaterRead schema.
 
     Raises:
         HTTPException: 403 if editing another user's record,
@@ -208,13 +282,7 @@ def edit_health_water(
             detail=("Cannot edit health water intake for another user."),
         )
 
-    db_health_water = get_health_water_by_id_and_user_id(health_water.id, user_id, db)
-
-    if db_health_water is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health water intake not found",
-        ) from None
+    db_health_water = _get_health_water_model_by_id_and_user_id_or_404(health_water.id, user_id, db)
 
     health_water_data = health_water.model_dump(exclude_unset=True)
     for key, value in health_water_data.items():
@@ -223,7 +291,7 @@ def edit_health_water(
     db.commit()
     db.refresh(db_health_water)
 
-    return db_health_water
+    return _transform_health_water(db_health_water)
 
 
 @core_decorators.handle_db_errors
@@ -242,13 +310,7 @@ def delete_health_water(user_id: int, health_water_id: int, db: Session) -> None
     Raises:
         HTTPException: If record not found or database error.
     """
-    db_health_water = get_health_water_by_id_and_user_id(health_water_id, user_id, db)
-
-    if db_health_water is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health water intake not found",
-        ) from None
+    db_health_water = _get_health_water_model_by_id_and_user_id_or_404(health_water_id, user_id, db)
 
     db.delete(db_health_water)
     db.commit()

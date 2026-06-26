@@ -15,7 +15,6 @@ Exports:
       HealthWaterUpdate, HealthWaterRead,
       HealthWaterListResponse
     - Enums: Source
-    - Models: HealthWater (ORM model)
 """
 
 from .crud import (
@@ -27,7 +26,6 @@ from .crud import (
     get_health_water_by_user_id,
     get_health_water_number_by_user_id,
 )
-from .models import HealthWater as HealthWaterModel
 from .schema import (
     HealthWaterBase,
     HealthWaterCreate,
@@ -38,15 +36,11 @@ from .schema import (
 )
 
 __all__ = [
-    # Pydantic schemas
     "HealthWaterBase",
     "HealthWaterCreate",
     "HealthWaterListResponse",
-    # Database model
-    "HealthWaterModel",
     "HealthWaterRead",
     "HealthWaterUpdate",
-    # Enums
     "Source",
     "create_health_water",
     "delete_health_water",
@@ -54,6 +48,5 @@ __all__ = [
     "get_health_water_by_date_and_user_id",
     "get_health_water_by_id_and_user_id",
     "get_health_water_by_user_id",
-    # CRUD operations
     "get_health_water_number_by_user_id",
 ]

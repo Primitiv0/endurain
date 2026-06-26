@@ -1,3 +1,5 @@
+from typing import overload
+
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +10,73 @@ import health.constants as health_constants
 import health.health_sleep.models as health_sleep_models
 import health.health_sleep.schema as health_sleep_schema
 import health.utils as health_utils
+
+# Private internal helpers
+
+
+@overload
+def _transform_health_sleep(health_sleep: health_sleep_models.HealthSleep) -> health_sleep_schema.HealthSleepRead: ...
+
+
+@overload
+def _transform_health_sleep(
+    health_sleep: list[health_sleep_models.HealthSleep],
+) -> list[health_sleep_schema.HealthSleepRead]: ...
+
+
+def _transform_health_sleep(
+    health_sleep: health_sleep_models.HealthSleep | list[health_sleep_models.HealthSleep],
+) -> health_sleep_schema.HealthSleepRead | list[health_sleep_schema.HealthSleepRead]:
+    """
+    Transform a health sleep or list of health sleep to a Pydantic schema.
+
+    Args:
+        health_sleep: The health sleep ORM instance or list of instances.
+
+    Returns:
+        The health sleep(s) as a schema.
+    """
+    if isinstance(health_sleep, list):
+        return [health_sleep_schema.HealthSleepRead.model_validate(hw) for hw in health_sleep]
+    return health_sleep_schema.HealthSleepRead.model_validate(health_sleep)
+
+
+@core_decorators.handle_db_errors
+def _get_health_sleep_model_by_id_and_user_id_or_404(
+    health_sleep_id: int, user_id: int, db: Session
+) -> health_sleep_models.HealthSleep:
+    """
+    Retrieve health sleep record model by ID and user ID.
+
+    Args:
+        health_sleep_id: Health sleep record ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthSleep`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_sleep from the database
+    stmt = select(health_sleep_models.HealthSleep).where(
+        health_sleep_models.HealthSleep.id == health_sleep_id,
+        health_sleep_models.HealthSleep.user_id == user_id,
+    )
+    db_health_sleep = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_sleep is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health sleep not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_sleep
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
@@ -45,39 +114,13 @@ def get_health_sleep_number_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_health_sleep_by_id_and_user_id(
-    health_sleep_id: int, user_id: int, db: Session
-) -> health_sleep_models.HealthSleep | None:
-    """
-    Retrieve health sleep record by ID and user ID.
-
-    Args:
-        health_sleep_id: Health sleep record ID to fetch.
-        user_id: User ID to fetch record for.
-        db: Database session.
-
-    Returns:
-        HealthSleep model if found, None otherwise.
-
-    Raises:
-        HTTPException: If database error occurs.
-    """
-    # Get the health_sleep from the database
-    stmt = select(health_sleep_models.HealthSleep).where(
-        health_sleep_models.HealthSleep.id == health_sleep_id,
-        health_sleep_models.HealthSleep.user_id == user_id,
-    )
-    return db.execute(stmt).scalar_one_or_none()
-
-
-@core_decorators.handle_db_errors
 def get_health_sleep_by_user_id(
     user_id: int,
     db: Session,
     page_number: int | None = None,
     num_records: int | None = None,
     interval: health_constants.Interval | None = None,
-) -> list[health_sleep_models.HealthSleep]:
+) -> list[health_sleep_schema.HealthSleepRead]:
     """
     Retrieve health sleep records for a specific user with optional pagination
         and filtering.
@@ -97,7 +140,7 @@ def get_health_sleep_by_user_id(
             are returned. Defaults to None.
 
     Returns:
-        list[health_sleep_models.HealthSleep]: A list of health sleep
+        list[health_sleep_schema.HealthSleepRead]: A list of health sleep
             records sorted by date in descending order, optionally paginated.
     """
     # Get the health_sleep from the database
@@ -113,13 +156,15 @@ def get_health_sleep_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_health_sleep = db.execute(stmt).scalars().all()
+
+    return _transform_health_sleep(list(db_health_sleep))
 
 
 @core_decorators.handle_db_errors
 def get_health_sleep_by_date_and_user_id(
     user_id: int, date: str, db: Session
-) -> health_sleep_models.HealthSleep | None:
+) -> health_sleep_schema.HealthSleepRead | None:
     """
     Retrieve health sleep record for a user on a specific date.
 
@@ -129,7 +174,7 @@ def get_health_sleep_by_date_and_user_id(
         db: Database session.
 
     Returns:
-        HealthSleep model if found, None otherwise.
+        HealthSleepRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -139,7 +184,8 @@ def get_health_sleep_by_date_and_user_id(
         health_sleep_models.HealthSleep.date == func.date(date),
         health_sleep_models.HealthSleep.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_sleep = db.execute(stmt).scalar_one_or_none()
+    return _transform_health_sleep(db_health_sleep) if db_health_sleep else None
 
 
 @core_decorators.handle_db_errors
@@ -147,7 +193,7 @@ def create_health_sleep(
     user_id: int,
     health_sleep: health_sleep_schema.HealthSleepCreate,
     db: Session,
-) -> health_sleep_models.HealthSleep:
+) -> health_sleep_schema.HealthSleepRead:
     """
     Create a new health sleep record for a user.
 
@@ -179,7 +225,7 @@ def create_health_sleep(
         db.refresh(db_health_sleep)
 
         # Return the created health_sleep model
-        return db_health_sleep
+        return _transform_health_sleep(db_health_sleep)
     except IntegrityError as integrity_error:
         # Rollback the transaction
         db.rollback()
@@ -196,7 +242,7 @@ def edit_health_sleep(
     user_id: int,
     health_sleep: health_sleep_schema.HealthSleepUpdate,
     db: Session,
-) -> health_sleep_models.HealthSleep:
+) -> health_sleep_schema.HealthSleepRead:
     """
     Edit an existing health sleep record for a user.
 
@@ -206,7 +252,7 @@ def edit_health_sleep(
         db: Database session.
 
     Returns:
-        Updated HealthSleep model.
+        Updated HealthSleepRead schema.
 
     Raises:
         HTTPException: 403 if trying to edit other user record, 404 if not
@@ -220,13 +266,7 @@ def edit_health_sleep(
         )
 
     # Get the health_sleep from the database
-    db_health_sleep = get_health_sleep_by_id_and_user_id(health_sleep.id, user_id, db)
-
-    if db_health_sleep is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health sleep not found",
-        )
+    db_health_sleep = _get_health_sleep_model_by_id_and_user_id_or_404(health_sleep.id, user_id, db)
 
     # Dictionary of the fields to update if they are not None
     health_sleep_data = health_sleep.model_dump(exclude_unset=True, mode="json")
@@ -238,7 +278,7 @@ def edit_health_sleep(
     db.commit()
     db.refresh(db_health_sleep)
 
-    return db_health_sleep
+    return _transform_health_sleep(db_health_sleep)
 
 
 @core_decorators.handle_db_errors
@@ -258,14 +298,7 @@ def delete_health_sleep(user_id: int, health_sleep_id: int, db: Session) -> None
         HTTPException: 404 if not found, 500 if database error.
     """
     # Get the record to delete
-    db_health_sleep = get_health_sleep_by_id_and_user_id(health_sleep_id, user_id, db)
-
-    # Check if the health_sleep was found
-    if db_health_sleep is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Health sleep with id {health_sleep_id} for user {user_id} not found"),
-        )
+    db_health_sleep = _get_health_sleep_model_by_id_and_user_id_or_404(health_sleep_id, user_id, db)
 
     # Delete the record
     db.delete(db_health_sleep)

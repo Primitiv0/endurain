@@ -6,7 +6,6 @@ step tracking including daily step counts and data sources.
 
 Exports:
     - CRUD: get_health_steps_number_by_user_id,
-      get_health_steps_by_id_and_user_id,
       get_health_steps_by_user_id, get_health_steps_by_date_and_user_id,
       create_health_steps, edit_health_steps, delete_health_steps
     - Schemas: HealthStepsBase, HealthStepsCreate, HealthStepsUpdate,
@@ -20,11 +19,9 @@ from .crud import (
     delete_health_steps,
     edit_health_steps,
     get_health_steps_by_date_and_user_id,
-    get_health_steps_by_id_and_user_id,
     get_health_steps_by_user_id,
     get_health_steps_number_by_user_id,
 )
-from .models import HealthSteps as HealthStepsModel
 from .schema import (
     HealthStepsBase,
     HealthStepsCreate,
@@ -35,22 +32,16 @@ from .schema import (
 )
 
 __all__ = [
-    # Pydantic schemas
     "HealthStepsBase",
     "HealthStepsCreate",
     "HealthStepsListResponse",
-    # Database model
-    "HealthStepsModel",
     "HealthStepsRead",
     "HealthStepsUpdate",
-    # Enums
     "Source",
     "create_health_steps",
     "delete_health_steps",
     "edit_health_steps",
     "get_health_steps_by_date_and_user_id",
-    "get_health_steps_by_id_and_user_id",
     "get_health_steps_by_user_id",
-    # CRUD operations
     "get_health_steps_number_by_user_id",
 ]

@@ -82,7 +82,8 @@ class TestGetHealthSleepWithPagination:
         ]
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db, page_number, num_records)
+        with patch.object(health_sleep_crud, "_transform_health_sleep", return_value=[mock_sleep1, mock_sleep2]):
+            result = health_sleep_crud.get_health_sleep_by_user_id(user_id, mock_db, page_number, num_records)
 
         # Assert
         assert result == [mock_sleep1, mock_sleep2]
@@ -133,7 +134,8 @@ class TestGetHealthSleepByDate:
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_sleep
 
         # Act
-        result = health_sleep_crud.get_health_sleep_by_date_and_user_id(user_id, test_date, mock_db)
+        with patch.object(health_sleep_crud, "_transform_health_sleep", return_value=mock_sleep):
+            result = health_sleep_crud.get_health_sleep_by_date_and_user_id(user_id, test_date, mock_db)
 
         # Assert
         assert result == mock_sleep
@@ -194,10 +196,13 @@ class TestCreateHealthSleep:
         mock_db.commit.return_value = None
         mock_db.refresh.return_value = None
 
-        with patch.object(
-            health_sleep_models,
-            "HealthSleep",
-            return_value=mock_db_sleep,
+        with (
+            patch.object(
+                health_sleep_models,
+                "HealthSleep",
+                return_value=mock_db_sleep,
+            ),
+            patch.object(health_sleep_crud, "_transform_health_sleep", return_value=mock_db_sleep),
         ):
             # Act
             result = health_sleep_crud.create_health_sleep(user_id, health_sleep, mock_db)
@@ -225,10 +230,13 @@ class TestCreateHealthSleep:
         mock_db.commit.return_value = None
         mock_db.refresh.return_value = None
 
-        with patch.object(
-            health_sleep_models,
-            "HealthSleep",
-            return_value=mock_db_sleep,
+        with (
+            patch.object(
+                health_sleep_models,
+                "HealthSleep",
+                return_value=mock_db_sleep,
+            ),
+            patch.object(health_sleep_crud, "_transform_health_sleep", return_value=mock_db_sleep),
         ):
             # Act
             result = health_sleep_crud.create_health_sleep(user_id, health_sleep, mock_db)
@@ -305,7 +313,10 @@ class TestEditHealthSleep:
         mock_db.execute.return_value.scalar_one_or_none.return_value = mock_db_sleep
 
         # Act
-        result = health_sleep_crud.edit_health_sleep(user_id, health_sleep, mock_db)
+        mock_result = MagicMock()
+        mock_result.total_sleep_seconds = 32400
+        with patch.object(health_sleep_crud, "_transform_health_sleep", return_value=mock_result):
+            result = health_sleep_crud.edit_health_sleep(user_id, health_sleep, mock_db)
 
         # Assert
         assert result.total_sleep_seconds == 32400
@@ -395,7 +406,7 @@ class TestDeleteHealthSleep:
             health_sleep_crud.delete_health_sleep(user_id, health_sleep_id, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert f"Health sleep with id {health_sleep_id}" in exc_info.value.detail
+        assert "Health sleep not found" in exc_info.value.detail
 
     def test_delete_health_sleep_exception(self, mock_db):
         """

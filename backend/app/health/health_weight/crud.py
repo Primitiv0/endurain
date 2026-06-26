@@ -1,4 +1,4 @@
-from typing import cast
+from typing import cast, overload
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
@@ -12,11 +12,80 @@ import health.health_weight.schema as health_weight_schema
 import health.health_weight.utils as health_weight_utils
 import health.utils as health_utils
 
+# Private internal helpers
+
+
+@overload
+def _transform_health_weight(
+    health_weight: health_weight_models.HealthWeight,
+) -> health_weight_schema.HealthWeightRead: ...
+
+
+@overload
+def _transform_health_weight(
+    health_weight: list[health_weight_models.HealthWeight],
+) -> list[health_weight_schema.HealthWeightRead]: ...
+
+
+def _transform_health_weight(
+    health_weight: health_weight_models.HealthWeight | list[health_weight_models.HealthWeight],
+) -> health_weight_schema.HealthWeightRead | list[health_weight_schema.HealthWeightRead]:
+    """
+    Transform a health weight or list of health weights to a Pydantic schema.
+
+    Args:
+        health_weight: The health weight ORM instance or list of instances.
+
+    Returns:
+        The health weight(s) as a schema.
+    """
+    if isinstance(health_weight, list):
+        return [health_weight_schema.HealthWeightRead.model_validate(hw) for hw in health_weight]
+    return health_weight_schema.HealthWeightRead.model_validate(health_weight)
+
+
+@core_decorators.handle_db_errors
+def _get_health_weight_model_by_id_and_user_id_or_404(
+    health_weight_id: int, user_id: int, db: Session
+) -> health_weight_models.HealthWeight:
+    """
+    Retrieve health weight record model by ID and user ID.
+
+    Args:
+        health_weight_id: Health weight record ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthWeight`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_weight from the database
+    stmt = select(health_weight_models.HealthWeight).where(
+        health_weight_models.HealthWeight.id == health_weight_id,
+        health_weight_models.HealthWeight.user_id == user_id,
+    )
+    db_health_weight = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_weight is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health weight not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_weight
+
+
+# Public CRUD functions
+
 
 @core_decorators.handle_db_errors
 def get_all_health_weight(
     db: Session,
-) -> list[health_weight_models.HealthWeight]:
+) -> list[health_weight_schema.HealthWeightRead]:
     """
     Retrieve all health weight records from the database.
 
@@ -24,14 +93,15 @@ def get_all_health_weight(
         db: Database session.
 
     Returns:
-        List of HealthWeight models ordered by date descending.
+        List of HealthWeightRead schemas ordered by date descending.
 
     Raises:
         HTTPException: If database error occurs.
     """
     # Get the health_weight from the database
     stmt = select(health_weight_models.HealthWeight).order_by(desc(health_weight_models.HealthWeight.date))
-    return list(db.execute(stmt).scalars().all())
+    db_health_weights = db.execute(stmt).scalars().all()
+    return _transform_health_weight(list(db_health_weights))
 
 
 @core_decorators.handle_db_errors
@@ -69,7 +139,7 @@ def get_health_weight_number_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_all_health_weight_by_user_id(user_id: int, db: Session) -> list[health_weight_models.HealthWeight]:
+def get_all_health_weight_by_user_id(user_id: int, db: Session) -> list[health_weight_schema.HealthWeightRead]:
     """
     Retrieve all health weight records for a user.
 
@@ -78,7 +148,7 @@ def get_all_health_weight_by_user_id(user_id: int, db: Session) -> list[health_w
         db: Database session.
 
     Returns:
-        List of HealthWeight models ordered by date descending.
+        List of HealthWeightRead schemas ordered by date descending.
 
     Raises:
         HTTPException: If database error occurs.
@@ -89,33 +159,10 @@ def get_all_health_weight_by_user_id(user_id: int, db: Session) -> list[health_w
         .where(health_weight_models.HealthWeight.user_id == user_id)
         .order_by(desc(health_weight_models.HealthWeight.date))
     )
-    return list(db.execute(stmt).scalars().all())
 
+    db_health_weights = db.execute(stmt).scalars().all()
 
-@core_decorators.handle_db_errors
-def get_health_weight_by_id_and_user_id(
-    health_weight_id: int, user_id: int, db: Session
-) -> health_weight_models.HealthWeight | None:
-    """
-    Retrieve health weight record by ID and user ID.
-
-    Args:
-        health_weight_id: Health weight record ID to fetch.
-        user_id: User ID to fetch record for.
-        db: Database session.
-
-    Returns:
-        HealthWeight model if found, None otherwise.
-
-    Raises:
-        HTTPException: If database error occurs.
-    """
-    # Get the health_weight from the database
-    stmt = select(health_weight_models.HealthWeight).where(
-        health_weight_models.HealthWeight.id == health_weight_id,
-        health_weight_models.HealthWeight.user_id == user_id,
-    )
-    return db.execute(stmt).scalar_one_or_none()
+    return _transform_health_weight(list(db_health_weights))
 
 
 @core_decorators.handle_db_errors
@@ -125,7 +172,7 @@ def get_health_weight_by_user_id(
     page_number: int | None = None,
     num_records: int | None = None,
     interval: health_constants.Interval | None = None,
-) -> list[health_weight_models.HealthWeight]:
+) -> list[health_weight_schema.HealthWeightRead]:
     """
     Retrieve health weight records for a specific user with optional pagination
         and filtering.
@@ -161,13 +208,15 @@ def get_health_weight_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_health_weights = db.execute(stmt).scalars().all()
+
+    return _transform_health_weight(list(db_health_weights))
 
 
 @core_decorators.handle_db_errors
 def get_health_weight_by_date_and_user_id(
     user_id: int, date: str, db: Session
-) -> health_weight_models.HealthWeight | None:
+) -> health_weight_schema.HealthWeightRead | None:
     """
     Retrieve health weight record for a user on a specific date.
 
@@ -177,7 +226,7 @@ def get_health_weight_by_date_and_user_id(
         db: Database session.
 
     Returns:
-        HealthWeight model if found, None otherwise.
+        HealthWeightRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -187,11 +236,14 @@ def get_health_weight_by_date_and_user_id(
         health_weight_models.HealthWeight.date == func.date(date),
         health_weight_models.HealthWeight.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+
+    db_health_weight = db.execute(stmt).scalar_one_or_none()
+
+    return _transform_health_weight(db_health_weight) if db_health_weight else None
 
 
 @core_decorators.handle_db_errors
-def get_latest_weight_by_user_id(user_id: int, db: Session) -> health_weight_models.HealthWeight | None:
+def get_latest_weight_by_user_id(user_id: int, db: Session) -> health_weight_schema.HealthWeightRead | None:
     """
     Get most recent weight record for dashboard display.
 
@@ -200,7 +252,7 @@ def get_latest_weight_by_user_id(user_id: int, db: Session) -> health_weight_mod
         db: Database session.
 
     Returns:
-        HealthWeight model if found, None otherwise.
+        HealthWeightRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -211,13 +263,14 @@ def get_latest_weight_by_user_id(user_id: int, db: Session) -> health_weight_mod
         .order_by(desc(health_weight_models.HealthWeight.date))
         .limit(1)
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_weight = db.execute(stmt).scalar_one_or_none()
+    return _transform_health_weight(db_health_weight) if db_health_weight else None
 
 
 @core_decorators.handle_db_errors
 def create_health_weight(
     user_id: int, health_weight: health_weight_schema.HealthWeightCreate, db: Session
-) -> health_weight_models.HealthWeight:
+) -> health_weight_schema.HealthWeightRead:
     """
     Create a new health weight entry for a user.
 
@@ -232,7 +285,7 @@ def create_health_weight(
         db (Session): The database session used for database operations.
 
     Returns:
-        health_weight_models.HealthWeightCreate: The created health weight model instance.
+        health_weight_schema.HealthWeightRead: The created health weight schema instance.
 
     Raises:
         HTTPException:
@@ -264,7 +317,7 @@ def create_health_weight(
         db.refresh(db_health_weight)
 
         # Return the health_weight
-        return db_health_weight
+        return _transform_health_weight(db_health_weight)
     except IntegrityError as integrity_error:
         # Rollback the transaction
         db.rollback()
@@ -281,7 +334,7 @@ def edit_health_weight(
     user_id: int,
     health_weight: health_weight_schema.HealthWeightUpdate,
     db: Session,
-) -> health_weight_models.HealthWeight:
+) -> health_weight_schema.HealthWeightRead:
     """
     Edit an existing health weight record for a user.
 
@@ -291,7 +344,7 @@ def edit_health_weight(
         db: Database session.
 
     Returns:
-        Updated health weight object.
+        Updated health weight schema instance.
 
     Raises:
         HTTPException: If record not found or database error.
@@ -304,14 +357,7 @@ def edit_health_weight(
         )
 
     # Get the health_weight from the database
-    db_health_weight = get_health_weight_by_id_and_user_id(health_weight.id, user_id, db)
-
-    if db_health_weight is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health weight not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    db_health_weight = _get_health_weight_model_by_id_and_user_id_or_404(health_weight.id, user_id, db)
 
     # Check if bmi is None
     if health_weight.bmi is None and health_weight.weight is not None:
@@ -330,7 +376,7 @@ def edit_health_weight(
     db.commit()
     db.refresh(db_health_weight)
 
-    return db_health_weight
+    return _transform_health_weight(db_health_weight)
 
 
 @core_decorators.handle_db_errors
@@ -350,14 +396,7 @@ def delete_health_weight(user_id: int, health_weight_id: int, db: Session) -> No
         HTTPException: If record not found or database error.
     """
     # Get and delete the health_weight
-    db_health_weight = get_health_weight_by_id_and_user_id(health_weight_id, user_id, db)
-
-    # Check if the health_weight was found
-    if db_health_weight is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Health weight with id {health_weight_id} for user {user_id} not found"),
-        )
+    db_health_weight = _get_health_weight_model_by_id_and_user_id_or_404(health_weight_id, user_id, db)
 
     # Delete the record
     db.delete(db_health_weight)

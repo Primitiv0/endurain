@@ -1,3 +1,5 @@
+from typing import overload
+
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +10,73 @@ import health.constants as health_constants
 import health.health_steps.models as health_steps_models
 import health.health_steps.schema as health_steps_schema
 import health.utils as health_utils
+
+# Private internal helpers
+
+
+@overload
+def _transform_health_steps(health_steps: health_steps_models.HealthSteps) -> health_steps_schema.HealthStepsRead: ...
+
+
+@overload
+def _transform_health_steps(
+    health_steps: list[health_steps_models.HealthSteps],
+) -> list[health_steps_schema.HealthStepsRead]: ...
+
+
+def _transform_health_steps(
+    health_steps: health_steps_models.HealthSteps | list[health_steps_models.HealthSteps],
+) -> health_steps_schema.HealthStepsRead | list[health_steps_schema.HealthStepsRead]:
+    """
+    Transform a health steps or list of health steps to a Pydantic schema.
+
+    Args:
+        health_steps: The health steps ORM instance or list of instances.
+
+    Returns:
+        The health steps(s) as a schema.
+    """
+    if isinstance(health_steps, list):
+        return [health_steps_schema.HealthStepsRead.model_validate(hw) for hw in health_steps]
+    return health_steps_schema.HealthStepsRead.model_validate(health_steps)
+
+
+@core_decorators.handle_db_errors
+def _get_health_steps_model_by_id_and_user_id_or_404(
+    health_steps_id: int, user_id: int, db: Session
+) -> health_steps_models.HealthSteps:
+    """
+    Retrieve health steps record model by ID and user ID.
+
+    Args:
+        health_steps_id: Health steps record ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``HealthSteps`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the health_steps from the database
+    stmt = select(health_steps_models.HealthSteps).where(
+        health_steps_models.HealthSteps.id == health_steps_id,
+        health_steps_models.HealthSteps.user_id == user_id,
+    )
+    db_health_steps = db.execute(stmt).scalar_one_or_none()
+
+    if db_health_steps is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Health steps not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return db_health_steps
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
@@ -45,37 +114,13 @@ def get_health_steps_number_by_user_id(
 
 
 @core_decorators.handle_db_errors
-def get_health_steps_by_id_and_user_id(
-    health_steps_id: int, user_id: int, db: Session
-) -> health_steps_models.HealthSteps | None:
-    """
-    Retrieve health steps record by ID and user ID.
-    Args:
-        health_steps_id: Health steps record ID to fetch.
-        user_id: User ID to fetch record for.
-        db: Database session.
-
-    Returns:
-        HealthSteps model if found, None otherwise.
-    Raises:
-        HTTPException: If database error occurs.
-    """
-    # Get the health_steps from the database
-    stmt = select(health_steps_models.HealthSteps).where(
-        health_steps_models.HealthSteps.id == health_steps_id,
-        health_steps_models.HealthSteps.user_id == user_id,
-    )
-    return db.execute(stmt).scalar_one_or_none()
-
-
-@core_decorators.handle_db_errors
 def get_health_steps_by_user_id(
     user_id: int,
     db: Session,
     page_number: int | None = None,
     num_records: int | None = None,
     interval: health_constants.Interval | None = None,
-) -> list[health_steps_models.HealthSteps]:
+) -> list[health_steps_schema.HealthStepsRead]:
     """
     Retrieve health steps records for a specific user with optional pagination
         and filtering.
@@ -95,7 +140,7 @@ def get_health_steps_by_user_id(
             are returned. Defaults to None.
 
     Returns:
-        list[health_steps_models.HealthSteps]: A list of health steps
+        list[health_steps_schema.HealthStepsRead]: A list of health steps
             records sorted by date in descending order, optionally paginated.
     """
     # Get the health_steps from the database
@@ -111,13 +156,14 @@ def get_health_steps_by_user_id(
     if page_number is not None and num_records is not None:
         stmt = stmt.offset((page_number - 1) * num_records).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_health_steps_list = db.execute(stmt).scalars().all()
+    return _transform_health_steps(list(db_health_steps_list))
 
 
 @core_decorators.handle_db_errors
 def get_health_steps_by_date_and_user_id(
     user_id: int, date: str, db: Session
-) -> health_steps_models.HealthSteps | None:
+) -> health_steps_schema.HealthStepsRead | None:
     """
     Retrieve health steps record for a user on a specific date.
 
@@ -127,7 +173,7 @@ def get_health_steps_by_date_and_user_id(
         db: Database session.
 
     Returns:
-        HealthSteps model if found, None otherwise.
+        HealthStepsRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If database error occurs.
@@ -137,7 +183,8 @@ def get_health_steps_by_date_and_user_id(
         health_steps_models.HealthSteps.date == func.date(date),
         health_steps_models.HealthSteps.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_health_steps = db.execute(stmt).scalar_one_or_none()
+    return _transform_health_steps(db_health_steps) if db_health_steps else None
 
 
 @core_decorators.handle_db_errors
@@ -145,7 +192,7 @@ def create_health_steps(
     user_id: int,
     health_steps: health_steps_schema.HealthStepsCreate,
     db: Session,
-) -> health_steps_models.HealthSteps:
+) -> health_steps_schema.HealthStepsRead:
     """
     Create a new health steps record for a user.
 
@@ -173,7 +220,7 @@ def create_health_steps(
         db.refresh(db_health_steps)
 
         # Return the health_steps
-        return db_health_steps
+        return _transform_health_steps(db_health_steps)
     except IntegrityError as integrity_error:
         # Rollback the transaction
         db.rollback()
@@ -190,7 +237,7 @@ def edit_health_steps(
     user_id: int,
     health_steps: health_steps_schema.HealthStepsUpdate,
     db: Session,
-) -> health_steps_models.HealthSteps:
+) -> health_steps_schema.HealthStepsRead:
     """
     Edit health steps record for a user.
 
@@ -200,7 +247,7 @@ def edit_health_steps(
         db: Database session.
 
     Returns:
-        Updated HealthSteps model.
+        Updated HealthStepsRead schema.
 
     Raises:
         HTTPException: 403 if trying to edit other user record, 404 if not
@@ -214,13 +261,7 @@ def edit_health_steps(
         )
 
     # Get the health_steps from the database
-    db_health_steps = get_health_steps_by_id_and_user_id(health_steps.id, user_id, db)
-
-    if db_health_steps is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health steps not found",
-        ) from None
+    db_health_steps = _get_health_steps_model_by_id_and_user_id_or_404(health_steps.id, user_id, db)
 
     # Dictionary of the fields to update if they are not None
     health_steps_data = health_steps.model_dump(exclude_unset=True)
@@ -233,7 +274,7 @@ def edit_health_steps(
     # Refresh the object to ensure it reflects database state
     db.refresh(db_health_steps)
 
-    return db_health_steps
+    return _transform_health_steps(db_health_steps)
 
 
 @core_decorators.handle_db_errors
@@ -253,14 +294,7 @@ def delete_health_steps(user_id: int, health_steps_id: int, db: Session) -> None
         HTTPException: If record not found or database error.
     """
     # Get the record first to ensure it exists
-    db_health_steps = get_health_steps_by_id_and_user_id(health_steps_id, user_id, db)
-
-    # Check if the health_steps was found
-    if db_health_steps is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Health steps not found",
-        ) from None
+    db_health_steps = _get_health_steps_model_by_id_and_user_id_or_404(health_steps_id, user_id, db)
 
     # Delete the health_steps
     db.delete(db_health_steps)
