@@ -164,6 +164,29 @@ def create_tokens(
     )
 
 
+def mint_access_token(
+    user: users_schema.UsersRead,
+    token_manager: auth_token_manager.TokenManager,
+    session_id: str,
+) -> tuple[datetime, str]:
+    """
+    Mint a single fresh access token for an existing session.
+
+    Used by the in-grace refresh replay path, which keeps the
+    existing (replayed) refresh token but still needs to hand the
+    client a new, full-lifetime access token.
+
+    Args:
+        user: The user the token is issued for.
+        token_manager: Token manager responsible for token creation.
+        session_id: Existing session identifier to bind the token to.
+
+    Returns:
+        Tuple of (access_token_exp, access_token).
+    """
+    return token_manager.create_token(session_id, user, auth_token_manager.TokenType.ACCESS)
+
+
 def _is_secure_cookie_environment() -> bool:
     """Return ``True`` when refresh cookies must be served with ``Secure``.
 

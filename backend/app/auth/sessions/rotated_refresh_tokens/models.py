@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from core.database import Base
@@ -23,6 +23,10 @@ class RotatedRefreshToken(Base):
         rotation_count: Which rotation this token belonged to.
         rotated_at: When this token was rotated.
         expires_at: Cleanup marker (rotated_at + 60 seconds).
+        replacement_refresh_token: Fernet-encrypted replacement
+            refresh token replayed for in-grace retries.
+        replacement_refresh_token_exp: Expiry of the
+            replacement refresh token.
         user_session: Relationship to UsersSessions model.
     """
 
@@ -58,6 +62,16 @@ class RotatedRefreshToken(Base):
         DateTime(timezone=True),
         nullable=False,
         comment="Cleanup marker (rotated_at + 60 seconds)",
+    )
+    replacement_refresh_token: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Fernet-encrypted replacement refresh token for idempotent in-grace replay",
+    )
+    replacement_refresh_token_exp: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="Expiry of the replacement refresh token",
     )
 
     # Relationship to UsersSessions model

@@ -59,6 +59,8 @@ def create_rotated_token(
         rotation_count=rotated_token.rotation_count,
         rotated_at=rotated_token.rotated_at,
         expires_at=rotated_token.expires_at,
+        replacement_refresh_token=rotated_token.replacement_refresh_token,
+        replacement_refresh_token_exp=rotated_token.replacement_refresh_token_exp,
     )
 
     db.add(db_rotated_token)

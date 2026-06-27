@@ -324,6 +324,29 @@ def edit_session(
     auth_sessions_crud.edit_session(updated_session, db)
 
 
+def update_session_csrf_token(
+    session_id: str,
+    new_csrf_token: str,
+    db: Session,
+) -> None:
+    """
+    Bind a freshly minted CSRF token to an existing session.
+
+    Hashes the CSRF token and updates only the session's CSRF hash,
+    leaving the refresh token and rotation count untouched. Used by
+    the in-grace refresh replay path for web clients.
+
+    Args:
+        session_id: The session to update.
+        new_csrf_token: Plain CSRF token to hash and store.
+        db: SQLAlchemy database session.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    auth_sessions_crud.update_session_csrf_hash(session_id, _hash_csrf_token(new_csrf_token), db)
+
+
 def get_user_agent(request: Request) -> str:
     """
     Extract User-Agent string from request headers.

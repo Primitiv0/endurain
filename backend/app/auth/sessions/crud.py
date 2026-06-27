@@ -364,6 +364,41 @@ def edit_session(
 
 
 @core_decorators.handle_db_errors
+def update_session_csrf_hash(
+    session_id: str,
+    csrf_token_hash: str,
+    db: Session,
+) -> None:
+    """
+    Update only the CSRF token hash on an existing session.
+
+    Used by the in-grace refresh replay path, which mints a fresh
+    CSRF token for web clients without rotating the refresh token
+    or bumping the rotation count.
+
+    Args:
+        session_id: The session to update.
+        csrf_token_hash: New HMAC-SHA256 CSRF token hash.
+        db: SQLAlchemy database session.
+
+    Raises:
+        HTTPException: If session not found (404) or database
+            error occurs (500).
+    """
+    db_session = get_session_by_id(session_id, db)
+
+    if not db_session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+
+    db_session.csrf_token_hash = csrf_token_hash
+    db.commit()
+    db.refresh(db_session)
+
+
+@core_decorators.handle_db_errors
 def delete_session(
     session_id: str,
     user_id: int,

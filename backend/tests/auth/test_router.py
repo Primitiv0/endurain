@@ -1608,6 +1608,191 @@ class TestRefreshEndpoint:
         assert data["refresh_token"] == "new-rt"
         mock_set_cookie.assert_not_called()
 
+    @patch("auth.router.auth_utils.mint_access_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.get_grace_replay_token")
+    @patch("auth.router.auth_utils.create_tokens")
+    @patch("auth.router.auth_sessions_utils.edit_session")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.users_crud.get_user_by_id")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
+    def test_refresh_in_grace_replay_mobile_returns_replayed_token(
+        self,
+        mock_get_session,
+        mock_validate_timeout,
+        mock_get_user,
+        mock_check_active,
+        mock_check_reuse,
+        mock_store_rotated,
+        mock_edit_session,
+        mock_create_tokens,
+        mock_get_replay,
+        mock_mint_access,
+        auth_client,
+        auth_app,
+        password_hasher,
+    ):
+        """In-grace replay (mobile) returns the stored replacement token."""
+        from datetime import datetime, timedelta
+
+        auth_app.state._client_type = "mobile"
+        now = datetime.now(UTC)
+        mock_session = MagicMock()
+        mock_session.id = "sid-replay-mob"
+        mock_session.user_id = 1
+        mock_session.refresh_token = password_hasher.hash_password("current_rt")
+        mock_session.csrf_token_hash = None
+        mock_session.token_family_id = "fam-1"
+        mock_session.rotation_count = 1
+        mock_get_session.return_value = mock_session
+        mock_validate_timeout.return_value = None
+        # Presented token was already rotated but is still within grace.
+        mock_check_reuse.return_value = (True, True)
+        mock_get_replay.return_value = ("replayed-rt", now + timedelta(days=7))
+        mock_get_user.return_value = MagicMock(id=1)
+        mock_check_active.return_value = None
+        mock_mint_access.return_value = (now + timedelta(minutes=15), "replayed-at")
+
+        app = auth_app
+        app.dependency_overrides[auth_security.validate_refresh_token] = lambda: None
+        app.dependency_overrides[auth_security.get_sub_from_refresh_token] = lambda: 1
+        app.dependency_overrides[auth_security.get_sid_from_refresh_token] = lambda: "sid-replay-mob"
+        app.dependency_overrides[auth_security.get_and_return_refresh_token] = lambda: "old_rotated_rt"
+        app.dependency_overrides[auth_security.header_csrf_token_scheme] = lambda: None
+
+        response = auth_client.post("/auth/refresh")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["access_token"] == "replayed-at"
+        assert data["refresh_token"] == "replayed-rt"
+        # Replay must be idempotent: no re-rotation side effects.
+        mock_store_rotated.assert_not_called()
+        mock_edit_session.assert_not_called()
+        mock_create_tokens.assert_not_called()
+        mock_mint_access.assert_called_once()
+
+    @patch("auth.router.auth_sessions_utils.update_session_csrf_token")
+    @patch("auth.router.auth_utils.set_refresh_token_cookie")
+    @patch("auth.router.auth_utils.mint_access_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.get_grace_replay_token")
+    @patch("auth.router.auth_utils.create_tokens")
+    @patch("auth.router.auth_sessions_utils.edit_session")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.users_utils.check_user_is_active")
+    @patch("auth.router.users_crud.get_user_by_id")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
+    def test_refresh_in_grace_replay_web_mints_fresh_csrf(
+        self,
+        mock_get_session,
+        mock_validate_timeout,
+        mock_get_user,
+        mock_check_active,
+        mock_check_reuse,
+        mock_store_rotated,
+        mock_edit_session,
+        mock_create_tokens,
+        mock_get_replay,
+        mock_mint_access,
+        mock_set_cookie,
+        mock_update_csrf,
+        auth_client,
+        auth_app,
+        password_hasher,
+    ):
+        """In-grace replay (web) mints a fresh access token and CSRF token."""
+        from datetime import datetime, timedelta
+
+        now = datetime.now(UTC)
+        mock_session = MagicMock()
+        mock_session.id = "sid-replay-web"
+        mock_session.user_id = 1
+        mock_session.refresh_token = password_hasher.hash_password("current_rt")
+        mock_session.csrf_token_hash = "stored-hmac"
+        mock_session.token_family_id = "fam-1"
+        mock_session.rotation_count = 1
+        mock_get_session.return_value = mock_session
+        mock_validate_timeout.return_value = None
+        mock_check_reuse.return_value = (True, True)
+        mock_get_replay.return_value = ("replayed-rt", now + timedelta(days=7))
+        mock_get_user.return_value = MagicMock(id=1)
+        mock_check_active.return_value = None
+        mock_mint_access.return_value = (now + timedelta(minutes=15), "replayed-at")
+        mock_set_cookie.return_value = None
+        mock_update_csrf.return_value = None
+
+        app = auth_app
+        app.dependency_overrides[auth_security.validate_refresh_token] = lambda: None
+        app.dependency_overrides[auth_security.get_sub_from_refresh_token] = lambda: 1
+        app.dependency_overrides[auth_security.get_sid_from_refresh_token] = lambda: "sid-replay-web"
+        app.dependency_overrides[auth_security.get_and_return_refresh_token] = lambda: "old_rotated_rt"
+        # No CSRF header: page-reload bootstrap / lost rotation response.
+        app.dependency_overrides[auth_security.header_csrf_token_scheme] = lambda: None
+
+        response = auth_client.post("/auth/refresh")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["access_token"] == "replayed-at"
+        # A fresh CSRF token is minted and bound to the session.
+        assert data["csrf_token"]
+        mock_update_csrf.assert_called_once()
+        assert mock_update_csrf.call_args.args[0] == "sid-replay-web"
+        # Refresh token is unchanged: delivered via cookie, no re-rotation.
+        mock_set_cookie.assert_called_once()
+        mock_store_rotated.assert_not_called()
+        mock_edit_session.assert_not_called()
+        mock_create_tokens.assert_not_called()
+
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.get_grace_replay_token")
+    @patch("auth.router.auth_sessions_utils.edit_session")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.store_rotated_token")
+    @patch("auth.router.auth_sessions_rotated_tokens_utils.check_token_reuse")
+    @patch("auth.router.auth_sessions_utils.validate_session_timeout")
+    @patch("auth.router.auth_sessions_crud.get_session_by_id_not_expired")
+    def test_refresh_in_grace_replay_missing_replacement_returns_401(
+        self,
+        mock_get_session,
+        mock_validate_timeout,
+        mock_check_reuse,
+        mock_store_rotated,
+        mock_edit_session,
+        mock_get_replay,
+        auth_client,
+        auth_app,
+        password_hasher,
+    ):
+        """In-grace replay with no stored replacement returns 401."""
+        mock_session = MagicMock()
+        mock_session.id = "sid-replay-none"
+        mock_session.user_id = 1
+        mock_session.refresh_token = password_hasher.hash_password("current_rt")
+        mock_session.csrf_token_hash = None
+        mock_session.token_family_id = "fam-1"
+        mock_session.rotation_count = 1
+        mock_get_session.return_value = mock_session
+        mock_validate_timeout.return_value = None
+        mock_check_reuse.return_value = (True, True)
+        mock_get_replay.return_value = None
+
+        app = auth_app
+        app.dependency_overrides[auth_security.validate_refresh_token] = lambda: None
+        app.dependency_overrides[auth_security.get_sub_from_refresh_token] = lambda: 1
+        app.dependency_overrides[auth_security.get_sid_from_refresh_token] = lambda: "sid-replay-none"
+        app.dependency_overrides[auth_security.get_and_return_refresh_token] = lambda: "old_rotated_rt"
+        app.dependency_overrides[auth_security.header_csrf_token_scheme] = lambda: None
+
+        response = auth_client.post("/auth/refresh")
+
+        assert response.status_code == 401
+        assert "Invalid refresh token" in response.json()["detail"]
+        mock_store_rotated.assert_not_called()
+        mock_edit_session.assert_not_called()
+
 
 # ------------------------------------------------------------------
 # POST /auth/logout

@@ -82,22 +82,36 @@ class TestStoreRotatedToken:
     Test suite for store_rotated_token function.
     """
 
+    @patch("auth.sessions.rotated_refresh_tokens.utils.core_cryptography")
     @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
     @patch("auth.sessions.rotated_refresh_tokens.utils.hmac_hash_token")
-    def test_store_rotated_token_success(self, mock_hash, mock_crud):
+    def test_store_rotated_token_success(self, mock_hash, mock_crud, mock_crypto):
         """
         Test successful storage of rotated token.
         """
         # Arrange
         mock_hash.return_value = "hashed-token"
+        mock_crypto.encrypt_token_fernet.return_value = "encrypted-replacement"
+        replacement_exp = datetime.now(UTC) + timedelta(days=7)
         mock_db = MagicMock()
 
         # Act
-        rotated_token_utils.store_rotated_token("raw-token", "family-id", 0, mock_db)
+        rotated_token_utils.store_rotated_token(
+            "raw-token",
+            "family-id",
+            0,
+            mock_db,
+            replacement_refresh_token="new-refresh-token",
+            replacement_refresh_token_exp=replacement_exp,
+        )
 
         # Assert
         mock_hash.assert_called_once_with("raw-token")
+        mock_crypto.encrypt_token_fernet.assert_called_once_with("new-refresh-token")
         mock_crud.create_rotated_token.assert_called_once()
+        stored_schema = mock_crud.create_rotated_token.call_args.args[0]
+        assert stored_schema.replacement_refresh_token == "encrypted-replacement"
+        assert stored_schema.replacement_refresh_token_exp == replacement_exp
 
 
 class TestCheckTokenReuse:
@@ -171,6 +185,99 @@ class TestCheckTokenReuse:
         assert in_grace is False
 
 
+class TestGetGraceReplayToken:
+    """
+    Test suite for get_grace_replay_token function.
+    """
+
+    @patch("auth.sessions.rotated_refresh_tokens.utils.core_cryptography")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.hmac_hash_token")
+    def test_get_grace_replay_token_success(self, mock_hash, mock_crud, mock_crypto):
+        """
+        Test replacement returned for an in-grace token.
+        """
+        # Arrange
+        mock_hash.return_value = "hashed-token"
+        now = datetime.now(UTC)
+        replacement_exp = now + timedelta(days=7)
+        mock_rotated_token = MagicMock(spec=rotated_token_models.RotatedRefreshToken)
+        mock_rotated_token.expires_at = now + timedelta(seconds=30)
+        mock_rotated_token.replacement_refresh_token = "encrypted-replacement"
+        mock_rotated_token.replacement_refresh_token_exp = replacement_exp
+        mock_crud.get_rotated_token_by_hash.return_value = mock_rotated_token
+        mock_crypto.decrypt_token_fernet.return_value = "decrypted-replacement"
+        mock_db = MagicMock()
+
+        # Act
+        result = rotated_token_utils.get_grace_replay_token("raw-token", mock_db)
+
+        # Assert
+        assert result == ("decrypted-replacement", replacement_exp)
+        mock_crypto.decrypt_token_fernet.assert_called_once_with("encrypted-replacement")
+
+    @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.hmac_hash_token")
+    def test_get_grace_replay_token_no_record(self, mock_hash, mock_crud):
+        """
+        Test None returned when no rotated record exists.
+        """
+        # Arrange
+        mock_hash.return_value = "hashed-token"
+        mock_crud.get_rotated_token_by_hash.return_value = None
+        mock_db = MagicMock()
+
+        # Act
+        result = rotated_token_utils.get_grace_replay_token("raw-token", mock_db)
+
+        # Assert
+        assert result is None
+
+    @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.hmac_hash_token")
+    def test_get_grace_replay_token_past_expiry(self, mock_hash, mock_crud):
+        """
+        Test None returned when the record is past its grace window.
+        """
+        # Arrange
+        mock_hash.return_value = "hashed-token"
+        now = datetime.now(UTC)
+        mock_rotated_token = MagicMock(spec=rotated_token_models.RotatedRefreshToken)
+        mock_rotated_token.expires_at = now - timedelta(seconds=5)
+        mock_rotated_token.replacement_refresh_token = "encrypted-replacement"
+        mock_rotated_token.replacement_refresh_token_exp = now + timedelta(days=7)
+        mock_crud.get_rotated_token_by_hash.return_value = mock_rotated_token
+        mock_db = MagicMock()
+
+        # Act
+        result = rotated_token_utils.get_grace_replay_token("raw-token", mock_db)
+
+        # Assert
+        assert result is None
+
+    @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.hmac_hash_token")
+    def test_get_grace_replay_token_no_replacement_stored(self, mock_hash, mock_crud):
+        """
+        Test None returned when no replacement was stored.
+        """
+        # Arrange
+        mock_hash.return_value = "hashed-token"
+        now = datetime.now(UTC)
+        mock_rotated_token = MagicMock(spec=rotated_token_models.RotatedRefreshToken)
+        mock_rotated_token.expires_at = now + timedelta(seconds=30)
+        mock_rotated_token.replacement_refresh_token = None
+        mock_rotated_token.replacement_refresh_token_exp = None
+        mock_crud.get_rotated_token_by_hash.return_value = mock_rotated_token
+        mock_db = MagicMock()
+
+        # Act
+        result = rotated_token_utils.get_grace_replay_token("raw-token", mock_db)
+
+        # Assert
+        assert result is None
+
+
 class TestInvalidateTokenFamily:
     """
     Test suite for invalidate_token_family function.
@@ -220,6 +327,27 @@ class TestCleanupExpiredRotatedTokens:
 
     @patch("auth.sessions.rotated_refresh_tokens.utils.SessionLocal")
     @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
+    def test_cleanup_retains_buffer_past_expiry(self, mock_crud, mock_session_local):
+        """
+        Test cleanup cutoff is held a buffer behind the current time.
+        """
+        # Arrange
+        mock_db = MagicMock()
+        mock_session_local.return_value.__enter__.return_value = mock_db
+        mock_crud.delete_expired_tokens.return_value = 0
+        buffer = timedelta(seconds=rotated_token_utils.ROTATED_TOKEN_CLEANUP_BUFFER_SECONDS)
+        before = datetime.now(UTC)
+
+        # Act
+        rotated_token_utils.cleanup_expired_rotated_tokens()
+        after = datetime.now(UTC)
+
+        # Assert
+        cutoff = mock_crud.delete_expired_tokens.call_args.args[0]
+        assert before - buffer <= cutoff <= after - buffer
+
+    @patch("auth.sessions.rotated_refresh_tokens.utils.SessionLocal")
+    @patch("auth.sessions.rotated_refresh_tokens.utils.rotated_token_crud")
     @patch("auth.sessions.rotated_refresh_tokens.utils.core_logger")
     def test_cleanup_expired_rotated_tokens_error_handling(self, mock_logger, mock_crud, mock_session_local):
         """
@@ -248,3 +376,16 @@ class TestTokenReuseGracePeriod:
         """
         # Assert
         assert rotated_token_utils.TOKEN_REUSE_GRACE_PERIOD_SECONDS == 60
+
+
+class TestRotatedTokenCleanupBuffer:
+    """
+    Test suite for ROTATED_TOKEN_CLEANUP_BUFFER_SECONDS constant.
+    """
+
+    def test_cleanup_buffer_value(self):
+        """
+        Test cleanup buffer is 10 seconds.
+        """
+        # Assert
+        assert rotated_token_utils.ROTATED_TOKEN_CLEANUP_BUFFER_SECONDS == 10

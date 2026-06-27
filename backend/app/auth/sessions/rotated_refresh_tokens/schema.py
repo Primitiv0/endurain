@@ -16,6 +16,10 @@ class RotatedRefreshTokenCreate(BaseModel):
             token.
         rotated_at: Timestamp when this token was rotated.
         expires_at: Cleanup marker timestamp.
+        replacement_refresh_token: Fernet-encrypted replacement
+            refresh token for in-grace replay.
+        replacement_refresh_token_exp: Expiry of the
+            replacement refresh token.
     """
 
     token_family_id: StrictStr = Field(
@@ -40,6 +44,14 @@ class RotatedRefreshTokenCreate(BaseModel):
     expires_at: datetime = Field(
         ...,
         description="Cleanup marker (rotated_at + 60 seconds)",
+    )
+    replacement_refresh_token: StrictStr | None = Field(
+        None,
+        description="Fernet-encrypted replacement refresh token for in-grace replay",
+    )
+    replacement_refresh_token_exp: datetime | None = Field(
+        None,
+        description="Expiry of the replacement refresh token",
     )
 
     model_config = ConfigDict(
