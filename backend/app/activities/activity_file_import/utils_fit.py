@@ -101,6 +101,21 @@ def create_activity_objects(
 
             privacy_kwargs = activity_file_import_utils.build_activity_privacy_kwargs(user_privacy_settings)
 
+            # Recompute avg/max HR from waypoints, excluding zeros (zero is not a
+            # valid HR value — it means the sensor was disconnected). This overrides
+            # the device-computed session value which may include zero-readings.
+            session_avg_hr = session_record["session"]["avg_hr"]
+            session_max_hr = session_record["session"]["max_hr"]
+            if session_record.get("hr_waypoints"):
+                recomputed_avg, recomputed_max = activities_utils.calculate_avg_and_max(
+                    session_record["hr_waypoints"],
+                    "hr",
+                )
+                if recomputed_avg:
+                    session_avg_hr = round(recomputed_avg)
+                if recomputed_max:
+                    session_max_hr = round(recomputed_max)
+
             activity = activities_schema.Activity(
                 user_id=user_id,
                 name=activity_name,
@@ -122,8 +137,8 @@ def create_activity_objects(
                 average_power=round(avg_power) if avg_power else None,
                 max_power=round(max_power) if max_power else None,
                 normalized_power=round(np_power) if np_power else None,
-                average_hr=session_record["session"]["avg_hr"],
-                max_hr=session_record["session"]["max_hr"],
+                average_hr=session_avg_hr,
+                max_hr=session_max_hr,
                 average_cad=session_record["session"]["avg_cadence"],
                 max_cad=session_record["session"]["max_cadence"],
                 workout_feeling=session_record["session"]["workout_feeling"],

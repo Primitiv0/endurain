@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import activities.activity_file_import.utils_tcx as utils_tcx
 
@@ -173,3 +174,65 @@ class TestUtilsTcx:
 
         assert activity.start_time == "2026-03-28T15:19:19"
         assert activity.end_time == "2026-03-28T16:19:19"
+
+    def test_parse_tcx_file_recomputes_hr_from_waypoints(self):
+        """parse_tcx_file overwrites hr_avg/hr_max from hr_waypoints, dropping zeros."""
+        dt_start = datetime(2026, 6, 20, 8, 0, 0, tzinfo=UTC)
+        dt_end = datetime(2026, 6, 20, 9, 0, 0, tzinfo=UTC)
+
+        mock_tcx = SimpleNamespace(
+            activity_type="Running",
+            distance=5000.0,
+            start_time=dt_start,
+            end_time=dt_end,
+            ascent=None,
+            descent=None,
+            hr_avg=103.0,  # stale — includes sensor-off zeros
+            hr_max=160.0,
+            cadence_avg=None,
+            cadence_max=None,
+            calories=None,
+            laps=[],
+            trackpoints=[],
+        )
+        mock_tcx.trackpoints_to_dict = lambda: []
+
+        fake_waypoints = {
+            "lat_lon_waypoints": [],
+            "hr_waypoints": [
+                {"time": "2026-06-20T08:00:00", "hr": 0},
+                {"time": "2026-06-20T08:00:10", "hr": 150},
+                {"time": "2026-06-20T08:00:20", "hr": 160},
+            ],
+            "cad_waypoints": [],
+            "ele_waypoints": [],
+            "power_waypoints": [],
+            "vel_waypoints": [],
+            "pace_waypoints": [],
+        }
+
+        with (
+            patch("tcxreader.TCXReader") as mock_reader_class,
+            patch(
+                "activities.activity_file_import.utils_tcx._extract_waypoints",
+                return_value=fake_waypoints,
+            ),
+            patch(
+                "activities.activity_file_import.utils_tcx"
+                ".user_default_gear_utils.get_user_default_gear_by_activity_type",
+                return_value=None,
+            ),
+        ):
+            mock_reader_class.return_value.read.return_value = mock_tcx
+
+            result = utils_tcx.parse_tcx_file(
+                file="dummy.tcx",
+                user_id=1,
+                user_privacy_settings=_privacy_settings(),
+                db=MagicMock(),
+            )
+
+        activity = result["activity"]
+        # Zeros excluded: mean([150, 160]) = 155, max = 160.
+        assert activity.average_hr == 155
+        assert activity.max_hr == 160

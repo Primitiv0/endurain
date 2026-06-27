@@ -135,3 +135,27 @@ class TestUtilsFit:
         )
 
         assert activities[0]["activity"].tracker_model is None
+
+    def test_create_activity_objects_recomputes_hr_from_waypoints(self):
+        """HR avg/max are recomputed from hr_waypoints, dropping zeros."""
+        record = _session_record(None)
+        # Populate hr_waypoints: one sensor-off zero, then real readings.
+        record["hr_waypoints"] = [
+            {"time": "2026-06-20T08:20:03", "hr": 0},
+            {"time": "2026-06-20T08:20:10", "hr": 150},
+            {"time": "2026-06-20T08:20:20", "hr": 160},
+        ]
+        # Stale device values that included the zero reading.
+        record["session"]["avg_hr"] = 103
+        record["session"]["max_hr"] = 160
+
+        activities_list = utils_fit.create_activity_objects(
+            [record],
+            user_id=1,
+            user_privacy_settings=_privacy_settings(),
+        )
+
+        activity = activities_list[0]["activity"]
+        # Zeros excluded: mean([150, 160]) = 155, max = 160.
+        assert activity.average_hr == 155
+        assert activity.max_hr == 160

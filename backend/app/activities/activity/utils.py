@@ -1530,12 +1530,19 @@ def calculate_pace(
     return pace_seconds_per_meter
 
 
-def calculate_avg_and_max(data: list[dict], stream_type: str) -> tuple[float, float]:
+def calculate_avg_and_max(data: list[dict], stream_type: str, exclude_zeros: bool = False) -> tuple[float, float]:
     """Compute the mean and max of ``stream_type`` across waypoints.
+
+    Zero values are always excluded when ``stream_type`` is ``"hr"`` because
+    zero is not a physiologically valid heart rate — it is a sentinel emitted
+    by sensors when they lose signal. Callers may also set ``exclude_zeros``
+    explicitly for other stream types.
 
     Args:
         data: List of waypoint dicts.
         stream_type: Key to read from each waypoint.
+        exclude_zeros: When ``True``, values equal to zero are excluded.
+            Automatically ``True`` when ``stream_type`` is ``"hr"``.
 
     Returns:
         Tuple of (avg, max), or (0, 0) when no values are present.
@@ -1546,6 +1553,9 @@ def calculate_avg_and_max(data: list[dict], stream_type: str) -> tuple[float, fl
     except (ValueError, KeyError, TypeError):
         # If there are no valid values, return 0
         return 0, 0
+
+    if exclude_zeros or stream_type == "hr":
+        values = [v for v in values if v != 0]
 
     if not values:
         return 0, 0

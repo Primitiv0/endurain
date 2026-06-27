@@ -489,6 +489,35 @@ class TestCalculateAvgAndMax:
         result = calculate_avg_and_max([{"hr": "not_a_number"}], "hr")
         assert result == (0.0, 0.0)
 
+    def test_hr_zeros_are_excluded_from_avg_and_max(self):
+        from activities.activity.utils import calculate_avg_and_max
+
+        # Zero is a sensor-off sentinel; the filter must drop it so
+        # only the real readings [150, 160] contribute.
+        avg, max_val = calculate_avg_and_max(
+            [{"hr": 0}, {"hr": 0}, {"hr": 150}, {"hr": 160}],
+            "hr",
+        )
+        assert avg == 155.0
+        assert max_val == 160.0
+
+    def test_all_hr_zeros_returns_zero_pair(self):
+        from activities.activity.utils import calculate_avg_and_max
+
+        # After filtering all zeros the value list is empty → (0, 0).
+        assert calculate_avg_and_max([{"hr": 0}, {"hr": 0}], "hr") == (0.0, 0.0)
+
+    def test_exclude_zeros_flag_strips_zeros_for_non_hr_stream(self):
+        from activities.activity.utils import calculate_avg_and_max
+
+        avg, max_val = calculate_avg_and_max(
+            [{"power": 0}, {"power": 200}, {"power": 300}],
+            "power",
+            exclude_zeros=True,
+        )
+        assert avg == 250.0
+        assert max_val == 300.0
+
 
 class TestCalculateNP:
     def test_returns_zero_for_empty_data(self):

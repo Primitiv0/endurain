@@ -384,6 +384,20 @@ def parse_tcx_file(
         if power_wp:
             avg_power, max_power, norm_power = activity_file_import_utils.calculate_power_metrics(power_wp)
 
+        # Recompute avg/max HR from waypoints, excluding zeros (zero is not a
+        # valid HR value — it means the sensor was disconnected). This overrides
+        # the device-computed value from the TCX file which may include zeros.
+        hr_wp = waypoints.get("hr_waypoints", [])
+        if hr_wp:
+            recomputed_avg, recomputed_max = activities_utils.calculate_avg_and_max(
+                hr_wp,
+                "hr",
+            )
+            if recomputed_avg:
+                tcx_file.hr_avg = recomputed_avg
+            if recomputed_max:
+                tcx_file.hr_max = recomputed_max
+
         activity = _build_activity(
             tcx_file=tcx_file,
             user_id=user_id,
