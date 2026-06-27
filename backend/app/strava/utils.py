@@ -110,6 +110,27 @@ def is_strava_rate_limit_error(err: Exception) -> bool:
     return "rate limit" in err_str or "429" in err_str
 
 
+def is_strava_not_found_error(err: Exception) -> bool:
+    """
+    Check if an exception is a Strava 404 Not Found error.
+
+    This occurs for activities that have no streams, such as
+    those manually added via Apple Health and imported into Strava.
+
+    Args:
+        err: The exception to check.
+
+    Returns:
+        True if the error is a 404 not-found response.
+    """
+    if isinstance(err, StravaFault):
+        response = getattr(err, "response", None)
+        if response is not None and getattr(response, "status_code", 0) == 404:
+            return True
+    err_str = str(err).lower()
+    return "not found" in err_str or "404" in err_str
+
+
 def _noop_rate_limiter(response_headers: dict, method: str) -> None:
     """
     No-op rate limiter replacement for stravalib.

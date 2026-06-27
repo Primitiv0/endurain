@@ -500,6 +500,29 @@ def fetch_and_process_activity_streams(
                 status_code=(status.HTTP_429_TOO_MANY_REQUESTS),
                 detail=("Strava API rate limit exceeded. Please try again later."),
             ) from err
+        # Check if streams simply don't exist for this activity (e.g., manually
+        # added activities from Apple Health have no GPS/sensor streams).
+        # In that case return empty data so the activity can still be imported.
+        if strava_utils.is_strava_not_found_error(err):
+            core_logger.print_to_log(
+                f"User {user_id}: No streams found for Strava activity {strava_activity_id} (activity has no sensor data). Continuing without streams.",
+                "info",
+            )
+            return (
+                [],
+                False,  # lat_lon_waypoints, is_lat_lon_set
+                [],
+                False,  # ele_waypoints, is_elevation_set
+                [],
+                False,  # hr_waypoints, is_heart_rate_set
+                [],
+                False,  # cad_waypoints, is_cadence_set
+                [],
+                False,  # power_waypoints, is_power_set
+                [],
+                False,  # vel_waypoints, is_velocity_set
+                [],  # pace_waypoints
+            )
         # Log an error event if an exception occurred
         core_logger.print_to_log(
             f"User {user_id}: Error fetching Strava activity streams {strava_activity_id}: {err!s}",
