@@ -18,7 +18,7 @@ router = APIRouter()
     response_model=health_targets_schema.HealthTargetsRead | None,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_targets_all(
+def read_health_targets_all(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
@@ -61,7 +61,7 @@ async def read_health_targets_all(
     response_model=health_targets_schema.HealthTargetsRead,
     status_code=status.HTTP_200_OK,
 )
-async def update_health_targets(
+def update_health_targets(
     health_targets: health_targets_schema.HealthTargetsUpdate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[

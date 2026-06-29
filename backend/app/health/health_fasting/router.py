@@ -28,7 +28,7 @@ router = APIRouter()
     response_model=health_fasting_schema.HealthFastingListResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_fasting_all_pagination(
+def read_health_fasting_all_pagination(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
@@ -100,7 +100,7 @@ async def read_health_fasting_all_pagination(
     response_model=health_fasting_schema.HealthFastingRead | None,
     status_code=status.HTTP_200_OK,
 )
-async def read_active_fasting(
+def read_active_fasting(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
@@ -130,7 +130,7 @@ async def read_active_fasting(
     response_model=health_fasting_schema.HealthFastingStatsResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_fasting_stats(
+def read_fasting_stats(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
@@ -178,7 +178,7 @@ async def read_fasting_stats(
     response_model=health_fasting_schema.HealthFastingRead,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_fasting_by_id(
+def read_health_fasting_by_id(
     health_fasting_id: int,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
@@ -221,7 +221,7 @@ async def read_health_fasting_by_id(
     response_model=health_fasting_schema.HealthFastingRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_health_fasting(
+def create_health_fasting(
     health_fasting: health_fasting_schema.HealthFastingCreate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -265,7 +265,7 @@ async def create_health_fasting(
     response_model=health_fasting_schema.HealthFastingRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_health_fasting(
+def edit_health_fasting(
     health_fasting: health_fasting_schema.HealthFastingUpdate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -297,7 +297,7 @@ async def edit_health_fasting(
     response_model=health_fasting_schema.HealthFastingRead,
     status_code=status.HTTP_200_OK,
 )
-async def complete_health_fasting(
+def complete_health_fasting(
     health_fasting_id: int,
     complete_data: health_fasting_schema.HealthFastingComplete,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
@@ -331,7 +331,7 @@ async def complete_health_fasting(
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_health_fasting(
+def delete_health_fasting(
     health_fasting_id: int,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[

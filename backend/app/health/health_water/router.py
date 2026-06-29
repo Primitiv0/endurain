@@ -34,7 +34,7 @@ router = APIRouter()
     response_model=(health_water_schema.HealthWaterListResponse),
     status_code=status.HTTP_200_OK,
 )
-async def read_health_water_all_pagination(
+def read_health_water_all_pagination(
     _check_scopes: Annotated[
         Callable,
         Security(
@@ -112,7 +112,7 @@ async def read_health_water_all_pagination(
     response_model=health_water_schema.HealthWaterRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_health_water(
+def create_health_water(
     health_water: health_water_schema.HealthWaterCreate,
     _check_scopes: Annotated[
         Callable,
@@ -177,7 +177,7 @@ async def create_health_water(
     response_model=health_water_schema.HealthWaterRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_health_water(
+def edit_health_water(
     health_water: health_water_schema.HealthWaterUpdate,
     _check_scopes: Annotated[
         Callable,
@@ -218,7 +218,7 @@ async def edit_health_water(
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_health_water(
+def delete_health_water(
     health_water_id: int,
     _check_scopes: Annotated[
         Callable,

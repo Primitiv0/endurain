@@ -20,7 +20,7 @@ router = APIRouter()
     response_model=health_weight_schema.HealthWeightListResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_weight_all_pagination(
+def read_health_weight_all_pagination(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
@@ -95,7 +95,7 @@ async def read_health_weight_all_pagination(
     response_model=health_weight_schema.HealthWeightRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_health_weight(
+def create_health_weight(
     health_weight: health_weight_schema.HealthWeightCreate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -154,7 +154,7 @@ async def create_health_weight(
     response_model=health_weight_schema.HealthWeightRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_health_weight(
+def edit_health_weight(
     health_weight: health_weight_schema.HealthWeightUpdate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -193,7 +193,7 @@ async def edit_health_weight(
 
 
 @router.delete("/{health_weight_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
-async def delete_health_weight(
+def delete_health_weight(
     health_weight_id: int,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[

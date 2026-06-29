@@ -20,7 +20,7 @@ router = APIRouter()
     response_model=health_steps_schema.HealthStepsListResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_steps_all_pagination(
+def read_health_steps_all_pagination(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
@@ -94,7 +94,7 @@ async def read_health_steps_all_pagination(
     response_model=health_steps_schema.HealthStepsRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_health_steps(
+def create_health_steps(
     health_steps: health_steps_schema.HealthStepsCreate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -154,7 +154,7 @@ async def create_health_steps(
     response_model=health_steps_schema.HealthStepsRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_health_steps(
+def edit_health_steps(
     health_steps: health_steps_schema.HealthStepsUpdate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -194,7 +194,7 @@ async def edit_health_steps(
 
 
 @router.delete("/{health_steps_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
-async def delete_health_steps(
+def delete_health_steps(
     health_steps_id: int,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[

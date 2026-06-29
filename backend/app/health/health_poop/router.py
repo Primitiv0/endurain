@@ -34,7 +34,7 @@ router = APIRouter()
     response_model=(health_poop_schema.HealthPoopListResponse),
     status_code=status.HTTP_200_OK,
 )
-async def read_health_poop_all_pagination(
+def read_health_poop_all_pagination(
     _check_scopes: Annotated[
         Callable,
         Security(
@@ -112,7 +112,7 @@ async def read_health_poop_all_pagination(
     response_model=health_poop_schema.HealthPoopRead,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_poop_by_id(
+def read_health_poop_by_id(
     health_poop_id: int,
     _check_scopes: Annotated[
         Callable,
@@ -161,7 +161,7 @@ async def read_health_poop_by_id(
     response_model=health_poop_schema.HealthPoopRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_health_poop(
+def create_health_poop(
     health_poop: health_poop_schema.HealthPoopCreate,
     _check_scopes: Annotated[
         Callable,
@@ -202,7 +202,7 @@ async def create_health_poop(
     response_model=health_poop_schema.HealthPoopRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_health_poop(
+def edit_health_poop(
     health_poop: health_poop_schema.HealthPoopUpdate,
     _check_scopes: Annotated[
         Callable,
@@ -243,7 +243,7 @@ async def edit_health_poop(
     response_model=None,
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def delete_health_poop(
+def delete_health_poop(
     health_poop_id: int,
     _check_scopes: Annotated[
         Callable,

@@ -21,7 +21,7 @@ router = APIRouter()
     response_model=health_sleep_schema.HealthSleepListResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_sleep_all_pagination(
+def read_health_sleep_all_pagination(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
@@ -95,7 +95,7 @@ async def read_health_sleep_all_pagination(
     response_model=health_sleep_schema.HealthSleepRead,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_health_sleep(
+def create_health_sleep(
     health_sleep: health_sleep_schema.HealthSleepCreate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -155,7 +155,7 @@ async def create_health_sleep(
     response_model=health_sleep_schema.HealthSleepRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_health_sleep(
+def edit_health_sleep(
     health_sleep: health_sleep_schema.HealthSleepUpdate,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[
@@ -198,7 +198,7 @@ async def edit_health_sleep(
 
 
 @router.delete("/{health_sleep_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
-async def delete_health_sleep(
+def delete_health_sleep(
     health_sleep_id: int,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:write"])],
     token_user_id: Annotated[

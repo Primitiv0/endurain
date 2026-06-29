@@ -31,7 +31,7 @@ router = APIRouter()
     response_model=health_schema.HealthDashboardResponse,
     status_code=status.HTTP_200_OK,
 )
-async def read_health_daily_stats(
+def read_health_daily_stats(
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["health:read"])],
     token_user_id: Annotated[
         int,
