@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from itertools import pairwise
 
 from sqlalchemy.orm import Session
 
@@ -16,42 +17,24 @@ def calculate_streaks(user_id: int, db: Session) -> tuple[int, int]:
     Returns:
         Tuple of (current_streak, longest_streak).
     """
-    completed_fasts = health_fasting_crud.get_completed_fasting_ordered_by_date_and_user_id(user_id, db)
-
-    if not completed_fasts:
-        return 0, 0
-
-    # Get unique dates (extract date part, skip records with no start time)
-    dates = sorted({fast.fast_start_time.date() for fast in completed_fasts if fast.fast_start_time is not None})
+    # Distinct completed-fast dates, sorted ascending, straight from SQL.
+    dates = health_fasting_crud.get_completed_fasting_dates_by_user_id(user_id, db)
 
     if not dates:
         return 0, 0
 
+    one_day = timedelta(days=1)
+
+    # Single forward pass: track the longest run of consecutive days while
+    # leaving `run` holding the streak length ending on the most recent date.
     longest_streak = 1
-    current_streak = 1
-    temp_streak = 1
+    run = 1
+    for previous, current in pairwise(dates):
+        run = run + 1 if current - previous == one_day else 1
+        longest_streak = max(longest_streak, run)
 
-    for i in range(1, len(dates)):
-        if dates[i] - dates[i - 1] == timedelta(days=1):
-            temp_streak += 1
-            longest_streak = max(longest_streak, temp_streak)
-        else:
-            temp_streak = 1
-
-    # Check if current streak is still active (last fast was today or yesterday)
-
+    # The current streak only counts if the latest fast was today or yesterday.
     today = date.today()
-    last_fast_date = dates[-1]
-
-    if last_fast_date == today or last_fast_date == today - timedelta(days=1):
-        # Count backwards from the end
-        current_streak = 1
-        for i in range(len(dates) - 1, 0, -1):
-            if dates[i] - dates[i - 1] == timedelta(days=1):
-                current_streak += 1
-            else:
-                break
-    else:
-        current_streak = 0
+    current_streak = run if dates[-1] in (today, today - one_day) else 0
 
     return current_streak, longest_streak

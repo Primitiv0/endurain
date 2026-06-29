@@ -5,6 +5,7 @@ This module provides database operations for creating, reading, updating,
 and deleting fasting session records.
 """
 
+from datetime import date
 from decimal import Decimal
 from typing import overload
 
@@ -304,32 +305,34 @@ def get_avg_fasting_duration(user_id: int, db: Session) -> int | None:
 
 
 @core_decorators.handle_db_errors
-def get_completed_fasting_ordered_by_date_and_user_id(
-    user_id: int, db: Session
-) -> list[health_fasting_schema.HealthFastingRead]:
+def get_completed_fasting_dates_by_user_id(user_id: int, db: Session) -> list[date]:
     """
-    Get all completed fasting sessions ordered by fast_start_time ascending.
+    Get the distinct dates a user completed a fast, sorted ascending.
+
+    Selects only the date component directly from the database so the
+    streak calculation does not have to materialize full records.
 
     Args:
-        user_id: User ID to fetch records for.
+        user_id: User ID to fetch completed fasting dates for.
         db: Database session.
 
     Returns:
-        List of completed HealthFastingRead schemas`  ordered by fast_start_time.
+        Sorted list of distinct dates with a completed fast.
 
     Raises:
         HTTPException: If database error occurs.
     """
+    fast_date = func.date(health_fasting_models.HealthFasting.fast_start_time)
     stmt = (
-        select(health_fasting_models.HealthFasting)
+        select(fast_date)
         .where(
             health_fasting_models.HealthFasting.user_id == user_id,
             health_fasting_models.HealthFasting.status == "completed",
         )
-        .order_by(health_fasting_models.HealthFasting.fast_start_time)
+        .distinct()
+        .order_by(fast_date)
     )
-    db_health_fastings = db.execute(stmt).scalars().all()
-    return _transform_health_fasting(list(db_health_fastings))
+    return list(db.execute(stmt).scalars().all())
 
 
 @core_decorators.handle_db_errors

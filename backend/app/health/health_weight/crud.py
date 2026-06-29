@@ -1,7 +1,7 @@
 from typing import cast, overload
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -377,6 +377,43 @@ def edit_health_weight(
     db.refresh(db_health_weight)
 
     return _transform_health_weight(db_health_weight)
+
+
+@core_decorators.handle_db_errors
+def recalculate_bmi_for_user(user_id: int, height_cm: float | None, db: Session) -> None:
+    """
+    Recalculate BMI for all of a user's weight entries in one statement.
+
+    Issues a single bulk UPDATE rather than loading and saving each
+    record individually, keeping the work to a constant number of
+    database round trips regardless of how many entries exist.
+
+    Args:
+        user_id: User ID whose weight entries should be updated.
+        height_cm: User height in centimeters, or None if unknown.
+        db: Database session.
+
+    Returns:
+        None
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    if height_cm and height_cm > 0:
+        # bmi = weight (kg) / (height (m))^2
+        new_bmi = health_weight_models.HealthWeight.weight / (height_cm / 100.0) ** 2
+    else:
+        # Without a usable height, BMI cannot be derived, so clear it.
+        new_bmi = None
+
+    stmt = (
+        update(health_weight_models.HealthWeight)
+        .where(health_weight_models.HealthWeight.user_id == user_id)
+        .values(bmi=new_bmi)
+    )
+
+    db.execute(stmt)
+    db.commit()
 
 
 @core_decorators.handle_db_errors

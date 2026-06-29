@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -202,9 +202,14 @@ class TestDeleteHealthFasting:
         assert e.value.status_code == 404
 
 
-class TestGetCompletedFastingOrdered:
+class TestGetCompletedFastingDates:
     def test_success(self, mock_db):
-        mock_fasting = _make_fasting_mock()
-        mock_db.execute.return_value.scalars.return_value.all.return_value = [mock_fasting]
-        result = health_fasting_crud.get_completed_fasting_ordered_by_date_and_user_id(1, mock_db)
-        assert len(result) == 1
+        dates = [date(2024, 1, 15), date(2024, 1, 16)]
+        mock_db.execute.return_value.scalars.return_value.all.return_value = dates
+        result = health_fasting_crud.get_completed_fasting_dates_by_user_id(1, mock_db)
+        assert result == dates
+
+    def test_empty(self, mock_db):
+        mock_db.execute.return_value.scalars.return_value.all.return_value = []
+        result = health_fasting_crud.get_completed_fasting_dates_by_user_id(1, mock_db)
+        assert result == []

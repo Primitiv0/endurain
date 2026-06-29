@@ -719,3 +719,46 @@ class TestDeleteHealthWeight:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
         assert exc_info.value.detail == "Database error occurred"
         mock_db.rollback.assert_called_once()
+
+
+class TestRecalculateBmiForUser:
+    """
+    Test suite for recalculate_bmi_for_user function.
+    """
+
+    def test_recalculate_bmi_for_user_with_height(self, mock_db):
+        """
+        Test that a usable height issues a single bulk update and commit.
+        """
+        # Act
+        health_weight_crud.recalculate_bmi_for_user(1, 175.0, mock_db)
+
+        # Assert
+        mock_db.execute.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_recalculate_bmi_for_user_without_height(self, mock_db):
+        """
+        Test that a missing height still issues a single bulk update.
+        """
+        # Act
+        health_weight_crud.recalculate_bmi_for_user(1, None, mock_db)
+
+        # Assert
+        mock_db.execute.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_recalculate_bmi_for_user_exception(self, mock_db):
+        """
+        Test exception handling in recalculate_bmi_for_user.
+        """
+        # Arrange
+        mock_db.execute.side_effect = SQLAlchemyError("Database error")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            health_weight_crud.recalculate_bmi_for_user(1, 175.0, mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert exc_info.value.detail == "Database error occurred"
+        mock_db.rollback.assert_called_once()
