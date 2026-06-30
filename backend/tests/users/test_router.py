@@ -2,8 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
-
 import users.users.router as users_router
 import users.users.schema as users_schema
 
@@ -13,8 +11,7 @@ class TestEditUserPassword:
     Test suite for admin password reset route.
     """
 
-    @pytest.mark.asyncio
-    async def test_revokes_target_sessions_after_password_reset(self):
+    def test_revokes_target_sessions_after_password_reset(self):
         """
         Test admin password resets delete existing target sessions.
         """
@@ -23,7 +20,7 @@ class TestEditUserPassword:
         identity_service = MagicMock()
         user_attributes = users_schema.UsersAdminEditPassword(password=new_password)
 
-        result = await users_router.edit_user_password(
+        result = users_router.edit_user_password(
             user_id=user_id,
             _validate_id=MagicMock(),
             user_attributes=user_attributes,

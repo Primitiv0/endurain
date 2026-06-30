@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Security, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 import auth.dependencies as auth_dependencies
@@ -27,7 +28,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersListResponse,
 )
-async def read_users_all_pagination(
+def read_users_all_pagination(
     _validate_pagination_values_on_query: Annotated[
         Callable, Depends(core_dependencies.validate_pagination_values_on_query)
     ],
@@ -128,7 +129,7 @@ async def read_users_all_pagination(
     status_code=status.HTTP_200_OK,
     response_model=list[users_schema.UsersRead] | None,
 )
-async def read_users_contain_username(
+def read_users_contain_username(
     username: str,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
@@ -155,7 +156,7 @@ async def read_users_contain_username(
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersRead | None,
 )
-async def read_users_username(
+def read_users_username(
     username: str,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
@@ -182,7 +183,7 @@ async def read_users_username(
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersRead | None,
 )
-async def read_users_email(
+def read_users_email(
     email: str,
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
     db: Annotated[
@@ -209,7 +210,7 @@ async def read_users_email(
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersRead | None,
 )
-async def read_users_id(
+def read_users_id(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
@@ -234,7 +235,7 @@ async def read_users_id(
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=users_schema.UsersRead)
-async def create_user(
+def create_user(
     user: users_schema.UsersCreate,
     _check_scope: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:write"])],
     identity_service: Annotated[
@@ -296,7 +297,8 @@ async def upload_user_image(
         Path to uploaded image.
     """
     await users_utils.save_user_image_file(user_id, file, db)
-    user: users_schema.UsersRead | None = users_crud.get_user_by_id(user_id, db)
+    # Fetch the persisted user off the event loop (blocking sync DB read).
+    user: users_schema.UsersRead | None = await run_in_threadpool(users_crud.get_user_by_id, user_id, db)
     return user.photo_path if user and user.photo_path else None
 
 
@@ -330,8 +332,12 @@ async def edit_user(
     """
     db_user: users_schema.UsersRead = await users_crud.edit_user(user_id, user_attributtes, db)
 
-    # Enrich with IDP count before serializing
-    idp_counts: dict[int, int] = identity_service.get_identity_link_counts_for_users([db_user.id])
+    # Enrich with IDP count before serializing. The lookup is a blocking
+    # sync DB call, so offload it to a worker thread to keep the event
+    # loop responsive.
+    idp_counts: dict[int, int] = await run_in_threadpool(
+        identity_service.get_identity_link_counts_for_users, [db_user.id]
+    )
     idp_count: int = idp_counts.get(db_user.id, 0)
     db_user.external_auth_count = idp_count
 
@@ -365,7 +371,8 @@ async def approve_user(
     Returns:
         Success message.
     """
-    users_crud.approve_user(user_id, db)
+    # Approve the user off the event loop (blocking sync DB write).
+    await run_in_threadpool(users_crud.approve_user, user_id, db)
 
     # Send approval email
     await sign_up_tokens_utils.send_sign_up_approval_email(user_id, email_service, db)
@@ -375,7 +382,7 @@ async def approve_user(
 
 
 @router.put("/{user_id}/password", status_code=status.HTTP_200_OK, response_model=dict[str, str])
-async def edit_user_password(
+def edit_user_password(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     user_attributes: users_schema.UsersAdminEditPassword,
@@ -462,7 +469,7 @@ async def delete_user(
     status_code=status.HTTP_200_OK,
     response_model=list[auth_identity_links_schema.UsersIdentityProviderResponse],
 )
-async def get_user_identity_providers(
+def get_user_identity_providers(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["users:read"])],
@@ -491,7 +498,7 @@ async def get_user_identity_providers(
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
 )
-async def delete_user_identity_provider(
+def delete_user_identity_provider(
     user_id: int,
     idp_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],

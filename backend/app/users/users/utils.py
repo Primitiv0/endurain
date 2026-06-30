@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     import auth.identity_service as auth_identity_service
 
 from fastapi import HTTPException, UploadFile, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 import core.config as core_config
@@ -146,10 +147,10 @@ async def save_user_image_file(user_id: int, file: UploadFile, db: Session) -> s
         HTTPException: 400 if filename or extension is invalid,
             413 if too large, 500 if upload fails.
     """
-    try:
-        get_user_by_id_or_404(user_id, db)
-    except HTTPException as err:
-        raise err
+    # Validate the user exists off the event loop (blocking sync DB read).
+    # A missing user raises HTTPException 404 inside the thread, which
+    # propagates through the await unchanged.
+    await run_in_threadpool(get_user_by_id_or_404, user_id, db)
 
     if not file.filename:
         raise HTTPException(

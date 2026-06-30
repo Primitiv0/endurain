@@ -20,7 +20,7 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     response_model=users_schema.UsersRead | None,
 )
-async def read_users_id(
+def read_users_id(
     user_id: int,
     _validate_id: Annotated[Callable, Depends(users_dependencies.validate_user_id)],
     db: Annotated[

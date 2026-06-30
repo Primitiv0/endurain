@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import auth.identity_service as auth_identity_service
 
 from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -84,6 +85,89 @@ def _get_user_model_by_id_or_404(user_id: int, db: Session) -> users_models.User
         )
 
     return db_userss
+
+
+def _persist_user_bmi_changes(
+    db_users: users_models.Users,
+    height_before: int | None,
+    recalculate_bmi_on_height_change: bool,
+    db: Session,
+) -> users_schema.UsersRead:
+    """
+    Commit pending user edits and serialize the result.
+
+    Bundles the blocking portion of an edit into a single unit so
+    callers can offload it with ``run_in_threadpool`` and keep the API
+    event loop responsive. The commit/refresh, the bulk BMI
+    recalculation, and the ``mfa_enabled`` lazy-load triggered while
+    serializing are all synchronous SQLAlchemy calls.
+
+    Args:
+        db_users: Mapped ``Users`` row carrying pending in-memory
+            changes that have not yet been committed.
+        height_before: User height prior to the edit, used to detect a
+            change that requires recalculating BMI.
+        recalculate_bmi_on_height_change: When ``True`` and the height
+            actually changed, recompute BMI for every weight entry.
+        db: SQLAlchemy database session.
+
+    Returns:
+        The persisted user serialized as ``users_schema.UsersRead``.
+    """
+    db.commit()
+    db.refresh(db_users)
+
+    if recalculate_bmi_on_height_change and height_before != db_users.height:
+        # Update the user's health data
+        health_weight_utils.calculate_bmi_all_user_entries(db_users.id, db)
+
+    return _transform_users(db_users)
+
+
+def _apply_user_photo_update(
+    user_id: int,
+    photo_path: str | None,
+    db: Session,
+) -> None:
+    """
+    Persist a user's photo path change.
+
+    Bundles the blocking DB work (lookup, update, commit, refresh)
+    so callers can offload it with ``run_in_threadpool`` and keep
+    the API event loop responsive.
+
+    Args:
+        user_id: ID of the user whose photo path is updated.
+        photo_path: New photo path, or ``None`` to clear it.
+        db: SQLAlchemy database session.
+
+    Raises:
+        HTTPException: 404 if the user does not exist.
+    """
+    db_users = _get_user_model_by_id_or_404(user_id, db)
+    db_users.photo_path = photo_path
+    db.commit()
+    db.refresh(db_users)
+
+
+def _delete_user_row(user_id: int, db: Session) -> None:
+    """
+    Delete a user row from the database.
+
+    Bundles the blocking DB work (lookup, delete, commit) so callers
+    can offload it with ``run_in_threadpool`` and keep the API event
+    loop responsive.
+
+    Args:
+        user_id: ID of the user to delete.
+        db: SQLAlchemy database session.
+
+    Raises:
+        HTTPException: 404 if the user does not exist.
+    """
+    db_users = _get_user_model_by_id_or_404(user_id, db)
+    db.delete(db_users)
+    db.commit()
 
 
 # Public CRUD functions
@@ -507,8 +591,8 @@ async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> 
         HTTPException: 500 if database error occurs.
     """
     try:
-        # Get the user from the database
-        db_users = _get_user_model_by_id_or_404(user_id, db)
+        # Fetch the user off the event loop (blocking DB read).
+        db_users = await run_in_threadpool(_get_user_model_by_id_or_404, user_id, db)
 
         height_before = db_users.height
 
@@ -532,19 +616,17 @@ async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> 
                 continue
             setattr(db_users, key, value)
 
-        # Commit the transaction
-        db.commit()
-        db.refresh(db_users)
-
-        if height_before != db_users.height:
-            # Update the user's health data
-            health_weight_utils.calculate_bmi_all_user_entries(db_users.id, db)
+        # Persist the changes off the event loop. The commit/refresh, the
+        # bulk BMI recalculation, and the ``mfa_enabled`` lazy-load triggered
+        # while serializing are blocking SQLAlchemy calls, so run them in a
+        # worker thread to keep the API event loop responsive.
+        updated_user = await run_in_threadpool(_persist_user_bmi_changes, db_users, height_before, True, db)
 
         if db_users.photo_path is None:
             # Delete the user photo in the filesystem
             await users_utils.delete_user_photo_filesystem(db_users.id)
 
-        return _transform_users(db_users)
+        return updated_user
     except HTTPException:
         raise
     except IntegrityError as integrity_error:
@@ -611,7 +693,8 @@ async def edit_profile_user(
             email/username uniqueness conflict, 500 on DB errors.
     """
     try:
-        db_users = _get_user_model_by_id_or_404(user_id, db)
+        # Fetch the user off the event loop (blocking DB read).
+        db_users = await run_in_threadpool(_get_user_model_by_id_or_404, user_id, db)
 
         height_before = db_users.height
         previous_photo_path = db_users.photo_path
@@ -667,13 +750,17 @@ async def edit_profile_user(
         for key, value in updates.items():
             setattr(db_users, key, value)
 
-        db.commit()
-        db.refresh(db_users)
-
-        if "height" in updates and height_before != db_users.height:
-            health_weight_utils.calculate_bmi_all_user_entries(db_users.id, db)
-
-        return _transform_users(db_users)
+        # Persist the changes off the event loop. The commit/refresh, the
+        # bulk BMI recalculation, and the ``mfa_enabled`` lazy-load triggered
+        # while serializing are blocking SQLAlchemy calls, so run them in a
+        # worker thread to keep the API event loop responsive.
+        return await run_in_threadpool(
+            _persist_user_bmi_changes,
+            db_users,
+            height_before,
+            "height" in updates,
+            db,
+        )
     except HTTPException:
         raise
     except IntegrityError as integrity_error:
@@ -769,24 +856,18 @@ async def update_user_photo(user_id: int, db: Session, photo_path: str | None = 
         HTTPException: 404 if user not found.
         HTTPException: 500 if database error occurs.
     """
-    # Get the user from the database
-    db_users = _get_user_model_by_id_or_404(user_id, db)
-
-    # Update the user
-    db_users.photo_path = photo_path
-
-    # Commit the transaction
-    db.commit()
-    db.refresh(db_users)
+    # Persist the photo path change off the event loop (blocking sync
+    # DB calls), keeping the API event loop responsive.
+    await run_in_threadpool(_apply_user_photo_update, user_id, photo_path, db)
 
     if photo_path:
         # Return the photo path
         return photo_path
-    else:
-        # Delete the user photo in the filesystem
-        await users_utils.delete_user_photo_filesystem(user_id)
 
-        return None
+    # Delete the user photo in the filesystem
+    await users_utils.delete_user_photo_filesystem(user_id)
+
+    return None
 
 
 @core_decorators.handle_db_errors
@@ -805,14 +886,9 @@ async def delete_user(user_id: int, db: Session) -> None:
         HTTPException: 404 if user not found.
         HTTPException: 500 if database error occurs.
     """
-    # Get the user from the database
-    db_users = _get_user_model_by_id_or_404(user_id, db)
-
-    # Delete the user
-    db.delete(db_users)
-
-    # Commit the transaction
-    db.commit()
+    # Delete the user row off the event loop (blocking sync DB calls),
+    # keeping the API event loop responsive.
+    await run_in_threadpool(_delete_user_row, user_id, db)
 
     # Delete the user photo in the filesystem
     await users_utils.delete_user_photo_filesystem(user_id)
