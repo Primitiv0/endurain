@@ -45,8 +45,6 @@ import health.health_targets.crud as health_targets_crud
 import health.health_targets.schema as health_targets_schema
 import health.health_weight.crud as health_weight_crud
 import health.health_weight.schema as health_weight_schema
-import notifications.crud as notifications_crud
-import notifications.schema as notifications_schema
 import users.users.crud as users_crud
 import users.users.schema as users_schema
 import users.users_default_gear.crud as user_default_gear_crud
@@ -263,13 +261,6 @@ class ImportService:
                     start_time,
                     timeout_seconds,
                 )
-
-                # Load and import notifications
-                profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
-                notifications_data = self._load_single_json(zipf, "data/notifications.json")
-
-                await self.collect_and_import_notifications_data(notifications_data)
-                del notifications_data
 
                 # Load and import health data
                 profile_utils.check_timeout(timeout_seconds, start_time, ImportTimeoutError, "Import")
@@ -658,7 +649,7 @@ class ImportService:
                 lap_data["activity_id"] = new_activity.id
                 laps.append(lap_data)
 
-            if laps:
+            if laps and new_activity.id is not None:
                 activity_laps_crud.create_activity_laps(laps, new_activity.id, self.db)
                 self.counts["activity_laps"] += len(laps)
 
@@ -676,7 +667,7 @@ class ImportService:
                 set_activity = activity_sets_schema.ActivitySetsCreate(**activity_set)
                 sets.append(set_activity)
 
-            if sets:
+            if sets and new_activity.id is not None:
                 activity_sets_crud.create_activity_sets(list(sets), new_activity.id, self.db)
                 self.counts["activity_sets"] += len(sets)
 
@@ -708,7 +699,7 @@ class ImportService:
                 step = activity_workout_steps_schema.ActivityWorkoutSteps(**step_data)
                 steps.append(step)
 
-            if steps:
+            if steps and new_activity.id is not None:
                 activity_workout_steps_crud.create_activity_workout_steps(steps, new_activity.id, self.db)
                 self.counts["activity_workout_steps"] += len(steps)
 
@@ -753,7 +744,7 @@ class ImportService:
                 media_item = activity_media_schema.ActivityMedia(**media_data)
                 media.append(media_item)
 
-            if media:
+            if media and new_activity.id is not None:
                 activity_media_crud.create_activity_medias(media, new_activity.id, self.db)
                 self.counts["activity_media"] += len(media)
 
@@ -959,21 +950,6 @@ class ImportService:
                 core_logger.print_to_log(f"Error loading {filename}: {err}", "warning")
 
         return all_components
-
-    async def collect_and_import_notifications_data(self, notifications_data: list[Any]) -> None:
-        if not notifications_data:
-            core_logger.print_to_log("No notifications data to import", "info")
-            return
-
-        for notification_data in notifications_data:
-            notification_data["user_id"] = self.user_id
-            notification_data.pop("id", None)
-
-            notification = notifications_schema.NotificationCreate(**notification_data)
-            notifications_crud.create_notification(notification, self.db)
-            self.counts["notifications"] += 1
-
-        core_logger.print_to_log(f"Imported {self.counts['notifications']} notifications", "info")
 
     async def collect_and_import_health_weight(
         self, health_weight_data: list[Any], health_targets_data: list[Any]

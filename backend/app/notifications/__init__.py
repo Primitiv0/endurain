@@ -6,8 +6,8 @@ notifications including activity alerts, follower requests, and admin approval
 notifications.
 
 Exports:
-    - CRUD: get_user_notification_by_id, get_user_notifications,
-        get_user_notifications_count, get_user_notifications_with_pagination,
+    - CRUD: get_user_notification_by_id, get_user_notifications_count,
+        get_user_notifications_with_pagination,
         create_notification, mark_notification_as_read
     - Schemas: NotificationBase, NotificationCreate, NotificationRead
     - Constants: NotificationType
@@ -22,7 +22,6 @@ from .constants import NotificationType
 from .crud import (
     create_notification,
     get_user_notification_by_id,
-    get_user_notifications,
     get_user_notifications_count,
     get_user_notifications_with_pagination,
     mark_notification_as_read,
@@ -52,7 +51,6 @@ __all__ = [
     "create_new_follower_request_notification",
     "create_notification",
     "get_user_notification_by_id",
-    "get_user_notifications",
     "get_user_notifications_count",
     "get_user_notifications_with_pagination",
     "mark_notification_as_read",

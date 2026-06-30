@@ -34,7 +34,6 @@ import gears.gear.crud as gear_crud
 import gears.gear_components.crud as gear_components_crud
 import health.health_targets.crud as health_targets_crud
 import health.health_weight.crud as health_weight_crud
-import notifications.crud as notifications_crud
 import users.users_default_gear.crud as user_default_gear_crud
 import users.users_default_gear.schema as user_default_gear_schema
 import users.users_goals.crud as user_goals_crud
@@ -663,27 +662,6 @@ class ExportService:
             core_logger.print_to_log(f"Database error collecting health data: {err}", "error", exc=err)
             raise DatabaseConnectionError(f"Failed to collect health data: {err}") from err
 
-    def collect_notifications_data(self, zipf: zipfile.ZipFile) -> None:
-        try:
-            try:
-                notifications = notifications_crud.get_user_notifications(self.user_id, self.db)
-                if notifications:
-                    notifications_dicts = [users_profile_utils.sqlalchemy_obj_to_dict(n) for n in notifications]
-                    users_profile_utils.write_json_to_zip(
-                        zipf,
-                        "data/notifications.json",
-                        notifications_dicts,
-                        self.counts,
-                    )
-                else:
-                    users_profile_utils.write_json_to_zip(zipf, "data/notifications.json", [], self.counts)
-            except Exception as err:
-                core_logger.print_to_log(f"Failed to collect user notifications: {err}", "error", exc=err)
-                raise DataCollectionError(f"Failed to collect user notifications: {err}") from err
-        except SQLAlchemyError as err:
-            core_logger.print_to_log(f"Database error collecting user notifications: {err}", "error", exc=err)
-            raise DatabaseConnectionError(f"Failed to collect user notifications: {err}") from err
-
     def collect_user_settings_data(self, zipf: zipfile.ZipFile) -> None:
         """
         Collect and write user settings to ZIP.
@@ -1041,11 +1019,6 @@ class ExportService:
                         users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
                         core_logger.print_to_log("Collecting and writing health data...", "info")
                         self.collect_health_weight(zipf)
-
-                        # Collect and write notifications progressively
-                        users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")
-                        core_logger.print_to_log("Collecting and writing notifications data...", "info")
-                        self.collect_notifications_data(zipf)
 
                         # Collect and write settings data progressively
                         users_profile_utils.check_timeout(timeout_seconds, start_time, ExportTimeoutError, "Export")

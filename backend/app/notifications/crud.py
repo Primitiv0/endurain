@@ -74,29 +74,6 @@ def get_user_notification_by_id(
 
 
 @core_decorators.handle_db_errors
-def get_user_notifications(
-    user_id: int,
-    db: Session,
-) -> list[notifications_schema.NotificationRead]:
-    """
-    Retrieve all notifications for a user.
-
-    Args:
-        user_id: The owning user ID.
-        db: Database session.
-
-    Returns:
-        List of NotificationRead schemas for the user.
-
-    Raises:
-        HTTPException: If a database error occurs.
-    """
-    stmt = select(notifications_models.Notification).where(notifications_models.Notification.user_id == user_id)
-    db_notifications = db.execute(stmt).scalars().all()
-    return _transform_notifications(list(db_notifications))
-
-
-@core_decorators.handle_db_errors
 def get_user_notifications_count(
     user_id: int,
     db: Session,

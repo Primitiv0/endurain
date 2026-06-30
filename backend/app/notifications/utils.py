@@ -1,6 +1,7 @@
 """Utility functions for notification creation."""
 
 from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 import core.logger as core_logger
@@ -15,27 +16,56 @@ import websocket.utils as websocket_utils
 from core.database import SessionLocal
 
 
+def _create_notification(
+    notification_data: notifications_schema.NotificationCreate,
+    db: Session | None = None,
+) -> notifications_schema.NotificationRead:
+    """
+    Persist a notification using the blocking database session.
+
+    Isolates all synchronous SQLAlchemy work so it can be dispatched to a
+    worker thread and never run on the event loop. When ``db`` is None a
+    dedicated session is opened and closed here, keeping the full database
+    lifecycle off the event loop as well.
+
+    Args:
+        notification_data: The notification to create.
+        db: An existing session to reuse, or None to open a dedicated one.
+
+    Returns:
+        The created NotificationRead schema.
+    """
+    if db is not None:
+        return notifications_crud.create_notification(notification_data, db)
+    with SessionLocal() as owned_db:
+        return notifications_crud.create_notification(notification_data, owned_db)
+
+
 async def _create_and_notify(
     notification_data: notifications_schema.NotificationCreate,
     ws_message: str,
     notify_user_id: int,
     ws_manager: websocket_manager.WebSocketManager,
-    db: Session,
+    db: Session | None = None,
 ) -> notifications_schema.NotificationRead:
     """
-    Create notification and send WebSocket message.
+    Create a notification and send a WebSocket message.
+
+    The blocking database write is offloaded to a worker thread via
+    ``run_in_threadpool`` so the event loop is never blocked; only the
+    awaitable WebSocket push runs on the loop.
 
     Args:
         notification_data: The notification to create.
         ws_message: WebSocket message type string.
         notify_user_id: User to notify via WebSocket.
         ws_manager: WebSocket manager instance.
-        db: Database session.
+        db: Existing session to reuse, or None to open a dedicated one.
 
     Returns:
         The created NotificationRead schema.
     """
-    notification = notifications_crud.create_notification(notification_data, db)
+    notification = await run_in_threadpool(_create_notification, notification_data, db)
     json_data = {
         "message": ws_message,
         "notification_id": notification.id,
@@ -63,33 +93,31 @@ async def create_new_activity_notification(
     Raises:
         HTTPException: If creation or notify fails.
     """
-    with SessionLocal() as db:
-        try:
-            return await _create_and_notify(
-                notifications_schema.NotificationCreate(
-                    user_id=user_id,
-                    type=(notifications_constants.NotificationType.NEW_ACTIVITY),
-                    options={
-                        "activity_id": activity_id,
-                    },
-                ),
-                "NEW_ACTIVITY_NOTIFICATION",
-                user_id,
-                websocket_manager,
-                db,
-            )
-        except HTTPException as http_err:
-            raise http_err
-        except Exception as err:
-            core_logger.print_to_log(
-                f"Error in create_new_activity_notification: {err}",
-                "error",
-                exc=err,
-            )
-            raise HTTPException(
-                status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-                detail="Internal Server Error",
-            ) from err
+    try:
+        return await _create_and_notify(
+            notifications_schema.NotificationCreate(
+                user_id=user_id,
+                type=(notifications_constants.NotificationType.NEW_ACTIVITY),
+                options={
+                    "activity_id": activity_id,
+                },
+            ),
+            "NEW_ACTIVITY_NOTIFICATION",
+            user_id,
+            websocket_manager,
+        )
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Error in create_new_activity_notification: {err}",
+            "error",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
+            detail="Internal Server Error",
+        ) from err
 
 
 async def create_new_duplicate_start_time_activity_notification(
@@ -111,33 +139,31 @@ async def create_new_duplicate_start_time_activity_notification(
     Raises:
         HTTPException: If creation or notify fails.
     """
-    with SessionLocal() as db:
-        try:
-            return await _create_and_notify(
-                notifications_schema.NotificationCreate(
-                    user_id=user_id,
-                    type=(notifications_constants.NotificationType.DUPLICATE_ACTIVITY),
-                    options={
-                        "activity_id": activity_id,
-                    },
-                ),
-                "NEW_DUPLICATE_ACTIVITY_START_TIME_NOTIFICATION",
-                user_id,
-                websocket_manager,
-                db,
-            )
-        except HTTPException as http_err:
-            raise http_err
-        except Exception as err:
-            core_logger.print_to_log(
-                f"Error in create_new_duplicate_start_time_activity_notification: {err}",
-                "error",
-                exc=err,
-            )
-            raise HTTPException(
-                status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-                detail="Internal Server Error",
-            ) from err
+    try:
+        return await _create_and_notify(
+            notifications_schema.NotificationCreate(
+                user_id=user_id,
+                type=(notifications_constants.NotificationType.DUPLICATE_ACTIVITY),
+                options={
+                    "activity_id": activity_id,
+                },
+            ),
+            "NEW_DUPLICATE_ACTIVITY_START_TIME_NOTIFICATION",
+            user_id,
+            websocket_manager,
+        )
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Error in create_new_duplicate_start_time_activity_notification: {err}",
+            "error",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
+            detail="Internal Server Error",
+        ) from err
 
 
 async def create_new_follower_request_notification(
@@ -162,7 +188,7 @@ async def create_new_follower_request_notification(
         HTTPException: If user not found or error.
     """
     try:
-        user = users_crud.get_user_by_id(user_id, db)
+        user = await run_in_threadpool(users_crud.get_user_by_id, user_id, db)
         if not user:
             raise HTTPException(
                 status_code=(status.HTTP_404_NOT_FOUND),
@@ -219,7 +245,7 @@ async def create_accepted_follower_request_notification(
         HTTPException: If user not found or error.
     """
     try:
-        user = users_crud.get_user_by_id(user_id, db)
+        user = await run_in_threadpool(users_crud.get_user_by_id, user_id, db)
         if not user:
             raise HTTPException(
                 status_code=(status.HTTP_404_NOT_FOUND),
@@ -274,7 +300,7 @@ async def create_admin_new_sign_up_approval_request_notification(
         HTTPException: If creation or notify fails.
     """
     try:
-        admins = users_utils.get_admin_users_or_404(db)
+        admins = await run_in_threadpool(users_utils.get_admin_users_or_404, db)
         for admin in admins:
             await _create_and_notify(
                 notifications_schema.NotificationCreate(
@@ -319,28 +345,26 @@ async def create_garmin_token_expired_notification(
     Returns:
         None.
     """
-    with SessionLocal() as db:
-        try:
-            await _create_and_notify(
-                notifications_schema.NotificationCreate(
-                    user_id=user_id,
-                    type=(notifications_constants.NotificationType.GARMIN_TOKEN_EXPIRED),
-                    options={},
-                ),
-                "GARMIN_TOKEN_EXPIRED_NOTIFICATION",
-                user_id,
-                websocket_manager,
-                db,
-            )
-        except HTTPException as http_err:
-            raise http_err
-        except Exception as err:
-            core_logger.print_to_log(
-                f"Error in create_garmin_token_expired_notification: {err}",
-                "error",
-                exc=err,
-            )
-            raise HTTPException(
-                status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
-                detail="Internal Server Error",
-            ) from err
+    try:
+        await _create_and_notify(
+            notifications_schema.NotificationCreate(
+                user_id=user_id,
+                type=(notifications_constants.NotificationType.GARMIN_TOKEN_EXPIRED),
+                options={},
+            ),
+            "GARMIN_TOKEN_EXPIRED_NOTIFICATION",
+            user_id,
+            websocket_manager,
+        )
+    except HTTPException as http_err:
+        raise http_err
+    except Exception as err:
+        core_logger.print_to_log(
+            f"Error in create_garmin_token_expired_notification: {err}",
+            "error",
+            exc=err,
+        )
+        raise HTTPException(
+            status_code=(status.HTTP_500_INTERNAL_SERVER_ERROR),
+            detail="Internal Server Error",
+        ) from err
