@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from typing import Annotated
 
@@ -30,7 +31,7 @@ router = APIRouter()
     response_model=server_settings_schema.ServerSettingsRead,
     status_code=status.HTTP_200_OK,
 )
-async def read_server_settings(
+def read_server_settings(
     _check_scopes: Annotated[
         Callable,
         Security(auth_dependencies.check_scopes, scopes=["server_settings:read"]),
@@ -56,7 +57,7 @@ async def read_server_settings(
     response_model=list[server_settings_schema.TileMapsTemplate],
     status_code=status.HTTP_200_OK,
 )
-async def list_tile_maps_templates(
+def list_tile_maps_templates(
     _check_scopes: Annotated[
         Callable,
         Security(auth_dependencies.check_scopes, scopes=["server_settings:read"]),
@@ -83,7 +84,7 @@ async def list_tile_maps_templates(
     response_model=server_settings_schema.ServerSettingsRead,
     status_code=status.HTTP_200_OK,
 )
-async def edit_server_settings(
+def edit_server_settings(
     request: Request,
     server_settings_attributes: server_settings_schema.ServerSettingsEdit,
     _check_scopes: Annotated[
@@ -166,7 +167,7 @@ async def upload_login_photo(
         filename="login.png",
     )
 
-    server_settings_crud.update_server_settings_login_photo_set(True, db)
+    await asyncio.to_thread(server_settings_crud.update_server_settings_login_photo_set, True, db)
 
     return {"message": "Login photo uploaded successfully."}
 
@@ -199,4 +200,4 @@ async def delete_login_photo(
     """
     await core_file_uploads.delete_files_by_pattern(core_config.SERVER_IMAGES_DIR, "login.png")
 
-    server_settings_crud.update_server_settings_login_photo_set(False, db)
+    await asyncio.to_thread(server_settings_crud.update_server_settings_login_photo_set, False, db)

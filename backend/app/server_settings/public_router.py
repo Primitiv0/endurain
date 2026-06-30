@@ -12,7 +12,7 @@ router = APIRouter()
 
 
 @router.get("", response_model=server_settings_schema.ServerSettingsReadPublic)
-async def read_public_server_settings(
+def read_public_server_settings(
     request: Request,
     response: Response,
     db: Annotated[
@@ -40,7 +40,7 @@ async def read_public_server_settings(
     "/tile_maps_templates",
     response_model=list[server_settings_schema.TileMapsTemplate],
 )
-async def list_tile_maps_templates(
+def list_tile_maps_templates(
     request: Request,
     response: Response,
 ) -> list[server_settings_schema.TileMapsTemplate]:
