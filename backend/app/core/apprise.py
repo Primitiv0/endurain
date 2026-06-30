@@ -43,6 +43,11 @@ class AppriseService:
         self.smtp_host: str = s.SMTP_HOST
         self.smtp_port: int = s.SMTP_PORT
         self.smtp_username: str = s.SMTP_USERNAME
+        # Optional explicit "From" address. When unset,
+        # Apprise auto-detects it from the URL. Needed for
+        # providers like Brevo that validate the sender
+        # against a verified-sender list.
+        self.smtp_from: str | None = s.SMTP_FROM
         self.smtp_secure: bool = s.SMTP_SECURE
         self.smtp_secure_type: str = s.SMTP_SECURE_TYPE
         # Password is intentionally not stored on the
@@ -83,6 +88,11 @@ class AppriseService:
         params.append(("smtp", self.smtp_host))
         params.append(("port", str(self.smtp_port)))
         params.append(("name", "Endurain"))
+        # Set the "From" address so providers that validate
+        # it (e.g. Brevo) accept the message. Omitted when
+        # unset so Apprise keeps auto-detecting the sender.
+        if self.smtp_from:
+            params.append(("from", self.smtp_from))
 
         return f"{scheme}://_?{urlencode(params)}"
 

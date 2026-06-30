@@ -146,6 +146,13 @@ class Settings(BaseSettings):
     SMTP_HOST: str | None = None
     SMTP_PORT: int = 587
     SMTP_USERNAME: str | None = None
+    # SMTP_FROM sets the "From" address on outgoing email.
+    # When unset, Apprise auto-detects it from the URL
+    # (typically SMTP_USERNAME). Providers that enforce a
+    # verified sender (e.g. Brevo) require this to match an
+    # approved sender address, which may differ from the
+    # SMTP auth username.
+    SMTP_FROM: str | None = None
     SMTP_SECURE: bool = True
     SMTP_SECURE_TYPE: str = "starttls"
 

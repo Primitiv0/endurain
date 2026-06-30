@@ -16,6 +16,7 @@ class TestAppriseServiceInit:
         assert hasattr(service, "smtp_host")
         assert hasattr(service, "smtp_port")
         assert hasattr(service, "smtp_username")
+        assert hasattr(service, "smtp_from")
         assert hasattr(service, "smtp_secure")
         assert hasattr(service, "smtp_secure_type")
         assert hasattr(service, "smtp_password")
@@ -81,6 +82,32 @@ class TestBuildSmtpUrl:
 
         url = service._build_smtp_url()
         assert "mode=ssl" in url
+
+    def test_with_from_address(self):
+        service = core_apprise.AppriseService()
+        service.smtp_secure = True
+        service.smtp_secure_type = "starttls"
+        service.smtp_username = "login@example.com"
+        service.smtp_password = "secret123"
+        service.smtp_host = "smtp-relay.brevo.com"
+        service.smtp_port = 587
+        service.smtp_from = "sender@example.com"
+
+        url = service._build_smtp_url()
+        assert "from=sender%40example.com" in url
+
+    def test_without_from_address(self):
+        service = core_apprise.AppriseService()
+        service.smtp_secure = True
+        service.smtp_secure_type = "starttls"
+        service.smtp_username = "login@example.com"
+        service.smtp_password = "secret123"
+        service.smtp_host = "smtp.example.com"
+        service.smtp_port = 587
+        service.smtp_from = None
+
+        url = service._build_smtp_url()
+        assert "from=" not in url
 
 
 class TestIsSmtpConfigured:
