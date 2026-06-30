@@ -17,7 +17,7 @@ from fastapi import HTTPException, status
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 import auth.password_policy as auth_password_policy
 import core.decorators as core_decorators
@@ -187,7 +187,7 @@ def get_all_users(db: Session) -> list[users_schema.UsersRead]:
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(users_models.Users)
+    stmt = select(users_models.Users).options(selectinload(users_models.Users.auth_mfa))
     users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
 
     return _transform_users(users)
@@ -242,7 +242,7 @@ def get_users_with_pagination(
             criteria, ordered by username. Returns an empty list if no users
             match the filters.
     """
-    stmt = select(users_models.Users)
+    stmt = select(users_models.Users).options(selectinload(users_models.Users.auth_mfa))
 
     if show_inactive is False:
         stmt = stmt.where(users_models.Users.active.is_(True))
@@ -305,8 +305,10 @@ def get_user_by_username(
         escaped_username = normalized_username.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
 
         # Query users with username containing the search term
-        stmt = select(users_models.Users).where(
-            func.lower(users_models.Users.username).like(f"%{escaped_username}%", escape="\\")
+        stmt = (
+            select(users_models.Users)
+            .options(selectinload(users_models.Users.auth_mfa))
+            .where(func.lower(users_models.Users.username).like(f"%{escaped_username}%", escape="\\"))
         )
         users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
         return _transform_users(users)
@@ -382,7 +384,11 @@ def get_users_admin(db: Session) -> list[users_schema.UsersRead]:
     Raises:
         HTTPException: 500 error if database query fails.
     """
-    stmt = select(users_models.Users).where(users_models.Users.access_type == users_schema.UserAccessType.ADMIN.value)
+    stmt = (
+        select(users_models.Users)
+        .options(selectinload(users_models.Users.auth_mfa))
+        .where(users_models.Users.access_type == users_schema.UserAccessType.ADMIN.value)
+    )
     users: list[users_models.Users] = list(db.execute(stmt).scalars().all())
     return _transform_users(users)
 
