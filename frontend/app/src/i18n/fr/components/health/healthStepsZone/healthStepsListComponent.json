@@ -1,9 +1,0 @@
-{
-  "labelSteps": "pas",
-  "modalDeleteStepsTitle": "Supprimer les pas saisis",
-  "modalDeleteStepsBody": "Êtes-vous sûr(e) de vouloir supprimer les pas saisis pour ",
-  "successDeleteSteps": "Pas supprimés",
-  "errorDeleteSteps": "Impossible de supprimer les pas saisis",
-  "successEditSteps": "Pas modifiés",
-  "errorEditSteps": "Impossible de modifier les pas saisis"
-}

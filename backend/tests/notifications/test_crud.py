@@ -172,3 +172,23 @@ class TestMarkNotificationAsRead:
         with pytest.raises(HTTPException) as e:
             crud.mark_notification_as_read(notification_id=1, user_id=1, db=mock_db)
         assert e.value.status_code == 500
+
+
+class TestMarkAllNotificationsAsRead:
+    def test_success(self, mock_db):
+        import notifications.crud as crud
+
+        result = crud.mark_all_notifications_as_read(user_id=1, db=mock_db)
+
+        assert result is None
+        mock_db.execute.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_db_error(self, mock_db):
+        import notifications.crud as crud
+
+        mock_db.execute.side_effect = SQLAlchemyError("err")
+
+        with pytest.raises(HTTPException) as e:
+            crud.mark_all_notifications_as_read(user_id=1, db=mock_db)
+        assert e.value.status_code == 500

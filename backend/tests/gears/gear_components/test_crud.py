@@ -16,6 +16,7 @@ def _make_gc_update(**kwargs):
         brand: str | None = None
         model: str | None = None
         retired_date: object = None
+        active: object = None
 
     return GCUpdate(**kwargs)
 
@@ -189,7 +190,50 @@ class TestEditGearComponent:
         assert db_gc.active is False
 
     @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
-    def test_retired_date_cleared_sets_active_true(self, mock_db):
+    def test_retired_date_overrides_explicit_active(self, mock_db):
+        # A retired component is always inactive, even when the client
+        # explicitly sends active=true in the same request.
+        from datetime import datetime
+
+        import gears.gear_components.crud as crud
+        import gears.gear_components.models as m
+
+        db_gc = MagicMock(spec=m.GearComponents)
+        db_gc.id = 1
+        db_gc.retired_date = None
+        setup_mock_execute(mock_db, return_one_or_none=db_gc)
+
+        crud.edit_gear_component(
+            gear_component=_make_gc_update(id=1, retired_date=datetime(2024, 6, 1), active=True),
+            user_id=1,
+            db=mock_db,
+        )
+        assert db_gc.active is False
+
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
+    def test_deactivate_without_retired_date(self, mock_db):
+        # Regression: unchecking active with no retired date must persist
+        # active=false; the client value is honoured, not overridden.
+        import gears.gear_components.crud as crud
+        import gears.gear_components.models as m
+
+        db_gc = MagicMock(spec=m.GearComponents)
+        db_gc.id = 1
+        db_gc.retired_date = None
+        db_gc.active = True
+        setup_mock_execute(mock_db, return_one_or_none=db_gc)
+
+        crud.edit_gear_component(
+            gear_component=_make_gc_update(id=1, retired_date=None, active=False),
+            user_id=1,
+            db=mock_db,
+        )
+        assert db_gc.active is False
+        mock_db.commit.assert_called_once()
+
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
+    def test_reactivate_by_clearing_retired_date(self, mock_db):
+        # Clearing retired_date and sending active=true reactivates.
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
 
@@ -200,7 +244,7 @@ class TestEditGearComponent:
         setup_mock_execute(mock_db, return_one_or_none=db_gc)
 
         crud.edit_gear_component(
-            gear_component=_make_gc_update(id=1, retired_date=None),
+            gear_component=_make_gc_update(id=1, retired_date=None, active=True),
             user_id=1,
             db=mock_db,
         )

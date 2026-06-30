@@ -5,7 +5,7 @@
 > **Endurain is on a temporary feature freeze** - The project is not paused. The focus is shifting from new features to strengthening the foundations. More details [here](https://docs.endurain.com/blog/2026/05/23/pausing-new-features-so-endurain-can-keep-growing/)
 
 <div align="center">
-  <img src="frontend/app/public/logo/logo.png" width="128" height="128">
+  <img src="logo/brand_logo_dark_theme.png" width="128" height="128">
 
   # Endurain
 
@@ -47,7 +47,7 @@ Experience Endurain without installation:
 
 Endurain is a self-hosted fitness tracking service designed to give users full control over their data and hosting environment. It's similar to Strava but focused on privacy and customization. Built with:
 
-- **Frontend:** Vue.js, Notivue and Bootstrap CSS
+- **Frontend:** Vue.js 3 with TypeScript, Tailwind CSS and shadcn-vue components, with Pinia and TanStack Query for state management
 - **Backend:** Python FastAPI, Alembic, SQLAlchemy, Apprise, stravalib and python-garminconnect for Strava and Garmin Connect integration, gpxpy, tcxreader and fitdecode for .gpx, .tcx and .fit file import respectively
 - **Database:** PostgreSQL for efficient data management
 - **Observability:** Jaeger for basic tracing and monitoring

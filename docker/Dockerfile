@@ -8,11 +8,11 @@ FROM node:24-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c
 WORKDIR /tmp/frontend
 
 # Copy and install dependencies
-COPY frontend/app/package*.json ./
+COPY frontend/package*.json ./
 RUN npm ci --prefer-offline --ignore-scripts
 
 # Copy the frontend directory
-COPY frontend/app ./
+COPY frontend ./
 
 # Build the app
 RUN npm run build

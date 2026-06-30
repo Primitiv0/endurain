@@ -23,7 +23,7 @@ concurrency:
 jobs:
 
   frontend:
-    name: Frontend (eslint + prettier + type-check)
+    name: Frontend (format + lint + type-check + test)
     runs-on: local-runner
     steps:
       - name: Checkout code
@@ -32,17 +32,21 @@ jobs:
           fetch-depth: 1
 
       - name: Install dependencies
-        working-directory: frontend/app
+        working-directory: frontend
         run: npm ci
 
       - name: Check formatting (Prettier)
-        working-directory: frontend/app
+        working-directory: frontend
         run: npm run format:check
 
-      - name: Check linting (ESLint)
-        working-directory: frontend/app
+      - name: Check linting (oxlint + ESLint)
+        working-directory: frontend
         run: npm run lint:check
 
       - name: Type check (vue-tsc)
-        working-directory: frontend/app
+        working-directory: frontend
         run: npm run type-check
+
+      - name: Unit tests with coverage gate
+        working-directory: frontend
+        run: npm run test:coverage

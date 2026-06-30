@@ -88,22 +88,29 @@ class TestGetGearsNumber:
         import gears.gear.crud as crud
 
         mock_db.execute.return_value.scalar_one.return_value = 42
-        r = crud.get_gears_number(db=mock_db)
+        r = crud.get_gears_number(user_id=1, db=mock_db)
         assert r == 42
 
     def test_zero(self, mock_db):
         import gears.gear.crud as crud
 
         mock_db.execute.return_value.scalar_one.return_value = 0
-        r = crud.get_gears_number(db=mock_db)
+        r = crud.get_gears_number(user_id=1, db=mock_db)
         assert r == 0
+
+    def test_hide_inactive(self, mock_db):
+        import gears.gear.crud as crud
+
+        mock_db.execute.return_value.scalar_one.return_value = 9
+        r = crud.get_gears_number(user_id=1, db=mock_db, show_inactive=False)
+        assert r == 9
 
     def test_db_error(self, mock_db):
         import gears.gear.crud as crud
 
         mock_db.execute.side_effect = SQLAlchemyError("err")
         with pytest.raises(HTTPException) as e:
-            crud.get_gears_number(db=mock_db)
+            crud.get_gears_number(user_id=1, db=mock_db)
         assert e.value.status_code == 500
 
 

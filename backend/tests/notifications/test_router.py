@@ -89,3 +89,13 @@ class TestMarkNotificationAsRead:
 
         response = client.put("/notifications/1/mark_as_read", headers={"Authorization": "Bearer x"})
         assert response.status_code == 204
+
+
+class TestMarkAllNotificationsAsRead:
+    @patch("notifications.router.notifications_crud.mark_all_notifications_as_read")
+    def test_mark_all_read_success(self, mock_mark, mock_db):
+        client = TestClient(_build_app(mock_db))
+
+        response = client.put("/notifications/mark_all_as_read", headers={"Authorization": "Bearer x"})
+        assert response.status_code == 204
+        mock_mark.assert_called_once()

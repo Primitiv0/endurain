@@ -89,7 +89,7 @@ async def read_gears_user_all_pagination(
         HTTPException: If unauthorized or invalid
             parameters.
     """
-    total = gears_crud.get_gears_number(db)
+    total = gears_crud.get_gears_number(token_user_id, db, show_inactive)
     gears = gears_crud.get_gear_users_with_pagination(
         token_user_id,
         db,

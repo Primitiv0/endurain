@@ -73,6 +73,21 @@ class TestGetUsersNumber:
 
         assert result == 0
 
+    def test_filters_applied(self):
+        from users.users.crud import get_users_number
+
+        mock_db = MagicMock(spec=Session)
+        mock_db.execute.return_value.scalar_one.return_value = 9
+
+        result = get_users_number(
+            mock_db,
+            show_inactive=False,
+            show_email_unverified=False,
+            show_pending_approval=False,
+        )
+
+        assert result == 9
+
     def test_db_error(self):
         from users.users.crud import get_users_number
 

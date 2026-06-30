@@ -1,9 +1,0 @@
-{
-  "headerName": "Nom",
-  "headerLocation": "Lieu",
-  "headerStartTime": "Heure de départ",
-  "headerDuration": "Durée",
-  "headerPace": "Allure/Vitesse",
-  "headerElevation": "Dénivelé",
-  "headerAvgHr": "Fréquence cardiaque moyenne"
-}

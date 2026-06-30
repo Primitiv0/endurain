@@ -4,11 +4,29 @@ import html
 
 import core.i18n as core_i18n
 
-# Bootstrap-derived brand colours used across email templates.
-LINK_COLOR_PRIMARY = "#0d6efd"  # blue  - password reset
-LINK_COLOR_SUCCESS = "#198754"  # green - sign-up flows
+# Endurain brand palette (light surface), mirrored from the frontend design
+# tokens in frontend/src/assets/main.css so transactional emails match the UI.
+BRAND_PRIMARY = "#1d9e75"  # --primary           (brand green)
+BRAND_PRIMARY_DARK = "#0f6e56"  # --secondary-foreground (brand mid)
+BRAND_FOREGROUND = "#2c2c2a"  # --foreground        (body text)
+BRAND_BACKGROUND = "#f1efe8"  # --background        (page backdrop)
+BRAND_MUTED_FOREGROUND = "#888780"  # --muted-foreground  (footer text)
+BRAND_BORDER = "#e2e0d8"  # subtle hairline border
 
-_LOGO_URL = "https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/app/public/logo/logo.png"
+# The new Endurain brand is green throughout, so every transactional email
+# shares one accent colour (previously Bootstrap blue/green per flow).
+LINK_COLOR_PRIMARY = BRAND_PRIMARY  # password reset
+LINK_COLOR_SUCCESS = BRAND_PRIMARY  # sign-up flows
+
+# Inline notice-box palettes used by the email body builders.
+WARNING_BG = "#fdf3e3"  # soft amber surface for security notices
+WARNING_BORDER = "#f3dcae"
+WARNING_TEXT = "#92570a"
+INFO_BG = "#e1f5ee"  # brand secondary tint for informational details
+INFO_BORDER = "#bfe6d8"
+INFO_TEXT = BRAND_PRIMARY_DARK
+
+_LOGO_URL = "https://codeberg.org/endurain-project/endurain/raw/branch/master/frontend/public/logo_light.png"
 
 
 def html_header(title: str, heading: str, lang: str = "en") -> str:
@@ -42,26 +60,29 @@ def html_header(title: str, heading: str, lang: str = "en") -> str:
 </head>
 
 <body
-    style="font-family: Arial, sans-serif; line-height: 1.6;
-    color: #333; max-width: 600px; margin: 0 auto; padding: 20px;
-    background-color: #f4f4f4;"
+    style="font-family: 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6; color: {BRAND_FOREGROUND}; max-width: 600px;
+    margin: 0 auto; padding: 20px;
+    background-color: {BRAND_BACKGROUND};"
 >
     <div
         style="background-color: #ffffff; padding: 30px;
-        border-radius: 10px; box-shadow: 0 2px 10px
-        rgba(0, 0, 0, 0.1);"
+        border-radius: 12px; border: 1px solid {BRAND_BORDER};
+        box-shadow: 0 2px 10px rgba(15, 110, 86, 0.08);"
     >
         <div style="text-align: center; margin-bottom: 30px;">
             <div
-                style="font-size: 34px; font-weight: bold;
+                style="font-size: 30px; font-weight: 600;
                 margin-bottom: 10px; display: flex; align-items: center;
-                justify-content: center; gap: 10px;"
+                justify-content: center; gap: 10px;
+                color: {BRAND_PRIMARY_DARK};"
             >
                 <img src="{_LOGO_URL}"
                     alt="Endurain logo" style="height: 32px; width: auto;">
                 <span>Endurain</span>
             </div>
-            <h3 style="margin: 0;">{heading}</h3>
+            <h3 style="margin: 0; font-weight: 600;
+                color: {BRAND_FOREGROUND};">{heading}</h3>
         </div>
 
         <div style="margin-bottom: 30px;">"""
@@ -107,9 +128,9 @@ def html_footer(
         </div>
 
         <div
-            style="text-align: center; font-size: 12px; color: #666;
-            margin-top: 30px; padding-top: 20px;
-            border-top: 1px solid #eee;"
+            style="text-align: center; font-size: 12px;
+            color: {BRAND_MUTED_FOREGROUND}; margin-top: 30px;
+            padding-top: 20px; border-top: 1px solid {BRAND_BORDER};"
         >
             <p>{best_regards}<br>{sign_off}</p>
             <p>

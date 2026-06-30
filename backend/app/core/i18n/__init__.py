@@ -13,7 +13,7 @@ from typing import Final
 
 import core.logger as core_logger
 
-DEFAULT_LOCALE: Final[str] = "us"
+DEFAULT_LOCALE: Final[str] = "en"
 
 
 def _load_supported_locales() -> frozenset[str]:
@@ -67,10 +67,10 @@ def __getattr__(name: str) -> frozenset[str]:
 # included for every locale so the HTML ``lang`` attribute is consistent
 # across emails. Keep this table in sync when ``Language`` gains entries.
 HTML_LANG_BY_LOCALE: Final[dict[str, str]] = {
-    "us": "en-US",
-    "pt": "pt-PT",
-    "cn": "zh-Hans",
-    "tw": "zh-Hant",
+    "en": "en-US",
+    "pt-PT": "pt-PT",
+    "zh-Hans": "zh-Hans",
+    "zh-Hant": "zh-Hant",
     "ca": "ca-ES",
     "de": "de-DE",
     "fr": "fr-FR",
@@ -80,6 +80,23 @@ HTML_LANG_BY_LOCALE: Final[dict[str, str]] = {
     "sl": "sl-SI",
     "sv": "sv-SE",
     "es": "es-ES",
+    "pl": "pl-PL",
+    "tr": "tr-TR",
+    "uk": "uk-UA",
+    "ro": "ro-RO",
+    "nb": "nb-NO",
+    "da": "da-DK",
+    "fi": "fi-FI",
+    "cs": "cs-CZ",
+    "el": "el-GR",
+    "hu": "hu-HU",
+    "bg": "bg-BG",
+    "hr": "hr-HR",
+    "sr": "sr-RS",
+    "sk": "sk-SK",
+    "lt": "lt-LT",
+    "lv": "lv-LV",
+    "et": "et-EE",
 }
 
 _LOCALES_DIR = pathlib.Path(__file__).parent / "locales"
@@ -109,10 +126,18 @@ def normalize_locale(locale: str | None) -> str:
     """
     if not locale:
         return DEFAULT_LOCALE
-    normalized = locale.strip().lower()
-    if normalized in _supported():
-        return normalized
-    return DEFAULT_LOCALE
+    candidate = locale.strip()
+    if not candidate:
+        return DEFAULT_LOCALE
+    # Case-insensitive match that preserves the canonical BCP 47 casing
+    # (e.g. "ZH-HANS" -> "zh-Hans"). Script and region subtags in the
+    # supported set are title/upper-cased, so a naive ``.lower()`` compare
+    # would never match them.
+    lowered = candidate.lower()
+    return next(
+        (code for code in _supported() if code.lower() == lowered),
+        DEFAULT_LOCALE,
+    )
 
 
 def html_lang(locale: str | None) -> str:
@@ -140,7 +165,7 @@ def _load_catalog(locale: str) -> dict[str, str]:
 
     Returns:
         A dict mapping translation keys to localized strings. Falls
-        back to the ``us`` catalog if the locale file does not exist
+        back to the ``en`` catalog if the locale file does not exist
         and logs a one-time warning (cached, so it fires once per
         missing locale per process).
     """

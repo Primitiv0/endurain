@@ -201,20 +201,34 @@ def get_gear_components_total_cost(
 
 
 @core_decorators.handle_db_errors
-def get_gears_number(db: Session) -> int:
+def get_gears_number(
+    user_id: int,
+    db: Session,
+    show_inactive: bool | None = True,
+) -> int:
     """
-    Get total count of gears in the database.
+    Count a user's gears, honoring the active filter.
 
     Args:
+        user_id: Owner user ID.
         db: Database session.
+        show_inactive: Include inactive gears. Defaults to True.
 
     Returns:
-        Total number of gears.
+        Number of gears matching the filter.
 
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(func.count(gears_models.Gear.id))
+    stmt = select(func.count(gears_models.Gear.id)).where(
+        gears_models.Gear.user_id == user_id,
+    )
+
+    if show_inactive is False:
+        stmt = stmt.where(
+            gears_models.Gear.active.is_(True),
+        )
+
     return db.execute(stmt).scalar_one()
 
 

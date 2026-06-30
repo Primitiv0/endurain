@@ -21,7 +21,7 @@ class TestGetPasswordResetEmail:
             "Alice",
             "https://example.com/reset?token=abc",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert len(result) == 3
 
@@ -31,39 +31,39 @@ class TestGetPasswordResetEmail:
             "Alice",
             "https://example.com/reset?token=abc",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert "Endurain" in subject
 
     def test_html_contains_reset_link(self):
         """HTML body contains the reset link."""
         link = "https://example.com/reset?token=abc"
-        _, html_body, _ = email_messages.get_password_reset_email("Alice", link, _make_service(), locale="us")
+        _, html_body, _ = email_messages.get_password_reset_email("Alice", link, _make_service(), locale="en")
         assert link in html_body
 
     def test_text_contains_reset_link(self):
         """Plain-text body contains the reset link."""
         link = "https://example.com/reset?token=abc"
-        _, _, text_body = email_messages.get_password_reset_email("Alice", link, _make_service(), locale="us")
+        _, _, text_body = email_messages.get_password_reset_email("Alice", link, _make_service(), locale="en")
         assert link in text_body
 
     def test_html_lang_attribute_en_us(self):
-        """HTML body uses lang='en-US' for the 'us' locale."""
+        """HTML body uses lang='en-US' for the 'en' locale."""
         _, html_body, _ = email_messages.get_password_reset_email(
             "Alice",
             "https://example.com/reset",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert 'lang="en-US"' in html_body
 
     def test_html_lang_attribute_pt(self):
-        """HTML body uses lang='pt-PT' for the 'pt' locale."""
+        """HTML body uses lang='pt-PT' for the 'pt-PT' locale."""
         _, html_body, _ = email_messages.get_password_reset_email(
             "Alice",
             "https://example.com/reset",
             _make_service(),
-            locale="pt",
+            locale="pt-PT",
         )
         assert 'lang="pt-PT"' in html_body
 
@@ -79,7 +79,7 @@ class TestGetPasswordResetEmail:
             "Bob",
             "https://example.com/reset",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert subject_xx == subject_us
 
@@ -95,7 +95,7 @@ class TestGetPasswordResetEmail:
             "Bob",
             "https://example.com/reset",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert subject_none == subject_us
 
@@ -105,7 +105,7 @@ class TestGetPasswordResetEmail:
             "<script>alert(1)</script>",
             "https://example.com/reset",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert "<script>" not in html_body
         assert "&lt;script&gt;" in html_body
@@ -117,7 +117,7 @@ class TestGetPasswordResetEmail:
             name,
             "https://example.com/reset",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         assert "Alice & Bob" in text_body
 
@@ -139,7 +139,7 @@ class TestGetPasswordResetEmail:
             malicious,
             "https://example.com/reset",
             _make_service(),
-            locale="us",
+            locale="en",
         )
         # The '<' of '<img' must be escaped to '&lt;'
         # so the raw tag boundary is never present.
@@ -154,7 +154,7 @@ class TestGetPasswordResetEmail:
 
         import core.i18n as core_i18n
 
-        for code, subj in (("us", "EN subject"), ("pt", "PT subject")):
+        for code, subj in (("en", "EN subject"), ("pt-PT", "PT subject")):
             (tmp_path / code).mkdir()
             (tmp_path / code / "email.json").write_text(
                 _json.dumps({"password_reset.subject": subj}),
@@ -167,13 +167,13 @@ class TestGetPasswordResetEmail:
                 "Alice",
                 "https://example.com/reset",
                 _make_service(),
-                locale="us",
+                locale="en",
             )
             subject_pt, _, _ = email_messages.get_password_reset_email(
                 "Alice",
                 "https://example.com/reset",
                 _make_service(),
-                locale="pt",
+                locale="pt-PT",
             )
         finally:
             core_i18n._load_catalog.cache_clear()

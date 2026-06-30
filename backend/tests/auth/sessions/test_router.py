@@ -265,3 +265,73 @@ class TestDeleteSessionUser:
         response = sessions_client.delete("/sessions/session-abc/user/1")
 
         assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+# ---------------------------------------------------------------------------
+# DELETE /sessions/user/{user_id}
+# ---------------------------------------------------------------------------
+
+
+class TestDeleteSessionsUser:
+    """Tests for DELETE /sessions/user/{user_id}."""
+
+    @patch("auth.sessions.router.auth_sessions_crud.delete_sessions_by_user")
+    def test_delete_all_sessions_success_returns_204(
+        self,
+        mock_delete,
+        sessions_client,
+        mock_db,
+    ) -> None:
+        """
+        Returns 204 No Content and revokes every session for the user
+        when no exclusion is supplied (admin-style "revoke all").
+        """
+        mock_delete.return_value = 3
+
+        response = sessions_client.delete("/sessions/user/7")
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        mock_delete.assert_called_once_with(7, mock_db, exclude_session_id=None)
+
+    @patch("auth.sessions.router.auth_sessions_crud.delete_sessions_by_user")
+    def test_delete_sessions_excludes_current_session(
+        self,
+        mock_delete,
+        sessions_client,
+        mock_db,
+    ) -> None:
+        """
+        Forwards the exclude_session_id query parameter so the caller's
+        current session is left intact ("revoke other sessions").
+        """
+        mock_delete.return_value = 2
+
+        response = sessions_client.delete(
+            "/sessions/user/7",
+            params={"exclude_session_id": "keep-this-session"},
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        mock_delete.assert_called_once_with(
+            7,
+            mock_db,
+            exclude_session_id="keep-this-session",
+        )
+
+    @patch("auth.sessions.router.auth_sessions_crud.delete_sessions_by_user")
+    def test_delete_sessions_database_error_returns_500(
+        self,
+        mock_delete,
+        sessions_client,
+    ) -> None:
+        """
+        Propagates an internal error raised by the CRUD layer as 500.
+        """
+        mock_delete.side_effect = HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred",
+        )
+
+        response = sessions_client.delete("/sessions/user/1")
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR

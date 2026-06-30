@@ -1,8 +1,0 @@
-{
-  "modalDeleteWeightTitle": "Izbriši težo",
-  "modalDeleteWeightBody": "Ali ste prepričani, da želite izbrisati vnos teže za ",
-  "successDeleteWeight": "Teža izbrisana",
-  "errorDeleteWeight": "Vnosa teže ni bilo mogoče izbrisati",
-  "successEditWeight": "Teža urejena",
-  "errorEditWeight": "Vnosa teže ni bilo mogoče urediti"
-}

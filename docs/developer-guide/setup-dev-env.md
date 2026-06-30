@@ -107,14 +107,14 @@ docker image remove unified-image
 ## Frontend
 Make sure you have an up-to-date version of [Node.js](https://nodejs.org/) installed.
 
-- Go to the root of the project and move to frontend/app folder and install the dependencies:
+- Go to the root of the project and move to frontend folder and install the dependencies:
 
 ```bash
-cd frontend/app
+cd frontend
 npm install
 ```
 
-- Create a file called `.env.local` inside frontend/app and add the following to it:
+- Create a file called `.env.local` inside frontend and add the following to it:
 
 ```conf
 VITE_ENDURAIN_HOST=http://localhost:8080 # Adapt this based on the docker compose of your dev environment

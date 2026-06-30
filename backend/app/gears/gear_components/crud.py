@@ -199,6 +199,11 @@ def edit_gear_component(
     """
     Edit an existing gear component by ID.
 
+    Applies a partial update (only fields present in the payload are
+    changed) and enforces the retired/active invariant: a retired
+    component (``retired_date`` set) is always inactive, while an
+    un-retired component keeps the client-supplied ``active`` value.
+
     Args:
         gear_component: Update schema data.
         db: Database session.
@@ -219,12 +224,15 @@ def edit_gear_component(
         if key not in _IMMUTABLE_FIELDS:
             setattr(db_gear_component, key, value)
 
-    # Enforce retired_date / active invariant.
+    # Enforce the retired/active invariant: a retired component is always
+    # inactive. When the component is not retired, the client-supplied
+    # ``active`` value (already applied above) is honoured as-is. The
+    # server never infers reactivation from field presence, so behaviour
+    # is deterministic across every client; reactivating a retired
+    # component is an explicit client action (clear ``retired_date`` and
+    # set ``active`` to True in the same request).
     if db_gear_component.retired_date is not None:
         db_gear_component.active = False
-    elif "retired_date" in gear_component_data:
-        # retired_date explicitly cleared.
-        db_gear_component.active = True
 
     db.commit()
     db.refresh(db_gear_component)

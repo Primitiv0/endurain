@@ -22,7 +22,7 @@ def get_password_reset_email(
         reset_link: The URL for resetting the password.
         email_service: AppriseService for footer metadata.
         locale: Preferred locale code for the recipient. Falls back
-            to ``"us"`` if unsupported or ``None``.
+            to ``"en"`` if unsupported or ``None``.
 
     Returns:
         A 3-tuple of (subject, html_content, text_content).
@@ -53,16 +53,17 @@ def get_password_reset_email(
             <div style="text-align: center; margin: 30px 0;">
                 <a
                     href="{safe_reset_link}"
-                    style="background-color: {color}; color: white;
+                    style="background-color: {color}; color: #ffffff;
                     padding: 12px 30px; text-decoration: none;
-                    border-radius: 5px; display: inline-block;
-                    font-weight: bold;"
+                    border-radius: 8px; display: inline-block;
+                    font-weight: 600;"
                 >{cta}</a>
             </div>
             <div
-                style="background-color: #fff3cd;
-                border: 1px solid #ffeaa7; color: #856404;
-                padding: 15px; border-radius: 5px; margin: 20px 0;"
+                style="background-color: {core_email_templates.WARNING_BG};
+                border: 1px solid {core_email_templates.WARNING_BORDER};
+                color: {core_email_templates.WARNING_TEXT};
+                padding: 15px; border-radius: 8px; margin: 20px 0;"
             >
                 <strong>{security_label}</strong> {security_notice}
             </div>

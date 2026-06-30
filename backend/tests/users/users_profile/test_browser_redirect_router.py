@@ -56,6 +56,53 @@ class TestLinkIdentityProvider:
         assert response.status_code == 307, f"Expected 307, got {response.status_code}: {response.text}"
         assert response.headers["location"] == "https://idp.example.com/auth"
 
+    def test_redirect_stored_on_oauth_state(self):
+        app, mock_identity_service = self._make_app()
+        client = TestClient(app)
+
+        mock_idp = MagicMock(spec=["enabled", "name"])
+        mock_idp.enabled = True
+        mock_idp.name = "TestIdP"
+
+        mock_identity_service.validate_and_claim_browser_link_token.return_value = 1
+        with (
+            patch("users.users_profile.browser_redirect_router.idp_crud.get_identity_provider", return_value=mock_idp),
+            patch(
+                "users.users_profile.browser_redirect_router.oauth_state_utils.create_state_id_and_nonce",
+                return_value=("state-id", "nonce"),
+            ),
+            patch(
+                "users.users_profile.browser_redirect_router.oauth_state_crud.create_oauth_state"
+            ) as mock_create_state,
+            patch(
+                "users.users_profile.browser_redirect_router.idp_service.idp_service.initiate_link",
+                new_callable=AsyncMock,
+                return_value="https://idp.example.com/auth",
+            ),
+        ):
+            response = client.get(
+                self.endpoint + "&redirect=/settings/security",
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 307
+        kwargs = mock_create_state.call_args.kwargs
+        assert kwargs["redirect_path"] == "/settings/security"
+        assert kwargs["client_type"] == "web"
+
+    def test_invalid_redirect_rejected_before_token_claim(self):
+        app, mock_identity_service = self._make_app()
+        client = TestClient(app)
+
+        response = client.get(
+            self.endpoint + "&redirect=https://evil.example.com",
+            follow_redirects=False,
+        )
+
+        assert response.status_code == 400
+        # The one-time link token must not be consumed when the redirect is invalid.
+        mock_identity_service.validate_and_claim_browser_link_token.assert_not_called()
+
     def test_invalid_token(self):
         app, mock_identity_service = self._make_app()
         client = TestClient(app)

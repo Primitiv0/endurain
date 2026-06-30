@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 import auth.identity_providers.crud as idp_crud
 import auth.identity_providers.service as idp_service
+import auth.identity_providers.utils as idp_utils
 import auth.identity_service as auth_identity_service
 import auth.oauth_state.crud as oauth_state_crud
 import auth.oauth_state.utils as oauth_state_utils
@@ -46,6 +47,12 @@ async def link_identity_provider(
         auth_identity_service.IdentityService,
         Depends(auth_identity_service.get_identity_service),
     ],
+    redirect: Annotated[
+        str | None,
+        Query(
+            description="Frontend return path after linking (relative path or a configured custom scheme)",
+        ),
+    ] = None,
 ) -> RedirectResponse:
     """
     Initiate linking an identity provider using a one-time link token.
@@ -76,6 +83,10 @@ async def link_identity_provider(
             - 409 CONFLICT: If the identity provider is already linked to the user's account.
             - 500 INTERNAL_SERVER_ERROR: If an unexpected error occurs during the linking process.
     """
+    # Validate the optional return path up front (open-redirect guard) so a bad
+    # target fails before the one-time link token is consumed.
+    idp_utils.validate_redirect_url(redirect)
+
     # Validate and claim the link token via auth facade.
     # This encapsulates all auth-owned CRUD calls (hash lookup, IP check,
     # existing-link check, atomic token claim) behind a single boundary.
@@ -98,14 +109,19 @@ async def link_identity_provider(
     state, nonce = oauth_state_utils.create_state_id_and_nonce()
     client_ip = request.client.host if request.client else None
 
+    # A custom-scheme return target signals a native/mobile handoff (mirrors the
+    # login flow); a plain relative path is a normal web return.
+    client_type = "mobile" if idp_utils.is_custom_scheme_redirect(redirect) else "web"
+
     oauth_state_crud.create_oauth_state(
         db=db,
         state_id=state,
         idp_id=idp_id,
         nonce=nonce,
-        client_type="web",  # Browser redirect = web client
+        client_type=client_type,
         ip_address=client_ip,
         user_id=token_user_id,  # Indicates link mode
+        redirect_path=redirect,
     )
 
     # Initiate OAuth flow in "link mode"

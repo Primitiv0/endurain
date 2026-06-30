@@ -261,6 +261,16 @@ async def edit_gear_component(
     """
     Update an existing gear component.
 
+    Applies a partial update: only fields present in the request body are
+    changed, so omit a field to leave it untouched and send an explicit
+    null to clear a nullable field (e.g. `retired_date`).
+
+    The retired/active invariant is enforced server-side: while
+    `retired_date` is set the component is always inactive (`active` is
+    forced to false); while it is null the submitted `active` value is
+    honoured. Reactivating a retired component therefore requires clearing
+    `retired_date` and setting `active` to true in the same request.
+
     Args:
         gear_component: Updated component data.
         _check_scopes: Validates gears:write scope.

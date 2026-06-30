@@ -193,20 +193,39 @@ def get_all_users(db: Session) -> list[users_schema.UsersRead]:
 
 
 @core_decorators.handle_db_errors
-def get_users_number(db: Session) -> int:
+def get_users_number(
+    db: Session,
+    show_inactive: bool | None = True,
+    show_email_unverified: bool | None = True,
+    show_pending_approval: bool | None = True,
+) -> int:
     """
-    Get total count of users in the database.
+    Count users matching the optional list filters.
 
     Args:
         db: SQLAlchemy database session.
+        show_inactive: If False, excludes inactive users.
+            Defaults to True.
+        show_email_unverified: If False, excludes users with
+            unverified emails. Defaults to True.
+        show_pending_approval: If False, excludes users pending
+            admin approval. Defaults to True.
 
     Returns:
-        Total number of users.
+        Number of users matching the filters.
 
     Raises:
         HTTPException: 500 error if database query fails.
     """
     stmt = select(func.count(users_models.Users.id))
+
+    if show_inactive is False:
+        stmt = stmt.where(users_models.Users.active.is_(True))
+    if show_email_unverified is False:
+        stmt = stmt.where(users_models.Users.email_verified.is_(True))
+    if show_pending_approval is False:
+        stmt = stmt.where(users_models.Users.pending_admin_approval.is_(False))
+
     return db.execute(stmt).scalar_one()
 
 
@@ -609,7 +628,7 @@ async def edit_user(user_id: int, user: users_schema.UsersRead, db: Session) -> 
         user.username = user.username.lower()
 
         # Dictionary of the fields to update if they are not None
-        user_data = user.model_dump(exclude_unset=True)
+        user_data = user.model_dump(exclude_unset=True, exclude={"password", "external_auth_count", "mfa_enabled"})
         # Iterate over the fields and update the db_users dynamically
         for key, value in user_data.items():
             # Skip read-only computed properties exposed by the read schema

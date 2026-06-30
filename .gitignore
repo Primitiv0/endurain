@@ -9,8 +9,15 @@ docker_forgejo_runner/data
 # aux folder
 .garminconnect
 
+# Vite
+.vite/
+.eslintcache
+deps/
+
 # Python
 __pycache__/
+.ruff_cache/
+.hypothesis/
 
 # Docs
 site/

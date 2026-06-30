@@ -1,6 +1,0 @@
-{
-  "errorFetchingNotificationsPagination": "Fel vid hämtning av notiser med sidnumrering",
-  "errorFetchingNotificationsNumber": "Fel vid hämtning av notisnummer",
-  "errorFetchingNotificationById": "Fel vid hämtning av notiser via ID",
-  "errorFetchingMessageFromWebSocket": "Fel vid hämtning av meddelande från WebSocket"
-}

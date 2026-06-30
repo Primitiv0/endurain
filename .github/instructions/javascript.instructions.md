@@ -1,20 +1,26 @@
 ---
-description: 'Vue.js 3 + TypeScript + Bootstrap 5 coding standards, architecture patterns, and pre-commit requirements for the Endurain frontend'
+description: 'Vue.js 3 + TypeScript + Tailwind CSS v4 + shadcn-vue coding standards, architecture patterns, and pre-commit requirements for the Endurain frontend'
 applyTo: '**/*.ts,**/*.js,**/*.vue'
 ---
 # Project Context
-- **Framework:** Vue.js 3 with TypeScript support
-- **Build Tool:** Vite
-- **UI Framework:** Bootstrap 5
-- **Additional Libraries:** Chart.js, Leaflet
-- **Project Structure:** All frontend code in `frontend/app/src/`
+- **Framework:** Vue.js 3 with TypeScript (`<script setup lang="ts">`)
+- **Build Tool:** Vite (`vue-tsc` type-check + build)
+- **UI Framework:** Tailwind CSS v4 (`@theme` tokens in `src/assets/main.css`) + shadcn-vue / reka-ui primitives
+- **State:** Pinia (setup stores) for client state, TanStack Query (`@tanstack/vue-query`) for server state
+- **Additional Libraries:** vue-router, vue-i18n (lazy locales), `@lucide/vue` icons, Chart.js (charts), Leaflet (maps), DOMPurify, marked
+- **Testing:** Vitest + `@vue/test-utils`
+- **Project Structure:** Feature-based modules under `frontend/src/features/<feature>/`; shared primitives in `frontend/src/components/`
 
 # Development Setup
-- **Navigate:** `cd frontend/app`
-- **Install dependencies:** `npm install` (≈20 seconds)
-- **Dev server:** `npm run dev` (port 5173 or 5174 if occupied)
-- **Build:** `npm run build` (≈9 seconds)
-- **Format:** `npm run format` (≈5 seconds)
+- **Navigate:** `cd frontend`
+- **Install dependencies:** `npm install`
+- **Dev server:** `npm run dev` (port 5173, or 5174 if occupied)
+- **Build:** `npm run build` (runs `type-check` then production build)
+- **Test:** `npm run test` (once) / `npm run test:unit` (watch) / `npm run test:coverage` (coverage gate)
+- **Lint:** `npm run lint` (oxlint + ESLint, `--fix`) / `npm run lint:check`
+- **Format:** `npm run format` (Prettier) / `npm run format:check`
+- **Full gate:** `npm run check` (type-check + lint:check + format:check + test) — run before pushing
+- **Regenerate typed API client:** `npm run gen:api` after backend API changes
 
 # TypeScript Standards
 
@@ -131,35 +137,57 @@ Guidelines:
 const MAX_USERS = 100;
 ```
 
-# Centralized Architecture
+# Architecture
 
-## Validation Utilities (`/utils/validationUtils.ts`)
-- `isValidPassword()` - Password validation
-- `passwordsMatch()` - Password confirmation
-- `isValidEmail()` - RFC 5322 email validation
-- `sanitizeInput()` - Input sanitization
-- Password strength analysis functions
+## Feature Modules (`src/features/<feature>/`)
+- Self-contained modules (e.g. `activities`, `auth`, `health`, `profile`, `settings`)
+- Each may contain `components/`, `composables/`, `services/`, `stores/`, `views/`, `utils/`, and `types.ts`
+- Keep feature code inside its module; promote to shared `src/` folders only when reused across features
 
-## Constants (`/constants/httpConstants.ts`)
-- `HTTP_STATUS` enum for HTTP status codes
-- `extractStatusCode()` for error response parsing
-- `QUERY_PARAM_TRUE` for URL parameters
+## Typed API Client (`src/types/api.generated.ts`)
+- Generated from the backend OpenAPI schema and **committed**; never hand-edit
+- Derive API-boundary DTOs via the `Schemas` helper in `src/types/index.ts` so backend contract changes surface as TypeScript errors
+- Regenerate with `npm run gen:api` after backend API changes
 
-## Type Definitions (`/types/index.ts`)
-- `ErrorWithResponse` - Error handling type
-- `NotificationType` - Notification types
-- `ActionButtonType` - Button action types
+## Server State (TanStack Query)
+- Use `@tanstack/vue-query` composables for all server data — loading/error/success are handled by the query
+- Query keys come from the central factories in `src/services/queryKeys.ts`
+- HTTP goes through `src/services/http.ts` (timeouts, auth, CSRF); never call `fetch` directly in components
+- Use `useInvalidatingMutation` for writes that must refresh cached queries
 
-## Bootstrap Modals (`/composables/useBootstrapModal.ts`)
-- Modal lifecycle management
-- Centralized modal control
+## Client State (Pinia)
+- Setup-style stores for UI/client state only — never store tokens or server-owned data
+
+## Shared UI (`src/components/`)
+- shadcn-vue / reka-ui primitives live in `src/components/ui/`; layout in `src/components/layout/`
+- Compose existing primitives; do not re-implement them
+
+## Cross-cutting Composables (`src/composables/`)
+- `useForm` (form state + validation), `useToasts` (notifications), `useTheme`, `useLocale`, `useNavigation`
+- `useChartProvider` / `useMapProvider` wrap Chart.js / Leaflet behind a seam
+- `useSafeRedirect` for validated redirects, `useTelemetry` for safe logging
+
+## Config
+- Read deployment config from the app config / public server settings, never from `import.meta.env` in views
 
 # UI/UX Standards
 
-## Bootstrap 5
-- Use `form-floating` classes for all form inputs
-- Follow Bootstrap 5 component patterns
-- Maintain consistent spacing and layout
+## Styling (Tailwind CSS v4 + shadcn-vue)
+- Build UI from shadcn-vue / reka-ui primitives in `src/components/ui/`; do not re-implement them
+- Style with Tailwind utility classes; avoid scoped CSS for what a utility already covers
+- Use the `cn()` helper (`src/lib/utils.ts`, clsx + tailwind-merge) for conditional/merged classes
+- Use semantic design tokens, not raw colors: `text-muted-foreground` for muted text, `bg-muted` for surfaces, `bg-background`/`text-foreground`, `bg-primary`/`text-primary-foreground`
+- Brand/design tokens live in `@theme` in `src/assets/main.css` — never hardcode hex values outside data-viz
+- Avoid arbitrary values (`w-[123px]`) except genuine one-off dimensional layout
+
+## Design System (brand, typography, primitives)
+**Full guide:** [Brand & UX guidelines](../../docs/developer-guide/brand-and-ux-guidelines.md). `frontend/src/assets/main.css` is the single source of truth for tokens.
+- **Philosophy:** data-dense, flat & calm (no card shadows — use `border border-border`; no gradients), dark-mode-first, numbers are the hero
+- **Brand accents** (data-viz / semantic only): `text-hr`, `text-effort`, `text-info`, `text-goal`, `bg-brand`/`text-brand`; activity colors come from `ActivityTypeBadge`, never hand-rolled
+- **Typography:** font is Inter (weights **400/500 only**, never 600/700). Apply type via the semantic utilities — `text-page-title`, `text-card-heading`, `text-section-heading`, `text-item-title`, `text-body`, `text-caption`, `text-hint`, `text-field-error`, and size-only `text-display`/`text-metric`/`text-meta`/`text-micro` — instead of ad-hoc `text-[..]`. Sentence case headings, never Title Case
+- **Primitives:** compose the Endurain primitives (`MetricPill`, `ActivityTypeBadge`, `EmptyState`, …) from `src/components/ui/`; don't reinvent them
+- **Dark mode:** driven by the `dark` class on `<html>` via `useTheme`. Prefer semantic tokens (they auto-flip — most components need no `dark:`); for teal on dark surfaces use `dark:text-brand-dark-foreground` / `dark:bg-brand-dark-surface`
+- **Radii:** `rounded-card` (12px), `rounded-input` (8px), `rounded-badge` (20px)
 
 ## Accessibility Requirements
 - **ARIA labels:** All interactive elements must have 
@@ -173,17 +201,17 @@ const MAX_USERS = 100;
 ## Responsive Design
 - Support mobile, tablet, and desktop viewports
 - Test across different screen sizes
-- Use Bootstrap responsive utilities
+- Use Tailwind responsive variants (`sm:`, `md:`, `lg:`, `xl:`)
 
 ## User Feedback
 - Always include loading states for async operations
 - Graceful error handling with user-friendly messages
 - Clear validation feedback
-- Appropriate use of notifications
+- Surface notifications via `useToasts`; render rich/HTML content through `SafeHtml.vue` (DOMPurify)
 
 # Composition API Patterns
 
-- Create reusable composables for shared logic (e.g., `useBootstrapModal`, `useFetch`)
+- Create reusable composables for shared logic (e.g., `useForm`, `useToasts`, TanStack Query composables)
 - Use `watch` and `watchEffect` with precise dependency lists
 - Clean up side effects in `onUnmounted` or inside `watch` cleanup callbacks
 - Use `provide`/`inject` sparingly — only for deep dependency injection where prop drilling is impractical
@@ -198,9 +226,10 @@ const MAX_USERS = 100;
 
 # Data Fetching
 
-- Handle loading, error, and success states explicitly in every async operation
-- Cancel or ignore stale requests on component unmount or when parameters change
-- Use composables to encapsulate fetch logic and keep components clean
+- Use TanStack Query (`@tanstack/vue-query`) for server state — it handles loading, error, success, caching, and cancellation
+- Route requests through `src/services/http.ts`; key queries via `src/services/queryKeys.ts`
+- Encapsulate query/mutation logic in feature composables to keep components clean
+- Use `useInvalidatingMutation` so writes refresh the affected cached queries
 
 # Routing
 
@@ -217,28 +246,26 @@ const MAX_USERS = 100;
 
 # Security (Frontend)
 
-- **Never use `v-html`** with user-controlled data — sanitize with DOMPurify if unavoidable
+- **Never use `v-html`** with user-controlled data — render through `SafeHtml.vue` (`src/components/federation/SafeHtml.vue`, DOMPurify) instead
 - Store sensitive tokens in HTTP-only cookies, not `localStorage` or `sessionStorage`
 - Use HTTPS for all API requests
 - Validate and escape data before rendering in templates or directives
 
-# Reference Implementations (10/10 Quality)
+# Reference Implementations
 
-Study these files as templates for new components:
+Study these as templates for new code:
 
-- **`LoginView.vue`** (437 lines) - Authentication with MFA
-- **`SignUpView.vue`** (611 lines) - Registration with optional 
-  fields
-- **`ResetPasswordView.vue`** (~320 lines) - Password reset with 
-  token validation
-- **`ModalComponentEmailInput.vue`** - RFC 5322 email validation
+- **`src/features/auth/`** — full feature module (views, composables, services, stores) covering login/MFA and password reset
+- **`src/features/health/`** — large feature with TanStack Query CRUD composables and shadcn-vue dialogs
+- **`src/components/ui/`** — shadcn-vue primitives to compose from
+- **`src/composables/useForm.ts`** — form state and validation pattern
+- **`src/components/federation/SafeHtml.vue`** — sanitized HTML rendering (DOMPurify)
 
 # Pre-commit Checklist
-- ✅ Run `npm run format` before commits
-- ✅ Confirm `npm run build` succeeds
-- ✅ Ensure `npm run dev` runs without warnings/errors
-- ✅ TypeScript types correct (no implicit any)
+- ✅ Run `npm run check` (type-check + lint:check + format:check + test) — the CI gate
+- ✅ TypeScript types correct (no implicit `any`); typed API DTOs derived from `Schemas`
+- ✅ Tests pass and cover new logic (Vitest)
 - ✅ Accessibility attributes verified
-- ✅ Uses centralized utilities/constants/types
-- ✅ Bootstrap 5 classes applied correctly
+- ✅ Uses feature modules, shared primitives, and central services (no duplicated utilities)
+- ✅ Tailwind/shadcn-vue conventions followed (semantic tokens, `cn()`, no stray hex)
 - ✅ Manual browser validation complete

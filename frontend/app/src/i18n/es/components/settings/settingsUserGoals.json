@@ -1,8 +1,0 @@
-{
-  "addNewGoal": "Añadir nuevo objetivo",
-  "filterAll": "Todo",
-  "labelNumberOfGoals1": "Tienes ",
-  "labelNumberOfGoals2": " objetivo(s) establecidos:",
-  "successGoalDeleted": "Objetivo eliminado correctamente",
-  "errorFetchingGoals": "Error obteniendo objetivos"
-}

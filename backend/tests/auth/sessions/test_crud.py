@@ -816,6 +816,68 @@ class TestSetSessionRefreshTokenHash:
         assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
+class TestUpdateSessionCsrfHash:
+    """
+    Test suite for update_session_csrf_hash function.
+
+    This function is used by the in-grace refresh replay path to mint a
+    fresh CSRF token hash for web clients without rotating the refresh
+    token or bumping the rotation count.
+    """
+
+    def test_update_csrf_hash_success(self, mock_db):
+        """
+        Updates session.csrf_token_hash and commits when session exists.
+        """
+        # Arrange
+        session_id = "test-session-id"
+        new_hash = "hmac-sha256-csrf-hash"
+        mock_session = MagicMock(spec=users_session_models.UsersSessions)
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_session
+        mock_db.execute.return_value = mock_result
+
+        # Act
+        result = auth_sessions_crud.update_session_csrf_hash(session_id, new_hash, mock_db)
+
+        # Assert
+        assert result is None
+        assert mock_session.csrf_token_hash == new_hash
+        mock_db.commit.assert_called_once()
+        mock_db.refresh.assert_called_once_with(mock_session)
+
+    def test_update_csrf_hash_session_not_found_raises_404(self, mock_db):
+        """
+        Raises HTTP 404 when the session does not exist.
+        """
+        # Arrange
+        session_id = "nonexistent-session"
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            auth_sessions_crud.update_session_csrf_hash(session_id, "some-hash", mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+        assert session_id in exc_info.value.detail
+        mock_db.commit.assert_not_called()
+
+    def test_update_csrf_hash_db_error_raises_500(self, mock_db):
+        """
+        Raises HTTP 500 when a SQLAlchemy error occurs.
+        """
+        # Arrange
+        mock_db.execute.side_effect = SQLAlchemyError("db failure")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            auth_sessions_crud.update_session_csrf_hash("session-id", "hash", mock_db)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
 class TestClaimSessionForTokenExchange:
     """
     Test suite for claim_session_for_token_exchange function.

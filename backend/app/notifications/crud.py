@@ -2,7 +2,7 @@
 
 from typing import overload
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.orm import Session
 
 import core.decorators as core_decorators
@@ -194,3 +194,33 @@ def mark_notification_as_read(
     db.commit()
     db.refresh(notification)
     return _transform_notifications(notification)
+
+
+@core_decorators.handle_db_errors
+def mark_all_notifications_as_read(
+    user_id: int,
+    db: Session,
+) -> None:
+    """
+    Mark all unread notifications as read for a user.
+
+    Args:
+        user_id: The owning user ID.
+        db: Database session.
+
+    Returns:
+        None
+
+    Raises:
+        HTTPException: If a database error occurs.
+    """
+    stmt = (
+        update(notifications_models.Notification)
+        .where(
+            notifications_models.Notification.user_id == user_id,
+            notifications_models.Notification.read.is_(False),
+        )
+        .values(read=True)
+    )
+    db.execute(stmt)
+    db.commit()

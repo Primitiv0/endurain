@@ -132,9 +132,9 @@ class Users(Base):
         comment="User birthdate (date)",
     )
     preferred_language: Mapped[str] = mapped_column(
-        String(5),
+        String(35),
         nullable=False,
-        comment="User preferred language (en, pt, others)",
+        comment="User preferred BCP 47 language tag (en, pt-PT, zh-Hans, others)",
     )
     gender: Mapped[str] = mapped_column(
         String(20),

@@ -166,3 +166,34 @@ def mark_notification_as_read(
         None.
     """
     notifications_crud.mark_notification_as_read(notification_id, token_user_id, db)
+
+
+@router.put(
+    "/mark_all_as_read",
+    response_model=None,
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def mark_all_notifications_as_read(
+    _check_scopes: Annotated[Callable, Security(auth_dependencies.check_scopes, scopes=["notifications:write"])],
+    token_user_id: Annotated[
+        int,
+        Depends(auth_dependencies.get_sub_from_access_token),
+    ],
+    db: Annotated[
+        Session,
+        Depends(core_database.get_db),
+    ],
+):
+    """
+    Mark all of the user's notifications as read.
+
+    Args:
+        _check_scopes: Dependency that checks if the user has the required
+            scopes.
+        token_user_id: ID of the user from the access token.
+        db: Database session dependency.
+
+    Returns:
+        None.
+    """
+    notifications_crud.mark_all_notifications_as_read(token_user_id, db)

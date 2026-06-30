@@ -141,10 +141,10 @@ class TestSendSignUpAdminApprovalEmail:
         admin1.preferred_language = "en"
         admin1.email = "admin1@example.com"
         admin2 = MagicMock()
-        admin2.preferred_language = "pt"
+        admin2.preferred_language = "pt-PT"
         admin2.email = "admin2@example.com"
         mock_get_admins.return_value = [admin1, admin2]
-        mock_normalize.return_value = "us"
+        mock_normalize.return_value = "en"
         mock_get_email.return_value = ("Subject", "<html>", "text")
 
         # Act

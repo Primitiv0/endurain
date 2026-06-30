@@ -447,6 +447,45 @@ async def delete_profile_photo(
 
 
 @router.delete(
+    "/sessions",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
+async def delete_profile_other_sessions(
+    token_user_id: Annotated[
+        int,
+        Depends(auth_dependencies.get_sub_from_access_token),
+    ],
+    token_session_id: Annotated[
+        str,
+        Depends(auth_dependencies.get_sid_from_access_token),
+    ],
+    identity_service: Annotated[
+        auth_identity_service.IdentityService,
+        Depends(auth_identity_service.get_identity_service),
+    ],
+) -> None:
+    """
+    Revoke all of the authenticated user's other sessions.
+
+    Signs out every device except the caller's current session
+    (identified from the access token), so a user can end all
+    other sessions without logging themselves out. This is the
+    standalone form of the password change's
+    ``revoke_other_sessions`` option.
+
+    Args:
+        token_user_id: User ID from access token.
+        token_session_id: The caller's current session, preserved.
+        identity_service: Identity service dependency.
+
+    Returns:
+        None.
+    """
+    identity_service.delete_other_user_sessions(token_user_id, token_session_id)
+
+
+@router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,

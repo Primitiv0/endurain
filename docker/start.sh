@@ -64,6 +64,47 @@ done
 if [ -n "$ENDURAIN_HOST" ]; then
     echo "window.env = { ENDURAIN_HOST: \"$ENDURAIN_HOST\" };" > "$FRONTEND_FOLDER/env.js"
     echo_info_log "Runtime env.js written with ENDURAIN_HOST=$ENDURAIN_HOST"
+
+    # Pin the SPA's fallback Content-Security-Policy connect-src to the exact
+    # backend API/WebSocket origin derived from ENDURAIN_HOST, replacing the
+    # broad build-time default. Only a statically served SPA relies on this meta
+    # CSP; the backend response-header CSP stays authoritative where it serves
+    # the page. Re-derived on every start so it tracks ENDURAIN_HOST changes.
+    INDEX_HTML="$FRONTEND_FOLDER/index.html"
+    if [ -f "$INDEX_HTML" ]; then
+        # Strip trailing slashes to get a clean origin (scheme://host[:port]).
+        API_ORIGIN="$ENDURAIN_HOST"
+        while [ "${API_ORIGIN%/}" != "$API_ORIGIN" ]; do
+            API_ORIGIN="${API_ORIGIN%/}"
+        done
+
+        # Derive the matching WebSocket origin (http -> ws, https -> wss).
+        WS_ORIGIN=""
+        case "$API_ORIGIN" in
+            https://*) WS_ORIGIN="wss://${API_ORIGIN#https://}" ;;
+            http://*)  WS_ORIGIN="ws://${API_ORIGIN#http://}" ;;
+        esac
+
+        # Reject anything that is not a clean http(s) origin so a malformed
+        # ENDURAIN_HOST cannot inject extra CSP directives or break the meta tag.
+        case "$API_ORIGIN" in
+            *[!A-Za-z0-9.:/_-]*) WS_ORIGIN="" ;;
+        esac
+
+        if [ -n "$WS_ORIGIN" ]; then
+            # Preserve the external origins from the build-time default
+            # (vite.config.ts) — currently the Codeberg release-update check.
+            EXTERNAL_CONNECT="https://codeberg.org"
+            # connect-src is the LAST CSP directive (see vite.config.ts), so match
+            # through to the closing '"' of the meta content attribute. Matching to
+            # the next ';' would corrupt the policy: the built HTML encodes quotes
+            # as &#39; whose trailing ';' terminates the match early.
+            sed -i "s#connect-src [^\"]*#connect-src 'self' $API_ORIGIN $WS_ORIGIN $EXTERNAL_CONNECT#g" "$INDEX_HTML"
+            echo_info_log "Hardened CSP connect-src to 'self' $API_ORIGIN $WS_ORIGIN $EXTERNAL_CONNECT"
+        else
+            echo_error_log "ENDURAIN_HOST is not a clean http(s) origin; left CSP connect-src as 'self'."
+        fi
+    fi
 fi
 
 # Set log level (default: info)

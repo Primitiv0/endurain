@@ -50,16 +50,17 @@ def get_signup_confirmation_email(
             <div style="text-align: center; margin: 30px 0;">
                 <a
                     href="{safe_signup_link}"
-                    style="background-color: {color}; color: white;
+                    style="background-color: {color}; color: #ffffff;
                     padding: 12px 30px; text-decoration: none;
-                    border-radius: 5px; display: inline-block;
-                    font-weight: bold;"
+                    border-radius: 8px; display: inline-block;
+                    font-weight: 600;"
                 >{cta}</a>
             </div>
             <div
-                style="background-color: #fff3cd;
-                border: 1px solid #ffeaa7; color: #856404;
-                padding: 15px; border-radius: 5px; margin: 20px 0;"
+                style="background-color: {core_email_templates.WARNING_BG};
+                border: 1px solid {core_email_templates.WARNING_BORDER};
+                color: {core_email_templates.WARNING_TEXT};
+                padding: 15px; border-radius: 8px; margin: 20px 0;"
             >
                 <strong>{security_label}</strong> {security_notice}
             </div>
@@ -135,9 +136,10 @@ def get_admin_signup_notification_email(
             <p>{tr("admin_signup.greeting", name=safe_name)}</p>
             <p>{intro}</p>
             <div
-                style="background-color: #e9ecef;
-                border: 1px solid #ccc; padding: 15px;
-                border-radius: 5px; margin: 20px 0;"
+                style="background-color: {core_email_templates.INFO_BG};
+                border: 1px solid {core_email_templates.INFO_BORDER};
+                color: {core_email_templates.INFO_TEXT}; padding: 15px;
+                border-radius: 8px; margin: 20px 0;"
             >
                 <strong>{user_label}</strong> {safe_sign_up_name}
             </div>
@@ -145,10 +147,10 @@ def get_admin_signup_notification_email(
             <div style="text-align: center; margin: 30px 0;">
                 <a
                     href="{safe_admin_link}"
-                    style="background-color: {color}; color: white;
+                    style="background-color: {color}; color: #ffffff;
                     padding: 12px 30px; text-decoration: none;
-                    border-radius: 5px; display: inline-block;
-                    font-weight: bold;"
+                    border-radius: 8px; display: inline-block;
+                    font-weight: 600;"
                 >{cta}</a>
             </div>
             <p>{copy_link}</p>
@@ -218,9 +220,10 @@ def get_user_signup_approved_email(
             <p>{tr("signup_approved.greeting", name=safe_name)}</p>
             <p>{intro}</p>
             <div
-                style="background-color: #e9ecef;
-                border: 1px solid #ccc; padding: 15px;
-                border-radius: 5px; margin: 20px 0;"
+                style="background-color: {core_email_templates.INFO_BG};
+                border: 1px solid {core_email_templates.INFO_BORDER};
+                color: {core_email_templates.INFO_TEXT}; padding: 15px;
+                border-radius: 8px; margin: 20px 0;"
             >
                 <strong>{username_label}</strong> {safe_username}
             </div>
@@ -228,10 +231,10 @@ def get_user_signup_approved_email(
             <div style="text-align: center; margin: 30px 0;">
                 <a
                     href="{safe_login_link}"
-                    style="background-color: {color}; color: white;
+                    style="background-color: {color}; color: #ffffff;
                     padding: 12px 30px; text-decoration: none;
-                    border-radius: 5px; display: inline-block;
-                    font-weight: bold;"
+                    border-radius: 8px; display: inline-block;
+                    font-weight: 600;"
                 >{cta}</a>
             </div>
             <p>{copy_link}</p>

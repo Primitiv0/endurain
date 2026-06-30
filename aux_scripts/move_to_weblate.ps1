@@ -20,7 +20,7 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = (Resolve-Path ".").Path
   }
 }
-$BaseDir = Join-Path $RepoRoot "frontend/app/src/i18n/us"
+$BaseDir = Join-Path $RepoRoot "frontend/src/i18n/us"
 
 $Headers = @{
   Authorization = "Token $Token"
@@ -88,7 +88,7 @@ foreach ($f in $files) {
 
   $rel = $fullPath.Substring($repoRootWithSep.Length) -replace "\\", "/"
 
-  if ($rel -notmatch "^frontend/app/src/i18n/us/") {
+  if ($rel -notmatch "^frontend/src/i18n/us/") {
     Write-Host "WARN unexpected relative path. Skipping file."
     if ($DebugMode) {
       Write-Host "DEBUG fullName=$fullPath"

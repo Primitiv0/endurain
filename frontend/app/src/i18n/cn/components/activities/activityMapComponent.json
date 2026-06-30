@@ -1,8 +1,0 @@
-{
-  "modalMediaDeleteTitle": "删除媒体",
-  "modalMediaDeleteBody1": "你确定要删除这个媒体文件吗",
-  "modalMediaDeleteBody2": " 和名称 ",
-  "errorFetchingActivityStream": "获取运动数据流时出错",
-  "mediaDeletedSuccessfully": "媒体已成功删除",
-  "errorDeletingMedia": "删除媒体时出错"
-}

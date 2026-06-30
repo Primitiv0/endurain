@@ -171,3 +171,32 @@ class TestChangeManagedUserPassword:
         )
         mock_delete_sessions.assert_called_once_with(42, mock_db)
         mock_clear_pending_mfa.assert_called_once_with(42)
+
+
+class TestDeleteOtherUserSessions:
+    """Tests for self-service 'revoke other sessions'."""
+
+    @patch("auth.services.account_security_service.core_logger.print_to_log")
+    @patch("auth.services.account_security_service.auth_sessions_crud.delete_sessions_by_user")
+    def test_revokes_all_sessions_except_current(
+        self,
+        mock_delete_sessions,
+        mock_log,
+        mock_db,
+    ):
+        """Deletes every session except the caller's current one and returns the count."""
+        mock_delete_sessions.return_value = 3
+
+        revoked = account_security_service.delete_other_user_sessions(
+            token_user_id=7,
+            current_session_id="session-1",
+            db=mock_db,
+        )
+
+        assert revoked == 3
+        mock_delete_sessions.assert_called_once_with(
+            7,
+            mock_db,
+            exclude_session_id="session-1",
+        )
+        mock_log.assert_called_once()

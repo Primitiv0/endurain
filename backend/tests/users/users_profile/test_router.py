@@ -26,7 +26,7 @@ def _make_user_mock() -> MagicMock:
     user.email = "test@example.com"
     user.city = None
     user.birthdate = None
-    user.preferred_language = "us"
+    user.preferred_language = "en"
     user.gender = "unspecified"
     user.units = "metric"
     user.height = None
@@ -475,6 +475,22 @@ class TestDeleteProfileSession:
         response = profile_client.delete(PREFIX + "/sessions/session-1")
 
         assert response.status_code == 204
+
+
+# ===================================================================
+# DELETE /profile/sessions
+# ===================================================================
+
+
+class TestDeleteProfileOtherSessions:
+    """Tests for DELETE /profile/sessions — delete_profile_other_sessions."""
+
+    def test_success(self, profile_client, mock_identity_service):
+        """Happy path: revokes other sessions, keeping the caller's current one."""
+        response = profile_client.delete(PREFIX + "/sessions")
+
+        assert response.status_code == 204
+        mock_identity_service.delete_other_user_sessions.assert_called_once_with(1, "session-1")
 
 
 # ===================================================================

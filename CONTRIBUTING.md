@@ -96,7 +96,7 @@ PRs that are too large to review efficiently will be asked to be split before th
 
 5. **Validate changes before pushing:**
    - **Backend:** `cd backend && uv run hatch run validate` (or any individual script from `[tool.hatch.envs.default.scripts]` in `pyproject.toml`)
-   - **Frontend:** `cd frontend/app && npm run format:check && npm run lint:check && npm run type-check`
+   - **Frontend:** `cd frontend && npm run format:check && npm run lint:check && npm run type-check`
 
    `uv run hatch run validate` runs lint, format, test, and typecheck sequentially in one command, which `uv run` alone does not yet offer. See `pyproject.toml` for the full list of available scripts.
 

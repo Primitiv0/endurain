@@ -1,8 +1,0 @@
-{
-  "modalDeleteWeightTitle": "删除体重记录",
-  "modalDeleteWeightBody": "确定要删除此体重记录吗？",
-  "successDeleteWeight": "体重记录已删除",
-  "errorDeleteWeight": "无法删除体重记录",
-  "successEditWeight": "体重记录已编辑",
-  "errorEditWeight": "无法编辑体重记录"
-}

@@ -45,6 +45,38 @@ def delete_user_session(
     auth_sessions_crud.delete_session(session_id, token_user_id, db)
 
 
+def delete_other_user_sessions(
+    token_user_id: int,
+    current_session_id: str,
+    db: Session,
+) -> int:
+    """Revoke all of the user's sessions except their current one.
+
+    Backs the self-service "sign out other devices" action: every
+    session the user owns is deleted except ``current_session_id``
+    (the caller's own session, derived from their access token), so
+    the caller stays signed in while every other device is evicted.
+
+    Args:
+        token_user_id: ID of the authenticated user.
+        current_session_id: The caller's current session, preserved.
+        db: SQLAlchemy session.
+
+    Returns:
+        Number of sessions revoked.
+    """
+    revoked = auth_sessions_crud.delete_sessions_by_user(
+        token_user_id,
+        db,
+        exclude_session_id=current_session_id,
+    )
+    core_logger.print_to_log(
+        f"User {token_user_id} revoked {revoked} other session(s)",
+        "info",
+    )
+    return revoked
+
+
 def change_own_password(
     user_id: int,
     current_password: str,

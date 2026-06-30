@@ -1,8 +1,0 @@
-{
-  "modalMediaDeleteTitle": "Elimina media",
-  "modalMediaDeleteBody1": "Sei sicuro di voler eliminare il media con ID ",
-  "modalMediaDeleteBody2": " e nome ",
-  "errorFetchingActivityStream": "Errore nel recupero dei dati del flusso attività",
-  "mediaDeletedSuccessfully": "Media eliminato con successo",
-  "errorDeletingMedia": "Errore nell'eliminazione del media"
-}

@@ -380,6 +380,18 @@ class IdentityService(Protocol):
         """
         ...
 
+    def delete_other_user_sessions(self, user_id: int, current_session_id: str) -> None:
+        """Delete all of the authenticated user's sessions except the current one.
+
+        Args:
+            user_id: Owner of the sessions.
+            current_session_id: The caller's session, left intact.
+
+        Returns:
+            None.
+        """
+        ...
+
     def change_own_password(
         self,
         user_id: int,
@@ -1136,6 +1148,14 @@ class DefaultIdentityService:
     def delete_user_session(self, session_id: str, user_id: int) -> None:
         """Delete one of the authenticated user's own sessions."""
         auth_account_security_service.delete_user_session(session_id, user_id, self._db)
+
+    def delete_other_user_sessions(self, user_id: int, current_session_id: str) -> None:
+        """Delete all of the authenticated user's sessions except the current one."""
+        auth_account_security_service.delete_other_user_sessions(
+            user_id,
+            current_session_id,
+            self._db,
+        )
 
     def change_own_password(
         self,

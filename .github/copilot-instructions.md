@@ -37,7 +37,7 @@ Always reference these instructions first and fallback to search or bash command
 ## Project Overview
 
 Endurain is a self-hosted fitness tracking application with:
-- **Frontend:** Vue.js 3 + TypeScript + Vite + Bootstrap 5
+- **Frontend:** Vue.js 3 + TypeScript + Vite + Tailwind CSS v4 + shadcn-vue
 - **Backend:** Python 3.13 + FastAPI + SQLAlchemy + Alembic
 - **Database:** PostgreSQL
 - **Integrations:** Strava, Garmin Connect
@@ -88,7 +88,7 @@ Examples:
 
 Fast iteration workflow for frontend-only development:
 
-- Navigate: `cd frontend/app`
+- Navigate: `cd frontend`
 - Install dependencies: `npm install` (≈20 seconds)
 - Start dev server: `npm run dev` (port 5173 or 5174 if occupied)
 - Build frontend: `npm run build` (≈9 seconds)
@@ -152,7 +152,7 @@ Python development without Docker (requires Python 3.13):
 
 ```plaintext
 Repository root:
-├── frontend/app/          # Vue.js frontend application
+├── frontend/          # Vue.js frontend application
 │   ├── package.json       # Frontend dependencies and scripts
 │   ├── src/               # Vue.js source code
 │   ├── dist/              # Built frontend output

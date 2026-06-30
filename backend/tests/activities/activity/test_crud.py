@@ -1,10 +1,11 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
-from tests._helpers.db import setup_mock_execute
+from tests._helpers.db import create_sqlite_session, setup_mock_execute
 from tests._helpers.models import mock_model
 
 
@@ -896,20 +897,58 @@ class TestGetActivityByIdFromUserIdOrHasVisibility:
         assert e.value.status_code == 500
 
 
-class TestGetActivityByIdIfIsPublic:
-    @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
-    @patch("activities.activity.crud.activities_utils.serialize_activity")
-    @patch("activities.activity.crud.activities_utils.apply_visibility_mask")
-    def test_success(self, mock_mask, mock_ser, mock_settings, mock_db):
-        import activities.activity.crud as crud
-        import activities.activity.models as am
+@pytest.fixture
+def sqlite_session():
+    """Real in-memory SQLite session for access-control behavior tests."""
+    session = create_sqlite_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
-        mock_settings.return_value.public_shareable_links = True
-        a = mock_model(am.Activity, id=1, visibility=0)
-        setup_mock_execute(mock_db, return_one_or_none=a)
-        mock_ser.return_value = MagicMock()
-        r = crud.get_activity_by_id_if_is_public(activity_id=1, db=mock_db)
-        assert r is not None
+
+def _public_activity(**overrides):
+    """Build a fully-populated ``Activity`` row, overridable per test."""
+    import activities.activity.models as am
+
+    fields = {
+        "user_id": 1,
+        "distance": 1000,
+        "activity_type": 1,
+        "start_time": datetime(2024, 1, 1, tzinfo=UTC),
+        "end_time": datetime(2024, 1, 1, 1, tzinfo=UTC),
+        "created_at": datetime(2024, 1, 1, tzinfo=UTC),
+        "total_elapsed_time": Decimal("3600"),
+        "total_timer_time": Decimal("3600"),
+        "visibility": 0,
+        "is_hidden": False,
+        "hide_start_time": False,
+        "hide_location": False,
+        "hide_map": False,
+        "hide_hr": False,
+        "hide_power": False,
+        "hide_cadence": False,
+        "hide_elevation": False,
+        "hide_speed": False,
+        "hide_pace": False,
+        "hide_laps": False,
+        "hide_workout_sets_steps": False,
+        "hide_gear": False,
+    }
+    fields.update(overrides)
+    return am.Activity(**fields)
+
+
+class TestGetActivityByIdIfIsPublic:
+    """Public single-activity access.
+
+    The ``visibility`` / ``is_hidden`` filtering is enforced by the SQL
+    ``WHERE`` clause, which a mocked ``Session`` cannot evaluate. Those
+    access-control guarantees are therefore exercised against a real in-memory
+    SQLite database; the remaining branches stay on the fast mock-DB path.
+    """
+
+    # --- branch coverage (mock DB) ---
 
     @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
     def test_disabled_setting(self, mock_settings, mock_db):
@@ -917,14 +956,6 @@ class TestGetActivityByIdIfIsPublic:
 
         mock_settings.return_value.public_shareable_links = False
         assert crud.get_activity_by_id_if_is_public(activity_id=1, db=mock_db) is None
-
-    @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
-    def test_not_found(self, mock_settings, mock_db):
-        import activities.activity.crud as crud
-
-        mock_settings.return_value.public_shareable_links = True
-        setup_mock_execute(mock_db, return_one_or_none=None)
-        assert crud.get_activity_by_id_if_is_public(activity_id=999, db=mock_db) is None
 
     @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
     def test_db_error(self, mock_settings, mock_db):
@@ -935,6 +966,66 @@ class TestGetActivityByIdIfIsPublic:
         with pytest.raises(HTTPException) as e:
             crud.get_activity_by_id_if_is_public(activity_id=1, db=mock_db)
         assert e.value.status_code == 500
+
+    # --- access-control behavior (real SQLite DB) ---
+
+    @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
+    @patch("activities.activity.crud.activities_utils.serialize_activity")
+    @patch("activities.activity.crud.activities_utils.apply_visibility_mask")
+    def test_serves_public_activity(self, mock_mask, mock_ser, mock_settings, sqlite_session):
+        """Regression guard: a public, non-hidden activity is still served after the is_hidden filter."""
+        import activities.activity.crud as crud
+
+        mock_settings.return_value.public_shareable_links = True
+        mock_ser.return_value = MagicMock()
+        sqlite_session.add(_public_activity(id=1, visibility=0, is_hidden=False))
+        sqlite_session.commit()
+
+        result = crud.get_activity_by_id_if_is_public(activity_id=1, db=sqlite_session)
+
+        assert result is not None
+        mock_ser.assert_called_once()
+        assert mock_ser.call_args.args[0].id == 1
+
+    @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
+    @patch("activities.activity.crud.activities_utils.serialize_activity")
+    @patch("activities.activity.crud.activities_utils.apply_visibility_mask")
+    def test_excludes_hidden_activities(self, mock_mask, mock_ser, mock_settings, sqlite_session):
+        """A hidden activity must never be served publicly, even when its visibility is public."""
+        import activities.activity.crud as crud
+
+        mock_settings.return_value.public_shareable_links = True
+        sqlite_session.add(_public_activity(id=1, visibility=0, is_hidden=True))
+        sqlite_session.commit()
+
+        result = crud.get_activity_by_id_if_is_public(activity_id=1, db=sqlite_session)
+
+        assert result is None
+        mock_ser.assert_not_called()
+
+    @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
+    @patch("activities.activity.crud.activities_utils.serialize_activity")
+    @patch("activities.activity.crud.activities_utils.apply_visibility_mask")
+    def test_excludes_non_public_visibility(self, mock_mask, mock_ser, mock_settings, sqlite_session):
+        """Only ``visibility == 0`` (public) activities are served."""
+        import activities.activity.crud as crud
+
+        mock_settings.return_value.public_shareable_links = True
+        sqlite_session.add(_public_activity(id=1, visibility=1, is_hidden=False))
+        sqlite_session.commit()
+
+        result = crud.get_activity_by_id_if_is_public(activity_id=1, db=sqlite_session)
+
+        assert result is None
+        mock_ser.assert_not_called()
+
+    @patch("activities.activity.crud.server_settings_utils.get_server_settings_or_404")
+    def test_not_found(self, mock_settings, sqlite_session):
+        """A non-existent activity id returns None."""
+        import activities.activity.crud as crud
+
+        mock_settings.return_value.public_shareable_links = True
+        assert crud.get_activity_by_id_if_is_public(activity_id=999, db=sqlite_session) is None
 
 
 class TestGetActivityByStartTime:

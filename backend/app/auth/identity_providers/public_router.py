@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from typing import Annotated
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
@@ -28,6 +29,41 @@ import users.users.utils as users_utils
 
 # Define the API router
 router = APIRouter()
+
+
+def _append_query_params(url: str, params: dict[str, str]) -> str:
+    """Append query parameters to a URL or relative path, preserving any existing query."""
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query.update(params)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _build_link_result_url(redirect_path: str | None, idp_name: str | None, *, success: bool) -> str:
+    """
+    Build the post-link redirect that carries the result to the originating client.
+
+    Honors a caller-supplied return path captured at link initiation (validated
+    there against open redirects): a relative path is resolved against the
+    configured frontend host, while a custom URI scheme is handed off directly to
+    the native client. Falls back to the security settings path when no return
+    path was provided.
+
+    Args:
+        redirect_path: The validated return path or custom scheme, or None.
+        idp_name: Provider display name (included on success).
+        success: Whether the link succeeded.
+
+    Returns:
+        The absolute URL (or custom-scheme URL) to redirect the browser to.
+    """
+    params = {"idp_link": "success" if success else "error"}
+    if success and idp_name is not None:
+        params["idp_name"] = idp_name
+    if redirect_path and idp_utils.is_custom_scheme_redirect(redirect_path):
+        return _append_query_params(redirect_path, params)
+    base = redirect_path or "/settings/security"
+    return f"{core_config.settings.ENDURAIN_HOST}{_append_query_params(base, params)}"
 
 
 @router.get(
@@ -230,6 +266,7 @@ async def handle_callback(
         - On error: Redirects to login page with error parameter
         - All redirects use HTTP 307 (Temporary Redirect) status code
     """
+    oauth_state = None
     try:
         # Get the identity provider
         idp = idp_crud.get_identity_provider_by_slug(idp_slug, db)
@@ -301,10 +338,10 @@ async def handle_callback(
         user = result["user"]
         is_link_mode = result.get("mode") == "link"
 
-        # Handle link mode differently - redirect to settings without creating new session
+        # Handle link mode differently - redirect to the originating page (the
+        # caller's validated return path) without creating a new session.
         if is_link_mode:
-            frontend_url = core_config.settings.ENDURAIN_HOST
-            redirect_url = f"{frontend_url}/settings?tab=security&idp_link=success&idp_name={idp.name}"
+            redirect_url = _build_link_result_url(oauth_state.redirect_path, idp.name, success=True)
 
             core_logger.print_to_log(f"IdP link successful for user {user.username}, IdP {idp.name}", "info")
 
@@ -369,9 +406,13 @@ async def handle_callback(
     except Exception as err:
         core_logger.print_to_log(f"Error in SSO callback: {err}", "error", exc=err)
 
-        # Redirect to frontend with error
-        frontend_url = core_config.settings.ENDURAIN_HOST
-        error_url = f"{frontend_url}/login?error=sso_failed"
+        # A failed LINK returns the browser to its originating page with an error
+        # flag; a failed LOGIN falls back to the login page. Link attempts are
+        # identified by the user_id stored on the OAuth state at initiation.
+        if oauth_state is not None and oauth_state.user_id is not None:
+            error_url = _build_link_result_url(oauth_state.redirect_path, None, success=False)
+        else:
+            error_url = f"{core_config.settings.ENDURAIN_HOST}/login?error=sso_failed"
 
         return RedirectResponse(url=error_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 

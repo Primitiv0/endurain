@@ -1680,7 +1680,7 @@ class IdentityProviderService:
             birthdate=mapped_data.get("birthdate"),
             name=mapped_data.get("name", username),
             password=random_password,
-            preferred_language=users_schema.Language.ENGLISH_USA,
+            preferred_language=users_schema.Language.ENGLISH,
             gender=users_schema.Gender.UNSPECIFIED,
             units=server_settings_schema.Units.METRIC,
             height=mapped_data.get("height"),

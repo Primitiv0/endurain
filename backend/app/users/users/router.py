@@ -88,7 +88,12 @@ def read_users_all_pagination(
     Returns:
         Paginated list of users with total count.
     """
-    total: int = users_crud.get_users_number(db)
+    total: int = users_crud.get_users_number(
+        db,
+        show_inactive,
+        show_email_unverified,
+        show_pending_approval,
+    )
     users: list[users_schema.UsersRead] = users_crud.get_users_with_pagination(
         db,
         page_number,

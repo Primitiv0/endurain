@@ -936,6 +936,7 @@ def get_activity_by_id_if_is_public(activity_id: int, db: Session) -> activities
 
         stmt = select(activities_models.Activity).where(
             activities_models.Activity.visibility == 0,
+            activities_models.Activity.is_hidden.is_(False),
             activities_models.Activity.id == activity_id,
         )
         activity = db.execute(stmt).scalar_one_or_none()

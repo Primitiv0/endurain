@@ -41,7 +41,7 @@ def _make_mock_user(user_id, **overrides):
     user.email = overrides.get("email", f"user{user_id}@example.com")
     user.city = overrides.get("city")
     user.birthdate = overrides.get("birthdate")
-    user.preferred_language = overrides.get("preferred_language", "us")
+    user.preferred_language = overrides.get("preferred_language", "en")
     user.gender = overrides.get("gender", "unspecified")
     user.units = overrides.get("units", "metric")
     user.height = overrides.get("height")

@@ -142,7 +142,7 @@ class TestSignupEndpoint:
                 "username": "testuser",
                 "email": "test@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 
@@ -188,7 +188,7 @@ class TestSignupEndpoint:
                 "username": "emailuser",
                 "email": "emailuser@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 
@@ -231,7 +231,7 @@ class TestSignupEndpoint:
                 "username": "failuser",
                 "email": "fail@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 
@@ -259,7 +259,7 @@ class TestSignupEndpoint:
                 "username": "blocked",
                 "email": "blocked@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 
@@ -313,7 +313,7 @@ class TestSignupEndpoint:
                 "username": "existing",
                 "email": "dup@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 
@@ -353,7 +353,7 @@ class TestSignupEndpoint:
                 "username": "adminuser",
                 "email": "admin@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 
@@ -400,7 +400,7 @@ class TestSignupEndpoint:
                 "username": "svcuser",
                 "email": "svc@example.com",
                 "password": "SecurePass1!",
-                "preferred_language": "us",
+                "preferred_language": "en",
             },
         )
 

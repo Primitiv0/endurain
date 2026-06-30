@@ -71,7 +71,7 @@ Environment variables are explained in the [Environment Variables Guide](advance
 ```env
 DB_HOST=localhost
 BACKEND_DIR="/path/to/endurain/backend/app"
-FRONTEND_DIR="/path/to/endurain/frontend/app/dist"
+FRONTEND_DIR="/path/to/endurain/frontend/dist"
 DATA_DIR="/path/to/endurain_data/data"
 LOGS_DIR="/path/to/endurain_data/logs"
 ```
@@ -79,7 +79,7 @@ LOGS_DIR="/path/to/endurain_data/logs"
 ## 5. Build the Frontend
 
 ```bash
-cd /path/to/endurain/frontend/app
+cd /path/to/endurain/frontend
 npm ci
 npm run build
 ```
@@ -87,7 +87,7 @@ npm run build
 Create `env.js`. Edit the URL if you use a reverse proxy.
 
 ```bash
-cat << 'EOF' > /path/to/endurain/frontend/app/dist/env.js
+cat << 'EOF' > /path/to/endurain/frontend/dist/env.js
 window.env = {
   ENDURAIN_HOST: "http://YOUR_SERVER_IP:8080",
 };
@@ -233,7 +233,7 @@ rm -rf "$EXTRACTED"
 Build the Frontend.
 
 ```bash
-cd /path/to/endurain/frontend/app
+cd /path/to/endurain/frontend
 npm ci
 npm run build
 ```
