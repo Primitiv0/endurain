@@ -616,33 +616,6 @@ class TestImportServiceHealth:
         assert service.counts["health_weight"] == 1
 
 
-class TestImportServiceNotifications:
-    async def test_collect_and_import_notifications_empty(self) -> None:
-        mock_db = MagicMock(spec=Session)
-        mock_ws = MagicMock()
-        service = profile_import_service.ImportService(
-            user_id=1,
-            db=mock_db,
-            websocket_manager=mock_ws,
-        )
-        await service.collect_and_import_notifications_data([])
-        assert service.counts.get("notifications", 0) == 0
-
-    async def test_collect_and_import_notifications(self) -> None:
-        mock_db = MagicMock(spec=Session)
-        mock_ws = MagicMock()
-        service = profile_import_service.ImportService(
-            user_id=1,
-            db=mock_db,
-            websocket_manager=mock_ws,
-        )
-
-        with patch("users.users_profile.import_service.notifications_crud.create_notification"):
-            await service.collect_and_import_notifications_data([{"user_id": 1, "type": 1}])
-
-        assert service.counts["notifications"] == 1
-
-
 class TestImportServiceActivities:
     async def test_collect_and_import_activities_batched_empty(self) -> None:
         mock_db = MagicMock(spec=Session)
@@ -868,7 +841,6 @@ class TestImportServiceFromZip:
             patch.object(service, "collect_and_import_gear_components_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_user_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_activities_data_batched", return_value={}),
-            patch.object(service, "collect_and_import_notifications_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_health_weight", new_callable=AsyncMock),
             patch.object(service, "add_activity_files_from_zip", new_callable=AsyncMock),
             patch.object(service, "add_activity_media_from_zip", new_callable=AsyncMock),
@@ -930,7 +902,6 @@ class TestImportServiceFromZip:
             patch.object(service, "collect_and_import_gear_components_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_user_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_activities_data_batched", return_value={}),
-            patch.object(service, "collect_and_import_notifications_data", new_callable=AsyncMock),
             patch.object(service, "collect_and_import_health_weight", new_callable=AsyncMock),
             patch.object(service, "add_activity_files_from_zip", new_callable=AsyncMock),
             patch.object(service, "add_activity_media_from_zip", new_callable=AsyncMock),

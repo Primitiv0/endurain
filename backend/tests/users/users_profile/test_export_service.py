@@ -415,74 +415,6 @@ class TestExportServiceCollectHealthWeight:
                 service.collect_health_weight(z)
 
 
-class TestExportServiceCollectNotifications:
-    def test_collect_notifications_with_data(self) -> None:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            mock_db = MagicMock(spec=Session)
-            service = profile_export_service.ExportService(user_id=1, db=mock_db)
-            service.performance_config.enable_memory_monitoring = False
-            mock_notifs = [MagicMock(), MagicMock()]
-
-            with (
-                patch(
-                    "users.users_profile.export_service.notifications_crud.get_user_notifications",
-                    return_value=mock_notifs,
-                ),
-                patch.object(profile_utils, "sqlalchemy_obj_to_dict", return_value={"id": 1}),
-            ):
-                service.collect_notifications_data(z)
-
-        assert service.counts["notifications"] == 2
-
-    def test_collect_notifications_no_data(self) -> None:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            mock_db = MagicMock(spec=Session)
-            service = profile_export_service.ExportService(user_id=1, db=mock_db)
-            service.performance_config.enable_memory_monitoring = False
-
-            with patch(
-                "users.users_profile.export_service.notifications_crud.get_user_notifications",
-                return_value=[],
-            ):
-                service.collect_notifications_data(z)
-
-        assert service.counts.get("notifications", 0) == 0
-
-    def test_collect_notifications_crud_exception_raises_data_collection_error(self) -> None:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            mock_db = MagicMock(spec=Session)
-            service = profile_export_service.ExportService(user_id=1, db=mock_db)
-            service.performance_config.enable_memory_monitoring = False
-
-            with (
-                patch(
-                    "users.users_profile.export_service.notifications_crud.get_user_notifications",
-                    side_effect=Exception("unexpected"),
-                ),
-                pytest.raises(DataCollectionError),
-            ):
-                service.collect_notifications_data(z)
-
-    def test_collect_notifications_sqlalchemy_error_wraps_as_data_collection_error(self) -> None:
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            mock_db = MagicMock(spec=Session)
-            service = profile_export_service.ExportService(user_id=1, db=mock_db)
-            service.performance_config.enable_memory_monitoring = False
-
-            with (
-                patch(
-                    "users.users_profile.export_service.notifications_crud.get_user_notifications",
-                    side_effect=SQLAlchemyError("db down"),
-                ),
-                pytest.raises(DataCollectionError),
-            ):
-                service.collect_notifications_data(z)
-
-
 class TestExportServiceCollectUserSettings:
     def test_collect_settings_all_empty(self) -> None:
         buf = io.BytesIO()
@@ -781,7 +713,6 @@ class TestExportServiceGenerateExportArchive:
             ),
             patch.object(service, "collect_gear_data"),
             patch.object(service, "collect_health_weight"),
-            patch.object(service, "collect_notifications_data"),
             patch.object(service, "collect_user_settings_data"),
             patch.object(service, "add_activity_files_to_zip"),
             patch.object(service, "add_activity_media_to_zip"),
@@ -1214,19 +1145,6 @@ class TestExportServiceDbErrorWrapsDataCollectionError:
                 pytest.raises(DataCollectionError),
             ):
                 service.collect_health_weight(z)
-
-    def test_notifications_db_error_wraps_as_data_collection_error(self) -> None:
-        with zipfile.ZipFile(io.BytesIO(), "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
-            service = profile_export_service.ExportService(user_id=1, db=MagicMock(spec=Session))
-            service.performance_config.enable_memory_monitoring = False
-            with (
-                patch(
-                    "users.users_profile.export_service.notifications_crud.get_user_notifications",
-                    side_effect=SQLAlchemyError("db down"),
-                ),
-                pytest.raises(DataCollectionError),
-            ):
-                service.collect_notifications_data(z)
 
 
 class TestExportServiceCollectUserSettingsEdgeCases:
@@ -1694,7 +1612,6 @@ class TestExportServiceGenerateExportArchiveEdgeCases:
             patch.object(service, "collect_user_activities_data", return_value=[]),
             patch.object(service, "collect_gear_data"),
             patch.object(service, "collect_health_weight"),
-            patch.object(service, "collect_notifications_data"),
             patch.object(service, "collect_user_settings_data"),
             patch.object(service, "add_activity_files_to_zip"),
             patch.object(service, "add_activity_media_to_zip"),
@@ -1718,7 +1635,6 @@ class TestExportServiceGenerateExportArchiveEdgeCases:
             patch.object(service, "collect_user_activities_data", return_value=[]),
             patch.object(service, "collect_gear_data"),
             patch.object(service, "collect_health_weight"),
-            patch.object(service, "collect_notifications_data"),
             patch.object(service, "collect_user_settings_data"),
             patch.object(service, "add_activity_files_to_zip"),
             patch.object(service, "add_activity_media_to_zip"),
@@ -1739,7 +1655,6 @@ class TestExportServiceGenerateExportArchiveEdgeCases:
             patch.object(service, "collect_user_activities_data", return_value=[]),
             patch.object(service, "collect_gear_data"),
             patch.object(service, "collect_health_weight"),
-            patch.object(service, "collect_notifications_data"),
             patch.object(service, "collect_user_settings_data"),
             patch.object(service, "add_activity_files_to_zip"),
             patch.object(service, "add_activity_media_to_zip"),
@@ -1760,7 +1675,6 @@ class TestExportServiceGenerateExportArchiveEdgeCases:
             patch.object(service, "collect_user_activities_data", return_value=[]),
             patch.object(service, "collect_gear_data"),
             patch.object(service, "collect_health_weight"),
-            patch.object(service, "collect_notifications_data"),
             patch.object(service, "collect_user_settings_data"),
             patch.object(service, "add_activity_files_to_zip"),
             patch.object(service, "add_activity_media_to_zip"),

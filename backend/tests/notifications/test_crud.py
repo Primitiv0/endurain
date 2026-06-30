@@ -36,36 +36,6 @@ class TestGetUserNotificationById:
         assert e.value.status_code == 500
 
 
-class TestGetUserNotifications:
-    def test_success(self, mock_db):
-        import notifications.crud as crud
-        import notifications.models as m
-
-        n = MagicMock(
-            spec=m.Notification, id=1, user_id=1, type=1, read=False, options=None, created_at=datetime(2024, 1, 1)
-        )
-        mock_db.execute.return_value.scalars.return_value.all.return_value = [n]
-        r = crud.get_user_notifications(user_id=1, db=mock_db)
-        assert len(r) == 1
-        assert r[0].id == 1
-        assert r[0].user_id == 1
-
-    def test_empty(self, mock_db):
-        import notifications.crud as crud
-
-        mock_db.execute.return_value.scalars.return_value.all.return_value = []
-        r = crud.get_user_notifications(user_id=1, db=mock_db)
-        assert r == []
-
-    def test_db_error(self, mock_db):
-        import notifications.crud as crud
-
-        mock_db.execute.side_effect = SQLAlchemyError("err")
-        with pytest.raises(HTTPException) as e:
-            crud.get_user_notifications(user_id=1, db=mock_db)
-        assert e.value.status_code == 500
-
-
 class TestGetUserNotificationsCount:
     def test_success(self, mock_db):
         import notifications.crud as crud
