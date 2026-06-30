@@ -6,7 +6,6 @@ from typing import Annotated
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException,
     Query,
     Security,
     status,
@@ -18,7 +17,6 @@ import core.database as core_database
 import core.dependencies as core_dependencies
 import gears.gear.crud as gears_crud
 import gears.gear.dependencies as gears_dependencies
-import gears.gear.models as gear_models
 import gears.gear.schema as gears_schema
 
 # Define the API router
@@ -115,7 +113,7 @@ async def read_gears_user_all_pagination(
 )
 async def read_gear_id(
     gear_id: int,
-    validate_id: Annotated[
+    _validate_id: Annotated[
         Callable,
         Depends(
             gears_dependencies.validate_gear_id,
@@ -180,7 +178,7 @@ async def read_gear_id(
     )
 
     return gears_schema.GearDetailRead(
-        **gears_schema.GearRead.model_validate(gear).model_dump(),
+        **gear.model_dump(),
         total_distance=(activity_stats["total_distance"] + initial_kms_m),
         total_time=(activity_stats["total_time"]),
         total_components_cost=(components_cost),
@@ -211,7 +209,7 @@ async def read_gear_user_contains_nickname(
         Session,
         Depends(core_database.get_db),
     ],
-) -> list[gear_models.Gear]:
+) -> list[gears_schema.GearRead]:
     """
     Retrieve gears matching a nickname substring.
 
@@ -288,7 +286,7 @@ async def read_gear_user_by_nickname(
 )
 async def read_gear_user_by_type(
     gear_type: int,
-    validate_type: Annotated[
+    _validate_type: Annotated[
         Callable,
         Depends(
             gears_dependencies.validate_gear_type,
@@ -311,7 +309,7 @@ async def read_gear_user_by_type(
         Session,
         Depends(core_database.get_db),
     ],
-) -> list[gear_models.Gear]:
+) -> list[gears_schema.GearRead]:
     """
     Retrieve gears by type for a user.
 
@@ -425,26 +423,9 @@ async def edit_gear(
         HTTPException: If gear not found, forbidden,
             or unauthorized.
     """
-    gear_db = gears_crud.get_gear_user_by_id(
-        token_user_id,
-        gear.id,
-        db,
-    )
-
-    if gear_db is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Gear ID {gear.id} not found"),
-        )
-
-    if gear_db.user_id != token_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(f"Gear ID {gear.id} does not belong to user {token_user_id}"),
-        )
-
     return gears_crud.edit_gear(
         gear,
+        token_user_id,
         db,
     )
 
@@ -455,7 +436,7 @@ async def edit_gear(
 )
 async def delete_gear(
     gear_id: int,
-    validate_id: Annotated[
+    _validate_id: Annotated[
         Callable,
         Depends(
             gears_dependencies.validate_gear_id,
@@ -496,22 +477,4 @@ async def delete_gear(
         HTTPException: If gear not found, forbidden,
             or unauthorized.
     """
-    gear = gears_crud.get_gear_user_by_id(
-        token_user_id,
-        gear_id,
-        db,
-    )
-
-    if gear is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Gear ID {gear_id} not found"),
-        )
-
-    if gear.user_id != token_user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(f"Gear ID {gear_id} does not belong to user {token_user_id}"),
-        )
-
-    gears_crud.delete_gear(gear_id, db)
+    gears_crud.delete_gear(gear_id, token_user_id, db)

@@ -81,7 +81,6 @@ def _get_user_model_by_id_or_404(user_id: int, db: Session) -> users_models.User
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return db_userss

@@ -1,6 +1,7 @@
 """Gear schema definitions."""
 
 from datetime import datetime as datetime_type
+from enum import IntEnum
 
 from pydantic import (
     BaseModel,
@@ -11,6 +12,31 @@ from pydantic import (
     StrictInt,
     StrictStr,
 )
+
+
+class GearType(IntEnum):
+    """
+    Supported gear type codes.
+
+    Attributes:
+        BIKE: Bicycle (1).
+        SHOES: Running or walking shoes (2).
+        WETSUIT: Wetsuit (3).
+        RACQUET: Racquet (4).
+        SKI: Skis (5).
+        SNOWBOARD: Snowboard (6).
+        WINDSURF: Windsurf board (7).
+        WATER_SPORTS_BOARD: Water sports board (8).
+    """
+
+    BIKE = 1
+    SHOES = 2
+    WETSUIT = 3
+    RACQUET = 4
+    SKI = 5
+    SNOWBOARD = 6
+    WINDSURF = 7
+    WATER_SPORTS_BOARD = 8
 
 
 class GearBase(BaseModel):
@@ -45,10 +71,8 @@ class GearBase(BaseModel):
         max_length=250,
         description="Gear display nickname",
     )
-    gear_type: StrictInt = Field(
+    gear_type: GearType = Field(
         ...,
-        ge=1,
-        le=8,
         description="Gear type identifier",
     )
     created_at: datetime_type | None = Field(

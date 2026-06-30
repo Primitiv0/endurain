@@ -50,7 +50,6 @@ def _get_health_targets_model_by_user_id_or_404(user_id: int, db: Session) -> he
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Health targets not found",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return db_health_targets

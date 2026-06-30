@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -20,33 +20,8 @@ def _make_gc_update(**kwargs):
     return GCUpdate(**kwargs)
 
 
-class TestGetGearComponentById:
-    def test_success(self, mock_db):
-        import gears.gear_components.crud as crud
-        import gears.gear_components.models as m
-
-        c = mock_model(m.GearComponents, id=1)
-        setup_mock_execute(mock_db, return_one_or_none=c)
-        r = crud.get_gear_component_by_id(gear_component_id=1, db=mock_db)
-        assert r is c
-
-    def test_not_found(self, mock_db):
-        import gears.gear_components.crud as crud
-
-        setup_mock_execute(mock_db, return_one_or_none=None)
-        r = crud.get_gear_component_by_id(gear_component_id=999, db=mock_db)
-        assert r is None
-
-    def test_db_error(self, mock_db):
-        import gears.gear_components.crud as crud
-
-        mock_db.execute.side_effect = SQLAlchemyError("err")
-        with pytest.raises(HTTPException) as e:
-            crud.get_gear_component_by_id(gear_component_id=1, db=mock_db)
-        assert e.value.status_code == 500
-
-
 class TestGetGearComponentsUser:
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_success(self, mock_db):
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
@@ -73,6 +48,7 @@ class TestGetGearComponentsUser:
 
 
 class TestGetGearComponentsUserByGearId:
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_success(self, mock_db):
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
@@ -82,6 +58,7 @@ class TestGetGearComponentsUserByGearId:
         r = crud.get_gear_components_user_by_gear_id(user_id=1, gear_id=1, db=mock_db)
         assert r == [c]
 
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_success_active_filter(self, mock_db):
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
@@ -108,7 +85,9 @@ class TestGetGearComponentsUserByGearId:
 
 
 class TestCreateGearComponent:
-    def test_success(self, mock_db):
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
+    @patch("gears.gear_components.crud.gear_components_models.GearComponents")
+    def test_success(self, mock_gc_cls, mock_db):
         from datetime import datetime
 
         import gears.gear_components.crud as crud
@@ -129,7 +108,8 @@ class TestCreateGearComponent:
         mock_db.refresh.assert_called_once()
         assert r is not None
 
-    def test_db_error(self, mock_db):
+    @patch("gears.gear_components.crud.gear_components_models.GearComponents")
+    def test_db_error(self, mock_gc_cls, mock_db):
         from datetime import datetime
 
         import gears.gear_components.crud as crud
@@ -152,6 +132,7 @@ class TestCreateGearComponent:
 
 
 class TestEditGearComponent:
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_success(self, mock_db):
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
@@ -168,7 +149,7 @@ class TestEditGearComponent:
             brand: str = "SRAM"
             model: str = "Red"
 
-        r = crud.edit_gear_component(gear_component=GCUpdate(), db=mock_db)
+        r = crud.edit_gear_component(gear_component=GCUpdate(), user_id=1, db=mock_db)
         assert r is db_gc
         mock_db.commit.assert_called_once()
         mock_db.refresh.assert_called_once_with(db_gc)
@@ -185,9 +166,10 @@ class TestEditGearComponent:
             brand: str = "SRAM"
 
         with pytest.raises(HTTPException) as e:
-            crud.edit_gear_component(gear_component=GCUpdate(), db=mock_db)
+            crud.edit_gear_component(gear_component=GCUpdate(), user_id=1, db=mock_db)
         assert e.value.status_code == 404
 
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_retired_date_sets_active_false(self, mock_db):
         from datetime import datetime
 
@@ -201,10 +183,12 @@ class TestEditGearComponent:
 
         crud.edit_gear_component(
             gear_component=_make_gc_update(id=1, retired_date=datetime(2024, 6, 1)),
+            user_id=1,
             db=mock_db,
         )
         assert db_gc.active is False
 
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_retired_date_cleared_sets_active_true(self, mock_db):
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
@@ -217,11 +201,13 @@ class TestEditGearComponent:
 
         crud.edit_gear_component(
             gear_component=_make_gc_update(id=1, retired_date=None),
+            user_id=1,
             db=mock_db,
         )
         assert db_gc.active is True
         mock_db.commit.assert_called_once()
 
+    @patch("gears.gear_components.crud._transform_gear_components", new=lambda x: x)
     def test_immutable_fields_ignored(self, mock_db):
         import gears.gear_components.crud as crud
         import gears.gear_components.models as m
@@ -238,7 +224,7 @@ class TestEditGearComponent:
             user_id: int = 999
             gear_id: int = 999
 
-        crud.edit_gear_component(gear_component=GCUpdate(), db=mock_db)
+        crud.edit_gear_component(gear_component=GCUpdate(), user_id=1, db=mock_db)
         assert db_gc.user_id != 999
         assert db_gc.gear_id != 999
         mock_db.commit.assert_called_once()
@@ -260,26 +246,25 @@ class TestEditGearComponent:
             brand: str = "SRAM"
 
         with pytest.raises(HTTPException) as e:
-            crud.edit_gear_component(gear_component=GCUpdate(), db=mock_db)
+            crud.edit_gear_component(gear_component=GCUpdate(), user_id=1, db=mock_db)
         assert e.value.status_code == 500
 
 
 class TestDeleteGearComponent:
     def test_success(self, mock_db):
         import gears.gear_components.crud as crud
+        import gears.gear_components.models as m
 
-        r = MagicMock()
-        r.rowcount = 1
-        mock_db.execute.return_value = r
+        db_gc = MagicMock(spec=m.GearComponents)
+        setup_mock_execute(mock_db, return_one_or_none=db_gc)
         crud.delete_gear_component(user_id=1, gear_component_id=1, db=mock_db)
+        mock_db.delete.assert_called_once_with(db_gc)
         mock_db.commit.assert_called_once()
 
     def test_not_found(self, mock_db):
         import gears.gear_components.crud as crud
 
-        r = MagicMock()
-        r.rowcount = 0
-        mock_db.execute.return_value = r
+        setup_mock_execute(mock_db, return_one_or_none=None)
         with pytest.raises(HTTPException) as e:
             crud.delete_gear_component(user_id=1, gear_component_id=999, db=mock_db)
         assert e.value.status_code == 404

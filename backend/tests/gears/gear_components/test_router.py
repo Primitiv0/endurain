@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 
 
@@ -41,7 +41,7 @@ class TestReadGearComponentTypes:
 
 
 class TestReadGearComponents:
-    @patch("gears.gear_components.router.gc_crud.get_gear_components_user")
+    @patch("gears.gear_components.router.gear_components_crud.get_gear_components_user")
     def test_all_success(self, mock_get, mock_db):
         from gears.gear_components.schema import GearComponentRead
 
@@ -53,7 +53,7 @@ class TestReadGearComponents:
         response = client.get("/gear_components", headers={"Authorization": "Bearer x"})
         assert response.status_code == 200
 
-    @patch("gears.gear_components.router.gc_crud.get_gear_components_user")
+    @patch("gears.gear_components.router.gear_components_crud.get_gear_components_user")
     def test_all_empty(self, mock_get, mock_db):
         client = TestClient(_build_app(mock_db))
         mock_get.return_value = None
@@ -64,8 +64,8 @@ class TestReadGearComponents:
 
 
 class TestReadGearComponentsByGearId:
-    @patch("gears.gear_components.router.gc_crud.get_components_activity_stats")
-    @patch("gears.gear_components.router.gc_crud.get_gear_components_user_by_gear_id")
+    @patch("gears.gear_components.router.gear_components_crud.get_components_activity_stats")
+    @patch("gears.gear_components.router.gear_components_crud.get_gear_components_user_by_gear_id")
     def test_with_components(self, mock_get_components, mock_get_stats, mock_db):
         from gears.gear_components.schema import GearComponentRead
 
@@ -80,7 +80,7 @@ class TestReadGearComponentsByGearId:
         assert len(data) == 1
         assert data[0]["current_distance"] == 1000
 
-    @patch("gears.gear_components.router.gc_crud.get_gear_components_user_by_gear_id")
+    @patch("gears.gear_components.router.gear_components_crud.get_gear_components_user_by_gear_id")
     def test_no_components(self, mock_get, mock_db):
         client = TestClient(_build_app(mock_db))
         mock_get.return_value = None
@@ -91,7 +91,7 @@ class TestReadGearComponentsByGearId:
 
 
 class TestCreateGearComponent:
-    @patch("gears.gear_components.router.gc_crud.create_gear_component")
+    @patch("gears.gear_components.router.gear_components_crud.create_gear_component")
     def test_create_success(self, mock_create, mock_db):
         from gears.gear_components.schema import GearComponentRead
 
@@ -114,15 +114,11 @@ class TestCreateGearComponent:
 
 
 class TestEditGearComponent:
-    @patch("gears.gear_components.router.gc_crud.edit_gear_component")
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_edit_success(self, mock_get, mock_edit, mock_db):
+    @patch("gears.gear_components.router.gear_components_crud.edit_gear_component")
+    def test_edit_success(self, mock_edit, mock_db):
         from gears.gear_components.schema import GearComponentRead
 
         client = TestClient(_build_app(mock_db))
-        component = GearComponentRead(id=1, user_id=1, gear_id=1, type="chain", brand="Shimano", model="Ultegra")
-        component.user_id = 1
-        mock_get.return_value = component
         mock_edit.return_value = GearComponentRead(
             id=1, user_id=1, gear_id=1, type="chain", brand="Shimano", model="Ultegra"
         )
@@ -140,10 +136,13 @@ class TestEditGearComponent:
         )
         assert response.status_code == 200
 
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_edit_not_found(self, mock_get, mock_db):
+    @patch("gears.gear_components.router.gear_components_crud.edit_gear_component")
+    def test_edit_not_found(self, mock_edit, mock_db):
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = None
+        mock_edit.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gear component not found",
+        )
 
         response = client.put(
             "/gear_components",
@@ -158,34 +157,8 @@ class TestEditGearComponent:
         )
         assert response.status_code == 404
 
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_edit_forbidden(self, mock_get, mock_db):
-        from gears.gear_components.schema import GearComponentRead
-
+    def test_edit_retired_before_purchase(self, mock_db):
         client = TestClient(_build_app(mock_db))
-        component = GearComponentRead(id=1, user_id=2, gear_id=1, type="chain", brand="Shimano", model="Ultegra")
-        mock_get.return_value = component
-
-        response = client.put(
-            "/gear_components",
-            json={
-                "id": 1,
-                "gear_id": 1,
-                "type": "chain",
-                "brand": "Shimano",
-                "model": "Ultegra",
-            },
-            headers={"Authorization": "Bearer x"},
-        )
-        assert response.status_code == 403
-
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_edit_retired_before_purchase(self, mock_get, mock_db):
-        from gears.gear_components.schema import GearComponentRead
-
-        client = TestClient(_build_app(mock_db))
-        component = GearComponentRead(id=1, user_id=1, gear_id=1, type="chain", brand="Shimano", model="Ultegra")
-        mock_get.return_value = component
 
         response = client.put(
             "/gear_components",
@@ -204,33 +177,21 @@ class TestEditGearComponent:
 
 
 class TestDeleteGearComponent:
-    @patch("gears.gear_components.router.gc_crud.delete_gear_component")
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_delete_success(self, mock_get, mock_delete, mock_db):
-        from gears.gear_components.schema import GearComponentRead
-
+    @patch("gears.gear_components.router.gear_components_crud.delete_gear_component")
+    def test_delete_success(self, mock_delete, mock_db):
         client = TestClient(_build_app(mock_db))
-        component = GearComponentRead(id=1, user_id=1, gear_id=1, type="chain", brand="Shimano", model="Ultegra")
-        mock_get.return_value = component
+        mock_delete.return_value = None
 
         response = client.delete("/gear_components/1", headers={"Authorization": "Bearer x"})
         assert response.status_code == 204
 
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_delete_not_found(self, mock_get, mock_db):
+    @patch("gears.gear_components.router.gear_components_crud.delete_gear_component")
+    def test_delete_not_found(self, mock_delete, mock_db):
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = None
+        mock_delete.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gear component not found",
+        )
 
         response = client.delete("/gear_components/999", headers={"Authorization": "Bearer x"})
         assert response.status_code == 404
-
-    @patch("gears.gear_components.router.gc_crud.get_gear_component_by_id")
-    def test_delete_forbidden(self, mock_get, mock_db):
-        from gears.gear_components.schema import GearComponentRead
-
-        client = TestClient(_build_app(mock_db))
-        component = GearComponentRead(id=1, user_id=2, gear_id=1, type="chain", brand="Shimano", model="Ultegra")
-        mock_get.return_value = component
-
-        response = client.delete("/gear_components/1", headers={"Authorization": "Bearer x"})
-        assert response.status_code == 403

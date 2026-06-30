@@ -1310,7 +1310,6 @@ def edit_activity(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Activity not found",
-                headers={"WWW-Authenticate": "Bearer"},
             )
 
         # Both `Activity` and `ActivityEdit` are Pydantic models;

@@ -14,10 +14,10 @@ from sqlalchemy.orm import Session
 
 import auth.dependencies as auth_dependencies
 import core.database as core_database
-import gears.gear.dependencies as gear_deps
-import gears.gear_components.crud as gc_crud
-import gears.gear_components.dependencies as gc_deps
-import gears.gear_components.schema as gc_schema
+import gears.gear.dependencies as gear_dependencies
+import gears.gear_components.crud as gear_components_crud
+import gears.gear_components.dependencies as gear_components_dependencies
+import gears.gear_components.schema as gear_components_schema
 
 # Define the API router
 router = APIRouter()
@@ -25,7 +25,7 @@ router = APIRouter()
 
 @router.get(
     "/types",
-    response_model=gc_schema.GearComponentTypesRead,
+    response_model=gear_components_schema.GearComponentTypesRead,
     status_code=status.HTTP_200_OK,
 )
 async def read_gear_component_types(
@@ -36,7 +36,7 @@ async def read_gear_component_types(
             scopes=["gears:read"],
         ),
     ],
-) -> gc_schema.GearComponentTypesRead:
+) -> gear_components_schema.GearComponentTypesRead:
     """
     Retrieve valid component type lists.
 
@@ -49,17 +49,17 @@ async def read_gear_component_types(
     Raises:
         HTTPException: If unauthorized.
     """
-    return gc_schema.GearComponentTypesRead(
-        bike=gc_schema.BIKE_COMPONENT_TYPES,
-        shoes=gc_schema.SHOES_COMPONENT_TYPES,
-        racquet=(gc_schema.RACQUET_COMPONENT_TYPES),
-        windsurf=(gc_schema.WINDSURF_COMPONENT_TYPES),
+    return gear_components_schema.GearComponentTypesRead(
+        bike=gear_components_schema.BIKE_COMPONENT_TYPES,
+        shoes=gear_components_schema.SHOES_COMPONENT_TYPES,
+        racquet=(gear_components_schema.RACQUET_COMPONENT_TYPES),
+        windsurf=(gear_components_schema.WINDSURF_COMPONENT_TYPES),
     )
 
 
 @router.get(
     "",
-    response_model=(list[gc_schema.GearComponentRead] | None),
+    response_model=(list[gear_components_schema.GearComponentRead] | None),
     status_code=status.HTTP_200_OK,
 )
 async def read_gear_components(
@@ -80,7 +80,7 @@ async def read_gear_components(
         Session,
         Depends(core_database.get_db),
     ],
-) -> list[gc_schema.GearComponentRead] | None:
+) -> list[gear_components_schema.GearComponentRead] | None:
     """
     Retrieve all gear components for a user.
 
@@ -95,7 +95,7 @@ async def read_gear_components(
     Raises:
         HTTPException: If unauthorized.
     """
-    return gc_crud.get_gear_components_user(
+    return gear_components_crud.get_gear_components_user(
         token_user_id,
         db,
     )
@@ -103,15 +103,15 @@ async def read_gear_components(
 
 @router.get(
     "/gear_id/{gear_id}",
-    response_model=(list[gc_schema.GearComponentRead] | None),
+    response_model=(list[gear_components_schema.GearComponentRead] | None),
     status_code=status.HTTP_200_OK,
 )
 async def read_gear_components_gear_id(
     gear_id: int,
-    validate_gear_id: Annotated[
+    _validate_gear_id: Annotated[
         Callable,
         Depends(
-            gear_deps.validate_gear_id,
+            gear_dependencies.validate_gear_id,
         ),
     ],
     _check_scopes: Annotated[
@@ -132,7 +132,7 @@ async def read_gear_components_gear_id(
         Depends(core_database.get_db),
     ],
     active: bool | None = None,
-) -> list[gc_schema.GearComponentRead] | None:
+) -> list[gear_components_schema.GearComponentRead] | None:
     """
     Retrieve gear components by gear ID.
 
@@ -150,7 +150,7 @@ async def read_gear_components_gear_id(
     Raises:
         HTTPException: If unauthorized.
     """
-    components = gc_crud.get_gear_components_user_by_gear_id(
+    components = gear_components_crud.get_gear_components_user_by_gear_id(
         token_user_id,
         gear_id,
         db,
@@ -159,17 +159,20 @@ async def read_gear_components_gear_id(
     if not components:
         return components
 
-    stats = gc_crud.get_components_activity_stats(
+    stats = gear_components_crud.get_components_activity_stats(
         gear_id,
         db,
     )
 
-    result: list[gc_schema.GearComponentRead] = []
+    result: list[gear_components_schema.GearComponentRead] = []
     for comp in components:
-        comp_read = gc_schema.GearComponentRead.model_validate(comp)
         comp_stats = stats.get(comp.id, {})
-        comp_read.current_distance = comp_stats.get("distance", 0)
-        comp_read.current_time = comp_stats.get("time", 0)
+        comp_read = comp.model_copy(
+            update={
+                "current_distance": comp_stats.get("distance", 0),
+                "current_time": comp_stats.get("time", 0),
+            }
+        )
         result.append(comp_read)
 
     return result
@@ -177,11 +180,11 @@ async def read_gear_components_gear_id(
 
 @router.post(
     "",
-    response_model=gc_schema.GearComponentRead,
+    response_model=gear_components_schema.GearComponentRead,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_gear_component(
-    gear_component: gc_schema.GearComponentCreate,
+    gear_component: gear_components_schema.GearComponentCreate,
     _check_scopes: Annotated[
         Callable,
         Security(
@@ -189,10 +192,10 @@ async def create_gear_component(
             scopes=["gears:write"],
         ),
     ],
-    verify_gear_type: Annotated[
+    _verify_gear_type: Annotated[
         Callable,
         Security(
-            gc_deps.validate_gear_component_type,
+            gear_components_dependencies.validate_gear_component_type,
         ),
     ],
     token_user_id: Annotated[
@@ -205,7 +208,7 @@ async def create_gear_component(
         Session,
         Depends(core_database.get_db),
     ],
-) -> gc_schema.GearComponentRead:
+) -> gear_components_schema.GearComponentRead:
     """
     Create a new gear component.
 
@@ -223,7 +226,7 @@ async def create_gear_component(
         HTTPException: If unauthorized or invalid
             component type.
     """
-    return gc_crud.create_gear_component(
+    return gear_components_crud.create_gear_component(
         gear_component,
         token_user_id,
         db,
@@ -232,11 +235,11 @@ async def create_gear_component(
 
 @router.put(
     "",
-    response_model=gc_schema.GearComponentRead,
+    response_model=gear_components_schema.GearComponentRead,
     status_code=status.HTTP_200_OK,
 )
 async def edit_gear_component(
-    gear_component: gc_schema.GearComponentUpdate,
+    gear_component: gear_components_schema.GearComponentUpdate,
     _check_scopes: Annotated[
         Callable,
         Security(
@@ -254,7 +257,7 @@ async def edit_gear_component(
         Session,
         Depends(core_database.get_db),
     ],
-) -> gc_schema.GearComponentRead:
+) -> gear_components_schema.GearComponentRead:
     """
     Update an existing gear component.
 
@@ -281,25 +284,9 @@ async def edit_gear_component(
             detail=("Retired date must be after purchase date"),
         )
 
-    gear_component_db = gc_crud.get_gear_component_by_id(
-        gear_component.id,
-        db,
-    )
-
-    if gear_component_db is None:
-        raise HTTPException(
-            status_code=(status.HTTP_404_NOT_FOUND),
-            detail=(f"Gear component ID {gear_component.id} not found"),
-        )
-
-    if gear_component_db.user_id != token_user_id:
-        raise HTTPException(
-            status_code=(status.HTTP_403_FORBIDDEN),
-            detail=(f"Gear component ID {gear_component.id} does not belong to user {token_user_id}"),
-        )
-
-    return gc_crud.edit_gear_component(
+    return gear_components_crud.edit_gear_component(
         gear_component,
+        token_user_id,
         db,
     )
 
@@ -310,10 +297,10 @@ async def edit_gear_component(
 )
 async def delete_component_gear(
     gear_component_id: int,
-    validate_id: Annotated[
+    _validate_id: Annotated[
         Callable,
         Depends(
-            gc_deps.validate_gear_component_id,
+            gear_components_dependencies.validate_gear_component_id,
         ),
     ],
     _check_scopes: Annotated[
@@ -351,24 +338,7 @@ async def delete_component_gear(
         HTTPException: If not found, forbidden,
             or unauthorized.
     """
-    gear_component = gc_crud.get_gear_component_by_id(
-        gear_component_id,
-        db,
-    )
-
-    if gear_component is None:
-        raise HTTPException(
-            status_code=(status.HTTP_404_NOT_FOUND),
-            detail=(f"Gear component ID {gear_component_id} not found"),
-        )
-
-    if gear_component.user_id != token_user_id:
-        raise HTTPException(
-            status_code=(status.HTTP_403_FORBIDDEN),
-            detail=(f"Gear component ID {gear_component_id} does not belong to user {token_user_id}"),
-        )
-
-    gc_crud.delete_gear_component(
+    gear_components_crud.delete_gear_component(
         token_user_id,
         gear_component_id,
         db,

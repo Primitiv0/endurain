@@ -64,7 +64,6 @@ def _get_migration_by_id_model_or_404(migration_id: int, db: Session) -> migrati
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Migration not found",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return db_migration

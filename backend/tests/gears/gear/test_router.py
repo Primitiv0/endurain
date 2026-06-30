@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 
 
@@ -145,12 +145,10 @@ class TestCreateGear:
 
 class TestEditGear:
     @patch("gears.gear.router.gears_crud.edit_gear")
-    @patch("gears.gear.router.gears_crud.get_gear_user_by_id")
-    def test_edit_success(self, mock_get, mock_edit, mock_db):
+    def test_edit_success(self, mock_edit, mock_db):
         from gears.gear.schema import GearRead
 
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = GearRead(id=1, user_id=1, nickname="Bike", gear_type=1)
         mock_edit.return_value = GearRead(id=1, user_id=1, nickname="Updated Bike", gear_type=1)
 
         response = client.put(
@@ -160,10 +158,13 @@ class TestEditGear:
         )
         assert response.status_code == 200
 
-    @patch("gears.gear.router.gears_crud.get_gear_user_by_id")
-    def test_edit_not_found(self, mock_get, mock_db):
+    @patch("gears.gear.router.gears_crud.edit_gear")
+    def test_edit_not_found(self, mock_edit, mock_db):
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = None
+        mock_edit.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gear not found",
+        )
 
         response = client.put(
             "/gears",
@@ -172,47 +173,23 @@ class TestEditGear:
         )
         assert response.status_code == 404
 
-    @patch("gears.gear.router.gears_crud.get_gear_user_by_id")
-    def test_edit_forbidden(self, mock_get, mock_db):
-        from gears.gear.schema import GearRead
-
-        client = TestClient(_build_app(mock_db))
-        mock_get.return_value = GearRead(id=1, user_id=2, nickname="Bike", gear_type=1)
-
-        response = client.put(
-            "/gears",
-            json={"id": 1, "nickname": "Not Mine", "gear_type": 1},
-            headers={"Authorization": "Bearer x"},
-        )
-        assert response.status_code == 403
-
 
 class TestDeleteGear:
     @patch("gears.gear.router.gears_crud.delete_gear")
-    @patch("gears.gear.router.gears_crud.get_gear_user_by_id")
-    def test_delete_success(self, mock_get, mock_delete, mock_db):
-        from gears.gear.schema import GearRead
-
+    def test_delete_success(self, mock_delete, mock_db):
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = GearRead(id=1, user_id=1, nickname="Bike", gear_type=1)
+        mock_delete.return_value = None
 
         response = client.delete("/gears/1", headers={"Authorization": "Bearer x"})
         assert response.status_code == 204
 
-    @patch("gears.gear.router.gears_crud.get_gear_user_by_id")
-    def test_delete_not_found(self, mock_get, mock_db):
+    @patch("gears.gear.router.gears_crud.delete_gear")
+    def test_delete_not_found(self, mock_delete, mock_db):
         client = TestClient(_build_app(mock_db))
-        mock_get.return_value = None
+        mock_delete.side_effect = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gear not found",
+        )
 
         response = client.delete("/gears/999", headers={"Authorization": "Bearer x"})
         assert response.status_code == 404
-
-    @patch("gears.gear.router.gears_crud.get_gear_user_by_id")
-    def test_delete_forbidden(self, mock_get, mock_db):
-        from gears.gear.schema import GearRead
-
-        client = TestClient(_build_app(mock_db))
-        mock_get.return_value = GearRead(id=1, user_id=2, nickname="Bike", gear_type=1)
-
-        response = client.delete("/gears/1", headers={"Authorization": "Bearer x"})
-        assert response.status_code == 403

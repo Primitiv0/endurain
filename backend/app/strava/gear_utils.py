@@ -11,7 +11,6 @@ import core.logger as core_logger
 import core.text_imports as core_text_imports
 import gears.gear.crud as gears_crud
 import gears.gear.schema as gears_schema
-import gears.gear.utils as gears_utils
 import strava.athlete_utils as strava_athlete_utils
 import strava.utils as strava_utils
 import users.users_integrations.crud as user_integrations_crud
@@ -97,7 +96,7 @@ def process_gear(
         brand=strava_gear.brand_name,
         model=strava_gear.model_name,
         nickname=strava_gear.name,
-        gear_type=1 if gear_type == "bike" else 2,
+        gear_type=(gears_schema.GearType.BIKE if gear_type == "bike" else gears_schema.GearType.SHOES),
         user_id=user_id,
         active=True,
         strava_gear_id=gear.id,
@@ -303,7 +302,7 @@ def transform_csv_bike_gear_to_schema_gear(bikes_dict: dict, token_user_id: int)
             brand=bikes_dict[bike]["Bike Brand"].strip() if bikes_dict[bike]["Bike Brand"] else None,
             model=bikes_dict[bike]["Bike Model"].strip() if bikes_dict[bike]["Bike Model"] else None,
             nickname=bike.strip(),
-            gear_type=gears_utils.GEAR_NAME_TO_ID["bike"],
+            gear_type=gears_schema.GearType.BIKE,
             active=True,
             strava_gear_id=None,
         )
@@ -360,7 +359,7 @@ def transform_csv_shoe_gear_to_schema_gear(
             brand=shoerow["Shoe Brand"].strip() if shoerow["Shoe Brand"] else None,
             model=shoerow["Shoe Model"].strip() if shoerow["Shoe Model"] else None,
             nickname=shoe_name,
-            gear_type=gears_utils.GEAR_NAME_TO_ID["shoes"],
+            gear_type=gears_schema.GearType.SHOES,
             active=True,
             strava_gear_id=None,
         )

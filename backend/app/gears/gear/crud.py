@@ -1,8 +1,7 @@
-from typing import Any
-from urllib.parse import unquote
+from typing import Any, overload
 
 from fastapi import HTTPException, status
-from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -11,12 +10,103 @@ import core.decorators as core_decorators
 import core.logger as core_logger
 import gears.gear.models as gears_models
 import gears.gear.schema as gears_schema
-import gears.gear.utils as gears_utils
 import gears.gear_components.models as gear_components_models
+
+# Fields that must never be reassigned through an update payload
+_IMMUTABLE_FIELDS: frozenset[str] = frozenset({"id", "user_id"})
+
+# Gear text fields trimmed of surrounding whitespace on write
+_TEXT_FIELDS: tuple[str, ...] = ("brand", "model", "nickname")
+
+# Private internal helpers
+
+
+@overload
+def _transform_gears(
+    gears: gears_models.Gear,
+) -> gears_schema.GearRead: ...
+
+
+@overload
+def _transform_gears(
+    gears: list[gears_models.Gear],
+) -> list[gears_schema.GearRead]: ...
+
+
+def _transform_gears(
+    gears: gears_models.Gear | list[gears_models.Gear],
+) -> gears_schema.GearRead | list[gears_schema.GearRead]:
+    """
+    Transform a gear or list of gears to a Pydantic schema.
+
+    Args:
+        gears: The gear ORM instance or list of instances.
+
+    Returns:
+        The gear(s) as a schema.
+    """
+    if isinstance(gears, list):
+        return [gears_schema.GearRead.model_validate(g) for g in gears]
+    return gears_schema.GearRead.model_validate(gears)
+
+
+def _normalize_gear_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Normalize a gear payload mapping for persistence.
+
+    Args:
+        data: Mapping of gear field names to values.
+
+    Returns:
+        The mapping with text fields trimmed and a None
+        ``created_at`` removed so the column default applies.
+    """
+    for field in _TEXT_FIELDS:
+        value = data.get(field)
+        if isinstance(value, str):
+            data[field] = value.strip()
+    if data.get("created_at") is None:
+        data.pop("created_at", None)
+    return data
 
 
 @core_decorators.handle_db_errors
-def get_gear_user_by_id(user_id: int, gear_id: int, db: Session) -> gears_models.Gear | None:
+def _get_gear_model_by_id_and_user_id_or_404(gear_id: int, user_id: int, db: Session) -> gears_models.Gear:
+    """
+    Retrieve gear model by ID and user ID.
+
+    Args:
+        gear_id: Gear ID to fetch.
+        user_id: User ID to fetch record for.
+        db: Database session.
+
+    Returns:
+        Mapped ``Gear`` ORM instance.
+
+    Raises:
+        HTTPException: If database error occurs.
+    """
+    # Get the gear from the database
+    stmt = select(gears_models.Gear).where(
+        gears_models.Gear.id == gear_id,
+        gears_models.Gear.user_id == user_id,
+    )
+    db_gear = db.execute(stmt).scalar_one_or_none()
+
+    if db_gear is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gear not found",
+        )
+
+    return db_gear
+
+
+# Public CRUD functions
+
+
+@core_decorators.handle_db_errors
+def get_gear_user_by_id(user_id: int, gear_id: int, db: Session) -> gears_schema.GearRead | None:
     """
     Retrieve a gear by ID for a specific user.
 
@@ -26,7 +116,7 @@ def get_gear_user_by_id(user_id: int, gear_id: int, db: Session) -> gears_models
         db: Database session.
 
     Returns:
-        Gear model if found, None otherwise.
+        GearRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -35,7 +125,8 @@ def get_gear_user_by_id(user_id: int, gear_id: int, db: Session) -> gears_models
         gears_models.Gear.user_id == user_id,
         gears_models.Gear.id == gear_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_gear = db.execute(stmt).scalar_one_or_none()
+    return _transform_gears(db_gear) if db_gear is not None else None
 
 
 @core_decorators.handle_db_errors
@@ -105,7 +196,7 @@ def get_gear_components_total_cost(
         gear_components_models.GearComponents.gear_id == gear_id,
         gear_components_models.GearComponents.user_id == user_id,
     )
-    result: CursorResult[Any] = db.execute(stmt).scalar_one()
+    result = db.execute(stmt).scalar_one()
     return float(result or 0)
 
 
@@ -134,7 +225,7 @@ def get_gear_users_with_pagination(
     page_number: int | None = None,
     num_records: int | None = None,
     show_inactive: bool | None = True,
-) -> list[gears_models.Gear]:
+) -> list[gears_schema.GearRead]:
     """
     Retrieve paginated gears for a user.
 
@@ -146,7 +237,7 @@ def get_gear_users_with_pagination(
         show_inactive: Include inactive gears. Defaults to True.
 
     Returns:
-        List of Gear models ordered by nickname.
+        List of GearRead schemas ordered by nickname.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -167,11 +258,12 @@ def get_gear_users_with_pagination(
             (page_number - 1) * num_records,
         ).limit(num_records)
 
-    return list(db.execute(stmt).scalars().all())
+    db_gears = db.execute(stmt).scalars().all()
+    return _transform_gears(list(db_gears))
 
 
 @core_decorators.handle_db_errors
-def get_gear_user(user_id: int, db: Session) -> list[gears_models.Gear]:
+def get_gear_user(user_id: int, db: Session) -> list[gears_schema.GearRead]:
     """
     Retrieve all gears for a specific user.
 
@@ -180,7 +272,7 @@ def get_gear_user(user_id: int, db: Session) -> list[gears_models.Gear]:
         db: Database session.
 
     Returns:
-        List of Gear models for the user.
+        List of GearRead schemas for the user.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -188,11 +280,12 @@ def get_gear_user(user_id: int, db: Session) -> list[gears_models.Gear]:
     stmt = select(gears_models.Gear).where(
         gears_models.Gear.user_id == user_id,
     )
-    return list(db.execute(stmt).scalars().all())
+    db_gears = db.execute(stmt).scalars().all()
+    return _transform_gears(list(db_gears))
 
 
 @core_decorators.handle_db_errors
-def get_gear_user_contains_nickname(user_id: int, nickname: str, db: Session) -> list[gears_models.Gear]:
+def get_gear_user_contains_nickname(user_id: int, nickname: str, db: Session) -> list[gears_schema.GearRead]:
     """
     Retrieve gears matching a nickname substring.
 
@@ -202,12 +295,12 @@ def get_gear_user_contains_nickname(user_id: int, nickname: str, db: Session) ->
         db: Database session.
 
     Returns:
-        List of Gear models matching criteria.
+        List of GearRead schemas matching criteria.
 
     Raises:
         HTTPException: If a database error occurs.
     """
-    parsed_nickname = unquote(nickname).replace("+", " ").lower().strip()
+    parsed_nickname = nickname.lower().strip()
 
     stmt = select(gears_models.Gear).where(
         func.lower(
@@ -215,11 +308,12 @@ def get_gear_user_contains_nickname(user_id: int, nickname: str, db: Session) ->
         ).like(f"%{parsed_nickname}%"),
         gears_models.Gear.user_id == user_id,
     )
-    return list(db.execute(stmt).scalars().all())
+    db_gears = db.execute(stmt).scalars().all()
+    return _transform_gears(list(db_gears))
 
 
 @core_decorators.handle_db_errors
-def get_gear_user_by_nickname(user_id: int, nickname: str, db: Session) -> gears_models.Gear | None:
+def get_gear_user_by_nickname(user_id: int, nickname: str, db: Session) -> gears_schema.GearRead | None:
     """
     Retrieve a gear by exact nickname for a user.
 
@@ -229,12 +323,12 @@ def get_gear_user_by_nickname(user_id: int, nickname: str, db: Session) -> gears
         db: Database session.
 
     Returns:
-        Gear model if found, None otherwise.
+        GearRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If a database error occurs.
     """
-    parsed_nickname = unquote(nickname).replace("+", " ").lower().strip()
+    parsed_nickname = nickname.lower().strip()
 
     stmt = select(gears_models.Gear).where(
         func.lower(
@@ -243,11 +337,12 @@ def get_gear_user_by_nickname(user_id: int, nickname: str, db: Session) -> gears
         == parsed_nickname,
         gears_models.Gear.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_gear = db.execute(stmt).scalar_one_or_none()
+    return _transform_gears(db_gear) if db_gear else None
 
 
 @core_decorators.handle_db_errors
-def get_gear_by_type_and_user(gear_type: int, user_id: int, db: Session) -> list[gears_models.Gear]:
+def get_gear_by_type_and_user(gear_type: int, user_id: int, db: Session) -> list[gears_schema.GearRead]:
     """
     Retrieve gears by type for a specific user.
 
@@ -257,7 +352,7 @@ def get_gear_by_type_and_user(gear_type: int, user_id: int, db: Session) -> list
         db: Database session.
 
     Returns:
-        List of Gear models ordered by nickname.
+        List of GearRead schemas ordered by nickname.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -270,7 +365,8 @@ def get_gear_by_type_and_user(gear_type: int, user_id: int, db: Session) -> list
         )
         .order_by(gears_models.Gear.nickname)
     )
-    return list(db.execute(stmt).scalars().all())
+    db_gears = db.execute(stmt).scalars().all()
+    return _transform_gears(list(db_gears))
 
 
 @core_decorators.handle_db_errors
@@ -278,7 +374,7 @@ def get_gear_by_strava_id_from_user_id(
     gear_strava_id: str,
     user_id: int,
     db: Session,
-) -> gears_models.Gear | None:
+) -> gears_schema.GearRead | None:
     """
     Retrieve a gear by Strava ID for a user.
 
@@ -288,7 +384,7 @@ def get_gear_by_strava_id_from_user_id(
         db: Database session.
 
     Returns:
-        Gear model if found, None otherwise.
+        GearRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -297,7 +393,8 @@ def get_gear_by_strava_id_from_user_id(
         gears_models.Gear.user_id == user_id,
         gears_models.Gear.strava_gear_id == gear_strava_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_gear = db.execute(stmt).scalar_one_or_none()
+    return _transform_gears(db_gear) if db_gear else None
 
 
 @core_decorators.handle_db_errors
@@ -305,7 +402,7 @@ def get_gear_by_garminconnect_id_from_user_id(
     gear_garminconnect_id: str,
     user_id: int,
     db: Session,
-) -> gears_models.Gear | None:
+) -> gears_schema.GearRead | None:
     """
     Retrieve a gear by Garmin Connect ID for a user.
 
@@ -315,7 +412,7 @@ def get_gear_by_garminconnect_id_from_user_id(
         db: Database session.
 
     Returns:
-        Gear model if found, None otherwise.
+        GearRead schema if found, None otherwise.
 
     Raises:
         HTTPException: If a database error occurs.
@@ -324,7 +421,8 @@ def get_gear_by_garminconnect_id_from_user_id(
         gears_models.Gear.user_id == user_id,
         gears_models.Gear.garminconnect_gear_id == gear_garminconnect_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_gear = db.execute(stmt).scalar_one_or_none()
+    return _transform_gears(db_gear) if db_gear else None
 
 
 @core_decorators.handle_db_errors
@@ -356,14 +454,14 @@ def create_multiple_gears(
     valid_gears = [
         gear
         for gear in (gears or [])
-        if gear is not None and getattr(gear, "nickname", None) and str(gear.nickname).replace("+", " ").strip()
+        if gear is not None and getattr(gear, "nickname", None) and str(gear.nickname).strip()
     ]
 
     # De-dupe by nickname (case-insensitive)
     seen: set[str] = set()
     deduped: list[gears_schema.GearCreate] = []
     for gear in valid_gears:
-        nickname_normalized = str(gear.nickname).replace("+", " ").lower().strip()
+        nickname_normalized = str(gear.nickname).lower().strip()
         if nickname_normalized not in seen:
             seen.add(nickname_normalized)
             deduped.append(gear)
@@ -373,15 +471,19 @@ def create_multiple_gears(
                 "warning",
             )
 
-    # Skip any that already exist for this user
+    # Fetch all already-existing nicknames for this user in one query
+    # instead of one SELECT per gear.
+    candidate_nicknames: set[str] = {str(g.nickname).lower().strip() for g in deduped}
+    existing_stmt = select(gears_models.Gear.nickname).where(
+        gears_models.Gear.user_id == user_id,
+        func.lower(gears_models.Gear.nickname).in_(candidate_nicknames),
+    )
+    existing_nicknames: set[str] = {row[0].lower().strip() for row in db.execute(existing_stmt).all()}
+
     gears_to_create: list[gears_schema.GearCreate] = []
     for gear in deduped:
-        gear_check = get_gear_user_by_nickname(
-            user_id,
-            gear.nickname,
-            db,
-        )
-        if gear_check is not None:
+        normalised = str(gear.nickname).lower().strip()
+        if normalised in existing_nicknames:
             core_logger.print_to_log_and_console(
                 f"Gear with nickname '{gear.nickname}' already exists for user {user_id}, skipping",
                 "warning",
@@ -392,10 +494,7 @@ def create_multiple_gears(
     # Persist any remaining
     if gears_to_create:
         new_gears = [
-            gears_utils.transform_schema_gear_to_model_gear(
-                gear,
-                user_id,
-            )
+            gears_models.Gear(**{**_normalize_gear_payload(gear.model_dump(exclude_unset=True)), "user_id": user_id})
             for gear in gears_to_create
         ]
         try:
@@ -416,7 +515,7 @@ def create_gear(
     gear: gears_schema.GearCreate,
     user_id: int,
     db: Session,
-) -> gears_models.Gear:
+) -> gears_schema.GearRead:
     """
     Create a single gear for a user.
 
@@ -426,7 +525,7 @@ def create_gear(
         db: Database session.
 
     Returns:
-        Created Gear model.
+        Created GearRead schema.
 
     Raises:
         HTTPException: If gear already exists or
@@ -444,10 +543,8 @@ def create_gear(
             detail=(f"Gear with nickname {gear.nickname} already exists for user {user_id}"),
         )
 
-    new_gear = gears_utils.transform_schema_gear_to_model_gear(
-        gear,
-        user_id,
-    )
+    gear_data = _normalize_gear_payload(gear.model_dump(exclude_unset=True))
+    new_gear = gears_models.Gear(**{**gear_data, "user_id": user_id})
 
     try:
         db.add(new_gear)
@@ -460,72 +557,58 @@ def create_gear(
             detail=("Duplicate entry error. Check if strava_gear_id or garminconnect_gear_id are unique"),
         ) from integrity_err
 
-    return new_gear
+    return _transform_gears(new_gear)
 
 
 @core_decorators.handle_db_errors
 def edit_gear(
     gear: gears_schema.GearUpdate,
+    user_id: int,
     db: Session,
-) -> gears_models.Gear:
+) -> gears_schema.GearRead:
     """
-    Edit an existing gear by ID.
+    Edit an existing gear by ID and user ID.
 
     Args:
         gear: Gear schema with updated fields.
+        user_id: Owner user ID.
         db: Database session.
 
     Returns:
-        Updated Gear model.
+        Updated GearRead schema.
 
     Raises:
         HTTPException: If a database error occurs.
     """
-    stmt = select(gears_models.Gear).where(
-        gears_models.Gear.id == gear.id,
+    db_gear = _get_gear_model_by_id_and_user_id_or_404(
+        gear.id,
+        user_id,
+        db,
     )
-    db_gear = db.execute(stmt).scalar_one_or_none()
 
-    if db_gear is None:
-        raise HTTPException(
-            status_code=(status.HTTP_404_NOT_FOUND),
-            detail="Gear not found",
-        )
+    gear_data = _normalize_gear_payload(
+        gear.model_dump(exclude_unset=True),
+    )
 
-    if gear.brand is not None:
-        db_gear.brand = unquote(gear.brand).replace("+", " ")
-    if gear.model is not None:
-        db_gear.model = unquote(gear.model).replace("+", " ")
-    if gear.nickname is not None:
-        db_gear.nickname = unquote(gear.nickname).replace("+", " ")
-    if gear.gear_type is not None:
-        db_gear.gear_type = gear.gear_type
-    if gear.created_at is not None:
-        db_gear.created_at = gear.created_at
-    if gear.active is not None:
-        db_gear.active = gear.active
-    if gear.initial_kms is not None:
-        db_gear.initial_kms = gear.initial_kms
-    if gear.purchase_value is not None:
-        db_gear.purchase_value = gear.purchase_value
-    if gear.strava_gear_id is not None:
-        db_gear.strava_gear_id = gear.strava_gear_id
-    if gear.garminconnect_gear_id is not None:
-        db_gear.garminconnect_gear_id = gear.garminconnect_gear_id
+    for key, value in gear_data.items():
+        if key in _IMMUTABLE_FIELDS or value is None:
+            continue
+        setattr(db_gear, key, value)
 
     db.commit()
     db.refresh(db_gear)
 
-    return db_gear
+    return _transform_gears(db_gear)
 
 
 @core_decorators.handle_db_errors
-def delete_gear(gear_id: int, db: Session) -> None:
+def delete_gear(gear_id: int, user_id: int, db: Session) -> None:
     """
-    Delete a gear by ID.
+    Delete a gear by ID and user ID.
 
     Args:
         gear_id: Gear ID to delete.
+        user_id: Owner user ID.
         db: Database session.
 
     Returns:
@@ -535,17 +618,13 @@ def delete_gear(gear_id: int, db: Session) -> None:
         HTTPException: If gear not found or
             a database error occurs.
     """
-    stmt = delete(gears_models.Gear).where(
-        gears_models.Gear.id == gear_id,
+    db_gear = _get_gear_model_by_id_and_user_id_or_404(
+        gear_id,
+        user_id,
+        db,
     )
-    result: CursorResult[Any] = db.execute(stmt)
 
-    if result.rowcount == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=(f"Gear with id {gear_id} not found"),
-        )
-
+    db.delete(db_gear)
     db.commit()
 
 
@@ -570,10 +649,8 @@ def delete_all_strava_gear_for_user(user_id: int, db: Session) -> None:
             None,
         ),
     )
-    result: CursorResult[Any] = db.execute(stmt)
-
-    if result.rowcount != 0:
-        db.commit()
+    db.execute(stmt)
+    db.commit()
 
 
 @core_decorators.handle_db_errors
@@ -596,7 +673,5 @@ def delete_all_garminconnect_gear_for_user(user_id: int, db: Session) -> None:
         gears_models.Gear.user_id == user_id,
         gears_models.Gear.garminconnect_gear_id.isnot(None),
     )
-    result: CursorResult[Any] = db.execute(stmt)
-
-    if result.rowcount != 0:
-        db.commit()
+    db.execute(stmt)
+    db.commit()

@@ -50,7 +50,7 @@ def process_gear(gear, user_id: int, db: Session) -> gears_schema.GearCreate | N
         brand=gear["gearMakeName"] if gear["gearMakeName"] else None,
         model=gear["gearModelName"] if gear["gearModelName"] else None,
         nickname=(gear["displayName"] if gear["displayName"] else gear["customMakeModel"]),
-        gear_type=1 if gear["gearTypeName"] == "Bike" else 2,
+        gear_type=(gears_schema.GearType.BIKE if gear["gearTypeName"] == "Bike" else gears_schema.GearType.SHOES),
         user_id=user_id,
         active=gear["gearStatusName"] == "active",
         garminconnect_gear_id=gear["uuid"],

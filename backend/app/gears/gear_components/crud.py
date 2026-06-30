@@ -1,9 +1,9 @@
 """CRUD operations for gear components."""
 
-from typing import Any
+from typing import overload
 
 from fastapi import HTTPException, status
-from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import activities.activity.models as activity_models
@@ -19,38 +19,80 @@ _IMMUTABLE_FIELDS: set[str] = {
     "gear_id",
 }
 
+# Private internal helpers
 
-@core_decorators.handle_db_errors
-def get_gear_component_by_id(
-    gear_component_id: int,
-    db: Session,
-) -> gear_components_models.GearComponents | None:
+
+@overload
+def _transform_gear_components(
+    gear_components: gear_components_models.GearComponents,
+) -> gear_components_schema.GearComponentRead: ...
+
+
+@overload
+def _transform_gear_components(
+    gear_components: list[gear_components_models.GearComponents],
+) -> list[gear_components_schema.GearComponentRead]: ...
+
+
+def _transform_gear_components(
+    gear_components: gear_components_models.GearComponents | list[gear_components_models.GearComponents],
+) -> gear_components_schema.GearComponentRead | list[gear_components_schema.GearComponentRead]:
     """
-    Retrieve a gear component by its ID.
+    Transform a gear component or list of gear components to a Pydantic schema.
 
     Args:
-        gear_component_id: Primary key.
+        gear_components: The gear component ORM instance or list of instances.
+
+    Returns:
+        The gear component(s) as a schema.
+    """
+    if isinstance(gear_components, list):
+        return [gear_components_schema.GearComponentRead.model_validate(gc) for gc in gear_components]
+    return gear_components_schema.GearComponentRead.model_validate(gear_components)
+
+
+@core_decorators.handle_db_errors
+def _get_gear_component_model_by_id_and_user_id_or_404(
+    gear_component_id: int, user_id: int, db: Session
+) -> gear_components_models.GearComponents:
+    """
+    Retrieve gear component model by ID and user ID.
+
+    Args:
+        gear_component_id: Gear component ID to fetch.
+        user_id: User ID to fetch record for.
         db: Database session.
 
     Returns:
-        ORM gear component or None.
+        Mapped ``GearComponents`` ORM instance.
 
     Raises:
-        HTTPException: On database error (500).
+        HTTPException: If database error occurs.
     """
-    stmt = select(
-        gear_components_models.GearComponents,
-    ).where(
+    # Get the gear_component from the database
+    stmt = select(gear_components_models.GearComponents).where(
         gear_components_models.GearComponents.id == gear_component_id,
+        gear_components_models.GearComponents.user_id == user_id,
     )
-    return db.execute(stmt).scalar_one_or_none()
+    db_gear_component = db.execute(stmt).scalar_one_or_none()
+
+    if db_gear_component is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Gear component not found",
+        )
+
+    return db_gear_component
+
+
+# Public CRUD functions
 
 
 @core_decorators.handle_db_errors
 def get_gear_components_user(
     user_id: int,
     db: Session,
-) -> list[gear_components_models.GearComponents]:
+) -> list[gear_components_schema.GearComponentRead]:
     """
     Retrieve all gear components for a user.
 
@@ -59,7 +101,7 @@ def get_gear_components_user(
         db: Database session.
 
     Returns:
-        List of ORM gear components.
+        List of GearComponentRead schema.
 
     Raises:
         HTTPException: On database error (500).
@@ -69,7 +111,8 @@ def get_gear_components_user(
     ).where(
         gear_components_models.GearComponents.user_id == user_id,
     )
-    return db.execute(stmt).scalars().all()
+    db_gear_components = db.execute(stmt).scalars().all()
+    return _transform_gear_components(list(db_gear_components))
 
 
 @core_decorators.handle_db_errors
@@ -78,7 +121,7 @@ def get_gear_components_user_by_gear_id(
     gear_id: int,
     db: Session,
     active: bool | None = None,
-) -> list[gear_components_models.GearComponents]:
+) -> list[gear_components_schema.GearComponentRead]:
     """
     Retrieve gear components by user and gear.
 
@@ -89,7 +132,7 @@ def get_gear_components_user_by_gear_id(
         active: Optional active-status filter.
 
     Returns:
-        List of ORM gear components.
+        List of GearComponentRead schema.
 
     Raises:
         HTTPException: On database error (500).
@@ -104,7 +147,8 @@ def get_gear_components_user_by_gear_id(
         stmt = stmt.where(
             gear_components_models.GearComponents.active == active,
         )
-    return db.execute(stmt).scalars().all()
+    db_gear_components = db.execute(stmt).scalars().all()
+    return _transform_gear_components(list(db_gear_components))
 
 
 @core_decorators.handle_db_errors
@@ -112,7 +156,7 @@ def create_gear_component(
     gear_component: (gear_components_schema.GearComponentCreate),
     user_id: int,
     db: Session,
-) -> gear_components_models.GearComponents:
+) -> gear_components_schema.GearComponentRead:
     """
     Create a new gear component.
 
@@ -122,7 +166,7 @@ def create_gear_component(
         db: Database session.
 
     Returns:
-        Created ORM gear component.
+        Created GearComponentRead schema.
 
     Raises:
         HTTPException: On database error (500).
@@ -143,14 +187,15 @@ def create_gear_component(
     db.commit()
     db.refresh(new_gear_component)
 
-    return new_gear_component
+    return _transform_gear_components(new_gear_component)
 
 
 @core_decorators.handle_db_errors
 def edit_gear_component(
     gear_component: (gear_components_schema.GearComponentUpdate),
+    user_id: int,
     db: Session,
-) -> gear_components_models.GearComponents:
+) -> gear_components_schema.GearComponentRead:
     """
     Edit an existing gear component by ID.
 
@@ -159,24 +204,13 @@ def edit_gear_component(
         db: Database session.
 
     Returns:
-        Updated ORM gear component.
+        Updated GearComponentRead schema.
 
     Raises:
         HTTPException: If not found (404) or
             database error (500).
     """
-    stmt = select(
-        gear_components_models.GearComponents,
-    ).where(
-        gear_components_models.GearComponents.id == gear_component.id,
-    )
-    db_gear_component = db.execute(stmt).scalar_one_or_none()
-
-    if db_gear_component is None:
-        raise HTTPException(
-            status_code=(status.HTTP_404_NOT_FOUND),
-            detail="Gear component not found",
-        )
+    db_gear_component = _get_gear_component_model_by_id_and_user_id_or_404(gear_component.id, user_id, db)
 
     gear_component_data = gear_component.model_dump(
         exclude_unset=True,
@@ -195,7 +229,7 @@ def edit_gear_component(
     db.commit()
     db.refresh(db_gear_component)
 
-    return db_gear_component
+    return _transform_gear_components(db_gear_component)
 
 
 @core_decorators.handle_db_errors
@@ -219,20 +253,9 @@ def delete_gear_component(
         HTTPException: If not found (404) or
             database error (500).
     """
-    stmt = delete(
-        gear_components_models.GearComponents,
-    ).where(
-        gear_components_models.GearComponents.user_id == user_id,
-        gear_components_models.GearComponents.id == gear_component_id,
-    )
-    result: CursorResult[Any] = db.execute(stmt)
+    db_gear_component = _get_gear_component_model_by_id_and_user_id_or_404(gear_component_id, user_id, db)
 
-    if result.rowcount == 0:
-        raise HTTPException(
-            status_code=(status.HTTP_404_NOT_FOUND),
-            detail=(f"Gear component with ID {gear_component_id} not found"),
-        )
-
+    db.delete(db_gear_component)
     db.commit()
 
 

@@ -20,9 +20,8 @@ Exports:
       delete_all_garminconnect_gear_for_user
     - Schemas: GearBase, GearCreate, GearRead,
       GearUpdate, GearsListResponse
+    - Enums: GearType
     - Models: Gear (ORM model)
-    - Utils: transform_schema_gear_to_model_gear,
-      GEAR_ID_TO_NAME, GEAR_NAME_TO_ID
 """
 
 from .crud import (
@@ -42,29 +41,20 @@ from .crud import (
     get_gear_users_with_pagination,
     get_gears_number,
 )
-from .models import Gear as GearModel
 from .schema import (
     GearBase,
     GearCreate,
     GearRead,
     GearsListResponse,
+    GearType,
     GearUpdate,
-)
-from .utils import (
-    GEAR_ID_TO_NAME,
-    GEAR_NAME_TO_ID,
-    transform_schema_gear_to_model_gear,
 )
 
 __all__ = [
-    "GEAR_ID_TO_NAME",
-    "GEAR_NAME_TO_ID",
-    # Pydantic schemas
     "GearBase",
     "GearCreate",
-    # Database model
-    "GearModel",
     "GearRead",
+    "GearType",
     "GearUpdate",
     "GearsListResponse",
     "create_gear",
@@ -77,12 +67,9 @@ __all__ = [
     "get_gear_by_strava_id_from_user_id",
     "get_gear_by_type_and_user",
     "get_gear_user",
-    # CRUD operations
     "get_gear_user_by_id",
     "get_gear_user_by_nickname",
     "get_gear_user_contains_nickname",
     "get_gear_users_with_pagination",
     "get_gears_number",
-    # Utilities
-    "transform_schema_gear_to_model_gear",
 ]

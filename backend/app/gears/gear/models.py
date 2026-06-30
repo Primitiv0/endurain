@@ -79,10 +79,10 @@ class Gear(Base):
     gear_type: Mapped[int] = mapped_column(
         nullable=False,
         comment=(
-            "Gear type (1 - bike, 2 - shoes,"
-            " 3 - wetsuit, 4 - racquet,"
-            " 5 - skis, 6 - snowboard,"
-            " 7 - windsurf,"
+            "Gear type code; see GearType enum"
+            " in gears.gear.schema (1 - bike,"
+            " 2 - shoes, 3 - wetsuit, 4 - racquet,"
+            " 5 - ski, 6 - snowboard, 7 - windsurf,"
             " 8 - water sports board)"
         ),
     )
@@ -99,6 +99,7 @@ class Gear(Base):
     )
     active: Mapped[bool] = mapped_column(
         nullable=False,
+        default=True,
         comment=("Whether the gear is active (true - yes, false - no)"),
     )
     initial_kms: Mapped[Decimal] = mapped_column(

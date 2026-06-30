@@ -73,7 +73,6 @@ def _get_health_weight_model_by_id_and_user_id_or_404(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Health weight not found",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return db_health_weight
