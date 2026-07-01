@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import type { ProfileDetails, ProfileEditInput } from '@/features/profile/types'
@@ -98,6 +98,12 @@ async function submitForm(values: ProfileFormValues): Promise<void> {
   }
 }
 
+// Mirror the active unit system into its own ref so the height validators can
+// branch on it. They can't read `values.units`: `values` comes from this same
+// `useForm(...)` call, so referencing it inside that call's validators would be
+// a circular reference TypeScript rejects.
+const activeUnits = ref<Schemas['Units']>('metric')
+
 const { values, errors, isValid, isSubmitting, handleSubmit, handleBlur, reset } =
   useForm<ProfileFormValues>({
     initialValues: {
@@ -130,13 +136,33 @@ const { values, errors, isValid, isSubmitting, handleSubmit, handleBlur, reset }
         required(t('settings.users.form.emailRequired')),
         email(t('settings.users.form.emailInvalid')),
       ),
-      heightFeet: numberRange(10, t('settings.users.form.feetInvalid')),
-      heightInches: numberRange(11, t('settings.users.form.inchesInvalid')),
+      // Height is captured per unit system and only the active system's inputs
+      // are rendered. Skip the imperial validators in metric mode (and vice
+      // versa) so a hidden field's seed value can't silently fail validation and
+      // disable submit with no visible error.
+      heightFeet: (value: number | null) =>
+        activeUnits.value === 'metric'
+          ? null
+          : numberRange(10, t('settings.users.form.feetInvalid'))(value),
+      heightInches: (value: number | null) =>
+        activeUnits.value === 'metric'
+          ? null
+          : numberRange(11, t('settings.users.form.inchesInvalid'))(value),
     },
     onSubmit: submitForm,
   })
 
 const isMetric = computed(() => values.units === 'metric')
+
+// Keep `activeUnits` in step with the unit selector so the height validators
+// re-run against the correct system whenever the user toggles units.
+watch(
+  () => values.units,
+  (units) => {
+    activeUnits.value = units
+  },
+  { immediate: true },
+)
 
 /** Seeds the form from the current profile each time the dialog opens. */
 function populate(): void {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp, Eye, EyeOff, LoaderCircle } from '@lucide/vue'
@@ -139,6 +139,12 @@ async function submitForm(formValues: SignUpFormValues): Promise<void> {
   }
 }
 
+// Validators can't read `values.units` directly: `values` is destructured from
+// this same `useForm(...)` call, so referencing it here is a circular reference.
+// Mirror the active unit system into a standalone ref the validators can read,
+// kept in sync with `values.units` via the watch below.
+const activeUnits = ref<SignUpFormValues['units']>('metric')
+
 const { values, errors, isValid, isSubmitting, submitError, handleSubmit, handleBlur } =
   useForm<SignUpFormValues>({
     initialValues: {
@@ -164,13 +170,29 @@ const { values, errors, isValid, isSubmitting, submitError, handleSubmit, handle
       password: compose(required<string>(t('signup.requiredField')), (value) =>
         isValidPassword(value, passwordRequirements.value) ? null : t('signup.passwordInvalid'),
       ),
-      heightFeet: numberRange(10, t('signup.feetInvalid')),
-      heightInches: numberRange(11, t('signup.inchesInvalid')),
+      // Height is captured per unit system and only the active system's inputs
+      // are rendered. Skip the imperial validators in metric mode (and vice
+      // versa) so a hidden field's stale value can't silently fail validation
+      // and disable submit with no visible error.
+      heightFeet: (value: number | null) =>
+        activeUnits.value === 'metric' ? null : numberRange(10, t('signup.feetInvalid'))(value),
+      heightInches: (value: number | null) =>
+        activeUnits.value === 'metric' ? null : numberRange(11, t('signup.inchesInvalid'))(value),
     },
     onSubmit: submitForm,
   })
 
 const isMetric = computed(() => values.units === 'metric')
+
+// Keep `activeUnits` in step with the unit selector so the height validators
+// re-run against the correct system whenever the user toggles units.
+watch(
+  () => values.units,
+  (units) => {
+    activeUnits.value = units
+  },
+  { immediate: true },
+)
 
 onMounted(async () => {
   await load()

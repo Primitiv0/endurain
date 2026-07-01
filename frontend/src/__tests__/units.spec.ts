@@ -7,6 +7,10 @@ describe('cmToFeetInches', () => {
     expect(cmToFeetInches(180)).toEqual({ feet: 5, inches: 11 })
     expect(cmToFeetInches(0)).toEqual({ feet: 0, inches: 0 })
   })
+
+  it('carries over to the next foot instead of returning 12 inches', () => {
+    expect(cmToFeetInches(182)).toEqual({ feet: 6, inches: 0 })
+  })
 })
 
 describe('feetAndInchesToCm', () => {

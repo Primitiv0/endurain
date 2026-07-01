@@ -13,14 +13,18 @@ export interface FeetInches {
 /**
  * Converts centimetres to whole feet and rounded inches.
  *
+ * Rounds to the nearest whole inch first, then splits into feet and inches, so
+ * a value that rounds up to 12 inches (e.g. 182 cm) carries over to the next
+ * foot (6'0") rather than producing an out-of-range 5'12".
+ *
  * @param cm - Height in centimetres.
  * @returns The equivalent feet and inches.
  */
 export function cmToFeetInches(cm: number): FeetInches {
-  const totalInches = cm / 2.54
+  const totalInches = Math.round(cm / 2.54)
   return {
     feet: Math.floor(totalInches / 12),
-    inches: Math.round(totalInches % 12),
+    inches: totalInches % 12,
   }
 }
 
