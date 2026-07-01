@@ -234,7 +234,7 @@ function onRefresh(): void {
 
       <!-- Loading -->
       <div v-if="isPending" class="flex flex-col gap-3" aria-busy="true">
-        <Card v-for="n in 3" :key="n" class="flex flex-col gap-4">
+        <Card v-for="n in 3" :key="n" class="flex flex-col gap-3">
           <div class="flex items-center gap-3">
             <Skeleton class="size-11 rounded-full" />
             <div class="flex-1 space-y-2">

@@ -29,15 +29,15 @@ const profile = computed(() => profileQuery.data.value ?? null)
          data transfer) so the placeholder matches the loaded layout. -->
     <div v-if="profileQuery.isPending.value" class="flex flex-col gap-3" aria-busy="true">
       <!-- Profile info: avatar + identity fields. -->
-      <Card class="flex flex-col gap-4">
-        <div class="flex items-center gap-4">
+      <Card class="flex flex-col gap-3">
+        <div class="flex items-center gap-3">
           <Skeleton class="size-28 shrink-0 rounded-full" />
           <div class="flex-1 space-y-2">
             <Skeleton class="h-5 w-1/3" />
             <Skeleton class="h-4 w-1/4" />
           </div>
         </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Skeleton v-for="n in 4" :key="n" class="h-9 w-full" />
         </div>
       </Card>

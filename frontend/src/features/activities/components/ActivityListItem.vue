@@ -102,7 +102,7 @@ const mobileSummary = computed(() => {
 
 <template>
   <div
-    class="flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:gap-4"
+    class="flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center sm:gap-3"
   >
     <!-- Identity: type icon, linked name, date · location, mobile metric summary. -->
     <div class="flex min-w-0 items-center gap-3 sm:flex-1">

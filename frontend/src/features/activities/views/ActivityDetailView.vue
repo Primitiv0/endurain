@@ -176,7 +176,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
 </script>
 
 <template>
-  <div class="flex flex-col gap-5">
+  <div class="flex flex-col gap-3">
     <Button variant="ghost" size="sm" class="self-start" @click="$router.back()">
       <ArrowLeft class="size-4" />
       {{ t('activities.back') }}
@@ -186,7 +186,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
          charts grid, and the splits table so the placeholder matches the load. -->
     <template v-if="isPending">
       <!-- Summary: athlete header + at-a-glance metrics (one card, as loaded). -->
-      <Card class="flex flex-col gap-5" aria-busy="true">
+      <Card class="flex flex-col gap-3" aria-busy="true">
         <div class="flex items-start justify-between gap-3">
           <div class="flex min-w-0 items-center gap-3">
             <Skeleton class="size-14 shrink-0 rounded-full" />
@@ -210,7 +210,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
       <Skeleton class="h-72 w-full rounded-card lg:h-150" />
 
       <!-- Charts grid: two-column stream-chart placeholders. -->
-      <div class="grid gap-4 lg:grid-cols-2" aria-busy="true">
+      <div class="grid gap-3 lg:grid-cols-2" aria-busy="true">
         <Card v-for="n in 4" :key="n" class="flex min-w-0 flex-col gap-3">
           <div class="flex items-center gap-2">
             <Skeleton class="size-2.5 rounded-full" />
@@ -231,7 +231,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
       </div>
 
       <!-- Splits/laps table. -->
-      <Card class="flex flex-col gap-4" aria-busy="true">
+      <Card class="flex flex-col gap-3" aria-busy="true">
         <Skeleton class="h-5 w-24" />
         <div class="space-y-2">
           <Skeleton v-for="n in 4" :key="n" class="h-8 w-full" />
@@ -275,7 +275,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
     <!-- Content -->
     <template v-else-if="activity && metricVisibility">
       <!-- Summary: title/user + at-a-glance metrics, before the map (v1 order). -->
-      <Card class="flex flex-col gap-5">
+      <Card class="flex flex-col gap-3">
         <ActivityDetailHeader
           :activity="activity"
           :units="units"
@@ -297,7 +297,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
 
       <ActivityGearCard v-if="isOwner" :activity="activity" />
 
-      <div v-if="chartPanels.length > 0" class="grid gap-4 lg:grid-cols-2">
+      <div v-if="chartPanels.length > 0" class="grid gap-3 lg:grid-cols-2">
         <template v-for="panel in chartPanels" :key="panel.key">
           <ActivityStreamChart
             v-if="panel.kind === 'chart'"
@@ -317,7 +317,7 @@ const notFound = computed(() => !isPending.value && !isError.value && activity.v
         </template>
       </div>
 
-      <Card v-if="showLaps || showWorkout" class="flex flex-col gap-4">
+      <Card v-if="showLaps || showWorkout" class="flex flex-col gap-3">
         <!-- Both available → switch between Laps and Sets (mirrors v1's pills). -->
         <Tabs v-if="showLaps && showWorkout" v-model="splitsTab">
           <TabsList>

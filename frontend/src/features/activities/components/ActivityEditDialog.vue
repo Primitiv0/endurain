@@ -119,7 +119,7 @@ async function submit(): Promise<void> {
     content-class="sm:max-w-2xl"
     @submit="submit"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3">
       <FormField :label="t('activities.edit.name')">
         <template #default="{ fieldId }">
           <Input

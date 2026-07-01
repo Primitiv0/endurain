@@ -202,7 +202,7 @@ onMounted(async () => {
         {{ submitError }}
       </Alert>
 
-      <div class="mt-5 flex flex-col gap-4">
+      <div class="mt-5 flex flex-col gap-3">
         <FormField :label="t('signup.name')" required :error="errors.name">
           <template #default="{ fieldId, describedBy, invalid }">
             <Input
@@ -297,7 +297,7 @@ onMounted(async () => {
           }}</span>
         </button>
 
-        <div v-if="showOptionalFields" class="flex flex-col gap-4">
+        <div v-if="showOptionalFields" class="flex flex-col gap-3">
           <FormField :label="t('signup.preferredLanguage')">
             <template #default="{ fieldId }">
               <Select

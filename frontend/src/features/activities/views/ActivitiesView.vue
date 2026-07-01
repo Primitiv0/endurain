@@ -162,7 +162,7 @@ function refetch(): void {
     <div class="grid gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
       <!-- Controls rail: name search + type + date range filters. -->
       <aside class="lg:sticky lg:top-6">
-        <Card class="flex flex-col gap-4">
+        <Card class="flex flex-col gap-3">
           <div class="relative">
             <Search
               class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -297,7 +297,7 @@ function refetch(): void {
 
         <div>
           <!-- Aligned column headers (desktop); cell classes match ActivityListItem. -->
-          <div class="hidden border-b border-border px-4 py-2 sm:flex sm:items-center sm:gap-4">
+          <div class="hidden border-b border-border px-4 py-2 sm:flex sm:items-center sm:gap-3">
             <span class="flex-1 ps-13 text-caption">{{
               t('activities.list.columns.activity')
             }}</span>

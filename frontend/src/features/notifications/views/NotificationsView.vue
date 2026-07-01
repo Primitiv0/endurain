@@ -58,7 +58,7 @@ function onMarkAllRead(): void {
 
 <template>
   <section class="flex flex-col 3">
-    <header class="flex items-start justify-between gap-4">
+    <header class="flex items-start justify-between gap-3">
       <div class="flex flex-col gap-1">
         <h1 class="text-page-title">{{ t('notifications.title') }}</h1>
         <p class="text-body">{{ t('notifications.subtitle') }}</p>

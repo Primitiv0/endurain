@@ -166,9 +166,9 @@ watch(selectedTemplate, (templateId) => {
 <template>
   <form class="flex flex-col gap-3" novalidate @submit.prevent="handleSubmit">
     <!-- General -->
-    <Card class="flex flex-col gap-4">
+    <Card class="flex flex-col gap-3">
       <h2 class="text-card-heading">{{ t('settings.server.general.title') }}</h2>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormField :label="t('settings.server.general.units')">
           <template #default="{ fieldId }">
             <Select :id="fieldId" v-model="values.units" :disabled="isSubmitting">
@@ -201,9 +201,9 @@ watch(selectedTemplate, (templateId) => {
     </Card>
 
     <!-- Password policy -->
-    <Card class="flex flex-col gap-4">
+    <Card class="flex flex-col gap-3">
       <h2 class="text-card-heading">{{ t('settings.server.password.title') }}</h2>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <FormField :label="t('settings.server.password.type')">
           <template #default="{ fieldId }">
             <Select :id="fieldId" v-model="values.passwordType" :disabled="isSubmitting">
@@ -302,7 +302,7 @@ watch(selectedTemplate, (templateId) => {
     </Card>
 
     <!-- Maps -->
-    <Card class="flex flex-col gap-4">
+    <Card class="flex flex-col gap-3">
       <h2 class="text-card-heading">{{ t('settings.server.maps.title') }}</h2>
 
       <FormField :label="t('settings.server.maps.template')">

@@ -85,7 +85,7 @@ const showSetWeight = computed(() => setRows.value.some((row) => row.weight !== 
 </script>
 
 <template>
-  <div class="flex flex-col gap-5">
+  <div class="flex flex-col gap-3">
     <!-- Planned steps (swim stroke / structured intervals). -->
     <div v-if="hasSteps">
       <h3 class="text-card-heading mb-2">{{ t('activities.workout.stepsTitle') }}</h3>

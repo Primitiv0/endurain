@@ -33,9 +33,9 @@ const templates = computed(() => templatesQuery.data.value ?? [])
     </header>
 
     <div v-if="isLoading" class="flex flex-col gap-3" aria-busy="true">
-      <Card v-for="section in 3" :key="section" class="flex flex-col gap-4">
+      <Card v-for="section in 3" :key="section" class="flex flex-col gap-3">
         <Skeleton class="h-6 w-40" />
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Skeleton v-for="field in 3" :key="field" class="h-9 w-full" />
         </div>
       </Card>

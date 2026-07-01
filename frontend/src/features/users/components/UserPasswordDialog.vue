@@ -120,7 +120,7 @@ watch(open, (isOpen) => {
     :can-submit="isValid && passwordsMatch"
     @submit="handleSubmit"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3">
       <FormField
         :label="t('settings.users.password.newLabel')"
         :error="errors.password"

@@ -102,7 +102,7 @@ function barWidth(percentage: number): string {
 </script>
 
 <template>
-  <Card class="flex flex-col gap-4">
+  <Card class="flex flex-col gap-3">
     <h2 class="text-card-heading">{{ t('home.goals.title') }}</h2>
 
     <!-- Loading -->

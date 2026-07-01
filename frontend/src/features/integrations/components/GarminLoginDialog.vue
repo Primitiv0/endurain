@@ -120,7 +120,7 @@ function onSubmitMfa(): void {
     :can-submit="canSubmit"
     @submit="onLogin"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3">
       <div class="flex flex-col gap-1.5">
         <Label for="garmin-username">{{ t('settings.integrations.garmin.username') }}</Label>
         <Input

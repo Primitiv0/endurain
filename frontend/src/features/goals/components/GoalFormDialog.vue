@@ -236,7 +236,7 @@ watch(open, (isOpen) => {
     :can-submit="canSubmit"
     @submit="handleSubmit"
   >
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-2">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-2">
       <FormField :label="t('settings.goals.form.interval')" required>
         <template #default="{ fieldId }">
           <Select :id="fieldId" v-model="values.interval" :disabled="isSubmitting">

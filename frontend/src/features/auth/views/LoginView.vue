@@ -229,7 +229,7 @@ onMounted(async () => {
         {{ alert.message }}
       </Alert>
 
-      <div v-if="showLocalLogin" class="mt-5 flex flex-col gap-4">
+      <div v-if="showLocalLogin" class="mt-5 flex flex-col gap-3">
         <template v-if="!isMfaStep">
           <div class="flex flex-col gap-1.5">
             <Label for="login-username">

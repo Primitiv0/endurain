@@ -91,7 +91,7 @@ const showPrivateNotes = computed(
 </script>
 
 <template>
-  <header class="flex flex-col gap-4">
+  <header class="flex flex-col gap-3">
     <!-- Athlete photo + name + meta on the left, external links on the right. -->
     <div class="flex items-start justify-between gap-3">
       <div class="flex min-w-0 items-center gap-3">

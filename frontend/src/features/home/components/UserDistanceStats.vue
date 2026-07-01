@@ -69,7 +69,7 @@ function formatValue(row: SportStatRow): string {
 </script>
 
 <template>
-  <Card class="flex flex-col gap-4">
+  <Card class="flex flex-col gap-3">
     <div class="flex items-center justify-between gap-2">
       <h2 class="text-card-heading">{{ t('home.stats.title') }}</h2>
     </div>

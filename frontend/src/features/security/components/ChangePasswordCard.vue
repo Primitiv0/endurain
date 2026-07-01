@@ -95,7 +95,7 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <Card class="flex flex-col gap-4" as="form" novalidate @submit.prevent="submit">
+  <Card class="flex flex-col gap-3" as="form" novalidate @submit.prevent="submit">
     <div class="flex flex-col gap-1">
       <h2 class="text-card-heading">{{ t('settings.security.password.title') }}</h2>
       <p class="text-hint">{{ t('settings.security.password.subtitle') }}</p>

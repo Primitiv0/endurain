@@ -56,7 +56,7 @@ function onSubmit(): void {
     :can-submit="canSubmit"
     @submit="onSubmit"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3">
       <div class="flex flex-col gap-1.5">
         <Label for="strava-client-id">{{ t('settings.integrations.strava.clientId') }}</Label>
         <input

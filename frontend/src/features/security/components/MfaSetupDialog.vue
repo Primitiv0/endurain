@@ -92,7 +92,7 @@ async function onSubmit(): Promise<void> {
     :can-submit="canSubmit"
     @submit="onSubmit"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3">
       <div
         v-if="setupMutation.isPending.value || !setup"
         class="flex items-center justify-center py-10"

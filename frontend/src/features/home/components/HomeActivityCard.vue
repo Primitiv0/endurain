@@ -139,7 +139,7 @@ const ownerRoute = computed(() =>
 </script>
 
 <template>
-  <Card :class="cn('flex flex-col gap-4', activity.isHidden && 'border-effort/60')">
+  <Card :class="cn('flex flex-col gap-3', activity.isHidden && 'border-effort/60')">
     <!-- Athlete header -->
     <div class="flex items-start justify-between gap-3">
       <div class="flex min-w-0 items-center gap-3">

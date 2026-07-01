@@ -128,7 +128,7 @@ function confirmDeletePhoto(): void {
 </script>
 
 <template>
-  <Card class="flex flex-col gap-5">
+  <Card class="flex flex-col gap-3">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
       <div class="flex flex-col items-center gap-3">
         <UserAvatar

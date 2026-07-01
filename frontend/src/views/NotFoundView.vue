@@ -8,7 +8,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <section class="flex flex-col items-center gap-4 text-center">
+  <section class="flex flex-col items-center gap-3 text-center">
     <p class="text-display font-medium leading-none text-brand dark:text-brand-dark-foreground">
       404
     </p>

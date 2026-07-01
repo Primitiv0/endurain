@@ -303,7 +303,7 @@ function refetchList(): void {
     </header>
 
     <!-- Controls: view-type switch, type filter, and period navigation. -->
-    <Card class="flex flex-col gap-4">
+    <Card class="flex flex-col gap-3">
       <Tabs v-model="viewTypeModel">
         <TabsList class="grid w-full grid-cols-4" :aria-label="t('summary.viewType.label')">
           <TabsTrigger

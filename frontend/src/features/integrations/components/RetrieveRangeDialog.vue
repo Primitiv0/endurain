@@ -73,7 +73,7 @@ function onSubmit(): void {
     :can-submit="canSubmit"
     @submit="onSubmit"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-3">
       <div class="flex gap-2">
         <Button
           type="button"
@@ -107,7 +107,7 @@ function onSubmit(): void {
         />
       </div>
 
-      <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div class="flex flex-col gap-1.5">
           <Label for="retrieve-start">{{ t('settings.integrations.retrieve.startDate') }}</Label>
           <input

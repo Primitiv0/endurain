@@ -87,7 +87,7 @@ const { values, isSubmitting, handleSubmit } = useForm<PrivacySettings>({
 </script>
 
 <template>
-  <Card class="flex flex-col gap-4" as="form" @submit.prevent="handleSubmit">
+  <Card class="flex flex-col gap-3" as="form" @submit.prevent="handleSubmit">
     <div class="flex flex-col gap-1">
       <h2 class="text-card-heading">{{ t('settings.profile.privacy.title') }}</h2>
       <p class="text-body">{{ t('settings.profile.privacy.subtitle') }}</p>

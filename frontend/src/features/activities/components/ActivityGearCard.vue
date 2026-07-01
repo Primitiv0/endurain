@@ -84,7 +84,7 @@ async function removeGear(): Promise<void> {
 </script>
 
 <template>
-  <Card v-if="showCard" class="flex flex-col gap-4">
+  <Card v-if="showCard" class="flex flex-col gap-3">
     <div class="flex items-center justify-between gap-3">
       <h2 class="text-card-heading">{{ t('activities.gear.title') }}</h2>
       <div v-if="activity.gearId" class="flex items-center gap-1">

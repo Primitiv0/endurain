@@ -206,7 +206,7 @@ function confirmDelete(): void {
     <div class="grid gap-3 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
       <!-- Controls rail: add + nickname search. -->
       <aside class="lg:sticky lg:top-6">
-        <Card class="flex flex-col gap-4">
+        <Card class="flex flex-col gap-3">
           <Button class="w-full" @click="openAdd">
             <Plus class="size-4" aria-hidden="true" />
             {{ t('gears.buttonAddGear') }}

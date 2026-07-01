@@ -186,10 +186,10 @@ function reject(): void {
          cards (identity providers + sessions) so the placeholder matches. -->
     <template v-if="userId && isPending">
       <Card
-        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
         aria-busy="true"
       >
-        <div class="flex min-w-0 items-center gap-4">
+        <div class="flex min-w-0 items-center gap-3">
           <Skeleton class="size-16 shrink-0 rounded-full" />
           <div class="space-y-2">
             <Skeleton class="h-6 w-40" />
@@ -255,8 +255,8 @@ function reject(): void {
 
     <!-- Loaded -->
     <template v-else>
-      <Card class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex min-w-0 items-center gap-4">
+      <Card class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex min-w-0 items-center gap-3">
           <span
             class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-muted-foreground"
           >

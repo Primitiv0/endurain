@@ -70,7 +70,7 @@ const yearRange = computed(() => {
 
       <p
         v-if="isEnabled('strava') || isEnabled('garmin')"
-        class="flex flex-wrap items-center justify-center gap-4"
+        class="flex flex-wrap items-center justify-center gap-3"
       >
         <img
           v-if="isEnabled('strava')"

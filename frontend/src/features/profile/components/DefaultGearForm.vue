@@ -73,7 +73,7 @@ const { values, isSubmitting, handleSubmit } = useForm<DefaultGearValues>({
 </script>
 
 <template>
-  <form class="flex flex-col gap-5" novalidate @submit.prevent="handleSubmit">
+  <form class="flex flex-col gap-3" novalidate @submit.prevent="handleSubmit">
     <div class="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
       <div v-for="group in DEFAULT_GEAR_GROUPS" :key="group.titleKey" class="flex flex-col gap-2">
         <p class="text-caption">{{ t(group.titleKey) }}</p>

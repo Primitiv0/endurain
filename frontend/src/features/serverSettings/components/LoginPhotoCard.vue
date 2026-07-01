@@ -67,7 +67,7 @@ function confirmDelete(): void {
 </script>
 
 <template>
-  <Card class="flex flex-col gap-4">
+  <Card class="flex flex-col gap-3">
     <div class="flex flex-col gap-1">
       <h2 class="text-card-heading">{{ t('settings.server.photo.title') }}</h2>
       <p class="text-body">{{ t('settings.server.photo.description') }}</p>

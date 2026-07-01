@@ -181,7 +181,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Card class="flex flex-col gap-4">
+  <Card class="flex flex-col gap-3">
     <div class="flex flex-col gap-1">
       <h2 class="text-card-heading">{{ t('settings.security.linked.title') }}</h2>
       <p class="text-hint">{{ t('settings.security.linked.subtitle') }}</p>
