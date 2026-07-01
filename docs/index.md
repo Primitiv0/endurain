@@ -1,6 +1,6 @@
 <div align="center">
   <p>
-    <img src="assets/brand_logo_light_theme.png" width="150" height="150">
+    <img class="index-logo" src="assets/brand_logo_light_theme.png" width="150" height="150">
   </p>
 
   <p>
