@@ -287,7 +287,14 @@ export async function authGuard(to: RouteLocationNormalized) {
 
   const requiresAuth = to.meta.requiresAuth !== false
   if (requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+    const query: Record<string, string> = { redirect: to.fullPath }
+    // Preserve the local-login override so an operator can bypass SSO
+    // auto-redirect even when landing on an auth-protected route (the flag
+    // would otherwise be lost inside the encoded `redirect` param).
+    if (to.query.forceLocalLogin === 'true') {
+      query.forceLocalLogin = 'true'
+    }
+    return { name: 'login', query }
   }
 
   // Admin-only routes: the user is authenticated by here, so the profile is in

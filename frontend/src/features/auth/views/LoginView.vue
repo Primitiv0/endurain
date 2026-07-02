@@ -188,9 +188,15 @@ onMounted(async () => {
 
   // Navigation/status messages are shown as toasts (out of layout flow) so the
   // card never grows on load; credential errors stay inline (see submitForm).
+  // The force-local-login notice is an instruction for the current attempt
+  // (not a past event), so it stays inline where the user can keep reading it.
   const initialAlert = resolveInitialAlert()
   if (initialAlert) {
-    toasts.notify(initialAlert.kind, initialAlert.message)
+    if (forceLocalLogin.value) {
+      alert.value = initialAlert
+    } else {
+      toasts.notify(initialAlert.kind, initialAlert.message)
+    }
   }
 
   const callback = await processSsoCallback()
