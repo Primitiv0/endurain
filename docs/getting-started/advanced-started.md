@@ -222,6 +222,7 @@ Docker image runs as a non-root user (`app`). For named Docker volumes, permissi
 ## Image personalization
 
 It is possible (v0.10.0 or higher) to personalize the login image in the login page. To do that, map the data/server_images directory for image persistence on container updates and:
+
  - Set the image in the server settings zone of the settings page
  - A square image is expected. Default one uses 1000px vs 1000px
 
