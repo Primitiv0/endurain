@@ -322,17 +322,17 @@ class TestCompleteLogin:
         assert exc_info.value.status_code == 403
         assert "Invalid client type" in exc_info.value.detail
 
-    def test_complete_login_sets_secure_cookie_for_https(
+    def test_complete_login_sets_secure_cookie_for_production(
         self, password_hasher, token_manager, mock_db, sample_user_read, mock_request
     ):
-        """Test that secure flag is set on cookie when using HTTPS."""
+        """Test that secure flag is set on cookie when ENVIRONMENT is production."""
         # Arrange
         response = Response()
         client_type = "web"
 
         with (
             patch("auth.utils.auth_sessions_utils.create_session"),
-            patch.dict("os.environ", {"FRONTEND_PROTOCOL": "https"}),
+            patch("auth.utils.core_config.settings.ENVIRONMENT", "production"),
         ):
             # Act
             auth_utils.complete_login(
@@ -348,6 +348,33 @@ class TestCompleteLogin:
         # Assert
         set_cookie_header = response.headers.get("set-cookie", "")
         assert "secure" in set_cookie_header.lower()
+
+    def test_complete_login_omits_secure_cookie_for_development(
+        self, password_hasher, token_manager, mock_db, sample_user_read, mock_request
+    ):
+        """Test that secure flag is omitted from cookie when ENVIRONMENT is development."""
+        # Arrange
+        response = Response()
+        client_type = "web"
+
+        with (
+            patch("auth.utils.auth_sessions_utils.create_session"),
+            patch("auth.utils.core_config.settings.ENVIRONMENT", "development"),
+        ):
+            # Act
+            auth_utils.complete_login(
+                response,
+                mock_request,
+                sample_user_read,
+                client_type,
+                password_hasher,
+                token_manager,
+                mock_db,
+            )
+
+        # Assert
+        set_cookie_header = response.headers.get("set-cookie", "")
+        assert "secure" not in set_cookie_header.lower()
 
     def test_complete_login_cookie_attributes(
         self, password_hasher, token_manager, mock_db, sample_user_read, mock_request
