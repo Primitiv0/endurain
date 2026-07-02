@@ -150,6 +150,18 @@ Save the generated **Client ID** and **Client Secret**.
 3. Verify that a **Sign in with `Provider Name`** button appears
 4. Test the authentication flow
 
+## Auto-redirect to SSO
+
+Under **Settings → Server Settings**, the **Auto-redirect to SSO** option skips the login page's provider picker and immediately sends unauthenticated users to your identity provider. It only takes effect when:
+
+- **SSO** is enabled and one identity provider is configured/enabled
+- **Allow local username and password login** is turned **off**
+
+If **Allow local username and password login** is enabled, the auto-redirect is skipped and the login page is shown as usual (with both the local form and SSO buttons available).
+
+!!! tip "Bypassing auto-redirect"
+    If you ever need to reach the local username/password form while auto-redirect is enabled (for example, if your identity provider is unreachable), append `?forceLocalLogin=true` to the Endurain URL, e.g. `https://endurain.mydomain.com/?forceLocalLogin=true`. This shows the local login form for that attempt and suppresses the automatic redirect. It does **not** disable the auto-redirect setting itself, it only applies to the current page load.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -174,6 +186,11 @@ Save the generated **Client ID** and **Client Secret**.
     - Check if external authentication is enabled on server settings
     - Check that the provider configuration is saved correctly
     - Clear your browser cache and refresh the page
+
+**Problem**: Automatically redirected to the identity provider and can't reach the local login form (e.g. the identity provider is down)
+
+- **Cause**: **Auto-redirect to SSO** is enabled and **Allow local username and password login** is disabled.
+- **Solution**: Visit the login page with `?forceLocalLogin=true` appended, e.g. `https://endurain.mydomain.com/?forceLocalLogin=true`. See [Auto-redirect to SSO](#auto-redirect-to-sso) above.
 
 **Problem**: "Invalid issuer URL" error
 
